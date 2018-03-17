@@ -40,7 +40,21 @@ func TimeToChunkId(cfg *config.TsdbConfig, tmilli int64) int {
 		return h
 	}
 
+	// Get the recomended hours to store in a chunck based on number of days, will guarantee up to 100 attributes per object
+	var hoursPerChunk int
+	switch {
+	case dpo == 1:
+		return h
+	case dpo >= 2 && dpo <= 9:
+		hoursPerChunk = dpo / 2
+	case dpo >= 10 && dpo <= 15:
+		hoursPerChunk = 4
+	case dpo >= 16 && dpo <= 31:
+		hoursPerChunk = 6
+	default:
+		hoursPerChunk = 12
+	}
+
 	dayIndex := d - ((d / dpo) * dpo)
-	// dividing the total number of hours by int(dpo/2) will guarantee up to 72 attributes per object
-	return (dayIndex*24 + h) / (dpo / 2)
+	return dayIndex*100 + (h/hoursPerChunk)*hoursPerChunk
 }

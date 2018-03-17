@@ -35,7 +35,7 @@ import (
 	"time"
 )
 
-type v3ioAdapter struct {
+type V3ioAdapter struct {
 	startTimeMargin int64
 	logger          logger.Logger
 	container       *v3io.Container
@@ -43,9 +43,9 @@ type v3ioAdapter struct {
 	cfg             *config.TsdbConfig
 }
 
-func NewV3ioAdapter(cfg *config.TsdbConfig, container *v3io.Container, logger logger.Logger) v3ioAdapter {
+func NewV3ioAdapter(cfg *config.TsdbConfig, container *v3io.Container, logger logger.Logger) V3ioAdapter {
 
-	newV3ioAdapter := v3ioAdapter{}
+	newV3ioAdapter := V3ioAdapter{}
 	newV3ioAdapter.cfg = cfg
 	if logger != nil {
 		newV3ioAdapter.logger = logger
@@ -64,7 +64,7 @@ func NewV3ioAdapter(cfg *config.TsdbConfig, container *v3io.Container, logger lo
 	return newV3ioAdapter
 }
 
-func (a v3ioAdapter) Start() error {
+func (a V3ioAdapter) Start() error {
 	msg := fmt.Sprintf("Starting V3IO TSDB client, server at : %s/%s/%s",
 		a.cfg.V3ioUrl, a.cfg.Container, a.cfg.Path)
 	fmt.Println(msg)
@@ -81,21 +81,21 @@ func (a v3ioAdapter) Start() error {
 	return errors.Wrap(err, "Failed to access v3io container")
 }
 
-func (a v3ioAdapter) Appender() (storage.Appender, error) {
+func (a V3ioAdapter) Appender() (storage.Appender, error) {
 	newAppender := v3ioAppender{metricsCache: a.metricsCache}
 	return newAppender, nil
 }
 
-func (a v3ioAdapter) StartTime() (int64, error) {
+func (a V3ioAdapter) StartTime() (int64, error) {
 	startTime := int64(time.Now().Unix() * 1000)
 	return startTime + a.startTimeMargin, nil
 }
 
-func (a v3ioAdapter) Close() error {
+func (a V3ioAdapter) Close() error {
 	return nil
 }
 
-func (a v3ioAdapter) Querier(_ context.Context, mint, maxt int64) (storage.Querier, error) {
+func (a V3ioAdapter) Querier(_ context.Context, mint, maxt int64) (storage.Querier, error) {
 	return querier.NewV3ioQuerier(a.container, a.logger, mint, maxt, &a.metricsCache.NameLabelMap, a.cfg), nil
 }
 

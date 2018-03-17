@@ -44,7 +44,8 @@ type V3ioQuerier struct {
 	Keymap     *map[string]bool
 }
 
-func (q V3ioQuerier) Select(oms ...*labels.Matcher) (storage.SeriesSet, error) {
+func (q V3ioQuerier) Select(params *storage.SelectParams, oms ...*labels.Matcher) (storage.SeriesSet, error) {
+	fmt.Println("Select:", params)
 	filter := match2filter(oms)
 	vc := v3ioutil.NewV3ioClient(q.logger, q.Keymap)
 	iter, err := vc.GetItems(q.container, q.cfg.Path+"/", filter, []string{"*"})

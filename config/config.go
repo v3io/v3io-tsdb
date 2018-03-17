@@ -30,6 +30,8 @@ type TsdbConfig struct {
 	V3ioUrl   string `json:"v3ioUrl"`
 	Container string `json:"container"`
 	Path      string `json:"path"`
+	Username  string `json:"username"`
+	Password  string `json:"password"`
 	Verbose   bool   `json:"verbose,omitempty"`
 	Workers   int    `json:"workers"`
 	ChanSize  int    `json:"chanSize"`

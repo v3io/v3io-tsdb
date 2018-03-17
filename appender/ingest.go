@@ -27,6 +27,7 @@ import (
 	"github.com/v3io/v3io-go-http"
 	"github.com/v3io/v3io-tsdb/chunkenc"
 	"github.com/v3io/v3io-tsdb/config"
+	"math"
 	"sync"
 )
 
@@ -218,7 +219,7 @@ func (mc *MetricsCache) Add(lset labels.Labels, t int64, v float64) (uint64, err
 	}
 
 	metric = &MetricState{Lset: lset, key: key}
-	metric.chunk = chunkenc.NewXORChunk()
+	metric.chunk = chunkenc.NewXORChunk(0, math.MaxInt64)
 	appender, err := metric.chunk.Appender()
 	if err != nil {
 		return 0, err

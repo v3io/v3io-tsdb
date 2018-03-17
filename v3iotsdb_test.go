@@ -91,7 +91,7 @@ func TestName(t *testing.T) {
 	}
 
 	match := labels.Matcher{Type: labels.MatchEqual, Name: "__name__", Value: "http_req"}
-	set, err := qry.Select(&match)
+	set, err := qry.Select(nil, &match)
 	if err != nil {
 		t.Fatal(err)
 	}
