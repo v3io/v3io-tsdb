@@ -62,6 +62,7 @@ type Chunk interface {
 	MoveOffset(num uint16) error
 	GetMeta() (uint16, uint16, uint16, uint8, uint8)
 	GetChunkBuffer() (uint64, int, []byte)
+	TimeRange() (int64, int64)
 }
 
 // FromData returns a chunk from a byte slice of chunk data.
@@ -127,6 +128,7 @@ func toMetadata(count, length, priv uint16, bits, encode uint8) uint64 {
 // Appender adds sample pairs to a chunk.
 type Appender interface {
 	Append(int64, float64)
+	Chunk() Chunk
 }
 
 // Iterator is a simple iterator that can only get the next value.

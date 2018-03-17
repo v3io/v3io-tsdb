@@ -84,6 +84,11 @@ func (c *XORChunk) Bytes() []byte {
 	return c.b.bytes()
 }
 
+// Bytes returns the underlying byte slice of the chunk.
+func (c *XORChunk) TimeRange() (int64, int64) {
+	return c.mint, c.maxt
+}
+
 // GetMeta returns offset, samples, length, bits, encoding
 func (c *XORChunk) GetMeta() (uint16, uint16, uint16, uint8, uint8) {
 	return c.b.rptr, c.samples, c.b.getLen(), c.b.count, 1
@@ -167,6 +172,10 @@ type xorAppender struct {
 
 	leading  uint8
 	trailing uint8
+}
+
+func (a *xorAppender) Chunk() Chunk {
+	return a.c
 }
 
 func (a *xorAppender) Append(t int64, v float64) {

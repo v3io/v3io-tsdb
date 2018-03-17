@@ -62,6 +62,7 @@ type MetricsCache struct {
 	container      *v3io.Container
 	logger         logger.Logger
 	responseChan   chan *v3io.Response
+	getRespChan    chan *v3io.Response
 	lastMetric     uint64
 	cacheMetricMap map[string]*MetricState
 	cacheRefMap    map[uint64]*MetricState
@@ -75,7 +76,8 @@ func NewMetricsCache(container *v3io.Container, logger logger.Logger, cfg *confi
 	newCache.cacheMetricMap = map[string]*MetricState{}
 	newCache.cacheRefMap = map[uint64]*MetricState{}
 	newCache.requestsMap = map[uint64]*MetricState{}
-	newCache.responseChan = make(chan *v3io.Response, 100)
+	newCache.responseChan = make(chan *v3io.Response, 1024)
+	newCache.getRespChan = make(chan *v3io.Response, 1024)
 	newCache.NameLabelMap = map[string]bool{}
 	return &newCache
 }
