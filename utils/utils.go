@@ -20,10 +20,6 @@ such restriction.
 
 package utils
 
-import (
-	"github.com/v3io/v3io-tsdb/config"
-)
-
 func TimeToDHM(tmilli int64) (int, int) {
 	t := int(tmilli / 1000)
 	//m := t/60 - ((t/3600) * 60)
@@ -32,29 +28,38 @@ func TimeToDHM(tmilli int64) (int, int) {
 	return d, h
 }
 
-func TimeToChunkId(cfg *config.TsdbConfig, tmilli int64) int {
+func TimeToChunkId(dpo int, tmilli int64) int {
 	d, h := TimeToDHM(tmilli)
-	dpo := cfg.DaysPerObj
 
-	if dpo == 1 {
+	if dpo <= 1 {
 		return h
 	}
 
-	// Get the recomended hours to store in a chunck based on number of days, will guarantee up to 100 attributes per object
-	var hoursPerChunk int
-	switch {
-	case dpo == 1:
-		return h
-	case dpo >= 2 && dpo <= 9:
-		hoursPerChunk = dpo / 2
-	case dpo >= 10 && dpo <= 15:
-		hoursPerChunk = 4
-	case dpo >= 16 && dpo <= 31:
-		hoursPerChunk = 6
-	default:
-		hoursPerChunk = 12
-	}
-
+	hoursPerChunk := hrPerChunk(dpo)
 	dayIndex := d - ((d / dpo) * dpo)
 	return dayIndex*100 + (h/hoursPerChunk)*hoursPerChunk
+}
+
+// Get the recomended hours to store in a chunck based on number of days, will guarantee up to 100 attributes per object
+func hrPerChunk(dpo int) int {
+	switch {
+	case dpo <= 1:
+		return 1
+	case dpo >= 2 && dpo <= 9:
+		return dpo / 2
+	case dpo >= 10 && dpo <= 15:
+		return 4
+	case dpo >= 16 && dpo <= 31:
+		return 6
+	}
+	return 12
+}
+
+func Time2TableID(t int64) int {
+	return 0
+}
+
+func Time2MinMax(dpo int, t int64) (int64, int64) {
+	mint := (t / 3600 / 1000) * 3600 * 1000 // get nearest hour
+	return mint, mint + 3600*1000*int64(hrPerChunk(dpo))
 }
