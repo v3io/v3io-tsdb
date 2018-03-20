@@ -7,25 +7,25 @@ import (
 	"github.com/v3io/v3io-tsdb/chunkenc"
 	"github.com/v3io/v3io-tsdb/config"
 	"github.com/v3io/v3io-tsdb/utils"
-	"math"
 )
 
 var MaxUpdatesBehind = 3
 var MaxArraySize = 1024
 var Config *config.TsdbConfig
 
+func NewChunkStore() chunkStore {
+	store := chunkStore{}
+	store.chunks[0] = &attrAppender{}
+	store.chunks[1] = &attrAppender{}
+	return store
+}
+
 type chunkStore struct {
 	updatesBehind int
 	state         storeState
-	//curAppender     chunkenc.Appender
-	//curUpdMarker    int
-	//curUpdCount     int
-	//prevAppender    chunkenc.Appender
-	//prevUpdMarker   int
-	//prevUpdCount    int
-	curChunk int
-	pending  []pendingData
-	chunks   [2]*attrAppender
+	curChunk      int
+	pending       []pendingData
+	chunks        [2]*attrAppender
 }
 
 type attrAppender struct {
@@ -36,7 +36,7 @@ type attrAppender struct {
 	writing    bool
 }
 
-func (a attrAppender) clear() {
+func (a *attrAppender) clear() {
 	a.updCount = 0
 	a.updMarker = 0
 	a.writing = false
@@ -54,9 +54,6 @@ const (
 	storeStateGet    storeState = 1
 	storeStateReady  storeState = 2
 	storeStateUpdate storeState = 3
-	//storeStateUpdCur  storeState = 3
-	//storeStateUpdPrev storeState = 4
-	//storeStateUpdBoth storeState = 5
 )
 
 func (cs *chunkStore) IsReady() bool {
@@ -79,13 +76,13 @@ func (cs *chunkStore) GetChunksState(mc *MetricsCache, t int64) {
 }
 
 func (cs *chunkStore) initChunk(idx int, t int64) error {
-	chunk := chunkenc.NewXORChunk(0, math.MaxInt64) // TODO: calc new mint/maxt
+	chunk := chunkenc.NewXORChunk() // TODO: calc new mint/maxt
 	app, err := chunk.Appender()
 	if err != nil {
 		return err
 	}
 
-	cs.chunks[idx] = &attrAppender{appender: app}
+	cs.chunks[idx].appender = app                                      //&attrAppender{appender: app}
 	cs.chunks[idx].mint, cs.chunks[idx].maxt = utils.Time2MinMax(0, t) // TODO: dpo from config
 
 	return nil
@@ -119,7 +116,7 @@ func (cs *chunkStore) Append(t int64, v float64) error {
 			//	return
 		}
 
-		chunk := chunkenc.NewXORChunk(0, math.MaxInt64) // TODO: calc new mint/maxt
+		chunk := chunkenc.NewXORChunk() // TODO: calc new mint/maxt
 		app, err := chunk.Appender()
 		if err != nil {
 			return err
@@ -170,7 +167,7 @@ func (cs *chunkStore) WriteChunks(lset labels.Labels) (int, string) {
 		return tableId, expr
 	}
 
-	isInitialized := false
+	notInitialized := false
 
 	for i := 1; i < 3; i++ {
 		chunk := cs.chunks[cs.curChunk^(i&1)]
@@ -187,53 +184,14 @@ func (cs *chunkStore) WriteChunks(lset labels.Labels) (int, string) {
 				chunk.updCount = samples
 				chunk.writing = true
 
-				isInitialized = (offsetByte > 0)
+				notInitialized = (offsetByte == 0)
 				expr = expr + Chunkbuf2Expr(offsetByte, meta, b, chunk.mint)
 
 			}
 		}
 	}
 
-	/*
-		if cs.prevAppender != nil && (cs.prevUpdCount > cs.prevAppender.Chunk().NumSamples()) {
-			mint, _ := cs.prevAppender.Chunk().TimeRange()
-			tableId = utils.Time2TableID(mint)
-
-			cs.state = storeStateUpdPrev
-			meta, offsetByte, b := cs.prevAppender.Chunk().GetChunkBuffer()
-			cs.prevUpdMarker = ((offsetByte + len(b) - 1) / 8) * 8
-			cs.prevUpdCount = cs.prevAppender.Chunk().NumSamples()
-			isInitialized = (offsetByte > 0)
-			expr = expr + Chunkbuf2Expr(offsetByte, meta, b, mint)
-
-		}
-
-		if cs.curAppender != nil && (cs.curUpdCount > cs.curAppender.Chunk().NumSamples()) {
-			mint, _ := cs.prevAppender.Chunk().TimeRange()
-			curTableId := utils.Time2TableID(mint)
-
-			if tableId == -1 || tableId == curTableId {
-
-				if tableId == -1 {
-					cs.state = storeStateUpdCur
-					tableId = curTableId
-				} else {
-					cs.state = storeStateUpdBoth
-				}
-
-				meta, offsetByte, b := cs.curAppender.Chunk().GetChunkBuffer()
-				cs.curUpdMarker = ((offsetByte + len(b) - 1) / 8) * 8
-				cs.curUpdCount = cs.curAppender.Chunk().NumSamples()
-				isInitialized = (offsetByte > 0)
-				expr = expr + Chunkbuf2Expr(offsetByte, meta, b, mint)
-
-
-			}
-
-		}
-	*/
-
-	if !isInitialized {
+	if notInitialized {
 		lblexpr := ""
 		for _, lbl := range lset {
 			if lbl.Name != "__name__" {
@@ -275,13 +233,13 @@ func Chunkbuf2Expr(offsetByte int, meta uint64, bytes []byte, mint int64) string
 	attr := utils.TimeToChunkId(0, mint) // TODO: add DaysPerObj from config
 
 	if offsetByte == 0 {
-		expr = expr + fmt.Sprintf("%04d=init_array(%d,'int'); ", attr, MaxArraySize)
+		expr = expr + fmt.Sprintf("v%04d=init_array(%d,'int'); ", attr, MaxArraySize)
 	}
 
-	expr = expr + fmt.Sprintf("%04d[0]=%d; ", attr, meta)
+	expr = expr + fmt.Sprintf("v%04d[0]=%d; ", attr, meta)
 	for i := 0; i < len(ui); i++ {
 		offset++
-		expr = expr + fmt.Sprintf("%04d[%d]=%d; ", attr, offset, int64(ui[i]))
+		expr = expr + fmt.Sprintf("v%04d[%d]=%d; ", attr, offset, int64(ui[i]))
 	}
 
 	return expr

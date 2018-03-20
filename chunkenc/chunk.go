@@ -62,7 +62,6 @@ type Chunk interface {
 	MoveOffset(num uint16) error
 	GetMeta() (uint16, uint16, uint16, uint8, uint8)
 	GetChunkBuffer() (uint64, int, []byte)
-	TimeRange() (int64, int64)
 }
 
 // FromData returns a chunk from a byte slice of chunk data.

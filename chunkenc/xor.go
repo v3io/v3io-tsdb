@@ -62,16 +62,15 @@ import (
 
 // XORChunk holds XOR encoded sample data.
 type XORChunk struct {
-	b          *bstream
-	samples    uint16
-	offset     int
-	mint, maxt int64
+	b       *bstream
+	samples uint16
+	offset  int
 }
 
 // NewXORChunk returns a new chunk with XOR encoding of the given size.
-func NewXORChunk(mint, maxt int64) Chunk {
+func NewXORChunk() Chunk {
 	//b := make([]byte, 32, 32)
-	return &XORChunk{b: newBWriter(256), mint: mint, maxt: maxt}
+	return &XORChunk{b: newBWriter(256)}
 }
 
 // Encoding returns the encoding type.
@@ -82,11 +81,6 @@ func (c *XORChunk) Encoding() Encoding {
 // Bytes returns the underlying byte slice of the chunk.
 func (c *XORChunk) Bytes() []byte {
 	return c.b.bytes()
-}
-
-// Bytes returns the underlying byte slice of the chunk.
-func (c *XORChunk) TimeRange() (int64, int64) {
-	return c.mint, c.maxt
 }
 
 // GetMeta returns offset, samples, length, bits, encoding
