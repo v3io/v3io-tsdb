@@ -28,7 +28,7 @@ import (
 	"time"
 )
 
-const basetime = 0 //1520346654002
+const basetime = 1520346654002
 
 func TestName(t *testing.T) {
 
@@ -78,12 +78,13 @@ func TestName(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err = appender.AddFast(lset, ref, basetime+2500, 8.3)
+	err = appender.AddFast(lset, ref, basetime+9500, 8.3)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	time.Sleep(time.Second * 1)
+	time.Sleep(time.Second * 2)
+	return
 
 	qry, err := adapter.Querier(nil, basetime+400, basetime+9000)
 	if err != nil {

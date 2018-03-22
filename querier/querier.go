@@ -27,6 +27,7 @@ import (
 	"github.com/prometheus/prometheus/storage"
 	"github.com/v3io/v3io-go-http"
 	"github.com/v3io/v3io-tsdb/config"
+	"github.com/v3io/v3io-tsdb/utils"
 	"github.com/v3io/v3io-tsdb/v3ioutil"
 	"strings"
 )
@@ -48,7 +49,9 @@ func (q V3ioQuerier) Select(params *storage.SelectParams, oms ...*labels.Matcher
 	fmt.Println("Select:", params)
 	filter := match2filter(oms)
 	vc := v3ioutil.NewV3ioClient(q.logger, q.Keymap)
-	iter, err := vc.GetItems(q.container, q.cfg.Path+"/", filter, []string{"*"})
+	attrs := []string{"_lset", "_meta_v"}
+	attrs = append(attrs, utils.Range2Attrs("v", 0, q.mint, q.maxt)...)
+	iter, err := vc.GetItems(q.container, q.cfg.Path+"/", filter, attrs)
 	if err != nil {
 		return nil, err
 	}

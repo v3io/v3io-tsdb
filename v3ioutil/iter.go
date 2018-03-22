@@ -26,6 +26,7 @@ import (
 	"github.com/prometheus/prometheus/pkg/labels"
 	"github.com/v3io/v3io-go-http"
 	"github.com/v3io/v3io-tsdb/chunkenc"
+	"github.com/v3io/v3io-tsdb/utils"
 	"math"
 	"strings"
 )
@@ -148,17 +149,23 @@ func (ic *V3ioItemsCursor) GetField(name string) interface{} {
 
 func (ic *V3ioItemsCursor) GetSeriesIter(mint, maxt int64) *v3ioSeriesIterator {
 	newIterator := v3ioSeriesIterator{mint: mint, maxt: maxt}
-	values, ok := (*ic.currentItem)["_values"]
-	if ok && len(values.([]byte)) >= 24 {
-		bytes := values.([]byte)
-		chunk, _ := chunkenc.FromBuffer(binary.LittleEndian.Uint64(bytes[16:24]), bytes[24:])
-		// TODO: err handle
+	attrs := utils.Range2Attrs("v", 0, mint, maxt)
+	newIterator.chunks = []chunkenc.Chunk{}
+	for _, attr := range attrs {
+		values, ok := (*ic.currentItem)[attr]
+		if ok && len(values.([]byte)) >= 24 {
+			bytes := values.([]byte)
+			chunk, _ := chunkenc.FromBuffer(binary.LittleEndian.Uint64(bytes[16:24]), bytes[24:])
+			// TODO: err handle
 
-		//c, _ := chunkenc.FromData(chunkenc.EncXOR, bytes[24:], count)
-		newIterator.chunk = chunk
-		newIterator.iter = chunk.Iterator()
+			//c, _ := chunkenc.FromData(chunkenc.EncXOR, bytes[24:], count)
+			newIterator.chunks = append(newIterator.chunks, chunk)
+
+		}
 
 	}
+	// TODO: if len>0 + err handle
+	newIterator.iter = newIterator.chunks[0].Iterator()
 	return &newIterator
 }
 
@@ -166,8 +173,8 @@ type v3ioSeriesIterator struct {
 	mint, maxt int64 // TBD per block
 	err        error
 
-	chunk chunkenc.Chunk //TODO: need to be array
-	iter  chunkenc.Iterator
+	chunks []chunkenc.Chunk //TODO: need to be array
+	iter   chunkenc.Iterator
 }
 
 func (it *v3ioSeriesIterator) Seek(t int64) bool {

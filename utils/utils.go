@@ -20,6 +20,8 @@ such restriction.
 
 package utils
 
+import "fmt"
+
 func TimeToDHM(tmilli int64) (int, int) {
 	t := int(tmilli / 1000)
 	//m := t/60 - ((t/3600) * 60)
@@ -28,20 +30,21 @@ func TimeToDHM(tmilli int64) (int, int) {
 	return d, h
 }
 
-func TimeToChunkId(dpo int, tmilli int64) int {
+func TimeToChunkId(dpo int, tmilli int64) (int, int) {
 	d, h := TimeToDHM(tmilli)
 
 	if dpo <= 1 {
-		return h
+		return h, 1
 	}
 
-	hoursPerChunk := hrPerChunk(dpo)
+	hoursPerChunk := HrPerChunk(dpo)
 	dayIndex := d - ((d / dpo) * dpo)
-	return dayIndex*100 + (h/hoursPerChunk)*hoursPerChunk
+	chunkIdx := dayIndex*24/hoursPerChunk + h/hoursPerChunk
+	return chunkIdx, hoursPerChunk
 }
 
 // Get the recomended hours to store in a chunck based on number of days, will guarantee up to 100 attributes per object
-func hrPerChunk(dpo int) int {
+func HrPerChunk(dpo int) int {
 	switch {
 	case dpo <= 1:
 		return 1
@@ -61,5 +64,36 @@ func Time2TableID(t int64) int {
 
 func Time2MinMax(dpo int, t int64) (int64, int64) {
 	mint := (t / 3600 / 1000) * 3600 * 1000 // get nearest hour
-	return mint, mint + 3600*1000*int64(hrPerChunk(dpo))
+	return mint, mint + 3600*1000*int64(HrPerChunk(dpo))
+}
+
+func Range2Cids(dpo int, mint, maxt int64) ([]int, int) {
+	list := []int{}
+	start, _ := TimeToChunkId(dpo, mint)
+	end, _ := TimeToChunkId(dpo, maxt)
+
+	for i := start; i < 24 || i <= end; i++ {
+		list = append(list, i)
+	}
+	if end < start {
+		for i := 0; i <= end; i++ {
+			list = append(list, i)
+		}
+
+	}
+
+	return list, HrPerChunk(dpo)
+}
+
+func ChunkID2Attr(col string, id, hr int) string {
+	return fmt.Sprintf("__%s%d", col, id*hr)
+}
+
+func Range2Attrs(col string, dpo int, mint, maxt int64) []string {
+	list, hrs := Range2Cids(dpo, mint, maxt)
+	strList := []string{}
+	for _, id := range list {
+		strList = append(strList, ChunkID2Attr(col, id, hrs))
+	}
+	return strList
 }

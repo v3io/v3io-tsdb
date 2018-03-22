@@ -2,7 +2,6 @@ package appender
 
 import (
 	"fmt"
-	"github.com/prometheus/prometheus/pkg/labels"
 	"github.com/v3io/v3io-go-http"
 	"github.com/v3io/v3io-tsdb/chunkenc"
 	"github.com/v3io/v3io-tsdb/config"
@@ -13,11 +12,11 @@ var MaxUpdatesBehind = 3
 var MaxArraySize = 1024
 var Config *config.TsdbConfig
 
-func NewChunkStore() chunkStore {
+func NewChunkStore() *chunkStore {
 	store := chunkStore{}
 	store.chunks[0] = &attrAppender{}
 	store.chunks[1] = &attrAppender{}
-	return store
+	return &store
 }
 
 type chunkStore struct {
@@ -61,7 +60,13 @@ func (cs *chunkStore) IsReady() bool {
 }
 
 func (cs *chunkStore) IsBlocked() bool {
-	return cs.updatesBehind > MaxUpdatesBehind
+	updatesBehind := len(cs.pending)
+	for _, chunk := range cs.chunks {
+		if chunk.appender != nil {
+			updatesBehind += chunk.appender.Chunk().NumSamples() - chunk.updCount
+		}
+	}
+	return updatesBehind > MaxUpdatesBehind
 }
 
 // Read (Async) the current chunk state and data from the storage
@@ -124,7 +129,6 @@ func (cs *chunkStore) Append(t int64, v float64) error {
 		next.clear()
 		next.appender = app
 		next.mint, next.maxt = utils.Time2MinMax(0, t) // TODO: dpo from config
-		fmt.Println("times:", t, next.mint, next.maxt, v)
 		next.appender.Append(t, v)
 		cs.curChunk = cs.curChunk ^ 1
 
@@ -158,7 +162,7 @@ func (cs *chunkStore) processGetResp(resp *v3io.Response) {
 }
 
 // Write pending data of the current or previous chunk to the storage
-func (cs *chunkStore) WriteChunks(lset labels.Labels) (int, string) {
+func (cs *chunkStore) WriteChunks(metric *MetricState) (int, string) {
 
 	tableId := -1
 	expr := ""
@@ -167,7 +171,7 @@ func (cs *chunkStore) WriteChunks(lset labels.Labels) (int, string) {
 		return tableId, expr
 	}
 
-	notInitialized := false
+	notInitialized := false //TODO: init depend on get
 
 	for i := 1; i < 3; i++ {
 		chunk := cs.chunks[cs.curChunk^(i&1)]
@@ -193,18 +197,18 @@ func (cs *chunkStore) WriteChunks(lset labels.Labels) (int, string) {
 
 	if notInitialized {
 		lblexpr := ""
-		for _, lbl := range lset {
+		for _, lbl := range metric.Lset {
 			if lbl.Name != "__name__" {
 				lblexpr = lblexpr + fmt.Sprintf("%s='%s'; ", lbl.Name, lbl.Value)
 			} else {
 				lblexpr = lblexpr + fmt.Sprintf("_name='%s'; ", lbl.Value)
 			}
 		}
-		expr = lblexpr + expr
+		expr = lblexpr + fmt.Sprintf("_lset='%s'; _dpo=%d; _hrInChunk=%d; _meta_v=init_array(%d,'int'); ",
+			metric.key, 0, utils.HrPerChunk(0), 24) + expr
 	}
 
 	return tableId, expr
-
 }
 
 // Process the response for the chunk update request
@@ -230,16 +234,17 @@ func Chunkbuf2Expr(offsetByte int, meta uint64, bytes []byte, mint int64) string
 	expr := ""
 	offset := offsetByte / 8
 	ui := chunkenc.ToUint64(bytes)
-	attr := utils.TimeToChunkId(0, mint) // TODO: add DaysPerObj from config
+	idx, hrInChunk := utils.TimeToChunkId(0, mint) // TODO: add DaysPerObj from config
+	attr := utils.ChunkID2Attr("v", idx, hrInChunk)
 
 	if offsetByte == 0 {
-		expr = expr + fmt.Sprintf("v%04d=init_array(%d,'int'); ", attr, MaxArraySize)
+		expr = expr + fmt.Sprintf("%s=init_array(%d,'int'); ", attr, MaxArraySize)
 	}
 
-	expr = expr + fmt.Sprintf("v%04d[0]=%d; ", attr, meta)
+	expr = expr + fmt.Sprintf("_meta_v[%d]=%d; ", idx, meta) // TODO: put meta in an array
 	for i := 0; i < len(ui); i++ {
 		offset++
-		expr = expr + fmt.Sprintf("v%04d[%d]=%d; ", attr, offset, int64(ui[i]))
+		expr = expr + fmt.Sprintf("%s[%d]=%d; ", attr, offset, int64(ui[i]))
 	}
 
 	return expr

@@ -25,7 +25,6 @@ import (
 	"github.com/nuclio/logger"
 	"github.com/prometheus/prometheus/pkg/labels"
 	"github.com/v3io/v3io-go-http"
-	"github.com/v3io/v3io-tsdb/chunkenc"
 	"github.com/v3io/v3io-tsdb/config"
 	"sync"
 )
@@ -35,37 +34,43 @@ const KEY_SEPERATOR = "="
 // to add, rollups policy (cnt, sum, min/max, sum^2) + interval , or policy in per name lable
 type MetricState struct {
 	sync.RWMutex
-	busyUpdating  bool
-	busyGetting   bool
-	initialized   bool
-	samplesBehind int
-	Lset          labels.Labels
-	key           string
-	curT          int64
-	writtenChunk  int
-	curChunk      int
-	ExpiresAt     int64
-	refId         uint64
-	wait          chan bool
-	waiting       bool
+	busyGetting  bool
+	Lset         labels.Labels
+	key          string
+	name         string
+	hash         uint64
+	curT         int64
+	writtenChunk int
+	curChunk     int
+	ExpiresAt    int64
+	refId        uint64
+	wait         chan bool
+	waiting      bool
 
-	chunk    chunkenc.Chunk
-	appender chunkenc.Appender
-	toTrim   int
+	store *chunkStore
+	err   error
+}
+
+func (m *MetricState) Err() error {
+	//return nil  // TODO: temp bypass
+	m.RLock()
+	defer m.RUnlock()
+	return m.err
 }
 
 type MetricsCache struct {
-	cfg            *config.TsdbConfig
-	mtx            sync.RWMutex
-	rmapMtx        sync.RWMutex
-	container      *v3io.Container
-	logger         logger.Logger
-	responseChan   chan *v3io.Response
-	getRespChan    chan *v3io.Response
-	lastMetric     uint64
-	cacheMetricMap map[string]*MetricState
-	cacheRefMap    map[uint64]*MetricState
-	requestsMap    map[uint64]*MetricState // v3io async requests
+	cfg             *config.TsdbConfig
+	mtx             sync.RWMutex
+	rmapMtx         sync.RWMutex
+	container       *v3io.Container
+	logger          logger.Logger
+	responseChan    chan *v3io.Response
+	getRespChan     chan *v3io.Response
+	asyncAppendChan chan *asyncAppend
+	lastMetric      uint64
+	cacheMetricMap  map[string]*MetricState
+	cacheRefMap     map[uint64]*MetricState
+	requestsMap     map[uint64]*MetricState // v3io async requests
 
 	NameLabelMap map[string]bool
 }
@@ -77,8 +82,15 @@ func NewMetricsCache(container *v3io.Container, logger logger.Logger, cfg *confi
 	newCache.requestsMap = map[uint64]*MetricState{}
 	newCache.responseChan = make(chan *v3io.Response, 1024)
 	newCache.getRespChan = make(chan *v3io.Response, 1024)
+	newCache.asyncAppendChan = make(chan *asyncAppend, 1024)
 	newCache.NameLabelMap = map[string]bool{}
 	return &newCache
+}
+
+type asyncAppend struct {
+	metric *MetricState
+	t      int64
+	v      float64
 }
 
 func (mc *MetricsCache) Start() error {
@@ -116,31 +128,51 @@ func (mc *MetricsCache) Start() error {
 
 					if respErr == nil {
 						// Set fields so next write will not include redundant info (bytes, lables, init_array)
-						metric.chunk.MoveOffset(uint16(metric.toTrim))
-						metric.initialized = true
-						metric.writtenChunk = metric.curChunk
+						metric.store.ProcessWriteResp()
 					}
 
-					if metric.samplesBehind > 0 {
-						// if pending writes, submit them
-						mc.updateMetric(metric)
-					} else {
-						metric.busyUpdating = false
+					tableId, expr := metric.store.WriteChunks(metric)
+					if tableId != -1 {
+						err := mc.submitUpdate(metric, tableId, expr)
+						fmt.Println("Loop:", expr)
+						if err != nil {
+							mc.logger.ErrorWith("Submit failed", "metric", metric.Lset, "err", err)
+							metric.err = err
+						}
 					}
 
 					if metric.waiting {
 						// if Appender is blocking (waiting for resp), release it
 						metric.wait <- true
-						mc.logger.DebugWith("after wait", "metric", metric.Lset)
+						mc.logger.DebugWith("after wait", "metric", metric)
 						metric.waiting = false
 					}
-					metric.samplesBehind = 0
 					metric.Unlock()
 					//mc.logger.Warn("resp unlock")
 
 				} else {
 					mc.logger.ErrorWith("Req ID not found", "id", resp.ID)
 				}
+
+			case app := <-mc.asyncAppendChan:
+				metric := app.metric
+				metric.Lock()
+				metric.store.Append(app.t, app.v)
+
+				if metric.store.IsReady() {
+					// if there are no in flight requests, update the DB
+					tableId, expr := metric.store.WriteChunks(metric)
+					//fmt.Println("AoW:", expr)
+					if tableId != -1 {
+						err := mc.submitUpdate(metric, tableId, expr)
+						fmt.Println("Async:", expr)
+						if err != nil {
+							mc.logger.ErrorWith("Async submit failed", "metric", metric.Lset, "err", err)
+							metric.err = err
+						}
+					}
+				}
+				metric.Unlock()
 
 			}
 		}
@@ -180,32 +212,8 @@ func (mc *MetricsCache) getMetricByRef(ref uint64) (*MetricState, bool) {
 	return metric, ok
 }
 
-// Append metric data to local cache and/or commit to v3io, block if too far behind
-func (mc *MetricsCache) appendOrWait(metric *MetricState, t int64, v float64) error {
-	var err error
-	metric.Lock()
-	mc.logger.DebugWith("appendOrWait", "behind", metric.samplesBehind, "t", t, "v", v)
-	//mc.logger.Warn("AoW lock: %s %d", metric.key, metric.samplesBehind)
-	metric.appender.Append(t, v)
-	metric.samplesBehind++
-
-	if metric.samplesBehind > mc.cfg.MaxBehind {
-		// if too far behind, block writer
-		mc.logger.WarnWith("Behind, Waiting for updates to complete", "ref", metric.refId)
-		metric.waiting = true
-		metric.Unlock()
-		<-metric.wait
-		mc.logger.Warn("after done")
-		return nil
-	}
-
-	if !metric.busyUpdating {
-		// if there are no in flight requests, update the DB
-		err = mc.updateMetric(metric)
-	}
-	metric.Unlock()
-	//mc.logger.Warn("AoW unlock: %d", t)
-	return err
+func (mc *MetricsCache) Append(metric *MetricState, t int64, v float64) {
+	mc.asyncAppendChan <- &asyncAppend{metric: metric, t: t, v: v}
 }
 
 // First time add time & value to metric (by label set)
@@ -215,27 +223,25 @@ func (mc *MetricsCache) Add(lset labels.Labels, t int64, v float64) (uint64, err
 	metric, ok := mc.getMetric(key)
 
 	if ok { //TODO: and didnt expire (beyond chunk max time)
-		err := mc.appendOrWait(metric, t, v)
-		return metric.refId, err
+		err := metric.Err()
+		if err != nil {
+			return 0, err
+		}
+		mc.Append(metric, t, v)
+		return metric.refId, nil
 	}
 
-	metric = &MetricState{Lset: lset, key: key}
-	metric.chunk = chunkenc.NewXORChunk()
-	appender, err := metric.chunk.Appender()
-	if err != nil {
-		return 0, err
-	}
-	metric.appender = appender
-	metric.appender.Append(t, v)
+	metric = &MetricState{Lset: lset, key: key, name: name, hash: lset.Hash()}
+	metric.store = NewChunkStore()
+	metric.store.state = storeStateReady // TODO: get metric on first instead
 	mc.addMetric(key, name, metric)
+
+	// push new/next update
+	mc.Append(metric, t, v)
 
 	// TODO: get state
 
-	// push new/next update
-	metric.samplesBehind++
-	err = mc.updateMetric(metric)
-
-	return metric.refId, err
+	return metric.refId, nil //err
 }
 
 // fast Add to metric (by refId)
@@ -250,60 +256,35 @@ func (mc *MetricsCache) AddFast(lset labels.Labels, ref uint64, t int64, v float
 	// check metric didnt expire
 
 	// Append to metric or block (if behind)
-	err := mc.appendOrWait(metric, t, v)
-	return err
+	err := metric.Err()
+	if err != nil {
+		return err
+	}
+	mc.Append(metric, t, v)
+	return nil
 
 }
 
-// Update metric to the database
-func (mc *MetricsCache) updateMetric(metric *MetricState) error {
-	metric.busyUpdating = true
+func (mc *MetricsCache) submitUpdate(metric *MetricState, tableId int, expr string) error {
 
-	//mc.logger.DebugWith("updateMetric", "Lset", metric.Lset)
-	expr := ""
-	if !metric.initialized {
-		for _, lbl := range metric.Lset {
-			if lbl.Name != "__name__" {
-				expr = expr + fmt.Sprintf("%s='%s'; ", lbl.Name, lbl.Value)
-			} else {
-				expr = expr + fmt.Sprintf("_name='%s'; ", lbl.Value)
-			}
-		}
-	}
-
-	//offset, toTrim, count, ui := chunkenc.ToUint64(metric.chunk)
-	meta, offsetByte, b := metric.chunk.GetChunkBuffer()
-	offset := offsetByte / 8
-	ui := chunkenc.ToUint64(b)
-	metric.toTrim = ((offsetByte + len(b) - 1) / 8) * 8
-	metric.curChunk = 1 //utils.TimeToChunkId(mc.cfg, t)
-	if metric.curChunk != metric.writtenChunk {
-		expr = expr + fmt.Sprintf("_values=init_array(%d,'int'); ", mc.cfg.ArraySize)
-	}
-	expr = expr + fmt.Sprintf("_values[0]=%d; ", meta)
-	for i := 0; i < len(ui); i++ {
-		offset++
-		expr = expr + fmt.Sprintf("_values[%d]=%d; ", offset, int64(ui[i]))
-	}
-	expr = expr + fmt.Sprintf("_arrlen=%d; _samples=%d", offset+len(ui), 0)
-
-	//mc.logger.WarnWith("updateMetric", "key", metric.key)
-	//metric.Unlock()
-	request, err := mc.container.UpdateItem(&v3io.UpdateItemInput{
-		Path: mc.cfg.Path + "/" + metric.key, Expression: &expr}, mc.responseChan)
+	//path := fmt.Sprintf("%s/%s", mc.cfg.Path, metric.key)
+	name, _ := labels2key(metric.Lset)
+	path := fmt.Sprintf("%s/%s.%d", mc.cfg.Path, name, metric.Lset.Hash())
+	request, err := mc.container.UpdateItem(&v3io.UpdateItemInput{Path: path, Expression: &expr}, mc.responseChan)
 	if err != nil {
 		mc.logger.ErrorWith("UpdateItem Failed", "err", err)
 		return err
 	}
 	//metric.Lock()
 
-	mc.logger.DebugWith("updateMetric expression", "key", metric.key, "totrim", metric.toTrim, "count", 0, "expr", expr, "reqid", request.ID)
+	mc.logger.DebugWith("updateMetric expression", "name", metric.name, "key", metric.key, "expr", expr, "reqid", request.ID)
 
 	mc.rmapMtx.Lock()
 	defer mc.rmapMtx.Unlock()
 	mc.requestsMap[request.ID] = metric
 
 	return nil
+
 }
 
 func labels2key(lset labels.Labels) (string, string) {
@@ -316,5 +297,5 @@ func labels2key(lset labels.Labels) (string, string) {
 			key = key + lbl.Name + KEY_SEPERATOR + lbl.Value + KEY_SEPERATOR
 		}
 	}
-	return name, name + "." + key[:len(key)-len(KEY_SEPERATOR)]
+	return name, key[:len(key)-len(KEY_SEPERATOR)]
 }
