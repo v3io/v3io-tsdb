@@ -20,7 +20,11 @@ such restriction.
 
 package utils
 
-import "fmt"
+import (
+	"fmt"
+	"github.com/v3io/v3io-tsdb/config"
+	"time"
+)
 
 func TimeToDHM(tmilli int64) (int, int) {
 	t := int(tmilli / 1000)
@@ -72,7 +76,7 @@ func Range2Cids(dpo int, mint, maxt int64) ([]int, int) {
 	start, _ := TimeToChunkId(dpo, mint)
 	end, _ := TimeToChunkId(dpo, maxt)
 
-	for i := start; i < 24 || i <= end; i++ {
+	for i := start; i < 24 && i <= end; i++ {
 		list = append(list, i)
 	}
 	if end < start {
@@ -89,11 +93,61 @@ func ChunkID2Attr(col string, id, hr int) string {
 	return fmt.Sprintf("__%s%d", col, id*hr)
 }
 
-func Range2Attrs(col string, dpo int, mint, maxt int64) []string {
+func Range2Attrs(col string, dpo int, mint, maxt int64) ([]string, []int) {
 	list, hrs := Range2Cids(dpo, mint, maxt)
 	strList := []string{}
 	for _, id := range list {
 		strList = append(strList, ChunkID2Attr(col, id, hrs))
 	}
-	return strList
+	return strList, list
+}
+
+func NewColDBPartition(cfg *config.TsdbConfig) *ColDBPartition {
+	newPart := ColDBPartition{
+		from:         0,
+		days:         1,
+		hoursInChunk: 1,
+		prefix:       "",
+		retention:    0,
+		cyclic:       true,
+	}
+	return &newPart
+}
+
+type ColDBPartition struct {
+	from         int64
+	days         int
+	hoursInChunk int
+	prefix       string
+	retention    int
+	cyclic       bool
+}
+
+func (p *ColDBPartition) HoursInChunk() int {
+	return p.hoursInChunk
+}
+
+func (p *ColDBPartition) TimeToChunkId(tmilli int64) int {
+	d, h := TimeToDHM(tmilli)
+
+	if p.days <= 1 {
+		return h
+	}
+
+	dayIndex := d - ((d / p.days) * p.days)
+	chunkIdx := dayIndex*24/p.hoursInChunk + h/p.hoursInChunk
+	return chunkIdx
+}
+
+func (p *ColDBPartition) PartTimeRange() (int64, int64) {
+	from := p.from
+	if p.cyclic {
+		from = (time.Now().Unix()/3600 - int64(p.days*24) + 1) * 24 * 3600 * 1000 // start p.days ago, hour rounded
+	}
+	return from, from + int64(p.days*24*3600*1000)
+}
+
+func (p *ColDBPartition) ChunkMinMax(t int64) (int64, int64) {
+	mint := (t / 3600 / 1000 / int64(p.hoursInChunk)) * 3600 * 1000 * int64(p.hoursInChunk) // get nearest chunk start
+	return mint, mint + 3600*1000*int64(p.hoursInChunk)
 }

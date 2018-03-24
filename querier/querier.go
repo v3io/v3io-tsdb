@@ -34,30 +34,34 @@ import (
 
 func NewV3ioQuerier(container *v3io.Container, logger logger.Logger, mint, maxt int64,
 	keymap *map[string]bool, cfg *config.TsdbConfig) V3ioQuerier {
-	return V3ioQuerier{container: container, mint: mint, maxt: maxt, logger: logger, Keymap: keymap, cfg: cfg}
+	newQuerier := V3ioQuerier{container: container, mint: mint, maxt: maxt,
+		logger: logger, Keymap: keymap, cfg: cfg}
+	newQuerier.headPartition = utils.NewColDBPartition(cfg)
+	return newQuerier
 }
 
 type V3ioQuerier struct {
-	logger     logger.Logger
-	container  *v3io.Container
-	cfg        *config.TsdbConfig
-	mint, maxt int64
-	Keymap     *map[string]bool
+	logger        logger.Logger
+	container     *v3io.Container
+	cfg           *config.TsdbConfig
+	mint, maxt    int64
+	Keymap        *map[string]bool
+	headPartition *utils.ColDBPartition
 }
 
 func (q V3ioQuerier) Select(params *storage.SelectParams, oms ...*labels.Matcher) (storage.SeriesSet, error) {
 	fmt.Println("Select:", params)
 	filter := match2filter(oms)
-	vc := v3ioutil.NewV3ioClient(q.logger, q.Keymap)
-	attrs := []string{"_lset", "_meta_v"}
-	attrs = append(attrs, utils.Range2Attrs("v", 0, q.mint, q.maxt)...)
-	iter, err := vc.GetItems(q.container, q.cfg.Path+"/", filter, attrs)
+	//vc := v3ioutil.NewV3ioClient(q.logger, q.Keymap)
+	//iter, err := vc.GetItems(q.container, q.cfg.Path+"/", filter, attrs)
+
+	newSet := newSeriesSet(q.headPartition, q.mint, q.maxt)
+	err := newSet.getItems(q.cfg.Path+"/", filter, q.container)
 	if err != nil {
 		return nil, err
 	}
 
-	newSeriesSet := seriesSet{iter: iter, mint: q.mint, maxt: q.maxt}
-	return newSeriesSet, nil
+	return newSet, nil
 }
 
 func match2filter(oms []*labels.Matcher) string {
@@ -93,36 +97,84 @@ func (q V3ioQuerier) Close() error {
 	return nil
 }
 
+func newSeriesSet(partition *utils.ColDBPartition, mint, maxt int64) seriesSet {
+
+	pmin, pmax := partition.PartTimeRange()
+	if pmin > mint {
+		mint = pmin
+	}
+	if pmax < maxt {
+		maxt = pmax
+	}
+
+	return seriesSet{mint: mint, maxt: maxt, partition: partition}
+}
+
 type seriesSet struct {
+	partition  *utils.ColDBPartition
 	iter       *v3ioutil.V3ioItemsCursor
 	mint, maxt int64
+	attrs      []string
+	chunkMaxt  []int64
+}
+
+// TODO: get items per partition + merge, per partition calc attrs
+func (s seriesSet) getItems(path, filter string, container *v3io.Container) error {
+
+	attrs := []string{"_lset", "_meta_v", "_name"}
+	attrStr, _ := utils.Range2Attrs("v", 0, s.mint, s.maxt)
+	attrs = append(attrs, attrStr...)
+	input := v3io.GetItemsInput{Path: path, AttributeNames: attrs, Filter: filter}
+
+	response, err := container.Sync.GetItems(&input)
+	if err != nil {
+		return err
+	}
+
+	s.iter = v3ioutil.NewItemsCursor(container, &input, response)
+	return nil
+
 }
 
 func (s seriesSet) Next() bool { return s.iter.Next() }
 func (s seriesSet) Err() error { return s.iter.Err() }
 
 func (s seriesSet) At() storage.Series {
-	return series{lset: s.iter.GetLables(), iter: s.iter.GetSeriesIter(s.mint, s.maxt)}
+	return NewSeries(s.partition, s.iter, s.mint, s.maxt)
 }
 
-type series struct {
-	lset labels.Labels
-	iter SeriesIterator
+type errSeriesSet struct {
+	err error
 }
 
-func (s series) Labels() labels.Labels            { return s.lset }
-func (s series) Iterator() storage.SeriesIterator { return s.iter }
+func (s errSeriesSet) Next() bool         { return false }
+func (s errSeriesSet) At() storage.Series { return nil }
+func (s errSeriesSet) Err() error         { return s.err }
 
-// SeriesIterator iterates over the data of a time series.
-type SeriesIterator interface {
-	// Seek advances the iterator forward to the given timestamp.
-	// If there's no value exactly at t, it advances to the first value
-	// after t.
-	Seek(t int64) bool
-	// At returns the current timestamp/value pair.
-	At() (t int64, v float64)
-	// Next advances the iterator by one.
-	Next() bool
-	// Err returns the current error.
-	Err() error
+func mergeLables(a, b []string) []string {
+	maxl := len(a)
+	if len(b) > len(a) {
+		maxl = len(b)
+	}
+	res := make([]string, 0, maxl*10/9)
+
+	for len(a) > 0 && len(b) > 0 {
+		d := strings.Compare(a[0], b[0])
+
+		if d == 0 {
+			res = append(res, a[0])
+			a, b = a[1:], b[1:]
+		} else if d < 0 {
+			res = append(res, a[0])
+			a = a[1:]
+		} else if d > 0 {
+			res = append(res, b[0])
+			b = b[1:]
+		}
+	}
+
+	// Append all remaining elements.
+	res = append(res, a...)
+	res = append(res, b...)
+	return res
 }

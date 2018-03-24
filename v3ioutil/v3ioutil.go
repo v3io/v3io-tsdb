@@ -64,24 +64,3 @@ func CreateContainer(logger logger.Logger, addr, cont string, workers int) (*v3i
 
 	return container, nil
 }
-
-func NewV3ioClient(logger logger.Logger, keymap *map[string]bool) *V3ioClient {
-	return &V3ioClient{logger: logger, Keymap: keymap}
-}
-
-type V3ioClient struct {
-	logger logger.Logger
-	Keymap *map[string]bool
-}
-
-func (vc *V3ioClient) GetItems(container *v3io.Container, path, filter string, attr []string) (*V3ioItemsCursor, error) {
-
-	input := v3io.GetItemsInput{Path: path, AttributeNames: attr, Filter: filter}
-
-	response, err := container.Sync.GetItems(&input)
-	if err != nil {
-		return nil, err
-	}
-
-	return newItemsCursor(container, &input, response), nil
-}

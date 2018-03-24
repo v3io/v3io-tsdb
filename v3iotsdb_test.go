@@ -41,7 +41,10 @@ func TestName(t *testing.T) {
 	fmt.Println(cfg)
 
 	adapter := NewV3ioAdapter(cfg, nil, nil)
-	adapter.Start()
+	err = adapter.Start()
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	appender, err := adapter.Appender()
 	if err != nil {
@@ -83,10 +86,10 @@ func TestName(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	time.Sleep(time.Second * 2)
-	return
+	time.Sleep(time.Second * 1)
+	//return
 
-	qry, err := adapter.Querier(nil, basetime+400, basetime+9000)
+	qry, err := adapter.Querier(nil, basetime+400, basetime+29000)
 	if err != nil {
 		t.Fatal(err)
 	}

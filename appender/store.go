@@ -243,8 +243,8 @@ func Chunkbuf2Expr(offsetByte int, meta uint64, bytes []byte, mint int64) string
 
 	expr = expr + fmt.Sprintf("_meta_v[%d]=%d; ", idx, meta) // TODO: put meta in an array
 	for i := 0; i < len(ui); i++ {
-		offset++
 		expr = expr + fmt.Sprintf("%s[%d]=%d; ", attr, offset, int64(ui[i]))
+		offset++
 	}
 
 	return expr

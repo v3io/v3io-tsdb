@@ -23,23 +23,8 @@ package v3ioutil
 import (
 	"encoding/binary"
 	"github.com/pkg/errors"
-	"github.com/prometheus/prometheus/pkg/labels"
 	"github.com/v3io/v3io-go-http"
-	"github.com/v3io/v3io-tsdb/chunkenc"
-	"github.com/v3io/v3io-tsdb/utils"
-	"math"
-	"strings"
 )
-
-func asInt64Array(val []byte) []uint64 {
-	var array []uint64
-	bytes := val
-	for i := 16; i+8 <= len(bytes); i += 8 {
-		val := binary.LittleEndian.Uint64(bytes[i : i+8])
-		array = append(array, val)
-	}
-	return array
-}
 
 type V3ioItemsCursor struct {
 	currentItem    *map[string]interface{}
@@ -53,7 +38,7 @@ type V3ioItemsCursor struct {
 	container      *v3io.Container
 }
 
-func newItemsCursor(container *v3io.Container, input *v3io.GetItemsInput, response *v3io.Response) *V3ioItemsCursor {
+func NewItemsCursor(container *v3io.Container, input *v3io.GetItemsInput, response *v3io.Response) *V3ioItemsCursor {
 	newItemsCursor := &V3ioItemsCursor{
 		container: container,
 		input:     input,
@@ -126,112 +111,17 @@ func (ic *V3ioItemsCursor) setResponse(response *v3io.Response) {
 	ic.itemIndex = 0
 }
 
-func (ic *V3ioItemsCursor) GetLables() labels.Labels {
-	name := (*ic.currentItem)["__name"].(string)
-	split := strings.SplitN(name, ".", 2)
-	lset := labels.Labels{labels.Label{Name: "__name__", Value: split[0]}}
-
-	if len(split) < 2 {
-		return lset
-	}
-
-	lbl := strings.Split(split[1], KEY_SEPERATOR)
-	for i := 0; i+2 <= len(lbl); i += 2 {
-		lset = append(lset, labels.Label{Name: lbl[i], Value: lbl[i+1]})
-	}
-
-	return lset
-}
-
 func (ic *V3ioItemsCursor) GetField(name string) interface{} {
 	return (*ic.currentItem)[name]
 }
 
-func (ic *V3ioItemsCursor) GetSeriesIter(mint, maxt int64) *v3ioSeriesIterator {
-	newIterator := v3ioSeriesIterator{mint: mint, maxt: maxt}
-	attrs := utils.Range2Attrs("v", 0, mint, maxt)
-	newIterator.chunks = []chunkenc.Chunk{}
-	for _, attr := range attrs {
-		values, ok := (*ic.currentItem)[attr]
-		if ok && len(values.([]byte)) >= 24 {
-			bytes := values.([]byte)
-			chunk, _ := chunkenc.FromBuffer(binary.LittleEndian.Uint64(bytes[16:24]), bytes[24:])
-			// TODO: err handle
-
-			//c, _ := chunkenc.FromData(chunkenc.EncXOR, bytes[24:], count)
-			newIterator.chunks = append(newIterator.chunks, chunk)
-
-		}
-
+// convert v3io blob to Int array
+func AsInt64Array(val []byte) []uint64 {
+	var array []uint64
+	bytes := val
+	for i := 16; i+8 <= len(bytes); i += 8 {
+		val := binary.LittleEndian.Uint64(bytes[i : i+8])
+		array = append(array, val)
 	}
-	// TODO: if len>0 + err handle
-	newIterator.iter = newIterator.chunks[0].Iterator()
-	return &newIterator
-}
-
-type v3ioSeriesIterator struct {
-	mint, maxt int64 // TBD per block
-	err        error
-
-	chunks []chunkenc.Chunk //TODO: need to be array
-	iter   chunkenc.Iterator
-}
-
-func (it *v3ioSeriesIterator) Seek(t int64) bool {
-	if t > it.maxt {
-		return false
-	}
-
-	// Seek to the first valid value after t.
-	if t < it.mint {
-		t = it.mint
-	}
-
-	// TODO: check if T < chunk start + max hours in chunk
-	//for ; it.chunks[it.i].MaxTime < t; it.i++ {
-	//	if it.i == len(it.chunks)-1 {
-	//		return false
-	//	}
-	//}
-
-	// TODO multiple chunks
-
-	for it.iter.Next() {
-		t0, _ := it.At()
-		if t0 >= t {
-			return true
-		}
-	}
-	return false
-}
-
-func (it *v3ioSeriesIterator) Next() bool {
-	if it.iter.Next() {
-		t, _ := it.iter.At()
-
-		if t < it.mint {
-			if !it.Seek(it.mint) {
-				return false
-			}
-			t, _ = it.At()
-
-			return t <= it.maxt
-		}
-		if t > it.maxt {
-			return false
-		}
-		return true
-	}
-
-	return false
-}
-
-func (it *v3ioSeriesIterator) At() (t int64, v float64) { return it.iter.At() }
-
-func (it *v3ioSeriesIterator) Err() error { return it.iter.Err() }
-
-func uintToTV(data uint64, curT int64, curV float64) (int64, float64) {
-	v := float64(math.Float32frombits(uint32(data)))
-	t := int64(data >> 32)
-	return curT + t, curV + v
+	return array
 }
