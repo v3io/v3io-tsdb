@@ -28,7 +28,6 @@ type chunkStore struct {
 
 // chunk appender
 type attrAppender struct {
-	partition  *utils.ColDBPartition
 	appender   chunkenc.Appender
 	updMarker  int
 	updCount   int
@@ -40,6 +39,7 @@ type attrAppender struct {
 func (a *attrAppender) clear() {
 	a.updCount = 0
 	a.updMarker = 0
+	a.lastT = 0
 	a.writing = false
 }
 
@@ -98,7 +98,8 @@ func (cs *chunkStore) initChunk(idx int, t int64) error {
 */
 
 // Append data to the right chunk and table based on the time and state
-func (cs *chunkStore) Append(t int64, v float64) error {
+func (cs *chunkStore) Append(t int64, vif interface{}) error {
+	v := vif.(float64) // TODO: change all to interface
 
 	// if it was just created and waiting to get the state we append to temporary list
 	if cs.state == storeStateGet || cs.state == storeStateInit {
@@ -168,13 +169,13 @@ func (cs *chunkStore) processGetResp(resp *v3io.Response) {
 }
 
 // Write pending data of the current or previous chunk to the storage
-func (cs *chunkStore) WriteChunks(metric *MetricState) (int, string) {
+func (cs *chunkStore) WriteChunks(mc *MetricsCache, metric *MetricState) error {
 
 	tableId := -1
 	expr := ""
 
 	if cs.state == storeStateGet {
-		return tableId, expr
+		return nil
 	}
 
 	notInitialized := false //TODO: init depend on get
@@ -214,7 +215,19 @@ func (cs *chunkStore) WriteChunks(metric *MetricState) (int, string) {
 			metric.key, 24) + expr
 	}
 
-	return tableId, expr
+	path := fmt.Sprintf("%s/%s.%d", mc.cfg.Path, metric.name, metric.hash) // TODO: use TableID
+	request, err := mc.container.UpdateItem(&v3io.UpdateItemInput{Path: path, Expression: &expr}, mc.responseChan)
+	if err != nil {
+		mc.logger.ErrorWith("UpdateItem Failed", "err", err)
+		return err
+	}
+
+	mc.logger.DebugWith("updateMetric expression", "name", metric.name, "key", metric.key, "expr", expr, "reqid", request.ID)
+	mc.rmapMtx.Lock()
+	defer mc.rmapMtx.Unlock()
+	mc.requestsMap[request.ID] = metric
+
+	return nil
 }
 
 // Process the response for the chunk update request
