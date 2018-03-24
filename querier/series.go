@@ -42,12 +42,15 @@ type SeriesIterator interface {
 
 func (s series) getLables(ic *v3ioutil.V3ioItemsCursor) {
 	name := ic.GetField("_name").(string)
-	lables := ic.GetField("_lset").(string)
+	lsetAttr := ic.GetField("_lset").(string)
 	lset := labels.Labels{labels.Label{Name: "__name__", Value: name}}
 
-	lbl := strings.Split(lables, v3ioutil.KEY_SEPERATOR)
-	for i := 0; i+2 <= len(lbl); i += 2 {
-		lset = append(lset, labels.Label{Name: lbl[i], Value: lbl[i+1]})
+	splitLset := strings.Split(lsetAttr, ",")
+	for _, label := range splitLset {
+		kv := strings.Split(label, "=")
+		if len(kv) > 1 {
+			lset = append(lset, labels.Label{Name: kv[0], Value: kv[1]})
+		}
 	}
 
 	s.lset = lset
@@ -113,7 +116,7 @@ func (it *v3ioSeriesIterator) Seek(t int64) bool {
 	//}
 	//	it.cur = it.chunks[it.i].Chunk.Iterator()
 
-	// TODO multiple chunks
+	// TODO: can optimize to skip to the right chunk
 
 	for i, s := range it.chunks[it.chunkIndex:] {
 		if i > 0 {

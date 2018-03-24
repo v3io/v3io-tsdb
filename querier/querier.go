@@ -121,7 +121,7 @@ type seriesSet struct {
 // TODO: get items per partition + merge, per partition calc attrs
 func (s seriesSet) getItems(path, filter string, container *v3io.Container) error {
 
-	attrs := []string{"_lset", "_meta_v", "_name"}
+	attrs := []string{"_lset", "_meta_v", "_name", "_maxtime"}
 	attrStr, _ := utils.Range2Attrs("v", 0, s.mint, s.maxt)
 	attrs = append(attrs, attrStr...)
 	input := v3io.GetItemsInput{Path: path, AttributeNames: attrs, Filter: filter}

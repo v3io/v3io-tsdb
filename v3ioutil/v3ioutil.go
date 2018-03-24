@@ -27,8 +27,6 @@ import (
 	"github.com/v3io/v3io-go-http"
 )
 
-const KEY_SEPERATOR = "="
-
 func NewLogger(verbose bool) (logger.Logger, error) {
 	var logLevel nucliozap.Level
 	if verbose {

@@ -4,13 +4,12 @@ import (
 	"fmt"
 	"github.com/v3io/v3io-go-http"
 	"github.com/v3io/v3io-tsdb/chunkenc"
-	"github.com/v3io/v3io-tsdb/config"
 	"github.com/v3io/v3io-tsdb/utils"
 )
 
-var MaxUpdatesBehind = 3
 var MaxArraySize = 1024
-var Config *config.TsdbConfig
+
+const MAX_LATE_WRITE = 59 * 3600 * 1000 // max late arrival of 59min
 
 func NewChunkStore() *chunkStore {
 	store := chunkStore{}
@@ -19,18 +18,21 @@ func NewChunkStore() *chunkStore {
 	return &store
 }
 
+// store latest + previous chunks and their state
 type chunkStore struct {
-	updatesBehind int
-	state         storeState
-	curChunk      int
-	pending       []pendingData
-	chunks        [2]*attrAppender
+	state    storeState
+	curChunk int
+	pending  []pendingData
+	chunks   [2]*attrAppender
 }
 
+// chunk appender
 type attrAppender struct {
+	partition  *utils.ColDBPartition
 	appender   chunkenc.Appender
 	updMarker  int
 	updCount   int
+	lastT      int64
 	mint, maxt int64
 	writing    bool
 }
@@ -59,14 +61,14 @@ func (cs *chunkStore) IsReady() bool {
 	return cs.state == storeStateReady
 }
 
-func (cs *chunkStore) IsBlocked() bool {
+func (cs *chunkStore) UpdatesBehind() int {
 	updatesBehind := len(cs.pending)
 	for _, chunk := range cs.chunks {
 		if chunk.appender != nil {
 			updatesBehind += chunk.appender.Chunk().NumSamples() - chunk.updCount
 		}
 	}
-	return updatesBehind > MaxUpdatesBehind
+	return updatesBehind
 }
 
 // Read (Async) the current chunk state and data from the storage
@@ -80,6 +82,7 @@ func (cs *chunkStore) GetChunksState(mc *MetricsCache, t int64) {
 
 }
 
+/*
 func (cs *chunkStore) initChunk(idx int, t int64) error {
 	chunk := chunkenc.NewXORChunk() // TODO: calc new mint/maxt
 	app, err := chunk.Appender()
@@ -92,11 +95,10 @@ func (cs *chunkStore) initChunk(idx int, t int64) error {
 
 	return nil
 }
+*/
 
 // Append data to the right chunk and table based on the time and state
 func (cs *chunkStore) Append(t int64, v float64) error {
-
-	cs.updatesBehind++
 
 	// if it was just created and waiting to get the state we append to temporary list
 	if cs.state == storeStateGet || cs.state == storeStateInit {
@@ -108,17 +110,20 @@ func (cs *chunkStore) Append(t int64, v float64) error {
 	if t >= cur.mint && t < cur.maxt {
 		// Append t/v to current chunk
 		cur.appender.Append(t, v)
+		if t > cur.lastT {
+			cur.lastT = t
+		}
+
 		return nil
 	}
 
-	next := cs.chunks[cs.curChunk^1]
 	if t >= cur.maxt {
+		// advance cur chunk
+		cur = cs.chunks[cs.curChunk^1]
 
 		// avoid append if there are still writes to prev chunk
-		if next.writing {
-			fmt.Println("Error, append to new chunk while writing to prev", t)
-			//	cs.pending = append(cs.pending, pendingData{t: t, v: v})
-			//	return
+		if cur.writing {
+			return fmt.Errorf("Error, append beyound cur chunk while IO in flight to prev", t)
 		}
 
 		chunk := chunkenc.NewXORChunk() // TODO: calc new mint/maxt
@@ -126,31 +131,32 @@ func (cs *chunkStore) Append(t int64, v float64) error {
 		if err != nil {
 			return err
 		}
-		next.clear()
-		next.appender = app
-		next.mint, next.maxt = utils.Time2MinMax(0, t) // TODO: dpo from config
-		next.appender.Append(t, v)
+		cur.clear()
+		cur.appender = app
+		cur.mint, cur.maxt = utils.Time2MinMax(0, t) // TODO: dpo from config
+		cur.appender.Append(t, v)
+		if t > cur.lastT {
+			cur.lastT = t
+		}
 		cs.curChunk = cs.curChunk ^ 1
 
 		return nil
-
-		// need to advance to a new chunk
-
-		// prev chunk = cur chunk
-		// init cur chunk, append t/v to it
-		// note: new chunk row/attr may already be initialized for some reason, can ignore or try to Get old one first
 	}
 
 	// write to an older chunk
 
-	if t >= next.mint && t < next.maxt {
+	prev := cs.chunks[cs.curChunk^1]
+	// delayed Appends only allowed to previous chunk or within allowed window
+	if t >= prev.mint && t < prev.maxt && t > cur.lastT-MAX_LATE_WRITE {
 		// Append t/v to previous chunk
-		next.appender.Append(t, v)
+		prev.appender.Append(t, v)
+		if t > prev.lastT {
+			prev.lastT = t
+		}
 		return nil
 	}
 
 	// if (mint - t) in allowed window may need to advance next (assume prev is not the one right before cur)
-	// if prev has pending data need to wait until it was commited to create a new prev
 
 	return nil
 }
@@ -189,13 +195,13 @@ func (cs *chunkStore) WriteChunks(metric *MetricState) (int, string) {
 				chunk.writing = true
 
 				notInitialized = (offsetByte == 0)
-				expr = expr + Chunkbuf2Expr(offsetByte, meta, b, chunk.mint)
+				expr = expr + Chunkbuf2Expr(offsetByte, meta, b, chunk.mint, chunk.lastT)
 
 			}
 		}
 	}
 
-	if notInitialized {
+	if notInitialized { // TODO: not correct, need to init once per metric/partition, maybe use cond expressions
 		lblexpr := ""
 		for _, lbl := range metric.Lset {
 			if lbl.Name != "__name__" {
@@ -204,8 +210,8 @@ func (cs *chunkStore) WriteChunks(metric *MetricState) (int, string) {
 				lblexpr = lblexpr + fmt.Sprintf("_name='%s'; ", lbl.Value)
 			}
 		}
-		expr = lblexpr + fmt.Sprintf("_lset='%s'; _dpo=%d; _hrInChunk=%d; _meta_v=init_array(%d,'int'); ",
-			metric.key, 0, utils.HrPerChunk(0), 24) + expr
+		expr = lblexpr + fmt.Sprintf("_lset='%s'; _meta_v=init_array(%d,'int'); ",
+			metric.key, 24) + expr
 	}
 
 	return tableId, expr
@@ -229,23 +235,24 @@ func (cs *chunkStore) ProcessWriteResp() {
 
 }
 
-func Chunkbuf2Expr(offsetByte int, meta uint64, bytes []byte, mint int64) string {
+func Chunkbuf2Expr(offsetByte int, meta uint64, bytes []byte, mint, maxt int64) string {
 
 	expr := ""
 	offset := offsetByte / 8
 	ui := chunkenc.ToUint64(bytes)
-	idx, hrInChunk := utils.TimeToChunkId(0, mint) // TODO: add DaysPerObj from config
+	idx, hrInChunk := utils.TimeToChunkId(0, mint) // TODO: add DaysPerObj from part manager
 	attr := utils.ChunkID2Attr("v", idx, hrInChunk)
 
 	if offsetByte == 0 {
 		expr = expr + fmt.Sprintf("%s=init_array(%d,'int'); ", attr, MaxArraySize)
 	}
 
-	expr = expr + fmt.Sprintf("_meta_v[%d]=%d; ", idx, meta) // TODO: put meta in an array
+	expr = expr + fmt.Sprintf("_meta_v[%d]=%d; ", idx, meta) // TODO: meta name as col variable
 	for i := 0; i < len(ui); i++ {
 		expr = expr + fmt.Sprintf("%s[%d]=%d; ", attr, offset, int64(ui[i]))
 		offset++
 	}
+	expr += fmt.Sprintf("_maxtime=%d", maxt) // TODO: use max() expr
 
 	return expr
 }

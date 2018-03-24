@@ -26,26 +26,23 @@ import (
 	"github.com/prometheus/prometheus/pkg/labels"
 	"github.com/v3io/v3io-go-http"
 	"github.com/v3io/v3io-tsdb/config"
+	"github.com/v3io/v3io-tsdb/utils"
 	"sync"
 )
-
-const KEY_SEPERATOR = "="
 
 // to add, rollups policy (cnt, sum, min/max, sum^2) + interval , or policy in per name lable
 type MetricState struct {
 	sync.RWMutex
-	busyGetting  bool
-	Lset         labels.Labels
-	key          string
-	name         string
-	hash         uint64
-	curT         int64
-	writtenChunk int
-	curChunk     int
-	ExpiresAt    int64
-	refId        uint64
-	wait         chan bool
-	waiting      bool
+	busyGetting bool
+	Lset        labels.Labels
+	key         string
+	name        string
+	hash        uint64
+
+	ExpiresAt int64
+	refId     uint64
+	wait      chan bool
+	//waiting      bool
 
 	store *chunkStore
 	err   error
@@ -60,6 +57,7 @@ func (m *MetricState) Err() error {
 
 type MetricsCache struct {
 	cfg             *config.TsdbConfig
+	headPartition   *utils.ColDBPartition
 	mtx             sync.RWMutex
 	rmapMtx         sync.RWMutex
 	container       *v3io.Container
@@ -124,8 +122,6 @@ func (mc *MetricsCache) Start() error {
 
 				if ok {
 					metric.Lock()
-					//mc.logger.Warn("resp lock%s %d", metric.key, metric.samplesBehind)
-
 					if respErr == nil {
 						// Set fields so next write will not include redundant info (bytes, lables, init_array)
 						metric.store.ProcessWriteResp()
@@ -141,14 +137,13 @@ func (mc *MetricsCache) Start() error {
 						}
 					}
 
-					if metric.waiting {
-						// if Appender is blocking (waiting for resp), release it
-						metric.wait <- true
-						mc.logger.DebugWith("after wait", "metric", metric)
-						metric.waiting = false
-					}
+					//if metric.waiting {
+					//	// if Appender is blocking (waiting for resp), release it
+					//	metric.wait <- true
+					//	mc.logger.DebugWith("after wait", "metric", metric)
+					//	metric.waiting = false
+					//}
 					metric.Unlock()
-					//mc.logger.Warn("resp unlock")
 
 				} else {
 					mc.logger.ErrorWith("Req ID not found", "id", resp.ID)
@@ -267,9 +262,7 @@ func (mc *MetricsCache) AddFast(lset labels.Labels, ref uint64, t int64, v float
 
 func (mc *MetricsCache) submitUpdate(metric *MetricState, tableId int, expr string) error {
 
-	//path := fmt.Sprintf("%s/%s", mc.cfg.Path, metric.key)
-	name, _ := labels2key(metric.Lset)
-	path := fmt.Sprintf("%s/%s.%d", mc.cfg.Path, name, metric.Lset.Hash())
+	path := fmt.Sprintf("%s/%s.%d", mc.cfg.Path, metric.name, metric.Lset.Hash())
 	request, err := mc.container.UpdateItem(&v3io.UpdateItemInput{Path: path, Expression: &expr}, mc.responseChan)
 	if err != nil {
 		mc.logger.ErrorWith("UpdateItem Failed", "err", err)
@@ -294,8 +287,8 @@ func labels2key(lset labels.Labels) (string, string) {
 		if lbl.Name == "__name__" {
 			name = lbl.Value
 		} else {
-			key = key + lbl.Name + KEY_SEPERATOR + lbl.Value + KEY_SEPERATOR
+			key = key + lbl.Name + "=" + lbl.Value + ","
 		}
 	}
-	return name, key[:len(key)-len(KEY_SEPERATOR)]
+	return name, key[:len(key)-1]
 }
