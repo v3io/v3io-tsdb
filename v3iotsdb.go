@@ -30,6 +30,7 @@ import (
 	"github.com/v3io/v3io-go-http"
 	"github.com/v3io/v3io-tsdb/appender"
 	"github.com/v3io/v3io-tsdb/config"
+	"github.com/v3io/v3io-tsdb/partmgr"
 	"github.com/v3io/v3io-tsdb/querier"
 	"github.com/v3io/v3io-tsdb/v3ioutil"
 	"time"
@@ -41,9 +42,10 @@ type V3ioAdapter struct {
 	container       *v3io.Container
 	metricsCache    *appender.MetricsCache
 	cfg             *config.TsdbConfig
+	partitionMngr   *partmgr.PartitionManager
 }
 
-func NewV3ioAdapter(cfg *config.TsdbConfig, container *v3io.Container, logger logger.Logger) V3ioAdapter {
+func NewV3ioAdapter(cfg *config.TsdbConfig, container *v3io.Container, logger logger.Logger) *V3ioAdapter {
 
 	newV3ioAdapter := V3ioAdapter{}
 	newV3ioAdapter.cfg = cfg
@@ -60,16 +62,24 @@ func NewV3ioAdapter(cfg *config.TsdbConfig, container *v3io.Container, logger lo
 			cfg.V3ioUrl, cfg.Container, cfg.Workers)
 	}
 
-	newV3ioAdapter.metricsCache = appender.NewMetricsCache(newV3ioAdapter.container, newV3ioAdapter.logger, cfg)
-	return newV3ioAdapter
+	return &newV3ioAdapter
 }
 
-func (a V3ioAdapter) Start() error {
+func (a *V3ioAdapter) Start() error {
 	msg := fmt.Sprintf("Starting V3IO TSDB client, server at : %s/%s/%s",
 		a.cfg.V3ioUrl, a.cfg.Container, a.cfg.Path)
 	fmt.Println(msg)
 	a.logger.Info(msg)
-	err := a.metricsCache.Start()
+
+	a.partitionMngr = partmgr.NewPartitionMngr(a.cfg)
+	err := a.partitionMngr.Init()
+	if err != nil {
+		return err
+	}
+
+	a.metricsCache = appender.NewMetricsCache(a.container, a.logger, a.cfg, a.partitionMngr)
+
+	err = a.metricsCache.Start()
 	if err != nil {
 		return err
 	}
@@ -81,22 +91,22 @@ func (a V3ioAdapter) Start() error {
 	return errors.Wrap(err, "Failed to access v3io container")
 }
 
-func (a V3ioAdapter) Appender() (storage.Appender, error) {
+func (a *V3ioAdapter) Appender() (storage.Appender, error) {
 	newAppender := v3ioAppender{metricsCache: a.metricsCache}
 	return newAppender, nil
 }
 
-func (a V3ioAdapter) StartTime() (int64, error) {
+func (a *V3ioAdapter) StartTime() (int64, error) {
 	startTime := int64(time.Now().Unix() * 1000)
 	return startTime + a.startTimeMargin, nil
 }
 
-func (a V3ioAdapter) Close() error {
+func (a *V3ioAdapter) Close() error {
 	return nil
 }
 
-func (a V3ioAdapter) Querier(_ context.Context, mint, maxt int64) (storage.Querier, error) {
-	return querier.NewV3ioQuerier(a.container, a.logger, mint, maxt, &a.metricsCache.NameLabelMap, a.cfg), nil
+func (a *V3ioAdapter) Querier(_ context.Context, mint, maxt int64) (storage.Querier, error) {
+	return querier.NewV3ioQuerier(a.container, a.logger, mint, maxt, &a.metricsCache.NameLabelMap, a.cfg, a.partitionMngr), nil
 }
 
 type v3ioAppender struct {

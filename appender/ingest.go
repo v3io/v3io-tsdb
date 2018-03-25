@@ -26,7 +26,7 @@ import (
 	"github.com/prometheus/prometheus/pkg/labels"
 	"github.com/v3io/v3io-go-http"
 	"github.com/v3io/v3io-tsdb/config"
-	"github.com/v3io/v3io-tsdb/utils"
+	"github.com/v3io/v3io-tsdb/partmgr"
 	"sync"
 )
 
@@ -51,7 +51,7 @@ func (m *MetricState) Err() error {
 
 type MetricsCache struct {
 	cfg           *config.TsdbConfig
-	headPartition *utils.ColDBPartition
+	partitionMngr *partmgr.PartitionManager
 	mtx           sync.RWMutex
 	rmapMtx       sync.RWMutex
 	container     *v3io.Container
@@ -69,8 +69,9 @@ type MetricsCache struct {
 	NameLabelMap map[string]bool // temp store all lable names
 }
 
-func NewMetricsCache(container *v3io.Container, logger logger.Logger, cfg *config.TsdbConfig) *MetricsCache {
-	newCache := MetricsCache{container: container, logger: logger, cfg: cfg}
+func NewMetricsCache(container *v3io.Container, logger logger.Logger, cfg *config.TsdbConfig,
+	partMngr *partmgr.PartitionManager) *MetricsCache {
+	newCache := MetricsCache{container: container, logger: logger, cfg: cfg, partitionMngr: partMngr}
 	newCache.cacheMetricMap = map[string]*MetricState{}
 	newCache.cacheRefMap = map[uint64]*MetricState{}
 	newCache.requestsMap = map[uint64]*MetricState{}
@@ -144,6 +145,7 @@ func (mc *MetricsCache) Start() error {
 				metric.Lock()
 
 				if metric.store.GetState() == storeStateInit {
+					metric.store.GetChunksState(mc, app.t)
 					metric.store.SetState(storeStateReady) // TODO: get metric instead
 				}
 

@@ -27,16 +27,16 @@ import (
 	"github.com/prometheus/prometheus/storage"
 	"github.com/v3io/v3io-go-http"
 	"github.com/v3io/v3io-tsdb/config"
-	"github.com/v3io/v3io-tsdb/utils"
+	"github.com/v3io/v3io-tsdb/partmgr"
 	"github.com/v3io/v3io-tsdb/v3ioutil"
 	"strings"
 )
 
 func NewV3ioQuerier(container *v3io.Container, logger logger.Logger, mint, maxt int64,
-	keymap *map[string]bool, cfg *config.TsdbConfig) V3ioQuerier {
+	keymap *map[string]bool, cfg *config.TsdbConfig, partMngr *partmgr.PartitionManager) V3ioQuerier {
 	newQuerier := V3ioQuerier{container: container, mint: mint, maxt: maxt,
 		logger: logger, Keymap: keymap, cfg: cfg}
-	newQuerier.headPartition = utils.NewColDBPartition(cfg)
+	newQuerier.partitionMngr = partMngr
 	return newQuerier
 }
 
@@ -46,16 +46,16 @@ type V3ioQuerier struct {
 	cfg           *config.TsdbConfig
 	mint, maxt    int64
 	Keymap        *map[string]bool
-	headPartition *utils.ColDBPartition
+	partitionMngr *partmgr.PartitionManager
 }
 
 func (q V3ioQuerier) Select(params *storage.SelectParams, oms ...*labels.Matcher) (storage.SeriesSet, error) {
-	fmt.Println("Select:", params)
 	filter := match2filter(oms)
 	//vc := v3ioutil.NewV3ioClient(q.logger, q.Keymap)
 	//iter, err := vc.GetItems(q.container, q.cfg.Path+"/", filter, attrs)
 
-	newSet := newSeriesSet(q.headPartition, q.mint, q.maxt)
+	partitions := q.partitionMngr.PartsForRange(q.mint, q.maxt)
+	newSet := newSeriesSet(partitions[0], q.mint, q.maxt) // TODO: support multiple partitions
 	err := newSet.getItems(q.cfg.Path+"/", filter, q.container)
 	if err != nil {
 		return nil, err
@@ -85,7 +85,6 @@ func match2filter(oms []*labels.Matcher) string {
 }
 
 func (q V3ioQuerier) LabelValues(name string) ([]string, error) {
-	fmt.Println("Get LabelValues:", name)
 	list := []string{}
 	for k, _ := range *q.Keymap {
 		list = append(list, k)
@@ -97,21 +96,21 @@ func (q V3ioQuerier) Close() error {
 	return nil
 }
 
-func newSeriesSet(partition *utils.ColDBPartition, mint, maxt int64) seriesSet {
+func newSeriesSet(partition *partmgr.DBPartition, mint, maxt int64) *seriesSet {
 
-	pmin, pmax := partition.PartTimeRange()
+	pmin, pmax := partition.TimeRange()
 	if pmin > mint {
-		mint = pmin
+		//mint = pmin
 	}
 	if pmax < maxt {
 		maxt = pmax
 	}
 
-	return seriesSet{mint: mint, maxt: maxt, partition: partition}
+	return &seriesSet{mint: mint, maxt: maxt, partition: partition}
 }
 
 type seriesSet struct {
-	partition  *utils.ColDBPartition
+	partition  *partmgr.DBPartition
 	iter       *v3ioutil.V3ioItemsCursor
 	mint, maxt int64
 	attrs      []string
@@ -119,13 +118,13 @@ type seriesSet struct {
 }
 
 // TODO: get items per partition + merge, per partition calc attrs
-func (s seriesSet) getItems(path, filter string, container *v3io.Container) error {
+func (s *seriesSet) getItems(path, filter string, container *v3io.Container) error {
 
 	attrs := []string{"_lset", "_meta_v", "_name", "_maxtime"}
-	s.attrs, s.chunkIds = utils.Range2Attrs("v", 0, s.mint, s.maxt)
+	s.attrs, s.chunkIds = s.partition.Range2Attrs("v", s.mint, s.maxt)
 	attrs = append(attrs, s.attrs...)
-	input := v3io.GetItemsInput{Path: path, AttributeNames: attrs, Filter: filter}
 
+	input := v3io.GetItemsInput{Path: path, AttributeNames: attrs, Filter: filter}
 	response, err := container.Sync.GetItems(&input)
 	if err != nil {
 		return err

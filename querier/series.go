@@ -1,3 +1,23 @@
+/*
+Copyright 2018 Iguazio Systems Ltd.
+
+Licensed under the Apache License, Version 2.0 (the "License") with
+an addition restriction as set forth herein. You may not use this
+file except in compliance with the License. You may obtain a copy of
+the License at http://www.apache.org/licenses/LICENSE-2.0.
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
+implied. See the License for the specific language governing
+permissions and limitations under the License.
+
+In addition, you may not use the software for any purposes that are
+illegal under applicable law, and the grant of the foregoing license
+under the Apache 2.0 license is conditioned upon your compliance with
+such restriction.
+*/
+
 package querier
 
 import (
@@ -9,11 +29,11 @@ import (
 	"strings"
 )
 
-func NewSeries(set *seriesSet) series {
+func NewSeries(set *seriesSet) *series {
 	newSeries := series{set: set}
 	newSeries.initLabels()
 	newSeries.initSeriesIter()
-	return newSeries
+	return &newSeries
 }
 
 type series struct {
@@ -40,7 +60,7 @@ type SeriesIterator interface {
 }
 
 // initialize the label set from _lset & name attributes
-func (s series) initLabels() {
+func (s *series) initLabels() {
 	name := s.set.iter.GetField("_name").(string)
 	lsetAttr := s.set.iter.GetField("_lset").(string)
 	lset := labels.Labels{labels.Label{Name: "__name__", Value: name}}
@@ -57,19 +77,20 @@ func (s series) initLabels() {
 }
 
 // initialize the series from value metadata & attributes
-func (s series) initSeriesIter() {
+func (s *series) initSeriesIter() {
 
 	maxt := s.set.maxt
-	maxTime := s.set.iter.GetField("_maxtime")
-	if maxTime != nil {
-		maxt = maxTime.(int64)
-	}
+	//maxTime := s.set.iter.GetField("_maxtime")
+	//if maxTime != nil {
+	//	maxt = maxTime.(int64)
+	//}
 	newIterator := v3ioSeriesIterator{mint: s.set.mint, maxt: maxt}
 	newIterator.chunks = []chunkenc.Chunk{}
 
 	metaAttr := s.set.iter.GetField("_meta_v")
 	// TODO: handle nil
 	metaArray := v3ioutil.AsInt64Array(metaAttr.([]byte))
+
 	for i, attr := range s.set.attrs {
 		values := s.set.iter.GetField(attr)
 		if values != nil && len(values.([]byte)) >= 24 {
@@ -84,9 +105,14 @@ func (s series) initSeriesIter() {
 		}
 
 	}
-	// TODO: if len>0 + err handle
-	newIterator.iter = newIterator.chunks[0].Iterator()
-	s.iter = &newIterator
+
+	if len(newIterator.chunks) == 0 {
+		// if there is no data, create a null iterator
+		s.iter = &nullSeriesIterator{}
+	} else {
+		newIterator.iter = newIterator.chunks[0].Iterator()
+		s.iter = &newIterator
+	}
 }
 
 type v3ioSeriesIterator struct {
@@ -176,3 +202,12 @@ func uintToTV(data uint64, curT int64, curV float64) (int64, float64) {
 	t := int64(data >> 32)
 	return curT + t, curV + v
 }
+
+type nullSeriesIterator struct {
+	err error
+}
+
+func (s nullSeriesIterator) Seek(t int64) bool        { return false }
+func (s nullSeriesIterator) Next() bool               { return false }
+func (s nullSeriesIterator) At() (t int64, v float64) { return 0, 0 }
+func (s nullSeriesIterator) Err() error               { return s.err }

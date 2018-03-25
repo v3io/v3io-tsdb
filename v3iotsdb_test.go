@@ -89,7 +89,7 @@ func TestName(t *testing.T) {
 	time.Sleep(time.Second * 1)
 	//return
 
-	qry, err := adapter.Querier(nil, basetime+400, basetime+29000)
+	qry, err := adapter.Querier(nil, basetime+400, basetime+2229000)
 	if err != nil {
 		t.Fatal(err)
 	}

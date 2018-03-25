@@ -1,10 +1,30 @@
+/*
+Copyright 2018 Iguazio Systems Ltd.
+
+Licensed under the Apache License, Version 2.0 (the "License") with
+an addition restriction as set forth herein. You may not use this
+file except in compliance with the License. You may obtain a copy of
+the License at http://www.apache.org/licenses/LICENSE-2.0.
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
+implied. See the License for the specific language governing
+permissions and limitations under the License.
+
+In addition, you may not use the software for any purposes that are
+illegal under applicable law, and the grant of the foregoing license
+under the Apache 2.0 license is conditioned upon your compliance with
+such restriction.
+*/
+
 package appender
 
 import (
 	"fmt"
 	"github.com/v3io/v3io-go-http"
 	"github.com/v3io/v3io-tsdb/chunkenc"
-	"github.com/v3io/v3io-tsdb/utils"
+	"github.com/v3io/v3io-tsdb/partmgr"
 )
 
 var MaxArraySize = 1024
@@ -22,25 +42,38 @@ func NewChunkStore() *chunkStore {
 type chunkStore struct {
 	state    storeState
 	curChunk int
+	lastTid  int
 	pending  []pendingData
 	chunks   [2]*attrAppender
 }
 
 // chunk appender
 type attrAppender struct {
-	appender   chunkenc.Appender
-	updMarker  int
-	updCount   int
-	lastT      int64
-	mint, maxt int64 // TODO: maxt can be calculated value or #hours to save space
-	writing    bool
+	appender  chunkenc.Appender
+	partition *partmgr.DBPartition
+	updMarker int
+	updCount  int
+	lastT     int64
+	chunkMint int64
+	writing   bool
 }
 
-func (a *attrAppender) clear() {
+func (a *attrAppender) initialize(partition *partmgr.DBPartition, t int64, app chunkenc.Appender) {
 	a.updCount = 0
 	a.updMarker = 0
 	a.lastT = 0
 	a.writing = false
+	a.partition = partition
+	a.chunkMint = partition.GetChunkMint(t)
+	a.appender = app
+}
+
+func (a *attrAppender) inRange(t int64) bool {
+	return a.partition.InChunkRange(a.chunkMint, t)
+}
+
+func (a *attrAppender) isAhead(t int64) bool {
+	return a.partition.IsAheadOfChunk(a.chunkMint, t)
 }
 
 // TODO: change appender from float to interface (allow map[str]interface cols)
@@ -96,6 +129,12 @@ func (cs *chunkStore) GetChunksState(mc *MetricsCache, t int64) {
 	// Get record meta + relevant attr
 	// return get resp id & err
 
+	part := mc.partitionMngr.TimeToPart(t)
+	chunk := chunkenc.NewXORChunk() // TODO: init based on schema, use init function
+	app, _ := chunk.Appender()
+
+	cs.chunks[0].initialize(part, t, app)
+
 	cs.state = storeStateGet
 
 }
@@ -116,14 +155,14 @@ func (cs *chunkStore) Append(t int64, v interface{}) error {
 	}
 
 	cur := cs.chunks[cs.curChunk]
-	if t >= cur.mint && t < cur.maxt {
+	if cur.inRange(t) {
 		// Append t/v to current chunk
 		cur.appendAttr(t, v)
 		return nil
 	}
 
-	if t >= cur.maxt {
-		// advance cur chunk
+	if cur.isAhead(t) {
+		// time is ahead of this chunk time, advance cur chunk
 		cur = cs.chunks[cs.curChunk^1]
 
 		// avoid append if there are still writes to old chunk
@@ -136,9 +175,7 @@ func (cs *chunkStore) Append(t int64, v interface{}) error {
 		if err != nil {
 			return err
 		}
-		cur.clear()
-		cur.appender = app
-		cur.mint, cur.maxt = utils.Time2MinMax(0, t) // TODO: dpo from config
+		cur.initialize(cur.partition.NextPart(t), t, app)
 		cur.appendAttr(t, v)
 		cs.curChunk = cs.curChunk ^ 1
 
@@ -149,7 +186,7 @@ func (cs *chunkStore) Append(t int64, v interface{}) error {
 
 	prev := cs.chunks[cs.curChunk^1]
 	// delayed Appends only allowed to previous chunk or within allowed window
-	if t >= prev.mint && t < prev.maxt && t > cur.lastT-MAX_LATE_WRITE {
+	if prev.inRange(t) && t > cur.lastT-MAX_LATE_WRITE {
 		// Append t/v to previous chunk
 		prev.appendAttr(t, v)
 		return nil
@@ -175,27 +212,39 @@ func (cs *chunkStore) WriteChunks(mc *MetricsCache, metric *MetricState) error {
 
 	notInitialized := false //TODO: init depend on get
 
-	for i := 1; i < 3; i++ {
+	for i := 0; i < 2; i++ {
 		chunk := cs.chunks[cs.curChunk^(i&1)]
-		tid := utils.Time2TableID(chunk.mint)
 
-		// write to a single table partition at a time, updated to 2nd partition will wait for next round
-		if chunk.appender != nil && (tableId == -1 || tableId == tid) {
+		if chunk.partition != nil {
+			tid := chunk.partition.GetId()
 
-			samples := chunk.appender.Chunk().NumSamples()
-			if samples > chunk.updCount {
-				tableId = tid
-				cs.state = storeStateUpdate
-				meta, offsetByte, b := chunk.appender.Chunk().GetChunkBuffer()
-				chunk.updMarker = ((offsetByte + len(b) - 1) / 8) * 8
-				chunk.updCount = samples
-				chunk.writing = true
+			// write to a single table partition at a time, updated to 2nd partition will wait for next round
+			if chunk.appender != nil && (tableId == -1 || tableId == tid) {
 
-				notInitialized = (offsetByte == 0)
-				expr = expr + chunkbuf2Expr(offsetByte, meta, b, chunk.mint, chunk.lastT)
+				samples := chunk.appender.Chunk().NumSamples()
+				if samples > chunk.updCount {
+					tableId = tid
+					cs.state = storeStateUpdate
+					meta, offsetByte, b := chunk.appender.Chunk().GetChunkBuffer()
+					chunk.updMarker = ((offsetByte + len(b) - 1) / 8) * 8
+					chunk.updCount = samples
+					chunk.writing = true
 
+					//notInitialized = (offsetByte == 0)
+					if tableId > cs.lastTid {
+						notInitialized = true
+						cs.lastTid = tableId
+					}
+					expr = expr + chunkbuf2Expr(offsetByte, meta, b, chunk)
+
+				}
 			}
+
 		}
+	}
+
+	if tableId == -1 { // no updates
+		return nil
 	}
 
 	if notInitialized { // TODO: not correct, need to init once per metric/partition, maybe use cond expressions
@@ -244,13 +293,13 @@ func (cs *chunkStore) ProcessWriteResp() {
 
 }
 
-func chunkbuf2Expr(offsetByte int, meta uint64, bytes []byte, mint, maxt int64) string {
+func chunkbuf2Expr(offsetByte int, meta uint64, bytes []byte, app *attrAppender) string {
 
 	expr := ""
 	offset := offsetByte / 8
 	ui := chunkenc.ToUint64(bytes)
-	idx, hrInChunk := utils.TimeToChunkId(0, mint) // TODO: add DaysPerObj from part manager
-	attr := utils.ChunkID2Attr("v", idx, hrInChunk)
+	idx := app.partition.TimeToChunkId(app.chunkMint) // TODO: add DaysPerObj from part manager
+	attr := app.partition.ChunkID2Attr("v", idx)
 
 	if offsetByte == 0 {
 		expr = expr + fmt.Sprintf("%s=init_array(%d,'int'); ", attr, MaxArraySize)
@@ -261,7 +310,7 @@ func chunkbuf2Expr(offsetByte int, meta uint64, bytes []byte, mint, maxt int64) 
 		expr = expr + fmt.Sprintf("%s[%d]=%d; ", attr, offset, int64(ui[i]))
 		offset++
 	}
-	expr += fmt.Sprintf("_maxtime=%d", maxt) // TODO: use max() expr
+	expr += fmt.Sprintf("_maxtime=%d", app.lastT) // TODO: use max() expr
 
 	return expr
 }
