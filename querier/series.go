@@ -4,23 +4,22 @@ import (
 	"github.com/prometheus/prometheus/pkg/labels"
 	"github.com/prometheus/prometheus/storage"
 	"github.com/v3io/v3io-tsdb/chunkenc"
-	"github.com/v3io/v3io-tsdb/utils"
 	"github.com/v3io/v3io-tsdb/v3ioutil"
 	"math"
 	"strings"
 )
 
-func NewSeries(partition *utils.ColDBPartition, ic *v3ioutil.V3ioItemsCursor, mint, maxt int64) series {
-	newSeries := series{partition: partition}
-	newSeries.getLables(ic)
-	newSeries.getSeriesIter(ic, mint, maxt)
+func NewSeries(set *seriesSet) series {
+	newSeries := series{set: set}
+	newSeries.initLabels()
+	newSeries.initSeriesIter()
 	return newSeries
 }
 
 type series struct {
-	partition *utils.ColDBPartition
-	lset      labels.Labels
-	iter      SeriesIterator
+	set  *seriesSet
+	lset labels.Labels
+	iter SeriesIterator
 }
 
 func (s series) Labels() labels.Labels            { return s.lset }
@@ -40,9 +39,10 @@ type SeriesIterator interface {
 	Err() error
 }
 
-func (s series) getLables(ic *v3ioutil.V3ioItemsCursor) {
-	name := ic.GetField("_name").(string)
-	lsetAttr := ic.GetField("_lset").(string)
+// initialize the label set from _lset & name attributes
+func (s series) initLabels() {
+	name := s.set.iter.GetField("_name").(string)
+	lsetAttr := s.set.iter.GetField("_lset").(string)
 	lset := labels.Labels{labels.Label{Name: "__name__", Value: name}}
 
 	splitLset := strings.Split(lsetAttr, ",")
@@ -56,28 +56,30 @@ func (s series) getLables(ic *v3ioutil.V3ioItemsCursor) {
 	s.lset = lset
 }
 
-func (s series) getSeriesIter(ic *v3ioutil.V3ioItemsCursor, mint, maxt int64) {
+// initialize the series from value metadata & attributes
+func (s series) initSeriesIter() {
 
-	newIterator := v3ioSeriesIterator{mint: mint, maxt: maxt}
+	maxt := s.set.maxt
+	maxTime := s.set.iter.GetField("_maxtime")
+	if maxTime != nil {
+		maxt = maxTime.(int64)
+	}
+	newIterator := v3ioSeriesIterator{mint: s.set.mint, maxt: maxt}
 	newIterator.chunks = []chunkenc.Chunk{}
-	newIterator.chunkMaxTime = []int64{}
 
-	attrs, ids := utils.Range2Attrs("v", 0, mint, maxt)
-	metaAttr := ic.GetField("_meta_v")
+	metaAttr := s.set.iter.GetField("_meta_v")
 	// TODO: handle nil
 	metaArray := v3ioutil.AsInt64Array(metaAttr.([]byte))
-	for i, attr := range attrs {
-		values := ic.GetField(attr)
+	for i, attr := range s.set.attrs {
+		values := s.set.iter.GetField(attr)
 		if values != nil && len(values.([]byte)) >= 24 {
-			chunkID := ids[i]
+			chunkID := s.set.chunkIds[i]
 			bytes := values.([]byte)
 			meta := metaArray[chunkID]
 			chunk, _ := chunkenc.FromBuffer(meta, bytes[16:])
 			// TODO: err handle
 
-			//c, _ := chunkenc.FromData(chunkenc.EncXOR, bytes[24:], count)
 			newIterator.chunks = append(newIterator.chunks, chunk)
-			newIterator.chunkMaxTime = append(newIterator.chunkMaxTime, int64(chunkID+1)*3600*1000) // TODO: use method to calc max
 
 		}
 
@@ -91,12 +93,12 @@ type v3ioSeriesIterator struct {
 	mint, maxt int64 // TBD per block
 	err        error
 
-	chunks       []chunkenc.Chunk
-	chunkMaxTime []int64
-	chunkIndex   int
-	iter         chunkenc.Iterator
+	chunks     []chunkenc.Chunk
+	chunkIndex int
+	iter       chunkenc.Iterator
 }
 
+// advance the iterator to the specified time
 func (it *v3ioSeriesIterator) Seek(t int64) bool {
 
 	if t > it.maxt {
@@ -133,6 +135,7 @@ func (it *v3ioSeriesIterator) Seek(t int64) bool {
 	return false
 }
 
+// move to the next iterator item
 func (it *v3ioSeriesIterator) Next() bool {
 	if it.iter.Next() {
 		t, _ := it.iter.At()
@@ -163,6 +166,7 @@ func (it *v3ioSeriesIterator) Next() bool {
 	return it.Next()
 }
 
+// read the time & value at the current location
 func (it *v3ioSeriesIterator) At() (t int64, v float64) { return it.iter.At() }
 
 func (it *v3ioSeriesIterator) Err() error { return it.iter.Err() }

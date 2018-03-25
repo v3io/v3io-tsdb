@@ -143,8 +143,8 @@ func (mc *MetricsCache) Start() error {
 				metric := app.metric
 				metric.Lock()
 
-				if metric.store.state == storeStateInit {
-					metric.store.state = storeStateReady // TODO: get metric instead
+				if metric.store.GetState() == storeStateInit {
+					metric.store.SetState(storeStateReady) // TODO: get metric instead
 				}
 
 				metric.store.Append(app.t, app.v)

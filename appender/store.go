@@ -32,7 +32,7 @@ type attrAppender struct {
 	updMarker  int
 	updCount   int
 	lastT      int64
-	mint, maxt int64
+	mint, maxt int64 // TODO: maxt can be calculated value or #hours to save space
 	writing    bool
 }
 
@@ -43,24 +43,42 @@ func (a *attrAppender) clear() {
 	a.writing = false
 }
 
+// TODO: change appender from float to interface (allow map[str]interface cols)
+func (a *attrAppender) appendAttr(t int64, v interface{}) {
+	a.appender.Append(t, v.(float64))
+	if t > a.lastT {
+		a.lastT = t
+	}
+}
+
 type pendingData struct {
 	t int64
-	v float64
+	v interface{}
 }
 
 type storeState uint8
 
 const (
 	storeStateInit   storeState = 0
-	storeStateGet    storeState = 1
-	storeStateReady  storeState = 2
-	storeStateUpdate storeState = 3
+	storeStateGet    storeState = 1 // Getting old state from storage
+	storeStateReady  storeState = 2 // Ready to update
+	storeStateUpdate storeState = 3 // Update/write in progress
+	storeStateSort   storeState = 3 // TBD sort chunk(s) in case of late arrivals
 )
 
 func (cs *chunkStore) IsReady() bool {
 	return cs.state == storeStateReady
 }
 
+func (cs *chunkStore) GetState() storeState {
+	return cs.state
+}
+
+func (cs *chunkStore) SetState(state storeState) {
+	cs.state = state
+}
+
+// return how many un-commited writes
 func (cs *chunkStore) UpdatesBehind() int {
 	updatesBehind := len(cs.pending)
 	for _, chunk := range cs.chunks {
@@ -82,24 +100,14 @@ func (cs *chunkStore) GetChunksState(mc *MetricsCache, t int64) {
 
 }
 
-/*
-func (cs *chunkStore) initChunk(idx int, t int64) error {
-	chunk := chunkenc.NewXORChunk() // TODO: calc new mint/maxt
-	app, err := chunk.Appender()
-	if err != nil {
-		return err
-	}
-
-	cs.chunks[idx].appender = app                                      //&attrAppender{appender: app}
-	cs.chunks[idx].mint, cs.chunks[idx].maxt = utils.Time2MinMax(0, t) // TODO: dpo from config
-
-	return nil
+// Process the GetItem response from the storage and initialize or restore the current chunk
+func (cs *chunkStore) ProcessGetResp(resp *v3io.Response) {
+	// init chunk from resp (attr)
+	// append last t/v into the chunk and clear pending
 }
-*/
 
 // Append data to the right chunk and table based on the time and state
-func (cs *chunkStore) Append(t int64, vif interface{}) error {
-	v := vif.(float64) // TODO: change all to interface
+func (cs *chunkStore) Append(t int64, v interface{}) error {
 
 	// if it was just created and waiting to get the state we append to temporary list
 	if cs.state == storeStateGet || cs.state == storeStateInit {
@@ -110,11 +118,7 @@ func (cs *chunkStore) Append(t int64, vif interface{}) error {
 	cur := cs.chunks[cs.curChunk]
 	if t >= cur.mint && t < cur.maxt {
 		// Append t/v to current chunk
-		cur.appender.Append(t, v)
-		if t > cur.lastT {
-			cur.lastT = t
-		}
-
+		cur.appendAttr(t, v)
 		return nil
 	}
 
@@ -122,12 +126,12 @@ func (cs *chunkStore) Append(t int64, vif interface{}) error {
 		// advance cur chunk
 		cur = cs.chunks[cs.curChunk^1]
 
-		// avoid append if there are still writes to prev chunk
+		// avoid append if there are still writes to old chunk
 		if cur.writing {
 			return fmt.Errorf("Error, append beyound cur chunk while IO in flight to prev", t)
 		}
 
-		chunk := chunkenc.NewXORChunk() // TODO: calc new mint/maxt
+		chunk := chunkenc.NewXORChunk() // TODO: init based on schema, use init function
 		app, err := chunk.Appender()
 		if err != nil {
 			return err
@@ -135,10 +139,7 @@ func (cs *chunkStore) Append(t int64, vif interface{}) error {
 		cur.clear()
 		cur.appender = app
 		cur.mint, cur.maxt = utils.Time2MinMax(0, t) // TODO: dpo from config
-		cur.appender.Append(t, v)
-		if t > cur.lastT {
-			cur.lastT = t
-		}
+		cur.appendAttr(t, v)
 		cs.curChunk = cs.curChunk ^ 1
 
 		return nil
@@ -150,22 +151,13 @@ func (cs *chunkStore) Append(t int64, vif interface{}) error {
 	// delayed Appends only allowed to previous chunk or within allowed window
 	if t >= prev.mint && t < prev.maxt && t > cur.lastT-MAX_LATE_WRITE {
 		// Append t/v to previous chunk
-		prev.appender.Append(t, v)
-		if t > prev.lastT {
-			prev.lastT = t
-		}
+		prev.appendAttr(t, v)
 		return nil
 	}
 
 	// if (mint - t) in allowed window may need to advance next (assume prev is not the one right before cur)
 
 	return nil
-}
-
-// Process the GetItem response from the storage and initialize or restore the current chunk
-func (cs *chunkStore) processGetResp(resp *v3io.Response) {
-	// init chunk from resp (attr)
-	// append last t/v into the chunk and clear pending
 }
 
 // Write pending data of the current or previous chunk to the storage
@@ -175,8 +167,11 @@ func (cs *chunkStore) WriteChunks(mc *MetricsCache, metric *MetricState) error {
 	expr := ""
 
 	if cs.state == storeStateGet {
+		// cannot write if restoring chunk state is in progress
 		return nil
 	}
+
+	// TODO: maybe have a bool to indicate if we have new appends vs checking all the chunks..
 
 	notInitialized := false //TODO: init depend on get
 
@@ -184,6 +179,7 @@ func (cs *chunkStore) WriteChunks(mc *MetricsCache, metric *MetricState) error {
 		chunk := cs.chunks[cs.curChunk^(i&1)]
 		tid := utils.Time2TableID(chunk.mint)
 
+		// write to a single table partition at a time, updated to 2nd partition will wait for next round
 		if chunk.appender != nil && (tableId == -1 || tableId == tid) {
 
 			samples := chunk.appender.Chunk().NumSamples()
@@ -196,7 +192,7 @@ func (cs *chunkStore) WriteChunks(mc *MetricsCache, metric *MetricState) error {
 				chunk.writing = true
 
 				notInitialized = (offsetByte == 0)
-				expr = expr + Chunkbuf2Expr(offsetByte, meta, b, chunk.mint, chunk.lastT)
+				expr = expr + chunkbuf2Expr(offsetByte, meta, b, chunk.mint, chunk.lastT)
 
 			}
 		}
@@ -212,7 +208,7 @@ func (cs *chunkStore) WriteChunks(mc *MetricsCache, metric *MetricState) error {
 			}
 		}
 		expr = lblexpr + fmt.Sprintf("_lset='%s'; _meta_v=init_array(%d,'int'); ",
-			metric.key, 24) + expr
+			metric.key, 24) + expr // TODO: compute meta arr size
 	}
 
 	path := fmt.Sprintf("%s/%s.%d", mc.cfg.Path, metric.name, metric.hash) // TODO: use TableID
@@ -248,7 +244,7 @@ func (cs *chunkStore) ProcessWriteResp() {
 
 }
 
-func Chunkbuf2Expr(offsetByte int, meta uint64, bytes []byte, mint, maxt int64) string {
+func chunkbuf2Expr(offsetByte int, meta uint64, bytes []byte, mint, maxt int64) string {
 
 	expr := ""
 	offset := offsetByte / 8

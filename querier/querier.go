@@ -115,15 +115,15 @@ type seriesSet struct {
 	iter       *v3ioutil.V3ioItemsCursor
 	mint, maxt int64
 	attrs      []string
-	chunkMaxt  []int64
+	chunkIds   []int
 }
 
 // TODO: get items per partition + merge, per partition calc attrs
 func (s seriesSet) getItems(path, filter string, container *v3io.Container) error {
 
 	attrs := []string{"_lset", "_meta_v", "_name", "_maxtime"}
-	attrStr, _ := utils.Range2Attrs("v", 0, s.mint, s.maxt)
-	attrs = append(attrs, attrStr...)
+	s.attrs, s.chunkIds = utils.Range2Attrs("v", 0, s.mint, s.maxt)
+	attrs = append(attrs, s.attrs...)
 	input := v3io.GetItemsInput{Path: path, AttributeNames: attrs, Filter: filter}
 
 	response, err := container.Sync.GetItems(&input)
@@ -140,7 +140,7 @@ func (s seriesSet) Next() bool { return s.iter.Next() }
 func (s seriesSet) Err() error { return s.iter.Err() }
 
 func (s seriesSet) At() storage.Series {
-	return NewSeries(s.partition, s.iter, s.mint, s.maxt)
+	return NewSeries(&s)
 }
 
 type errSeriesSet struct {
