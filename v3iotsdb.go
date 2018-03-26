@@ -85,10 +85,13 @@ func (a *V3ioAdapter) Start() error {
 	}
 
 	_, err = a.container.Sync.ListBucket(&v3io.ListBucketInput{})
+
 	if err != nil {
 		a.logger.ErrorWith("Failed to access v3io container", "url", a.cfg.V3ioUrl, "err", err)
+		return errors.Wrap(err, "Failed to access v3io container")
 	}
-	return errors.Wrap(err, "Failed to access v3io container")
+
+	return nil
 }
 
 func (a *V3ioAdapter) Appender() (storage.Appender, error) {

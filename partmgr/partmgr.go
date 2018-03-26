@@ -30,7 +30,7 @@ import (
 )
 
 func NewPartitionMngr(cfg *config.TsdbConfig) *PartitionManager {
-	newMngr := &PartitionManager{cyclic: true}
+	newMngr := &PartitionManager{cfg: cfg, cyclic: true}
 	newMngr.headPartition = NewDBPartition(newMngr)
 	return newMngr
 }
@@ -40,16 +40,17 @@ func NewDBPartition(pmgr *PartitionManager) *DBPartition {
 		manager:       pmgr,
 		partID:        1,
 		startTime:     0,
-		days:          1,
-		hoursInChunk:  1,
+		days:          pmgr.cfg.DaysPerObj,
+		hoursInChunk:  pmgr.cfg.HrInChunk,
 		prefix:        "",
-		retentionDays: 0,
+		retentionDays: pmgr.cfg.DaysRetention,
 	}
 	return &newPart
 }
 
 type PartitionManager struct {
 	mtx           sync.RWMutex
+	cfg           *config.TsdbConfig
 	headPartition *DBPartition
 	cyclic        bool
 }
@@ -125,7 +126,7 @@ func (p *DBPartition) TimeRange() (int64, int64) {
 }
 
 func (p *DBPartition) ChunkID2Attr(col string, id int) string {
-	return fmt.Sprintf("__%s%d", col, id*p.hoursInChunk)
+	return fmt.Sprintf("_%s%d", col, id*p.hoursInChunk)
 }
 
 func (p *DBPartition) Range2Attrs(col string, mint, maxt int64) ([]string, []int) {

@@ -27,19 +27,20 @@ import (
 )
 
 type TsdbConfig struct {
-	V3ioUrl   string `json:"v3ioUrl"`
-	Container string `json:"container"`
-	Path      string `json:"path"`
-	Username  string `json:"username"`
-	Password  string `json:"password"`
-	Verbose   bool   `json:"verbose,omitempty"`
-	Workers   int    `json:"workers"`
-	ChanSize  int    `json:"chanSize"`
-	MaxBehind int    `json:"maxBehind"`
-	ArraySize int    `json:"arraySize,omitempty"`
-	//HrInChunk      int                     `json:"hrInChunk,omitempty"`
+	V3ioUrl        string                  `json:"v3ioUrl"`
+	Container      string                  `json:"container"`
+	Path           string                  `json:"path"`
+	Username       string                  `json:"username"`
+	Password       string                  `json:"password"`
+	Verbose        bool                    `json:"verbose,omitempty"`
+	Workers        int                     `json:"workers"`
+	ChanSize       int                     `json:"chanSize"`
+	MaxBehind      int                     `json:"maxBehind"`
+	ArraySize      int                     `json:"arraySize,omitempty"`
+	HrInChunk      int                     `json:"hrInChunk,omitempty"`
 	DaysPerObj     int                     `json:"daysPerObj,omitempty"`
 	DaysRetention  int                     `json:"daysRetention,omitempty"`
+	PartFormat     string                  `json:"partFormat,omitempty"`
 	DefaultRollups string                  `json:"defaultRollups,omitempty"`
 	RollupHrs      int                     `json:"rollupHrs,omitempty"`
 	DelRawSamples  bool                    `json:"delRawSamples,omitempty"`
@@ -82,13 +83,16 @@ func LoadFromData(data []byte) (*TsdbConfig, error) {
 		cfg.Workers = 8
 	}
 	if cfg.ArraySize == 0 {
-		cfg.ArraySize = 1024
+		cfg.ArraySize = 2048
 	}
 	if cfg.ChanSize == 0 {
 		cfg.ChanSize = 2048
 	}
 	if cfg.DaysPerObj == 0 {
 		cfg.DaysPerObj = 1
+	}
+	if cfg.HrInChunk == 0 {
+		cfg.HrInChunk = 1
 	}
 	if cfg.Path == "" {
 		cfg.Path = "metrics"

@@ -256,5 +256,8 @@ func labels2key(lset labels.Labels) (string, string) {
 			key = key + lbl.Name + "=" + lbl.Value + ","
 		}
 	}
+	if len(key) == 0 {
+		return name, ""
+	}
 	return name, key[:len(key)-1]
 }
