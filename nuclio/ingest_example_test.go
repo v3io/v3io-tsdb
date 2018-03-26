@@ -12,16 +12,16 @@ func TestName(t *testing.T) {
 	data := nutest.DataBind{Name: "db0", Url: os.Getenv("V3IO_URL"), Container: "nuclio"}
 	tc, err := nutest.NewTestContext(Handler, true, &data)
 	if err != nil {
-		t.Fail()
+		t.Fatal(err)
 	}
 
 	err = tc.InitContext(InitContext)
 	if err != nil {
-		t.Fail()
+		t.Fatal(err)
 	}
 	testEvent := nutest.TestEvent{
 		Path:    "/some/path",
-		Body:    []byte("1234"),
+		Body:    []byte(pushEvent),
 		Headers: map[string]interface{}{"first": "string", "sec": "1"},
 	}
 	resp, err := tc.Invoke(&testEvent)
