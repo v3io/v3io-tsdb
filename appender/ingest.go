@@ -62,7 +62,7 @@ type MetricsCache struct {
 	asyncAppendChan chan *asyncAppend
 
 	lastMetric     uint64
-	cacheMetricMap map[string]*MetricState // TODO: maybe use hash as key & combine w ref
+	cacheMetricMap map[uint64]*MetricState // TODO: maybe use hash as key & combine w ref
 	cacheRefMap    map[uint64]*MetricState // TODO: maybe turn to list + free list, periodically delete old matrics
 	requestsMap    map[uint64]*MetricState // v3io async requests
 
@@ -72,7 +72,7 @@ type MetricsCache struct {
 func NewMetricsCache(container *v3io.Container, logger logger.Logger, cfg *config.TsdbConfig,
 	partMngr *partmgr.PartitionManager) *MetricsCache {
 	newCache := MetricsCache{container: container, logger: logger, cfg: cfg, partitionMngr: partMngr}
-	newCache.cacheMetricMap = map[string]*MetricState{}
+	newCache.cacheMetricMap = map[uint64]*MetricState{}
 	newCache.cacheRefMap = map[uint64]*MetricState{}
 	newCache.requestsMap = map[uint64]*MetricState{}
 
@@ -169,23 +169,23 @@ func (mc *MetricsCache) Start() error {
 }
 
 // return metric struct by key
-func (mc *MetricsCache) getMetric(key string) (*MetricState, bool) {
+func (mc *MetricsCache) getMetric(hash uint64) (*MetricState, bool) {
 	mc.mtx.RLock()
 	defer mc.mtx.RUnlock()
 
-	metric, ok := mc.cacheMetricMap[key]
+	metric, ok := mc.cacheMetricMap[hash]
 	return metric, ok
 }
 
 // create a new metric and save in the map
-func (mc *MetricsCache) addMetric(key, name string, metric *MetricState) {
+func (mc *MetricsCache) addMetric(hash uint64, name string, metric *MetricState) {
 	mc.mtx.Lock()
 	defer mc.mtx.Unlock()
 
 	mc.lastMetric++
 	metric.refId = mc.lastMetric
 	mc.cacheRefMap[mc.lastMetric] = metric
-	mc.cacheMetricMap[key] = metric
+	mc.cacheMetricMap[hash] = metric
 	mc.NameLabelMap[name] = true // TODO: temporary until we get names from storage
 }
 
@@ -199,7 +199,7 @@ func (mc *MetricsCache) getMetricByRef(ref uint64) (*MetricState, bool) {
 }
 
 // Push append to async channel
-func (mc *MetricsCache) append(metric *MetricState, t int64, v interface{}) {
+func (mc *MetricsCache) appendTV(metric *MetricState, t int64, v interface{}) {
 	mc.asyncAppendChan <- &asyncAppend{metric: metric, t: t, v: v}
 }
 
@@ -207,23 +207,24 @@ func (mc *MetricsCache) append(metric *MetricState, t int64, v interface{}) {
 func (mc *MetricsCache) Add(lset labels.Labels, t int64, v interface{}) (uint64, error) {
 
 	name, key := labels2key(lset)
-	metric, ok := mc.getMetric(key)
+	hash := lset.Hash()
+	metric, ok := mc.getMetric(hash)
 
 	if ok {
 		err := metric.Err()
 		if err != nil {
 			return 0, err
 		}
-		mc.append(metric, t, v)
+		mc.appendTV(metric, t, v)
 		return metric.refId, nil
 	}
 
-	metric = &MetricState{Lset: lset, key: key, name: name, hash: lset.Hash()}
+	metric = &MetricState{Lset: lset, key: key, name: name, hash: hash}
 	metric.store = NewChunkStore()
-	mc.addMetric(key, name, metric)
+	mc.addMetric(hash, name, metric)
 
 	// push new/next update
-	mc.append(metric, t, v)
+	mc.appendTV(metric, t, v)
 	return metric.refId, nil
 }
 
@@ -240,7 +241,7 @@ func (mc *MetricsCache) AddFast(lset labels.Labels, ref uint64, t int64, v inter
 	if err != nil {
 		return err
 	}
-	mc.append(metric, t, v)
+	mc.appendTV(metric, t, v)
 	return nil
 
 }
