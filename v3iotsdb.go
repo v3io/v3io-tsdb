@@ -123,3 +123,12 @@ func (a v3ioAppender) AddFast(lset labels.Labels, ref uint64, t int64, v float64
 
 func (a v3ioAppender) Commit() error   { return nil }
 func (a v3ioAppender) Rollback() error { return nil }
+
+// Appender provides batched appends against a storage.
+type Appender interface {
+	Add(l labels.Labels, t int64, v float64) (uint64, error)
+	AddFast(l labels.Labels, ref uint64, t int64, v float64) error
+	// Commit submits the collected samples and purges the batch.
+	Commit() error
+	Rollback() error
+}
