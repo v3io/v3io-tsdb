@@ -38,15 +38,19 @@ type V3ioItemsCursor struct {
 	container      *v3io.Container
 }
 
-func NewItemsCursor(container *v3io.Container, input *v3io.GetItemsInput, response *v3io.Response) *V3ioItemsCursor {
+func NewItemsCursor(container *v3io.Container, input *v3io.GetItemsInput) (*V3ioItemsCursor, error) {
 	newItemsCursor := &V3ioItemsCursor{
 		container: container,
 		input:     input,
 	}
 
+	response, err := container.Sync.GetItems(input)
+	if err != nil {
+		return nil, err
+	}
 	newItemsCursor.setResponse(response)
 
-	return newItemsCursor
+	return newItemsCursor, nil
 }
 
 func (ic *V3ioItemsCursor) Err() error {

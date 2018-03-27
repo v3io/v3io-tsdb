@@ -145,7 +145,7 @@ func (c *XORChunk) iterator() *xorIterator {
 	// When using striped locks to guard access to chunks, probably yes.
 	// Could only copy data if the chunk is not completed yet.
 	return &xorIterator{
-		br:       newBReader(c.b.bytes()), // TODO: removed bytes() may need merge
+		br:       newBReader(c.b.bytes()), // TODO: may need merge
 		numTotal: c.samples,
 	}
 }

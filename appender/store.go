@@ -256,7 +256,7 @@ func (cs *chunkStore) WriteChunks(mc *MetricsCache, metric *MetricState) error {
 				lblexpr = lblexpr + fmt.Sprintf("_name='%s'; ", lbl.Value)
 			}
 		}
-		expr = lblexpr + fmt.Sprintf("_lset='%s'; _meta_v=init_array(%d,'int'); ",
+		expr = lblexpr + fmt.Sprintf("_lset='%s'; _meta=init_array(%d,'int'); ",
 			metric.key, 24) + expr // TODO: compute meta arr size
 	}
 
@@ -305,7 +305,7 @@ func chunkbuf2Expr(offsetByte int, meta uint64, bytes []byte, app *attrAppender)
 		expr = expr + fmt.Sprintf("%s=init_array(%d,'int'); ", attr, MaxArraySize)
 	}
 
-	expr = expr + fmt.Sprintf("_meta_v[%d]=%d; ", idx, meta) // TODO: meta name as col variable
+	expr = expr + fmt.Sprintf("_meta[%d]=%d; ", idx, meta) // TODO: meta name as col variable
 	for i := 0; i < len(ui); i++ {
 		expr = expr + fmt.Sprintf("%s[%d]=%d; ", attr, offset, int64(ui[i]))
 		offset++

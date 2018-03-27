@@ -30,7 +30,7 @@ import (
 )
 
 func NewPartitionMngr(cfg *config.TsdbConfig) *PartitionManager {
-	newMngr := &PartitionManager{cfg: cfg, cyclic: true}
+	newMngr := &PartitionManager{cfg: cfg, cyclic: true, ignoreWrap: true}
 	newMngr.headPartition = NewDBPartition(newMngr)
 	return newMngr
 }
@@ -53,6 +53,11 @@ type PartitionManager struct {
 	cfg           *config.TsdbConfig
 	headPartition *DBPartition
 	cyclic        bool
+	ignoreWrap    bool
+}
+
+func (p *PartitionManager) IsCyclic() bool {
+	return p.cyclic
 }
 
 func (p *PartitionManager) Init() error {
@@ -68,6 +73,11 @@ func (p *PartitionManager) TimeToPart(t int64) *DBPartition {
 func (p *PartitionManager) PartsForRange(mint, maxt int64) []*DBPartition {
 
 	return []*DBPartition{p.headPartition}
+}
+
+func (p *PartitionManager) GetHead() *DBPartition {
+
+	return p.headPartition
 }
 
 type DBPartition struct {
@@ -119,10 +129,20 @@ func (p *DBPartition) TimeToChunkId(t int64) int {
 
 func (p *DBPartition) TimeRange() (int64, int64) {
 	from := p.startTime
-	if p.manager.cyclic {
-		from = (time.Now().Unix()/3600 - int64(p.days*24) + 1) * 24 * 3600 * 1000 // start p.days ago, hour rounded
-	}
 	return from, from + int64(p.days*24*3600*1000)
+}
+
+func (p *DBPartition) CyclicMinTime(mint, maxt int64) int64 {
+	maxSec := maxt / 1000
+	if !p.manager.ignoreWrap {
+		maxSec = time.Now().Unix()
+	}
+	// start p.days ago, rounded to next hour
+	newMin := (maxSec/3600 - int64(p.days*24) + 1) * 3600 * 1000
+	if mint > newMin {
+		return mint
+	}
+	return newMin
 }
 
 func (p *DBPartition) ChunkID2Attr(col string, id int) string {
@@ -143,16 +163,20 @@ func (p *DBPartition) Range2Cids(mint, maxt int64) []int {
 	start := p.TimeToChunkId(mint)
 	end := p.TimeToChunkId(maxt)
 
-	for i := start; i < 24 && i <= end; i++ {
-		list = append(list, i)
-	}
 	if end < start {
+		for i := start; i < 24; i++ {
+			list = append(list, i)
+		}
 		for i := 0; i <= end; i++ {
 			list = append(list, i)
 		}
 
+		return list
 	}
 
+	for i := start; i <= end; i++ {
+		list = append(list, i)
+	}
 	return list
 }
 

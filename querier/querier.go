@@ -35,7 +35,7 @@ import (
 func NewV3ioQuerier(container *v3io.Container, logger logger.Logger, mint, maxt int64,
 	keymap *map[string]bool, cfg *config.TsdbConfig, partMngr *partmgr.PartitionManager) V3ioQuerier {
 	newQuerier := V3ioQuerier{container: container, mint: mint, maxt: maxt,
-		logger: logger, Keymap: keymap, cfg: cfg}
+		logger: logger.GetChild("Querier"), Keymap: keymap, cfg: cfg}
 	newQuerier.partitionMngr = partMngr
 	return newQuerier
 }
@@ -54,14 +54,27 @@ func (q V3ioQuerier) Select(params *storage.SelectParams, oms ...*labels.Matcher
 	//vc := v3ioutil.NewV3ioClient(q.logger, q.Keymap)
 	//iter, err := vc.GetItems(q.container, q.cfg.Path+"/", filter, attrs)
 
-	partitions := q.partitionMngr.PartsForRange(q.mint, q.maxt)
-	newSet := newSeriesSet(partitions[0], q.mint, q.maxt) // TODO: support multiple partitions
-	err := newSet.getItems(q.cfg.Path+"/", filter, q.container)
-	if err != nil {
-		return nil, err
+	mint, maxt := q.mint, q.maxt
+	if q.partitionMngr.IsCyclic() {
+		partition := q.partitionMngr.GetHead()
+		mint = partition.CyclicMinTime(mint, maxt)
+		q.logger.DebugWith("Select - new cyclic series", "from", mint, "to", maxt, "filter", filter)
+		newSet := &seriesSet{mint: mint, maxt: maxt, partition: partition, logger: q.logger}
+
+		err := newSet.getItems(q.cfg.Path+"/", filter, q.container)
+		if err != nil {
+			return nil, err
+		}
+
+		return newSet, nil
+
 	}
 
-	return newSet, nil
+	q.logger.Warn("Select with multi partitions, not supported ")
+	// TODO: support multiple partitions
+	//partitions := q.partitionMngr.PartsForRange(q.mint, q.maxt)
+
+	return nullSeriesSet{}, nil
 }
 
 func match2filter(oms []*labels.Matcher) string {
@@ -98,18 +111,11 @@ func (q V3ioQuerier) Close() error {
 
 func newSeriesSet(partition *partmgr.DBPartition, mint, maxt int64) *seriesSet {
 
-	pmin, pmax := partition.TimeRange()
-	if pmin > mint {
-		//mint = pmin
-	}
-	if pmax < maxt {
-		maxt = pmax
-	}
-
 	return &seriesSet{mint: mint, maxt: maxt, partition: partition}
 }
 
 type seriesSet struct {
+	logger     logger.Logger
 	partition  *partmgr.DBPartition
 	iter       *v3ioutil.V3ioItemsCursor
 	mint, maxt int64
@@ -120,17 +126,18 @@ type seriesSet struct {
 // TODO: get items per partition + merge, per partition calc attrs
 func (s *seriesSet) getItems(path, filter string, container *v3io.Container) error {
 
-	attrs := []string{"_lset", "_meta_v", "_name", "_maxtime"}
+	attrs := []string{"_lset", "_meta", "_name", "_maxtime"}
 	s.attrs, s.chunkIds = s.partition.Range2Attrs("v", s.mint, s.maxt)
 	attrs = append(attrs, s.attrs...)
 
+	s.logger.DebugWith("Select - GetItems", "path", path, "attr", attrs, "filter", filter)
 	input := v3io.GetItemsInput{Path: path, AttributeNames: attrs, Filter: filter}
-	response, err := container.Sync.GetItems(&input)
+	iter, err := v3ioutil.NewItemsCursor(container, &input)
 	if err != nil {
 		return err
 	}
 
-	s.iter = v3ioutil.NewItemsCursor(container, &input, response)
+	s.iter = iter
 	return nil
 
 }
@@ -142,13 +149,13 @@ func (s seriesSet) At() storage.Series {
 	return NewSeries(&s)
 }
 
-type errSeriesSet struct {
+type nullSeriesSet struct {
 	err error
 }
 
-func (s errSeriesSet) Next() bool         { return false }
-func (s errSeriesSet) At() storage.Series { return nil }
-func (s errSeriesSet) Err() error         { return s.err }
+func (s nullSeriesSet) Next() bool         { return false }
+func (s nullSeriesSet) At() storage.Series { return nil }
+func (s nullSeriesSet) Err() error         { return s.err }
 
 func mergeLables(a, b []string) []string {
 	maxl := len(a)

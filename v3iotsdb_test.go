@@ -25,15 +25,15 @@ import (
 	"github.com/prometheus/prometheus/pkg/labels"
 	"github.com/v3io/v3io-tsdb/config"
 	"testing"
-	"time"
+	//"time"
 )
 
-const basetime = 1520346654002
+const basetime = 1522105859209
 
 func TestName(t *testing.T) {
 
-	ts1 := []int64{2000, 3050, 4100, 4950, 7000, 8200}
-	arr1 := []float64{1, 2, 3, 4, 5, 6}
+	//ts1 := []int64{2000, 3050, 4100, 4950, 7000, 8200}
+	//arr1 := []float64{1, 2, 3, 4, 5, 6}
 	cfg, err := config.LoadConfig("v3io.yaml")
 	if err != nil {
 		t.Fatal(err)
@@ -46,55 +46,57 @@ func TestName(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	appender, err := adapter.Appender()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	lset := labels.Labels{labels.Label{Name: "__name__", Value: "http_req"},
-		labels.Label{Name: "method", Value: "post"}}
-
-	lset2 := labels.Labels{labels.Label{Name: "__name__", Value: "http_req"},
-		labels.Label{Name: "method", Value: "get"}}
-
-	ref, err := appender.Add(lset, basetime+1000, 2)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	//time.Sleep(time.Second * 1)
-	ref2, err := appender.Add(lset2, basetime+1600, 9.3)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	//time.Sleep(time.Second * 2)
-	for i := 0; i < len(arr1); i++ {
-		err = appender.AddFast(lset, ref, basetime+ts1[i], arr1[i])
+	/*
+		appender, err := adapter.Appender()
 		if err != nil {
 			t.Fatal(err)
 		}
-	}
 
-	err = appender.AddFast(lset2, ref2, basetime+2300, 7.7)
+		lset := labels.Labels{labels.Label{Name: "__name__", Value: "http_req"},
+			labels.Label{Name: "method", Value: "post"}}
+
+		lset2 := labels.Labels{labels.Label{Name: "__name__", Value: "http_req"},
+			labels.Label{Name: "method", Value: "get"}}
+
+		ref, err := appender.Add(lset, basetime+1000, 2)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		//time.Sleep(time.Second * 1)
+		ref2, err := appender.Add(lset2, basetime+1600, 9.3)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		//time.Sleep(time.Second * 2)
+		for i := 0; i < len(arr1); i++ {
+			err = appender.AddFast(lset, ref, basetime+ts1[i], arr1[i])
+			if err != nil {
+				t.Fatal(err)
+			}
+		}
+
+		err = appender.AddFast(lset2, ref2, basetime+2300, 7.7)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		err = appender.AddFast(lset, ref, basetime+9500, 8.3)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		time.Sleep(time.Second * 1)
+		//return
+	*/
+
+	qry, err := adapter.Querier(nil, basetime-8000000, basetime+3800000)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	err = appender.AddFast(lset, ref, basetime+9500, 8.3)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	time.Sleep(time.Second * 1)
-	//return
-
-	qry, err := adapter.Querier(nil, basetime+400, basetime+2229000)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	match := labels.Matcher{Type: labels.MatchEqual, Name: "__name__", Value: "http_req"}
+	match := labels.Matcher{Type: labels.MatchEqual, Name: "__name__", Value: "http_requests_total"}
 	set, err := qry.Select(nil, &match)
 	if err != nil {
 		t.Fatal(err)

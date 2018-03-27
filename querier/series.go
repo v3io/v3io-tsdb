@@ -80,28 +80,36 @@ func (s *series) initLabels() {
 func (s *series) initSeriesIter() {
 
 	maxt := s.set.maxt
-	//maxTime := s.set.iter.GetField("_maxtime")
-	//if maxTime != nil {
-	//	maxt = maxTime.(int64)
-	//}
+	maxTime := s.set.iter.GetField("_maxtime")
+	if maxTime != nil && int64(maxTime.(int)) < maxt {
+		maxt = int64(maxTime.(int))
+	}
+
 	newIterator := v3ioSeriesIterator{mint: s.set.mint, maxt: maxt}
 	newIterator.chunks = []chunkenc.Chunk{}
 
-	metaAttr := s.set.iter.GetField("_meta_v")
-	// TODO: handle nil
+	metaAttr := s.set.iter.GetField("_meta")
+	if metaAttr == nil {
+		s.set.logger.ErrorWith("Nil Metadata Array", "Lset", s.lset)
+		s.iter = &nullSeriesIterator{}
+		return
+	}
+
 	metaArray := v3ioutil.AsInt64Array(metaAttr.([]byte))
 
 	for i, attr := range s.set.attrs {
 		values := s.set.iter.GetField(attr)
 		if values != nil && len(values.([]byte)) >= 24 {
+
 			chunkID := s.set.chunkIds[i]
 			bytes := values.([]byte)
 			meta := metaArray[chunkID]
-			chunk, _ := chunkenc.FromBuffer(meta, bytes[16:])
-			// TODO: err handle
-
-			newIterator.chunks = append(newIterator.chunks, chunk)
-
+			chunk, err := chunkenc.FromBuffer(meta, bytes[16:])
+			if err != nil {
+				s.set.logger.ErrorWith("Error reading chunk buffer", "Lset", s.lset, "err", err)
+			} else {
+				newIterator.chunks = append(newIterator.chunks, chunk)
+			}
 		}
 
 	}
@@ -127,6 +135,7 @@ type v3ioSeriesIterator struct {
 // advance the iterator to the specified time
 func (it *v3ioSeriesIterator) Seek(t int64) bool {
 
+	// Seek time is after the max time in object
 	if t > it.maxt {
 		return false
 	}
@@ -165,7 +174,6 @@ func (it *v3ioSeriesIterator) Seek(t int64) bool {
 func (it *v3ioSeriesIterator) Next() bool {
 	if it.iter.Next() {
 		t, _ := it.iter.At()
-
 		if t < it.mint {
 			if !it.Seek(it.mint) {
 				return false
