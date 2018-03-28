@@ -163,6 +163,7 @@ func (cs *chunkStore) Append(t int64, v interface{}) error {
 
 	if cur.isAhead(t) {
 		// time is ahead of this chunk time, advance cur chunk
+		part := cur.partition
 		cur = cs.chunks[cs.curChunk^1]
 
 		// avoid append if there are still writes to old chunk
@@ -175,7 +176,7 @@ func (cs *chunkStore) Append(t int64, v interface{}) error {
 		if err != nil {
 			return err
 		}
-		cur.initialize(cur.partition.NextPart(t), t, app)
+		cur.initialize(part.NextPart(t), t, app) // TODO: next part
 		cur.appendAttr(t, v)
 		cs.curChunk = cs.curChunk ^ 1
 

@@ -85,7 +85,8 @@ func (s *series) initSeriesIter() {
 		maxt = int64(maxTime.(int))
 	}
 
-	newIterator := v3ioSeriesIterator{mint: s.set.mint, maxt: maxt}
+	newIterator := v3ioSeriesIterator{
+		mint: s.set.mint, maxt: maxt, chunkTime: s.set.partition.HoursInChunk() * 3600 * 1000}
 	newIterator.chunks = []chunkenc.Chunk{}
 
 	metaAttr := s.set.iter.GetField("_meta")
@@ -129,6 +130,7 @@ type v3ioSeriesIterator struct {
 
 	chunks     []chunkenc.Chunk
 	chunkIndex int
+	chunkTime  int
 	iter       chunkenc.Iterator
 }
 
@@ -145,28 +147,31 @@ func (it *v3ioSeriesIterator) Seek(t int64) bool {
 		t = it.mint
 	}
 
-	// TODO: check if T < chunk start + max hours in chunk
-	//for ; it.chunks[it.i].MaxTime < t; it.i++ {
-	//	if it.i == len(it.chunks)-1 {
-	//		return false
-	//	}
-	//}
-	//	it.cur = it.chunks[it.i].Chunk.Iterator()
-
-	// TODO: can optimize to skip to the right chunk
-
-	for i, s := range it.chunks[it.chunkIndex:] {
-		if i > 0 {
-			it.iter = s.Iterator()
-		}
-		for it.iter.Next() {
+	for {
+		if it.iter.Next() {
 			t0, _ := it.At()
-			if t0 >= t {
+			if t <= t0 {
+				// this chunk contains data on or after t
 				return true
 			}
+			if t > t0+int64(it.chunkTime) {
+				// this chunk is too far behind, move to next
+				if it.chunkIndex == len(it.chunks)-1 {
+					return false
+				}
+				it.chunkIndex++
+				it.iter = it.chunks[it.chunkIndex].Iterator()
+			}
+		} else {
+			// End of chunk, move to next or return if last
+			if it.chunkIndex == len(it.chunks)-1 {
+				return false
+			}
+			it.chunkIndex++
+			it.iter = it.chunks[it.chunkIndex].Iterator()
 		}
-		it.chunkIndex++
 	}
+
 	return false
 }
 

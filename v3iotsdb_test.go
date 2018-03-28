@@ -23,17 +23,18 @@ package v3io_tsdb
 import (
 	"fmt"
 	"github.com/prometheus/prometheus/pkg/labels"
+	"github.com/prometheus/prometheus/storage"
 	"github.com/v3io/v3io-tsdb/config"
+	"github.com/v3io/v3io-tsdb/partmgr"
+	"math/rand"
 	"testing"
-	//"time"
+	"time"
 )
 
-const basetime = 1522105859209
+const basetime = 15222481971234
 
 func TestName(t *testing.T) {
 
-	//ts1 := []int64{2000, 3050, 4100, 4950, 7000, 8200}
-	//arr1 := []float64{1, 2, 3, 4, 5, 6}
 	cfg, err := config.LoadConfig("v3io.yaml")
 	if err != nil {
 		t.Fatal(err)
@@ -46,57 +47,29 @@ func TestName(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	/*
-		appender, err := adapter.Appender()
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		lset := labels.Labels{labels.Label{Name: "__name__", Value: "http_req"},
-			labels.Label{Name: "method", Value: "post"}}
-
-		lset2 := labels.Labels{labels.Label{Name: "__name__", Value: "http_req"},
-			labels.Label{Name: "method", Value: "get"}}
-
-		ref, err := appender.Add(lset, basetime+1000, 2)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		//time.Sleep(time.Second * 1)
-		ref2, err := appender.Add(lset2, basetime+1600, 9.3)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		//time.Sleep(time.Second * 2)
-		for i := 0; i < len(arr1); i++ {
-			err = appender.AddFast(lset, ref, basetime+ts1[i], arr1[i])
-			if err != nil {
-				t.Fatal(err)
-			}
-		}
-
-		err = appender.AddFast(lset2, ref2, basetime+2300, 7.7)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		err = appender.AddFast(lset, ref, basetime+9500, 8.3)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		time.Sleep(time.Second * 1)
-		//return
-	*/
-
-	qry, err := adapter.Querier(nil, basetime-8000000, basetime+3800000)
+	//adapter.partitionMngr.GetHead().NextPart(0)
+	appender, err := adapter.Appender()
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	match := labels.Matcher{Type: labels.MatchEqual, Name: "__name__", Value: "http_requests_total"}
+	lset := labels.Labels{labels.Label{Name: "__name__", Value: "http_req"},
+		labels.Label{Name: "method", Value: "post"}}
+
+	err = DoAppend(lset, appender, 620, 120)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	time.Sleep(time.Second * 1)
+	//return
+
+	qry, err := adapter.Querier(nil, basetime, basetime+24*3600*1000)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	match := labels.Matcher{Type: labels.MatchEqual, Name: "__name__", Value: "http_req"}
 	set, err := qry.Select(nil, &match)
 	if err != nil {
 		t.Fatal(err)
@@ -117,9 +90,34 @@ func TestName(t *testing.T) {
 			}
 
 			t, v := iter.At()
-			fmt.Printf("t=%d,v=%f ", t, v)
+			d, h := partmgr.TimeToDHM(t)
+			fmt.Printf("t=%d:%d,v=%.2f ", d, h, v)
 		}
 		fmt.Println()
 	}
 
+}
+
+func DoAppend(lset labels.Labels, app storage.Appender, num, interval int) error {
+	//time.Sleep(time.Second * 1)
+	curTime := int64(basetime)
+
+	ref, err := app.Add(lset, curTime, 2)
+	if err != nil {
+		return err
+	}
+
+	for i := 0; i <= num; i++ {
+		time.Sleep(time.Millisecond * 100)
+		curTime += int64(interval * 1000)
+		t := curTime + int64(rand.Intn(100)) - 50
+		v := rand.Float64() * 100
+		fmt.Printf("t-%d,v%3.2f ", t, v)
+		err = app.AddFast(lset, ref, t, v)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }

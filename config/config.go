@@ -32,6 +32,7 @@ type TsdbConfig struct {
 	Path           string                  `json:"path"`
 	Username       string                  `json:"username"`
 	Password       string                  `json:"password"`
+	Disabled       bool                    `json:"disabled,omitempty"`
 	Verbose        bool                    `json:"verbose,omitempty"`
 	Workers        int                     `json:"workers"`
 	ChanSize       int                     `json:"chanSize"`
