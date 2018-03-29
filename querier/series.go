@@ -86,7 +86,8 @@ func (s *series) initSeriesIter() {
 	}
 
 	newIterator := v3ioSeriesIterator{
-		mint: s.set.mint, maxt: maxt, chunkTime: s.set.partition.HoursInChunk() * 3600 * 1000}
+		mint: s.set.mint, maxt: maxt, chunkTime: s.set.partition.HoursInChunk() * 3600 * 1000,
+		isCyclic: s.set.partition.IsCyclic()}
 	newIterator.chunks = []chunkenc.Chunk{}
 
 	metaAttr := s.set.iter.GetField("_meta")
@@ -97,12 +98,13 @@ func (s *series) initSeriesIter() {
 	}
 
 	metaArray := v3ioutil.AsInt64Array(metaAttr.([]byte))
+	s.set.logger.DebugWith("query meta", "array", metaArray, "attr", s.set.attrs)
 
 	for i, attr := range s.set.attrs {
 		values := s.set.iter.GetField(attr)
-		if values != nil && len(values.([]byte)) >= 24 {
+		chunkID := s.set.chunkIds[i]
 
-			chunkID := s.set.chunkIds[i]
+		if values != nil && len(values.([]byte)) >= 24 && metaArray[chunkID] != 0 {
 			bytes := values.([]byte)
 			meta := metaArray[chunkID]
 			chunk, err := chunkenc.FromBuffer(meta, bytes[16:])
@@ -127,6 +129,7 @@ func (s *series) initSeriesIter() {
 type v3ioSeriesIterator struct {
 	mint, maxt int64 // TBD per block
 	err        error
+	isCyclic   bool
 
 	chunks     []chunkenc.Chunk
 	chunkIndex int
@@ -150,17 +153,16 @@ func (it *v3ioSeriesIterator) Seek(t int64) bool {
 	for {
 		if it.iter.Next() {
 			t0, _ := it.At()
-			if t <= t0 {
-				// this chunk contains data on or after t
-				return true
-			}
-			if t > t0+int64(it.chunkTime) {
+			if (t > t0+int64(it.chunkTime)) || (t0 >= it.maxt && it.isCyclic) {
 				// this chunk is too far behind, move to next
 				if it.chunkIndex == len(it.chunks)-1 {
 					return false
 				}
 				it.chunkIndex++
 				it.iter = it.chunks[it.chunkIndex].Iterator()
+			} else if t <= t0 {
+				// this chunk contains data on or after t
+				return true
 			}
 		} else {
 			// End of chunk, move to next or return if last
@@ -187,10 +189,12 @@ func (it *v3ioSeriesIterator) Next() bool {
 
 			return t <= it.maxt
 		}
-		if t > it.maxt {
+		if t <= it.maxt {
+			return true
+		}
+		if !it.isCyclic {
 			return false
 		}
-		return true
 	}
 
 	if err := it.iter.Err(); err != nil {

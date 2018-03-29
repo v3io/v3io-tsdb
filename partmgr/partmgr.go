@@ -90,6 +90,10 @@ type DBPartition struct {
 	retentionDays int
 }
 
+func (p *DBPartition) IsCyclic() bool {
+	return p.manager.cyclic
+}
+
 func (p *DBPartition) HoursInChunk() int {
 	return p.hoursInChunk
 }

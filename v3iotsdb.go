@@ -66,7 +66,7 @@ func NewV3ioAdapter(cfg *config.TsdbConfig, container *v3io.Container, logger lo
 }
 
 func (a *V3ioAdapter) Start() error {
-	msg := fmt.Sprintf("Starting V3IO TSDB client, server at : %s/%s/%s",
+	msg := fmt.Sprintf("Starting V3IO TSDB client, server is at : %s/%s/%s\n",
 		a.cfg.V3ioUrl, a.cfg.Container, a.cfg.Path)
 	fmt.Println(msg)
 	a.logger.Info(msg)
@@ -131,7 +131,6 @@ func (a v3ioAppender) Rollback() error { return nil }
 type Appender interface {
 	Add(l labels.Labels, t int64, v float64) (uint64, error)
 	AddFast(l labels.Labels, ref uint64, t int64, v float64) error
-	// Commit submits the collected samples and purges the batch.
 	Commit() error
 	Rollback() error
 }

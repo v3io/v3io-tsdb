@@ -79,6 +79,12 @@ func LoadFromData(data []byte) (*TsdbConfig, error) {
 	cfg := TsdbConfig{}
 	err := yaml.Unmarshal(data, &cfg)
 
+	initDefaults(&cfg)
+
+	return &cfg, err
+}
+
+func initDefaults(cfg *TsdbConfig) {
 	// Initialize defaults
 	if cfg.Workers == 0 {
 		cfg.Workers = 8
@@ -98,6 +104,4 @@ func LoadFromData(data []byte) (*TsdbConfig, error) {
 	if cfg.Path == "" {
 		cfg.Path = "metrics"
 	}
-
-	return &cfg, err
 }
