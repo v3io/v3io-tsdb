@@ -37,6 +37,7 @@ type TsdbConfig struct {
 	Workers        int                     `json:"workers"`
 	ChanSize       int                     `json:"chanSize"`
 	MaxBehind      int                     `json:"maxBehind"`
+	OverrideOld    bool                    `json:"overrideOld"`
 	ArraySize      int                     `json:"arraySize,omitempty"`
 	HrInChunk      int                     `json:"hrInChunk,omitempty"`
 	DaysPerObj     int                     `json:"daysPerObj,omitempty"`

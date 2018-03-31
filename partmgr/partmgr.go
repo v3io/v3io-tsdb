@@ -106,6 +106,10 @@ func (p *DBPartition) GetId() int {
 	return p.partID
 }
 
+func (p *DBPartition) GetPath() string {
+	return "0" // TODO: format a string based on id & format
+}
+
 // get nearest chunk start
 func (p *DBPartition) GetChunkMint(t int64) int64 {
 	return (t / 3600 / 1000 / int64(p.hoursInChunk)) * 3600 * 1000 * int64(p.hoursInChunk)

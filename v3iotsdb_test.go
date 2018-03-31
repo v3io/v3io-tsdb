@@ -50,23 +50,22 @@ func TestName(t *testing.T) {
 	}
 
 	//adapter.partitionMngr.GetHead().NextPart(0)
-	/*
-		appender, err := adapter.Appender()
-		if err != nil {
-			t.Fatal(err)
-		}
 
-		lset := labels.Labels{labels.Label{Name: "__name__", Value: "http_req"},
-			labels.Label{Name: "method", Value: "post"}}
+	appender, err := adapter.Appender()
+	if err != nil {
+		t.Fatal(err)
+	}
 
-		err = DoAppend(lset, appender, 750, 120)
-		if err != nil {
-			t.Fatal(err)
-		}
+	lset := labels.Labels{labels.Label{Name: "__name__", Value: "http_req"},
+		labels.Label{Name: "method", Value: "post"}}
 
-		time.Sleep(time.Second * 1)
-		//return
-	*/
+	err = DoAppend(lset, appender, 750, 120)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	time.Sleep(time.Second * 1)
+	return
 
 	qry, err := adapter.Querier(nil, basetime-4*3600*1000, basetime+23*3600*1000)
 	if err != nil {

@@ -28,6 +28,7 @@ import (
 	"github.com/v3io/v3io-tsdb/config"
 	"github.com/v3io/v3io-tsdb/partmgr"
 	"sync"
+	"time"
 )
 
 // to add, rollups policy (cnt, sum, min/max, sum^2) + interval , or policy in per name lable
@@ -107,12 +108,12 @@ func (mc *MetricsCache) Start() error {
 				respErr := resp.Error
 
 				if respErr != nil {
-					mc.logger.ErrorWith("failed v3io request", "metric", resp.ID, "err", respErr,
+					mc.logger.ErrorWith("failed v3io Update request", "metric", resp.ID, "err", respErr,
 						"request", *resp.Request().Input.(*v3io.UpdateItemInput).Expression, "key",
 						resp.Request().Input.(*v3io.UpdateItemInput).Path)
 					// TODO: how to handle further ?
 				} else {
-					mc.logger.DebugWith("Process resp", "id", resp.ID,
+					mc.logger.DebugWith("Process Update resp", "id", resp.ID,
 						"request", *resp.Request().Input.(*v3io.UpdateItemInput).Expression, "key",
 						resp.Request().Input.(*v3io.UpdateItemInput).Path)
 				}
@@ -145,8 +146,10 @@ func (mc *MetricsCache) Start() error {
 				metric.Lock()
 
 				if metric.store.GetState() == storeStateInit {
-					metric.store.GetChunksState(mc, app.t)
-					metric.store.SetState(storeStateReady) // TODO: get metric instead
+					err := metric.store.GetChunksState(mc, metric, app.t)
+					if err != nil {
+						metric.err = err
+					}
 				}
 
 				metric.store.Append(app.t, app.v)
@@ -160,6 +163,46 @@ func (mc *MetricsCache) Start() error {
 					}
 				}
 				metric.Unlock()
+
+			case resp := <-mc.getRespChan:
+				// Handle V3io GetItem responses
+
+				// TODO: add metric interface to v3io req instead of using req map
+				mc.rmapMtx.Lock()
+				metric, ok := mc.requestsMap[resp.ID]
+				delete(mc.requestsMap, resp.ID)
+				mc.rmapMtx.Unlock()
+				respErr := resp.Error
+
+				if respErr != nil {
+					mc.logger.ErrorWith("failed v3io GetItem request", "metric", resp.ID, "err", respErr,
+						"key", resp.Request().Input.(*v3io.GetItemInput).Path)
+				} else {
+					mc.logger.DebugWith("Process GetItem resp", "id", resp.ID,
+						"key", resp.Request().Input.(*v3io.GetItemInput).Path)
+				}
+
+				if ok {
+					metric.Lock()
+					metric.store.ProcessGetResp(mc, metric, resp)
+
+					if metric.store.IsReady() {
+						// if there are no in flight requests, update the DB
+						err := metric.store.WriteChunks(mc, metric)
+						if err != nil {
+							mc.logger.ErrorWith("Async Submit failed", "metric", metric.Lset, "err", err)
+							metric.err = err
+						}
+					}
+
+					metric.Unlock()
+					time.Sleep(time.Second)
+					panic(nil)
+				} else {
+					mc.logger.ErrorWith("GetItem Req ID not found", "id", resp.ID)
+				}
+
+				resp.Release()
 
 			}
 		}

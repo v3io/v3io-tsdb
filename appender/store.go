@@ -58,14 +58,13 @@ type attrAppender struct {
 	writing   bool
 }
 
-func (a *attrAppender) initialize(partition *partmgr.DBPartition, t int64, app chunkenc.Appender) {
+func (a *attrAppender) initialize(partition *partmgr.DBPartition, t int64) {
 	a.updCount = 0
 	a.updMarker = 0
 	a.lastT = 0
 	a.writing = false
 	a.partition = partition
 	a.chunkMint = partition.GetChunkMint(t)
-	a.appender = app
 }
 
 func (a *attrAppender) inRange(t int64) bool {
@@ -122,27 +121,77 @@ func (cs *chunkStore) UpdatesBehind() int {
 	return updatesBehind
 }
 
+func (cs *chunkStore) GetMetricPath(metric *MetricState, basePath, table string) string {
+	return fmt.Sprintf("%s/%s.%d", basePath, metric.name, metric.hash) // TODO: use TableID
+}
+
 // Read (Async) the current chunk state and data from the storage
-func (cs *chunkStore) GetChunksState(mc *MetricsCache, t int64) {
+func (cs *chunkStore) GetChunksState(mc *MetricsCache, metric *MetricState, t int64) error {
 
 	// clac table mint
 	// Get record meta + relevant attr
 	// return get resp id & err
 
 	part := mc.partitionMngr.TimeToPart(t)
+	cs.chunks[0].initialize(part, t)
 	chunk := chunkenc.NewXORChunk() // TODO: init based on schema, use init function
 	app, _ := chunk.Appender()
+	cs.chunks[0].appender = app
 
-	cs.chunks[0].initialize(part, t, app)
+	if mc.cfg.OverrideOld {
+
+		cs.state = storeStateReady
+		return nil
+	}
+
+	path := cs.GetMetricPath(metric, mc.cfg.Path, part.GetPath())
+	getInput := v3io.GetItemInput{
+		Path: path, AttributeNames: []string{"_maxtime", "_meta"}}
+
+	request, err := mc.container.GetItem(&getInput, mc.getRespChan)
+	if err != nil {
+		mc.logger.ErrorWith("GetItem Failed", "metric", metric.Lset, "err", err)
+		return err
+	}
+
+	mc.logger.DebugWith("GetItems", "name", metric.name, "key", metric.key, "reqid", request.ID)
+	mc.rmapMtx.Lock()
+	defer mc.rmapMtx.Unlock()
+	mc.requestsMap[request.ID] = metric
 
 	cs.state = storeStateGet
+	return nil
 
 }
 
 // Process the GetItem response from the storage and initialize or restore the current chunk
-func (cs *chunkStore) ProcessGetResp(resp *v3io.Response) {
+func (cs *chunkStore) ProcessGetResp(mc *MetricsCache, metric *MetricState, resp *v3io.Response) {
 	// init chunk from resp (attr)
 	// append last t/v into the chunk and clear pending
+
+	cs.state = storeStateReady
+
+	if resp.Error != nil {
+		// assume the item not found   TODO: check error code
+		return
+	}
+
+	item := resp.Output.(*v3io.GetItemOutput).Item
+	var maxTime int64
+	val := item["_maxtime"]
+	if val != nil {
+		maxTime = int64(val.(int))
+	}
+	mc.logger.DebugWith("Got Item", "name", metric.name, "key", metric.key, "maxt", maxTime)
+
+	// TODO: using blob append, any implications ?
+
+	//val := item["_meta"]
+	//meta := v3ioutil.AsInt64Array(val.([]byte))
+
+	// set Last TableId, no need to create metric object
+	cs.lastTid = cs.chunks[0].partition.GetId()
+
 }
 
 // Append data to the right chunk and table based on the time and state
@@ -176,7 +225,8 @@ func (cs *chunkStore) Append(t int64, v interface{}) error {
 		if err != nil {
 			return err
 		}
-		cur.initialize(part.NextPart(t), t, app) // TODO: next part
+		cur.initialize(part.NextPart(t), t) // TODO: next part
+		cur.appender = app
 		cur.appendAttr(t, v)
 		cs.curChunk = cs.curChunk ^ 1
 
@@ -261,7 +311,7 @@ func (cs *chunkStore) WriteChunks(mc *MetricsCache, metric *MetricState) error {
 			metric.key, 24) + expr // TODO: compute meta arr size
 	}
 
-	path := fmt.Sprintf("%s/%s.%d", mc.cfg.Path, metric.name, metric.hash) // TODO: use TableID
+	path := cs.GetMetricPath(metric, mc.cfg.Path, "") // TODO: use TableID
 	request, err := mc.container.UpdateItem(&v3io.UpdateItemInput{Path: path, Expression: &expr}, mc.responseChan)
 	if err != nil {
 		mc.logger.ErrorWith("UpdateItem Failed", "err", err)
