@@ -119,6 +119,10 @@ func (ic *V3ioItemsCursor) GetField(name string) interface{} {
 	return (*ic.currentItem)[name]
 }
 
+func (ic *V3ioItemsCursor) GetFields() *map[string]interface{} {
+	return ic.currentItem
+}
+
 // convert v3io blob to Int array
 func AsInt64Array(val []byte) []uint64 {
 	var array []uint64

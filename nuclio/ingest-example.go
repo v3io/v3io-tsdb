@@ -12,8 +12,13 @@ import (
 
 // Configuration
 const tsdbConfig = `
-path: "metrics3"
-workers: 8
+container: "1"
+path: "pmetric"
+verbose: true 
+workers: 32
+maxBehind: 5
+arraySize: 9000
+overrideOld: true
 `
 
 // example event
@@ -21,7 +26,7 @@ const pushEvent = `
 {
   "Lset": { "__name__":"cpu", "os" : "win", "node" : "xyz123"},
   "Time" : 1000,
-  "Value" : 2.7
+  "Value" : 3.5
 }
 `
 

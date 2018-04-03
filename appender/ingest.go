@@ -28,7 +28,6 @@ import (
 	"github.com/v3io/v3io-tsdb/config"
 	"github.com/v3io/v3io-tsdb/partmgr"
 	"sync"
-	"time"
 )
 
 // to add, rollups policy (cnt, sum, min/max, sum^2) + interval , or policy in per name lable
@@ -196,8 +195,6 @@ func (mc *MetricsCache) Start() error {
 					}
 
 					metric.Unlock()
-					time.Sleep(time.Second)
-					panic(nil)
 				} else {
 					mc.logger.ErrorWith("GetItem Req ID not found", "id", resp.ID)
 				}

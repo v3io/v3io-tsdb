@@ -20,9 +20,55 @@ such restriction.
 
 package aggregate
 
-type aggrType uint8
+import (
+	"fmt"
+	"strings"
+)
+
+type AggrType uint8
 
 const (
-	AggrCount aggrType = 1
-	AggrSum   aggrType = 2
+	aggrTypeCount AggrType = 1
+	aggrTypeSum   AggrType = 2
+	aggrTypeSqr   AggrType = 4
+	aggrTypeMax   AggrType = 8
+	aggrTypeMin   AggrType = 16
+
+	aggrTypeAvg    AggrType = aggrTypeCount | aggrTypeSum
+	aggrTypeStddev AggrType = aggrTypeCount | aggrTypeSum | aggrTypeSqr
 )
+
+var aggrTypeString = map[string]AggrType{
+	"cnt": aggrTypeCount, "sum": aggrTypeSum, "sqr": aggrTypeSqr, "min": aggrTypeMin,
+	"max": aggrTypeMax, "avg": aggrTypeAvg, "stddev": aggrTypeStddev}
+
+func AggrsFromString(list string) (AggrType, error) {
+	split := strings.Split(list, ",")
+	var aggrList AggrType
+	for _, s := range split {
+		aggr, ok := aggrTypeString[s]
+		if !ok {
+			return aggrList, fmt.Errorf("Invalid aggragator type %s", s)
+		}
+		aggrList = aggrList | aggr
+	}
+	return aggrList, nil
+}
+
+type AggregatorList []Aggregator
+
+type Aggregator interface {
+	Aggregate(v float64)
+	GetExpr(bucket int) string
+	GetType() AggrType
+}
+
+type CountAggregator struct {
+	count int
+}
+
+func (a CountAggregator) Aggregate(v float64) { a.count++ }
+func (a CountAggregator) GetType() AggrType   { return aggrTypeCount }
+func (a CountAggregator) GetExpr(col string, bucket int) string {
+	return fmt.Sprintf("_%s_cnt[%d]=_%s_cnt[%d]+%d;", col, bucket, col, bucket, a.count)
+}

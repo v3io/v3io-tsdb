@@ -33,7 +33,7 @@ import (
 
 const basetime = 15222481971234
 
-func TestName(t *testing.T) {
+func TestTsdb(t *testing.T) {
 
 	d, h := partmgr.TimeToDHM(basetime)
 	fmt.Println("base=", d, h)
@@ -64,7 +64,7 @@ func TestName(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	time.Sleep(time.Second * 1)
+	time.Sleep(time.Second * 5)
 	return
 
 	qry, err := adapter.Querier(nil, basetime-4*3600*1000, basetime+23*3600*1000)
@@ -117,7 +117,7 @@ func DoAppend(lset labels.Labels, app storage.Appender, num, interval int) error
 	}
 
 	for i := 0; i <= num; i++ {
-		time.Sleep(time.Millisecond * 150)
+		time.Sleep(time.Millisecond * 250)
 		curTime += int64(interval * 1000)
 		t := curTime + int64(rand.Intn(100)) - 50
 		_, h := partmgr.TimeToDHM(t)

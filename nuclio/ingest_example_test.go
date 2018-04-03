@@ -9,7 +9,7 @@ import (
 )
 
 func TestName(t *testing.T) {
-	data := nutest.DataBind{Name: "db0", Url: os.Getenv("V3IO_URL"), Container: "nuclio"}
+	data := nutest.DataBind{Name: "db0", Url: os.Getenv("V3IO_URL"), Container: "1"}
 	tc, err := nutest.NewTestContext(Handler, true, &data)
 	if err != nil {
 		t.Fatal(err)
@@ -20,11 +20,12 @@ func TestName(t *testing.T) {
 		t.Fatal(err)
 	}
 	testEvent := nutest.TestEvent{
-		Path:    "/some/path",
-		Body:    []byte(pushEvent),
-		Headers: map[string]interface{}{"first": "string", "sec": "1"},
+		Body: []byte(pushEvent),
 	}
 	resp, err := tc.Invoke(&testEvent)
+	tc.Logger.InfoWith("Run complete", "resp", resp, "err", err)
+	resp, err = tc.Invoke(&testEvent)
+	time.Sleep(time.Second * 1)
 	tc.Logger.InfoWith("Run complete", "resp", resp, "err", err)
 	fmt.Println(resp)
 

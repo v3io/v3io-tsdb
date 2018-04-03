@@ -88,6 +88,12 @@ type pendingData struct {
 	v interface{}
 }
 
+type pendingList []pendingData
+
+func (l pendingList) Len() int           { return len(l) }
+func (l pendingList) Less(i, j int) bool { return l[i].t < l[j].t }
+func (l pendingList) Swap(i, j int)      { l[i], l[j] = l[j], l[i] }
+
 type storeState uint8
 
 const (
@@ -185,9 +191,6 @@ func (cs *chunkStore) ProcessGetResp(mc *MetricsCache, metric *MetricState, resp
 	mc.logger.DebugWith("Got Item", "name", metric.name, "key", metric.key, "maxt", maxTime)
 
 	// TODO: using blob append, any implications ?
-
-	//val := item["_meta"]
-	//meta := v3ioutil.AsInt64Array(val.([]byte))
 
 	// set Last TableId, no need to create metric object
 	cs.lastTid = cs.chunks[0].partition.GetId()
