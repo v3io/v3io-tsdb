@@ -24,6 +24,7 @@ package partmgr
 
 import (
 	"fmt"
+	"github.com/v3io/v3io-tsdb/aggregate"
 	"github.com/v3io/v3io-tsdb/config"
 	"sync"
 	"time"
@@ -44,7 +45,13 @@ func NewDBPartition(pmgr *PartitionManager) *DBPartition {
 		hoursInChunk:  pmgr.cfg.HrInChunk,
 		prefix:        "",
 		retentionDays: pmgr.cfg.DaysRetention,
+		rollupTime:    int64(pmgr.cfg.RollupMin) * 60 * 1000,
+		rollupBuckets: pmgr.cfg.DaysPerObj * 24 * 60 / pmgr.cfg.RollupMin,
 	}
+
+	aggrType, _ := aggregate.AggrsFromString(pmgr.cfg.DefaultRollups) // TODO: error check & load part data from schema object
+	newPart.defaultRollups = aggrType
+
 	return &newPart
 }
 
@@ -81,13 +88,16 @@ func (p *PartitionManager) GetHead() *DBPartition {
 }
 
 type DBPartition struct {
-	manager       *PartitionManager
-	partID        int
-	startTime     int64
-	days          int
-	hoursInChunk  int
-	prefix        string
-	retentionDays int
+	manager        *PartitionManager
+	partID         int
+	startTime      int64
+	days           int
+	hoursInChunk   int
+	prefix         string
+	retentionDays  int
+	defaultRollups aggregate.AggrType
+	rollupTime     int64
+	rollupBuckets  int
 }
 
 func (p *DBPartition) IsCyclic() bool {
@@ -110,6 +120,26 @@ func (p *DBPartition) GetPath() string {
 	return "0" // TODO: format a string based on id & format
 }
 
+// get aggregator block id
+func (p *DBPartition) GetAggrBlockId(t int64) int64 {
+	return ((t - p.startTime) / p.rollupTime) % int64(p.rollupBuckets)
+}
+
+func (p *DBPartition) AggrType() aggregate.AggrType {
+	return p.defaultRollups
+}
+
+func (p *DBPartition) AggrBuckets() int {
+	return p.rollupBuckets
+}
+
+func (p *DBPartition) Time2Bucket(t int64) int {
+	if p.rollupTime == 0 {
+		return 0
+	}
+	return int((t-p.startTime)/p.rollupTime) % p.rollupBuckets
+}
+
 // get nearest chunk start
 func (p *DBPartition) GetChunkMint(t int64) int64 {
 	return (t / 3600 / 1000 / int64(p.hoursInChunk)) * 3600 * 1000 * int64(p.hoursInChunk)
@@ -130,14 +160,16 @@ func (p *DBPartition) TimeToChunkId(t int64) int {
 		return h
 	}
 
-	dayIndex := d - ((d / p.days) * p.days)
+	dayIndex := d % p.days
 	chunkIdx := dayIndex*24/p.hoursInChunk + h/p.hoursInChunk
 	return chunkIdx
 }
 
-func (p *DBPartition) TimeRange() (int64, int64) {
-	from := p.startTime
-	return from, from + int64(p.days*24*3600*1000)
+func (p *DBPartition) InRange(t int64) bool {
+	if p.manager.cyclic {
+		return true
+	}
+	return (t >= p.startTime) && (t < p.startTime+int64(p.days)*24*3600*1000)
 }
 
 func (p *DBPartition) CyclicMinTime(mint, maxt int64) int64 {
@@ -191,7 +223,7 @@ func (p *DBPartition) Range2Cids(mint, maxt int64) []int {
 func TimeToDHM(tmilli int64) (int, int) {
 	t := int(tmilli / 1000)
 	//m := t/60 - ((t/3600) * 60)
-	h := t/3600 - ((t / 3600 / 24) * 24)
+	h := (t / 3600) % 24
 	d := t / 3600 / 24
 	return d, h
 }

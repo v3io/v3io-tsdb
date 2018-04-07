@@ -59,13 +59,13 @@ func TestTsdb(t *testing.T) {
 	lset := labels.Labels{labels.Label{Name: "__name__", Value: "http_req"},
 		labels.Label{Name: "method", Value: "post"}}
 
-	err = DoAppend(lset, appender, 750, 120)
+	err = DoAppend(lset, appender, 50, 120)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	time.Sleep(time.Second * 5)
-	return
+	//return
 
 	qry, err := adapter.Querier(nil, basetime-4*3600*1000, basetime+23*3600*1000)
 	if err != nil {
@@ -117,7 +117,7 @@ func DoAppend(lset labels.Labels, app storage.Appender, num, interval int) error
 	}
 
 	for i := 0; i <= num; i++ {
-		time.Sleep(time.Millisecond * 250)
+		time.Sleep(time.Millisecond * 50)
 		curTime += int64(interval * 1000)
 		t := curTime + int64(rand.Intn(100)) - 50
 		_, h := partmgr.TimeToDHM(t)

@@ -44,7 +44,7 @@ type TsdbConfig struct {
 	DaysRetention  int                     `json:"daysRetention,omitempty"`
 	PartFormat     string                  `json:"partFormat,omitempty"`
 	DefaultRollups string                  `json:"defaultRollups,omitempty"`
-	RollupHrs      int                     `json:"rollupHrs,omitempty"`
+	RollupMin      int                     `json:"rollupMin,omitempty"`
 	DelRawSamples  bool                    `json:"delRawSamples,omitempty"`
 	MetricsConfig  map[string]MetricConfig `json:"metricsConfig,omitempty"`
 }
