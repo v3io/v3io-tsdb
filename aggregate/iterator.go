@@ -2,13 +2,12 @@ package aggregate
 
 import (
 	"fmt"
-	"github.com/v3io/v3io-tsdb/partmgr"
 	"github.com/v3io/v3io-tsdb/v3ioutil"
 	"strings"
 )
 
 type AggregateSeries struct {
-	partition  *partmgr.DBPartition
+	//partition  *partmgr.DBPartition
 	colName    string
 	functions  []AggrType
 	aggregates AggrType
