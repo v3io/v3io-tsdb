@@ -36,11 +36,21 @@ const (
 
 	aggrTypeAvg    AggrType = aggrTypeCount | aggrTypeSum
 	aggrTypeStddev AggrType = aggrTypeCount | aggrTypeSum | aggrTypeSqr
+	aggrTypeAll    AggrType = 0xff
 )
+
+var rawAggregators = []AggrType{aggrTypeCount, aggrTypeSum, aggrTypeSqr, aggrTypeMax, aggrTypeMin}
 
 var aggrTypeString = map[string]AggrType{
 	"cnt": aggrTypeCount, "sum": aggrTypeSum, "sqr": aggrTypeSqr, "min": aggrTypeMin,
-	"max": aggrTypeMax, "avg": aggrTypeAvg, "stddev": aggrTypeStddev}
+	"max": aggrTypeMax, "avg": aggrTypeAvg, "stddev": aggrTypeStddev, "*": aggrTypeAll}
+
+var aggrToString = map[AggrType]string{
+	aggrTypeCount: "cnt", aggrTypeSum: "sum", aggrTypeSqr: "sqr", aggrTypeMin: "min",
+	aggrTypeMax: "max", aggrTypeAvg: "avg", aggrTypeStddev: "stddev", aggrTypeAll: "*",
+}
+
+func (a AggrType) String() string { return aggrToString[a] }
 
 func AggrsFromString(list string) (AggrType, error) {
 	split := strings.Split(list, ",")
@@ -61,7 +71,16 @@ func NewAggregatorList(aggrType AggrType) *AggregatorList {
 		list = append(list, &CountAggregator{})
 	}
 	if (aggrType & aggrTypeSum) != 0 {
-		list = append(list, &SumAggregator{})
+		list = append(list, &SumAggregator{FloatAggregator{attr: "sum"}})
+	}
+	if (aggrType & aggrTypeSqr) != 0 {
+		list = append(list, &SqrAggregator{FloatAggregator{attr: "sqr"}})
+	}
+	if (aggrType & aggrTypeMin) != 0 {
+		list = append(list, &MinAggregator{FloatAggregator{attr: "min"}})
+	}
+	if (aggrType & aggrTypeMax) != 0 {
+		list = append(list, &MaxAggregator{FloatAggregator{attr: "max"}})
 	}
 	return &list
 }
@@ -111,51 +130,4 @@ func (a AggregatorList) Clear() {
 	}
 }
 
-type Aggregator interface {
-	Aggregate(v float64)
-	Clear()
-	GetType() AggrType
-	UpdateExpr(col string, bucket int) string
-	SetExpr(col string, bucket int) string
-	InitExpr(col string, buckets int) string
-}
-
-type CountAggregator struct {
-	count int
-}
-
-func (a *CountAggregator) Aggregate(v float64) { a.count++ }
-func (a *CountAggregator) Clear()              { a.count = 0 }
-func (a *CountAggregator) GetType() AggrType   { return aggrTypeCount }
-
-func (a *CountAggregator) UpdateExpr(col string, bucket int) string {
-	return fmt.Sprintf("_%s_cnt[%d]=_%s_cnt[%d]+%d;", col, bucket, col, bucket, a.count)
-}
-
-func (a *CountAggregator) SetExpr(col string, bucket int) string {
-	return fmt.Sprintf("_%s_cnt[%d]=%d;", col, bucket, a.count)
-}
-
-func (a *CountAggregator) InitExpr(col string, buckets int) string {
-	return fmt.Sprintf("_%s_cnt=init_array(%d,'int');", col, buckets)
-}
-
-type SumAggregator struct {
-	sum float64
-}
-
-func (a *SumAggregator) Aggregate(v float64) { a.sum += v }
-func (a *SumAggregator) Clear()              { a.sum = 0 }
-func (a *SumAggregator) GetType() AggrType   { return aggrTypeSum }
-
-func (a *SumAggregator) UpdateExpr(col string, bucket int) string {
-	return fmt.Sprintf("_%s_sum[%d]=_%s_sum[%d]+%f;", col, bucket, col, bucket, a.sum)
-}
-
-func (a *SumAggregator) SetExpr(col string, bucket int) string {
-	return fmt.Sprintf("_%s_sum[%d]=%f;", col, bucket, a.sum)
-}
-
-func (a *SumAggregator) InitExpr(col string, buckets int) string {
-	return fmt.Sprintf("_%s_sum=init_array(%d,'double');", col, buckets)
-}
+type AggregatorMap map[AggrType]Aggregator
