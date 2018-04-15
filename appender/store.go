@@ -274,7 +274,7 @@ func (cs *chunkStore) WriteChunks(mc *MetricsCache, metric *MetricState) error {
 		// if the last item or last item in the same partition add expressions and break
 		if (i == len(cs.pending)-1) || !partition.InRange(cs.pending[i+1].t) {
 			expr = expr + cs.aggrList.SetOrUpdateExpr("v", bucket, isNewBucket)
-			expr = expr + cs.appendExpression(activeChunk)
+			expr = expr + cs.appendExpression(activeChunk, mc.cfg.ArraySize)
 			break
 		}
 
@@ -290,7 +290,7 @@ func (cs *chunkStore) WriteChunks(mc *MetricsCache, metric *MetricState) error {
 
 		// if the next item is in a new chuck, gen expression and init new chunk
 		if activeChunk != nil && !activeChunk.inRange(nextT) {
-			expr = expr + cs.appendExpression(activeChunk)
+			expr = expr + cs.appendExpression(activeChunk, mc.cfg.ArraySize)
 			activeChunk = cs.chunkByTime(nextT)
 		}
 	}
@@ -354,39 +354,35 @@ func (cs *chunkStore) ProcessWriteResp() {
 
 }
 
-func (cs *chunkStore) appendExpression(chunk *attrAppender) string {
+func (cs *chunkStore) appendExpression(chunk *attrAppender, maxArray int) string {
 
 	if chunk != nil {
 		samples := chunk.appender.Chunk().NumSamples()
-		meta, offsetByte, b := chunk.appender.Chunk().GetChunkBuffer()
-		chunk.updMarker = ((offsetByte + len(b) - 1) / 8) * 8
+		meta, offsetByte, bytes := chunk.appender.Chunk().GetChunkBuffer()
+		chunk.updMarker = ((offsetByte + len(bytes) - 1) / 8) * 8
 		chunk.updCount = samples
 		chunk.writing = true
 
-		return cs.chunkbuf2Expr(offsetByte, meta, b, chunk)
+		expr := ""
+		offset := offsetByte / 8
+		ui := chunkenc.ToUint64(bytes)
+		idx := chunk.partition.TimeToChunkId(chunk.chunkMint) // TODO: add DaysPerObj from part manager
+		attr := chunk.partition.ChunkID2Attr("v", idx)
+
+		if offsetByte == 0 {
+			expr = expr + fmt.Sprintf("%s=init_array(%d,'int'); ", attr, maxArray)
+		}
+
+		expr = expr + fmt.Sprintf("_meta[%d]=%d; ", idx, meta) // TODO: meta name as col variable
+		for i := 0; i < len(ui); i++ {
+			expr = expr + fmt.Sprintf("%s[%d]=%d; ", attr, offset, int64(ui[i]))
+			offset++
+		}
+		expr += fmt.Sprintf("_maxtime=%d", chunk.lastT) // TODO: use max() expr
+
+		return expr
+
 	}
 
 	return ""
-}
-
-func (cs *chunkStore) chunkbuf2Expr(offsetByte int, meta uint64, bytes []byte, app *attrAppender) string {
-
-	expr := ""
-	offset := offsetByte / 8
-	ui := chunkenc.ToUint64(bytes)
-	idx := app.partition.TimeToChunkId(app.chunkMint) // TODO: add DaysPerObj from part manager
-	attr := app.partition.ChunkID2Attr("v", idx)
-
-	if offsetByte == 0 {
-		expr = expr + fmt.Sprintf("%s=init_array(%d,'int'); ", attr, MaxArraySize)
-	}
-
-	expr = expr + fmt.Sprintf("_meta[%d]=%d; ", idx, meta) // TODO: meta name as col variable
-	for i := 0; i < len(ui); i++ {
-		expr = expr + fmt.Sprintf("%s[%d]=%d; ", attr, offset, int64(ui[i]))
-		offset++
-	}
-	expr += fmt.Sprintf("_maxtime=%d", app.lastT) // TODO: use max() expr
-
-	return expr
 }
