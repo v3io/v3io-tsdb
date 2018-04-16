@@ -23,6 +23,7 @@ package querier
 import (
 	"github.com/prometheus/prometheus/pkg/labels"
 	"github.com/prometheus/prometheus/storage"
+	"github.com/v3io/v3io-tsdb/aggregate"
 	"github.com/v3io/v3io-tsdb/chunkenc"
 	"github.com/v3io/v3io-tsdb/v3ioutil"
 	"math"
@@ -31,7 +32,7 @@ import (
 
 func NewSeries(set *seriesSet) *series {
 	newSeries := series{set: set}
-	newSeries.initLabels()
+	newSeries.lset = initLabels(set)
 	newSeries.initSeriesIter()
 	return &newSeries
 }
@@ -60,9 +61,9 @@ type SeriesIterator interface {
 }
 
 // initialize the label set from _lset & name attributes
-func (s *series) initLabels() {
-	name := s.set.iter.GetField("_name").(string)
-	lsetAttr := s.set.iter.GetField("_lset").(string)
+func initLabels(set *seriesSet) labels.Labels {
+	name := set.iter.GetField("_name").(string)
+	lsetAttr := set.iter.GetField("_lset").(string)
 	lset := labels.Labels{labels.Label{Name: "__name__", Value: name}}
 
 	splitLset := strings.Split(lsetAttr, ",")
@@ -73,7 +74,7 @@ func (s *series) initLabels() {
 		}
 	}
 
-	s.lset = lset
+	return lset
 }
 
 // initialize the series from value metadata & attributes
@@ -219,6 +220,48 @@ func uintToTV(data uint64, curT int64, curV float64) (int64, float64) {
 	t := int64(data >> 32)
 	return curT + t, curV + v
 }
+
+func NewAggrSeries(set *seriesSet, aggr aggregate.AggrType) *series {
+	newSeries := series{set: set}
+	lset := append(initLabels(set), labels.Label{Name: "Aggregator", Value: aggr.String()})
+	newSeries.lset = lset
+	newSeries.iter = &aggrSeriesIterator{set: set, aggrType: aggr, index: -1}
+	return &newSeries
+}
+
+type aggrSeriesIterator struct {
+	set      *seriesSet
+	aggrType aggregate.AggrType
+	index    int
+	err      error
+}
+
+func (s *aggrSeriesIterator) Seek(t int64) bool {
+	if t <= s.set.baseTime {
+		return true
+	}
+
+	if t > s.set.baseTime+int64(s.set.aggrSet.GetMaxCell())*s.set.interval {
+		return false
+	}
+
+	s.index = int((t - s.set.baseTime) / s.set.interval)
+	return true
+}
+func (s *aggrSeriesIterator) Next() bool {
+	if s.index > s.set.aggrSet.GetMaxCell() {
+		return false
+	}
+
+	s.index++
+	return false
+}
+
+func (s *aggrSeriesIterator) At() (t int64, v float64) {
+	val := s.set.aggrSet.GetCellValue(s.aggrType, s.index)
+	return s.set.baseTime + int64(s.index)*s.set.interval, val
+}
+func (s *aggrSeriesIterator) Err() error { return s.err }
 
 type nullSeriesIterator struct {
 	err error

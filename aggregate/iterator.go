@@ -3,6 +3,7 @@ package aggregate
 import (
 	"fmt"
 	"github.com/v3io/v3io-tsdb/v3ioutil"
+	"math"
 	"strings"
 )
 
@@ -18,6 +19,10 @@ type AggregateSeries struct {
 }
 
 func NewAggregateSeries(functions, col string) (*AggregateSeries, error) {
+
+	if functions == "" {
+		return nil, nil
+	}
 
 	split := strings.Split(functions, ",")
 	var aggrSum AggrType
@@ -37,6 +42,14 @@ func NewAggregateSeries(functions, col string) (*AggregateSeries, error) {
 	newAggregateSeries.colName = col
 
 	return &newAggregateSeries, nil
+}
+
+func (as *AggregateSeries) GetFunctions() []AggrType {
+	return as.functions
+}
+
+func (as *AggregateSeries) NumFunctions() int {
+	return len(as.functions)
 }
 
 func (as *AggregateSeries) toAttrName(aggr AggrType) string {
@@ -74,4 +87,87 @@ func (as *AggregateSeries) LoadAttrs(attrs *map[string]interface{}) error {
 	// merge multiple cells (per aggr) into dataArrays based on desired interval vs array (partition) interval
 
 	return nil
+}
+
+type AggregateSet struct {
+	as         *AggregateSeries
+	dataArrays map[AggrType][]float64
+	length     int
+	maxCell    int
+}
+
+func (as *AggregateSeries) NewAggregateSet(length int) *AggregateSet {
+	newAggregateSet := AggregateSet{as: as, length: length}
+	dataArrays := map[AggrType][]float64{}
+
+	for _, aggr := range rawAggregators {
+		if aggr&as.aggregates != 0 {
+			dataArrays[aggr] = make([]float64, length, length) // TODO: len/capacity & reuse (pool)
+		}
+	}
+
+	newAggregateSet.dataArrays = dataArrays
+	return &newAggregateSet
+}
+
+func (as *AggregateSet) GetMaxCell() int {
+	return as.maxCell
+}
+
+func (as *AggregateSet) AppendCell(cell int, val float64) {
+
+	if cell > as.length {
+		return
+	}
+
+	if cell > as.maxCell {
+		as.maxCell = cell
+	}
+
+	for aggr, _ := range as.dataArrays {
+		switch aggr {
+		case aggrTypeCount:
+			as.dataArrays[aggr][cell] += 1
+		case aggrTypeSum:
+			as.dataArrays[aggr][cell] += val
+		case aggrTypeSqr:
+			as.dataArrays[aggr][cell] += val * val
+		case aggrTypeMin:
+			if val < as.dataArrays[aggr][cell] {
+				as.dataArrays[aggr][cell] = val
+			}
+		case aggrTypeMax:
+			if val > as.dataArrays[aggr][cell] {
+				as.dataArrays[aggr][cell] = val
+			}
+		}
+	}
+}
+
+func (as *AggregateSet) GetCellValue(aggr AggrType, cell int) float64 {
+
+	if cell > as.maxCell {
+		return math.NaN()
+	}
+
+	if cell > as.length {
+		return 0
+	}
+
+	switch aggr {
+	case aggrTypeAvg:
+		return as.dataArrays[aggrTypeSum][cell] / as.dataArrays[aggrTypeCount][cell]
+	case aggrTypeStddev:
+		return as.dataArrays[aggrTypeCount][cell] // TODO: real function
+	default:
+		return as.dataArrays[aggr][cell]
+	}
+
+}
+
+func (as *AggregateSet) Clear() {
+	as.maxCell = 0
+	for aggr, _ := range as.dataArrays {
+		as.dataArrays[aggr] = as.dataArrays[aggr][:0]
+	}
 }

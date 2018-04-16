@@ -26,6 +26,7 @@ import (
 	"github.com/prometheus/prometheus/pkg/labels"
 	"github.com/prometheus/prometheus/storage"
 	"github.com/v3io/v3io-go-http"
+	"github.com/v3io/v3io-tsdb/aggregate"
 	"github.com/v3io/v3io-tsdb/config"
 	"github.com/v3io/v3io-tsdb/partmgr"
 	"github.com/v3io/v3io-tsdb/v3ioutil"
@@ -51,8 +52,11 @@ type V3ioQuerier struct {
 
 func (q V3ioQuerier) Select(params *storage.SelectParams, oms ...*labels.Matcher) (storage.SeriesSet, error) {
 	filter := match2filter(oms)
-	//vc := v3ioutil.NewV3ioClient(q.logger, q.Keymap)
-	//iter, err := vc.GetItems(q.container, q.cfg.Path+"/", filter, attrs)
+
+	newAggrSeries, err := aggregate.NewAggregateSeries(params.Func, "v")
+	if err != nil {
+		return nil, err
+	}
 
 	mint, maxt := q.mint, q.maxt
 	if q.partitionMngr.IsCyclic() {
@@ -60,6 +64,11 @@ func (q V3ioQuerier) Select(params *storage.SelectParams, oms ...*labels.Matcher
 		mint = partition.CyclicMinTime(mint, maxt)
 		q.logger.DebugWith("Select - new cyclic series", "from", mint, "to", maxt, "filter", filter)
 		newSet := &seriesSet{mint: mint, maxt: maxt, partition: partition, logger: q.logger}
+
+		if newAggrSeries != nil && params.Step != 0 {
+			newSet.aggrSeries = newAggrSeries
+			newSet.interval = params.Step
+		}
 
 		err := newSet.getItems(q.cfg.Path+"/", filter, q.container)
 		if err != nil {
@@ -115,12 +124,20 @@ func newSeriesSet(partition *partmgr.DBPartition, mint, maxt int64) *seriesSet {
 }
 
 type seriesSet struct {
+	err        error
 	logger     logger.Logger
 	partition  *partmgr.DBPartition
 	iter       *v3ioutil.V3ioItemsCursor
 	mint, maxt int64
 	attrs      []string
 	chunkIds   []int
+
+	interval   int64
+	aggrSeries *aggregate.AggregateSeries
+	aggrIdx    int
+	currSeries storage.Series
+	aggrSet    *aggregate.AggregateSet
+	baseTime   int64
 }
 
 // TODO: get items per partition + merge, per partition calc attrs
@@ -142,11 +159,66 @@ func (s *seriesSet) getItems(path, filter string, container *v3io.Container) err
 
 }
 
-func (s seriesSet) Next() bool { return s.iter.Next() }
-func (s seriesSet) Err() error { return s.iter.Err() }
+func (s seriesSet) Next() bool {
+	if s.aggrSeries == nil {
+		if s.iter.Next() {
+			s.currSeries = NewSeries(&s)
+			return true
+		}
+		return false
+	}
+
+	if s.aggrIdx == s.aggrSeries.NumFunctions()-1 {
+		if !s.iter.Next() {
+			return false
+		}
+		s.currSeries = NewSeries(&s)
+		s.chunks2Aggregates()
+	}
+
+	s.aggrIdx = (s.aggrIdx + 1) % s.aggrSeries.NumFunctions()
+	return true
+}
+
+func (s seriesSet) chunks2Aggregates() {
+
+	s.aggrSet = s.aggrSeries.NewAggregateSet(24)
+
+	iter := s.currSeries.Iterator()
+	if iter.Next() {
+
+		if iter.Err() != nil {
+			s.err = iter.Err()
+			return
+		}
+
+		t0, _ := iter.At()
+		s.baseTime = (t0 / s.interval) * s.interval
+
+		for {
+			t, v := iter.At()
+			s.aggrSet.AppendCell(int((t-s.baseTime)/s.interval), v)
+			if !iter.Next() {
+				s.err = iter.Err()
+				break
+			}
+		}
+	}
+}
+
+func (s seriesSet) Err() error {
+	if s.iter.Err() != nil {
+		return s.iter.Err()
+	}
+	return s.err
+}
 
 func (s seriesSet) At() storage.Series {
-	return NewSeries(&s)
+	if s.aggrSeries == nil {
+		return s.currSeries
+	}
+
+	return NewAggrSeries(&s, s.aggrSeries.GetFunctions()[s.aggrIdx])
 }
 
 type nullSeriesSet struct {

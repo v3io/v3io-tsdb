@@ -58,7 +58,6 @@ type attrAppender struct {
 	partition *partmgr.DBPartition
 	updMarker int
 	updCount  int
-	lastT     int64
 	chunkMint int64
 	writing   bool
 }
@@ -66,7 +65,6 @@ type attrAppender struct {
 func (a *attrAppender) initialize(partition *partmgr.DBPartition, t int64) {
 	a.updCount = 0
 	a.updMarker = 0
-	a.lastT = 0
 	a.writing = false
 	a.partition = partition
 	a.chunkMint = partition.GetChunkMint(t)
@@ -83,9 +81,6 @@ func (a *attrAppender) isAhead(t int64) bool {
 // TODO: change appender from float to interface (allow map[str]interface cols)
 func (a *attrAppender) appendAttr(t int64, v interface{}) {
 	a.appender.Append(t, v.(float64))
-	if t > a.lastT {
-		a.lastT = t
-	}
 }
 
 type pendingData struct {
@@ -324,6 +319,7 @@ func (cs *chunkStore) WriteChunks(mc *MetricsCache, metric *MetricState) error {
 
 	//fmt.Println("\nEXPR", expr)
 	// Call V3IO async Update Item method
+	expr += fmt.Sprintf("_maxtime=%d;", cs.maxTime)   // TODO: use max() expr
 	path := cs.GetMetricPath(metric, mc.cfg.Path, "") // TODO: use TableID
 	request, err := mc.container.UpdateItem(&v3io.UpdateItemInput{Path: path, Expression: &expr}, mc.responseChan)
 	if err != nil {
@@ -378,7 +374,6 @@ func (cs *chunkStore) appendExpression(chunk *attrAppender, maxArray int) string
 			expr = expr + fmt.Sprintf("%s[%d]=%d; ", attr, offset, int64(ui[i]))
 			offset++
 		}
-		expr += fmt.Sprintf("_maxtime=%d", chunk.lastT) // TODO: use max() expr
 
 		return expr
 
