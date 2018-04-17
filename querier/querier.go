@@ -51,7 +51,8 @@ type V3ioQuerier struct {
 }
 
 func (q V3ioQuerier) Select(params *storage.SelectParams, oms ...*labels.Matcher) (storage.SeriesSet, error) {
-	filter := match2filter(oms)
+
+	filter := match2filter(oms) // TODO: use special match for aggregates (allow to flexible qry from Prom)
 
 	newAggrSeries, err := aggregate.NewAggregateSeries(params.Func, "v")
 	if err != nil {
@@ -68,6 +69,7 @@ func (q V3ioQuerier) Select(params *storage.SelectParams, oms ...*labels.Matcher
 		if newAggrSeries != nil && params.Step != 0 {
 			newSet.aggrSeries = newAggrSeries
 			newSet.interval = params.Step
+			newSet.aggrIdx = newAggrSeries.NumFunctions() - 1
 		}
 
 		err := newSet.getItems(q.cfg.Path+"/", filter, q.container)
@@ -159,10 +161,10 @@ func (s *seriesSet) getItems(path, filter string, container *v3io.Container) err
 
 }
 
-func (s seriesSet) Next() bool {
+func (s *seriesSet) Next() bool {
 	if s.aggrSeries == nil {
 		if s.iter.Next() {
-			s.currSeries = NewSeries(&s)
+			s.currSeries = NewSeries(s)
 			return true
 		}
 		return false
@@ -172,7 +174,7 @@ func (s seriesSet) Next() bool {
 		if !s.iter.Next() {
 			return false
 		}
-		s.currSeries = NewSeries(&s)
+		s.currSeries = NewSeries(s)
 		s.chunks2Aggregates()
 	}
 
@@ -180,7 +182,7 @@ func (s seriesSet) Next() bool {
 	return true
 }
 
-func (s seriesSet) chunks2Aggregates() {
+func (s *seriesSet) chunks2Aggregates() {
 
 	s.aggrSet = s.aggrSeries.NewAggregateSet(24)
 
@@ -206,19 +208,19 @@ func (s seriesSet) chunks2Aggregates() {
 	}
 }
 
-func (s seriesSet) Err() error {
+func (s *seriesSet) Err() error {
 	if s.iter.Err() != nil {
 		return s.iter.Err()
 	}
 	return s.err
 }
 
-func (s seriesSet) At() storage.Series {
+func (s *seriesSet) At() storage.Series {
 	if s.aggrSeries == nil {
 		return s.currSeries
 	}
 
-	return NewAggrSeries(&s, s.aggrSeries.GetFunctions()[s.aggrIdx])
+	return NewAggrSeries(s, s.aggrSeries.GetFunctions()[s.aggrIdx])
 }
 
 type nullSeriesSet struct {

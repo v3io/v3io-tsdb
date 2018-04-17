@@ -36,18 +36,19 @@ const (
 
 	aggrTypeAvg    AggrType = aggrTypeCount | aggrTypeSum
 	aggrTypeStddev AggrType = aggrTypeCount | aggrTypeSum | aggrTypeSqr
+	aggrTypeStdvar AggrType = aggrTypeCount | aggrTypeSum | aggrTypeSqr | 0x80
 	aggrTypeAll    AggrType = 0xff
 )
 
 var rawAggregators = []AggrType{aggrTypeCount, aggrTypeSum, aggrTypeSqr, aggrTypeMax, aggrTypeMin}
 
 var aggrTypeString = map[string]AggrType{
-	"cnt": aggrTypeCount, "sum": aggrTypeSum, "sqr": aggrTypeSqr, "min": aggrTypeMin,
-	"max": aggrTypeMax, "avg": aggrTypeAvg, "stddev": aggrTypeStddev, "*": aggrTypeAll}
+	"count": aggrTypeCount, "sum": aggrTypeSum, "sqr": aggrTypeSqr, "min": aggrTypeMin,
+	"max": aggrTypeMax, "avg": aggrTypeAvg, "stddev": aggrTypeStddev, "stdvar": aggrTypeStdvar, "*": aggrTypeAll}
 
 var aggrToString = map[AggrType]string{
-	aggrTypeCount: "cnt", aggrTypeSum: "sum", aggrTypeSqr: "sqr", aggrTypeMin: "min",
-	aggrTypeMax: "max", aggrTypeAvg: "avg", aggrTypeStddev: "stddev", aggrTypeAll: "*",
+	aggrTypeCount: "count", aggrTypeSum: "sum", aggrTypeSqr: "sqr", aggrTypeMin: "min",
+	aggrTypeMax: "max", aggrTypeAvg: "avg", aggrTypeStddev: "stddev", aggrTypeStdvar: "stdvar", aggrTypeAll: "*",
 }
 
 func (a AggrType) String() string { return aggrToString[a] }

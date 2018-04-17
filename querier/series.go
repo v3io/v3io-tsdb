@@ -43,8 +43,8 @@ type series struct {
 	iter SeriesIterator
 }
 
-func (s series) Labels() labels.Labels            { return s.lset }
-func (s series) Iterator() storage.SeriesIterator { return s.iter }
+func (s *series) Labels() labels.Labels            { return s.lset }
+func (s *series) Iterator() storage.SeriesIterator { return s.iter }
 
 // SeriesIterator iterates over the data of a time series.
 type SeriesIterator interface {
@@ -249,12 +249,12 @@ func (s *aggrSeriesIterator) Seek(t int64) bool {
 	return true
 }
 func (s *aggrSeriesIterator) Next() bool {
-	if s.index > s.set.aggrSet.GetMaxCell() {
+	if s.index >= s.set.aggrSet.GetMaxCell() {
 		return false
 	}
 
 	s.index++
-	return false
+	return true
 }
 
 func (s *aggrSeriesIterator) At() (t int64, v float64) {

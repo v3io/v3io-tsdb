@@ -59,7 +59,7 @@ func TestTsdb(t *testing.T) {
 	lset := labels.Labels{labels.Label{Name: "__name__", Value: "http_req"},
 		labels.Label{Name: "method", Value: "post"}}
 
-	err = DoAppend(lset, appender, 50, 120)
+	err = DoAppend(lset, appender, 150, 120)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -73,7 +73,7 @@ func TestTsdb(t *testing.T) {
 	}
 
 	match := labels.Matcher{Type: labels.MatchEqual, Name: "__name__", Value: "http_req"}
-	params := storage.SelectParams{}
+	params := storage.SelectParams{Func: "count,avg,sum,stddev,stdvar", Step: 1000 * 3600}
 	set, err := qry.Select(&params, &match)
 	if err != nil {
 		t.Fatal(err)
@@ -109,6 +109,7 @@ func TestTsdb(t *testing.T) {
 }
 
 func DoAppend(lset labels.Labels, app storage.Appender, num, interval int) error {
+	return nil
 	//time.Sleep(time.Second * 1)
 	curTime := int64(basetime)
 
@@ -118,7 +119,7 @@ func DoAppend(lset labels.Labels, app storage.Appender, num, interval int) error
 	}
 
 	for i := 0; i <= num; i++ {
-		time.Sleep(time.Millisecond * 30)
+		time.Sleep(time.Millisecond * 80)
 		curTime += int64(interval * 1000)
 		t := curTime + int64(rand.Intn(100)) - 50
 		_, h := partmgr.TimeToDHM(t)

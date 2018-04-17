@@ -158,7 +158,15 @@ func (as *AggregateSet) GetCellValue(aggr AggrType, cell int) float64 {
 	case aggrTypeAvg:
 		return as.dataArrays[aggrTypeSum][cell] / as.dataArrays[aggrTypeCount][cell]
 	case aggrTypeStddev:
-		return as.dataArrays[aggrTypeCount][cell] // TODO: real function
+		cnt := as.dataArrays[aggrTypeCount][cell]
+		sum := as.dataArrays[aggrTypeSum][cell]
+		sqr := as.dataArrays[aggrTypeSqr][cell]
+		return math.Sqrt((cnt*sqr - sum*sum) / (cnt * (cnt - 1)))
+	case aggrTypeStdvar:
+		cnt := as.dataArrays[aggrTypeCount][cell]
+		sum := as.dataArrays[aggrTypeSum][cell]
+		sqr := as.dataArrays[aggrTypeSqr][cell]
+		return (cnt*sqr - sum*sum) / (cnt * (cnt - 1))
 	default:
 		return as.dataArrays[aggr][cell]
 	}
