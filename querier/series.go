@@ -259,7 +259,7 @@ func (s *aggrSeriesIterator) Next() bool {
 
 func (s *aggrSeriesIterator) At() (t int64, v float64) {
 	val := s.set.aggrSet.GetCellValue(s.aggrType, s.index)
-	return s.set.baseTime + int64(s.index)*s.set.interval, val
+	return s.set.aggrSet.GetCellTime(s.set.baseTime, s.index), val
 }
 func (s *aggrSeriesIterator) Err() error { return s.err }
 

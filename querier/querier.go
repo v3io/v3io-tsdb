@@ -34,11 +34,11 @@ import (
 )
 
 func NewV3ioQuerier(container *v3io.Container, logger logger.Logger, mint, maxt int64,
-	keymap *map[string]bool, cfg *config.TsdbConfig, partMngr *partmgr.PartitionManager) V3ioQuerier {
+	keymap *map[string]bool, cfg *config.TsdbConfig, partMngr *partmgr.PartitionManager) *V3ioQuerier {
 	newQuerier := V3ioQuerier{container: container, mint: mint, maxt: maxt,
 		logger: logger.GetChild("Querier"), Keymap: keymap, cfg: cfg}
 	newQuerier.partitionMngr = partMngr
-	return newQuerier
+	return &newQuerier
 }
 
 type V3ioQuerier struct {
@@ -48,9 +48,14 @@ type V3ioQuerier struct {
 	mint, maxt    int64
 	Keymap        *map[string]bool
 	partitionMngr *partmgr.PartitionManager
+	overlapWin    []int
 }
 
-func (q V3ioQuerier) Select(params *storage.SelectParams, oms ...*labels.Matcher) (storage.SeriesSet, error) {
+func (q *V3ioQuerier) SetTimeWindows(win []int) {
+	q.overlapWin = win
+}
+
+func (q *V3ioQuerier) Select(params *storage.SelectParams, oms ...*labels.Matcher) (storage.SeriesSet, error) {
 
 	filter := match2filter(oms) // TODO: use special match for aggregates (allow to flexible qry from Prom)
 
@@ -70,6 +75,7 @@ func (q V3ioQuerier) Select(params *storage.SelectParams, oms ...*labels.Matcher
 			newSet.aggrSeries = newAggrSeries
 			newSet.interval = params.Step
 			newSet.aggrIdx = newAggrSeries.NumFunctions() - 1
+			newSet.overlapWin = q.overlapWin
 		}
 
 		err := newSet.getItems(q.cfg.Path+"/", filter, q.container)
@@ -108,7 +114,7 @@ func match2filter(oms []*labels.Matcher) string {
 	return strings.Join(filter, " and ")
 }
 
-func (q V3ioQuerier) LabelValues(name string) ([]string, error) {
+func (q *V3ioQuerier) LabelValues(name string) ([]string, error) {
 	list := []string{}
 	for k, _ := range *q.Keymap {
 		list = append(list, k)
@@ -116,7 +122,7 @@ func (q V3ioQuerier) LabelValues(name string) ([]string, error) {
 	return list, nil
 }
 
-func (q V3ioQuerier) Close() error {
+func (q *V3ioQuerier) Close() error {
 	return nil
 }
 
@@ -135,6 +141,7 @@ type seriesSet struct {
 	chunkIds   []int
 
 	interval   int64
+	overlapWin []int
 	aggrSeries *aggregate.AggregateSeries
 	aggrIdx    int
 	currSeries storage.Series
@@ -175,16 +182,21 @@ func (s *seriesSet) Next() bool {
 			return false
 		}
 		s.currSeries = NewSeries(s)
-		s.chunks2Aggregates()
+		if s.overlapWin != nil {
+			s.aggrSet = aggregate.NewAggregateSet(s.aggrSeries.GetAggrMask(), len(s.overlapWin), s.interval, s.overlapWin)
+			s.chunks2WindowedAggregates()
+		} else {
+			size := int((s.maxt - s.mint) / s.interval)
+			s.aggrSet = aggregate.NewAggregateSet(s.aggrSeries.GetAggrMask(), size+1, s.interval, nil)
+			s.chunks2IntervalAggregates()
+		}
 	}
 
 	s.aggrIdx = (s.aggrIdx + 1) % s.aggrSeries.NumFunctions()
 	return true
 }
 
-func (s *seriesSet) chunks2Aggregates() {
-
-	s.aggrSet = s.aggrSeries.NewAggregateSet(24)
+func (s *seriesSet) chunks2IntervalAggregates() {
 
 	iter := s.currSeries.Iterator()
 	if iter.Next() {
@@ -199,7 +211,40 @@ func (s *seriesSet) chunks2Aggregates() {
 
 		for {
 			t, v := iter.At()
-			s.aggrSet.AppendCell(int((t-s.baseTime)/s.interval), v)
+			s.aggrSet.AppendAllCells(int((t-s.baseTime)/s.interval), v)
+			if !iter.Next() {
+				s.err = iter.Err()
+				break
+			}
+		}
+	}
+}
+
+func (s *seriesSet) chunks2WindowedAggregates() {
+
+	maxAligned := (s.maxt / s.interval) * s.interval
+	baseTime := maxAligned - int64(s.overlapWin[0])*s.interval
+
+	iter := s.currSeries.Iterator()
+
+	if iter.Seek(s.baseTime) {
+
+		if iter.Err() != nil {
+			s.err = iter.Err()
+			return
+		}
+
+		s.baseTime = baseTime
+
+		for {
+			t, v := iter.At()
+			if t < maxAligned {
+				for i, win := range s.overlapWin {
+					if t > maxAligned-int64(win)*s.interval {
+						s.aggrSet.AppendAllCells(i, v)
+					}
+				}
+			}
 			if !iter.Next() {
 				s.err = iter.Err()
 				break

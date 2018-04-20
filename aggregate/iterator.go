@@ -44,6 +44,10 @@ func NewAggregateSeries(functions, col string) (*AggregateSeries, error) {
 	return &newAggregateSeries, nil
 }
 
+func (as *AggregateSeries) GetAggrMask() AggrType {
+	return as.aggregates
+}
+
 func (as *AggregateSeries) GetFunctions() []AggrType {
 	return as.functions
 }
@@ -90,18 +94,20 @@ func (as *AggregateSeries) LoadAttrs(attrs *map[string]interface{}) error {
 }
 
 type AggregateSet struct {
-	as         *AggregateSeries
 	dataArrays map[AggrType][]float64
 	length     int
 	maxCell    int
+	baseTime   int64
+	interval   int64
+	overlapWin []int
 }
 
-func (as *AggregateSeries) NewAggregateSet(length int) *AggregateSet {
-	newAggregateSet := AggregateSet{as: as, length: length}
+func NewAggregateSet(aggregates AggrType, length int, interval int64, win []int) *AggregateSet {
+	newAggregateSet := AggregateSet{length: length, interval: interval, overlapWin: win}
 	dataArrays := map[AggrType][]float64{}
 
 	for _, aggr := range rawAggregators {
-		if aggr&as.aggregates != 0 {
+		if aggr&aggregates != 0 {
 			dataArrays[aggr] = make([]float64, length, length) // TODO: len/capacity & reuse (pool)
 		}
 	}
@@ -110,11 +116,19 @@ func (as *AggregateSeries) NewAggregateSet(length int) *AggregateSet {
 	return &newAggregateSet
 }
 
+func (as *AggregateSet) GetBaseTime() int64 {
+	return as.baseTime
+}
+
+func (as *AggregateSet) GetInterval() int64 {
+	return as.interval
+}
+
 func (as *AggregateSet) GetMaxCell() int {
 	return as.maxCell
 }
 
-func (as *AggregateSet) AppendCell(cell int, val float64) {
+func (as *AggregateSet) AppendAllCells(cell int, val float64) {
 
 	if cell > as.length {
 		return
@@ -125,21 +139,26 @@ func (as *AggregateSet) AppendCell(cell int, val float64) {
 	}
 
 	for aggr, _ := range as.dataArrays {
-		switch aggr {
-		case aggrTypeCount:
-			as.dataArrays[aggr][cell] += 1
-		case aggrTypeSum:
-			as.dataArrays[aggr][cell] += val
-		case aggrTypeSqr:
-			as.dataArrays[aggr][cell] += val * val
-		case aggrTypeMin:
-			if val < as.dataArrays[aggr][cell] {
-				as.dataArrays[aggr][cell] = val
-			}
-		case aggrTypeMax:
-			if val > as.dataArrays[aggr][cell] {
-				as.dataArrays[aggr][cell] = val
-			}
+		as.updateCell(aggr, cell, val)
+	}
+}
+
+func (as *AggregateSet) updateCell(aggr AggrType, cell int, val float64) {
+
+	switch aggr {
+	case aggrTypeCount:
+		as.dataArrays[aggr][cell] += 1
+	case aggrTypeSum:
+		as.dataArrays[aggr][cell] += val
+	case aggrTypeSqr:
+		as.dataArrays[aggr][cell] += val * val
+	case aggrTypeMin:
+		if val < as.dataArrays[aggr][cell] {
+			as.dataArrays[aggr][cell] = val
+		}
+	case aggrTypeMax:
+		if val > as.dataArrays[aggr][cell] {
+			as.dataArrays[aggr][cell] = val
 		}
 	}
 }
@@ -171,6 +190,16 @@ func (as *AggregateSet) GetCellValue(aggr AggrType, cell int) float64 {
 		return as.dataArrays[aggr][cell]
 	}
 
+}
+
+func (as *AggregateSet) GetCellTime(base int64, index int) int64 {
+	if as.overlapWin == nil {
+		return base + int64(index)*as.interval
+	}
+	if index >= len(as.overlapWin) {
+		return base
+	}
+	return base - int64(as.overlapWin[index])*as.interval
 }
 
 func (as *AggregateSet) Clear() {
