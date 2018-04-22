@@ -27,7 +27,6 @@ import (
 	"github.com/v3io/v3io-tsdb/aggregate"
 	"github.com/v3io/v3io-tsdb/config"
 	"sync"
-	"time"
 )
 
 func NewPartitionMngr(cfg *config.TsdbConfig) *PartitionManager {
@@ -120,11 +119,6 @@ func (p *DBPartition) GetPath() string {
 	return "0" // TODO: format a string based on id & format
 }
 
-// get aggregator block id
-func (p *DBPartition) GetAggrBlockId(t int64) int64 {
-	return ((t - p.startTime) / p.rollupTime) % int64(p.rollupBuckets)
-}
-
 func (p *DBPartition) AggrType() aggregate.AggrType {
 	return p.defaultRollups
 }
@@ -133,6 +127,11 @@ func (p *DBPartition) AggrBuckets() int {
 	return p.rollupBuckets
 }
 
+func (p *DBPartition) RollupTime() int64 {
+	return p.rollupTime
+}
+
+// get aggregator bucket id
 func (p *DBPartition) Time2Bucket(t int64) int {
 	if p.rollupTime == 0 {
 		return 0
@@ -174,9 +173,9 @@ func (p *DBPartition) InRange(t int64) bool {
 
 func (p *DBPartition) CyclicMinTime(mint, maxt int64) int64 {
 	maxSec := maxt / 1000
-	if !p.manager.ignoreWrap {
-		maxSec = time.Now().Unix()
-	}
+	//if !p.manager.ignoreWrap {
+	//	maxSec = time.Now().Unix()
+	//}
 	// start p.days ago, rounded to next hour
 	newMin := (maxSec/3600 - int64(p.days*24) + 1) * 3600 * 1000
 	if mint > newMin {
@@ -202,9 +201,10 @@ func (p *DBPartition) Range2Cids(mint, maxt int64) []int {
 	list := []int{}
 	start := p.TimeToChunkId(mint)
 	end := p.TimeToChunkId(maxt)
+	chunks := p.days * 24 / p.hoursInChunk
 
 	if end < start {
-		for i := start; i < 24; i++ {
+		for i := start; i < chunks; i++ {
 			list = append(list, i)
 		}
 		for i := 0; i <= end; i++ {

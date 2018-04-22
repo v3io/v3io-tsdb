@@ -17,18 +17,18 @@ type CountAggregator struct {
 
 func (a *CountAggregator) Aggregate(v float64) { a.count++ }
 func (a *CountAggregator) Clear()              { a.count = 0 }
-func (a *CountAggregator) GetAttr() string     { return "cnt" }
+func (a *CountAggregator) GetAttr() string     { return "count" }
 
 func (a *CountAggregator) UpdateExpr(col string, bucket int) string {
-	return fmt.Sprintf("_%s_cnt[%d]=_%s_cnt[%d]+%d;", col, bucket, col, bucket, a.count)
+	return fmt.Sprintf("_%s_count[%d]=_%s_count[%d]+%d;", col, bucket, col, bucket, a.count)
 }
 
 func (a *CountAggregator) SetExpr(col string, bucket int) string {
-	return fmt.Sprintf("_%s_cnt[%d]=%d;", col, bucket, a.count)
+	return fmt.Sprintf("_%s_count[%d]=%d;", col, bucket, a.count)
 }
 
 func (a *CountAggregator) InitExpr(col string, buckets int) string {
-	return fmt.Sprintf("_%s_cnt=init_array(%d,'int');", col, buckets)
+	return fmt.Sprintf("_%s_count=init_array(%d,'int');", col, buckets)
 }
 
 type FloatAggregator struct {

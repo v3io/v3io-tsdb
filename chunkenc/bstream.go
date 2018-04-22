@@ -93,11 +93,12 @@ func (b *bstream) bytes() []byte {
 		return b.stream
 	}
 
-	if b.wrapPtr(b.rptr) <= b.wrapPtr(b.wptr) {
-		return b.stream[b.wrapPtr(b.rptr) : b.wrapPtr(b.wptr)+1]
+	wptr := b.getLen()
+	if b.wrapPtr(b.rptr) <= b.wrapPtr(wptr) {
+		return b.stream[b.wrapPtr(b.rptr):b.wrapPtr(wptr)]
 	}
 
-	return append(b.stream[b.wrapPtr(b.rptr):len(b.stream)], b.stream[0:b.wrapPtr(b.wptr)+1]...)
+	return append(b.stream[b.wrapPtr(b.rptr):len(b.stream)], b.stream[0:b.wrapPtr(wptr)]...)
 }
 
 func (b *bstream) getOffset() uint16 {
@@ -105,7 +106,7 @@ func (b *bstream) getOffset() uint16 {
 }
 
 func (b *bstream) getLen() uint16 {
-	if b.count > 0 {
+	if b.count != 8 {
 		return b.wptr + 1
 	}
 	return b.wptr
@@ -136,6 +137,12 @@ func (b *bstream) writeBit(bit bit) {
 	}
 
 	b.count--
+}
+
+func (b *bstream) padToByte() {
+	if b.count != 8 {
+		b.count = 0
+	}
 }
 
 func (b *bstream) writeByte(byt byte) {

@@ -59,17 +59,18 @@ func (q *V3ioQuerier) Select(params *storage.SelectParams, oms ...*labels.Matche
 
 	filter := match2filter(oms) // TODO: use special match for aggregates (allow to flexible qry from Prom)
 
-	newAggrSeries, err := aggregate.NewAggregateSeries(params.Func, "v")
-	if err != nil {
-		return nil, err
-	}
-
 	mint, maxt := q.mint, q.maxt
 	if q.partitionMngr.IsCyclic() {
 		partition := q.partitionMngr.GetHead()
 		mint = partition.CyclicMinTime(mint, maxt)
 		q.logger.DebugWith("Select - new cyclic series", "from", mint, "to", maxt, "filter", filter)
 		newSet := &seriesSet{mint: mint, maxt: maxt, partition: partition, logger: q.logger}
+
+		newAggrSeries, err := aggregate.NewAggregateSeries(
+			params.Func, "v", partition.AggrBuckets(), params.Step, partition.RollupTime(), q.overlapWin)
+		if err != nil {
+			return nil, err
+		}
 
 		if newAggrSeries != nil && params.Step != 0 {
 			newSet.aggrSeries = newAggrSeries
@@ -78,7 +79,7 @@ func (q *V3ioQuerier) Select(params *storage.SelectParams, oms ...*labels.Matche
 			newSet.overlapWin = q.overlapWin
 		}
 
-		err := newSet.getItems(q.cfg.Path+"/", filter, q.container)
+		err = newSet.getItems(q.cfg.Path+"/", filter, q.container)
 		if err != nil {
 			return nil, err
 		}
@@ -153,7 +154,12 @@ type seriesSet struct {
 func (s *seriesSet) getItems(path, filter string, container *v3io.Container) error {
 
 	attrs := []string{"_lset", "_meta", "_name", "_maxtime"}
-	s.attrs, s.chunkIds = s.partition.Range2Attrs("v", s.mint, s.maxt)
+
+	if s.aggrSeries != nil && s.aggrSeries.CanAggregate(s.partition.AggrType()) {
+		s.attrs = s.aggrSeries.GetAttrNames()
+	} else {
+		s.attrs, s.chunkIds = s.partition.Range2Attrs("v", s.mint, s.maxt)
+	}
 	attrs = append(attrs, s.attrs...)
 
 	s.logger.DebugWith("Select - GetItems", "path", path, "attr", attrs, "filter", filter)
@@ -181,14 +187,42 @@ func (s *seriesSet) Next() bool {
 		if !s.iter.Next() {
 			return false
 		}
-		s.currSeries = NewSeries(s)
-		if s.overlapWin != nil {
-			s.aggrSet = aggregate.NewAggregateSet(s.aggrSeries.GetAggrMask(), len(s.overlapWin), s.interval, s.overlapWin)
-			s.chunks2WindowedAggregates()
+
+		if s.aggrSeries.CanAggregate(s.partition.AggrType()) {
+
+			maxt := s.maxt
+			maxTime := s.iter.GetField("_maxtime")
+			if maxTime != nil && int64(maxTime.(int)) < maxt {
+				maxt = int64(maxTime.(int))
+			}
+			mint := s.partition.CyclicMinTime(s.mint, maxt)
+			start := s.partition.Time2Bucket(mint)
+			end := s.partition.Time2Bucket(maxt)
+			length := int((maxt - mint) / s.interval)
+
+			if s.overlapWin != nil {
+				s.baseTime = maxt - int64(s.overlapWin[0])*s.interval
+			} else {
+				s.baseTime = mint
+			}
+
+			aggrSet, err := s.aggrSeries.NewSetFromAttrs(length, start, end, mint, maxt, s.iter.GetFields())
+			if err != nil {
+				s.err = err
+				return false
+			}
+
+			s.aggrSet = aggrSet
+
 		} else {
-			size := int((s.maxt - s.mint) / s.interval)
-			s.aggrSet = aggregate.NewAggregateSet(s.aggrSeries.GetAggrMask(), size+1, s.interval, nil)
-			s.chunks2IntervalAggregates()
+			s.currSeries = NewSeries(s)
+			s.aggrSet = s.aggrSeries.NewSetFromChunks(int((s.maxt-s.mint)/s.interval) + 1)
+			if s.overlapWin != nil {
+				s.chunks2WindowedAggregates()
+			} else {
+				s.chunks2IntervalAggregates()
+			}
+
 		}
 	}
 

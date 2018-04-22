@@ -223,6 +223,8 @@ func (a *xorAppender) Append(t int64, v float64) {
 	a.v = v
 	(*a.samples)++
 	a.tDelta = tDelta
+
+	a.b.padToByte() // TODO: pad, align to next byte
 }
 
 func bitRange(x int64, nbits uint8) bool {
@@ -372,7 +374,10 @@ func (it *xorIterator) Next() bool {
 	it.tDelta = uint64(int64(it.tDelta) + dod)
 	it.t = it.t + int64(it.tDelta)
 
-	return it.readValue()
+	rv := it.readValue()
+	it.br.padToByte() // TODO: pad, align to next byte
+
+	return rv
 }
 
 func (it *xorIterator) readValue() bool {
