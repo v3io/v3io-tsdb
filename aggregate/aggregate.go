@@ -34,6 +34,7 @@ const (
 	aggrTypeMax   AggrType = 8
 	aggrTypeMin   AggrType = 16
 
+	// derived aggregators
 	aggrTypeAvg    AggrType = aggrTypeCount | aggrTypeSum
 	aggrTypeStddev AggrType = aggrTypeCount | aggrTypeSum | aggrTypeSqr
 	aggrTypeStdvar AggrType = aggrTypeCount | aggrTypeSum | aggrTypeSqr | 0x80
@@ -53,6 +54,7 @@ var aggrToString = map[AggrType]string{
 
 func (a AggrType) String() string { return aggrToString[a] }
 
+// convert comma seperated string to aggregator mask
 func AggrsFromString(list string) (AggrType, error) {
 	split := strings.Split(list, ",")
 	var aggrList AggrType
@@ -66,6 +68,7 @@ func AggrsFromString(list string) (AggrType, error) {
 	return aggrList, nil
 }
 
+// create list of aggregator objects from aggregator mask
 func NewAggregatorList(aggrType AggrType) *AggregatorList {
 	list := AggregatorList{}
 	if (aggrType & aggrTypeCount) != 0 {
@@ -86,14 +89,17 @@ func NewAggregatorList(aggrType AggrType) *AggregatorList {
 	return &list
 }
 
+// list of aggregators
 type AggregatorList []Aggregator
 
+// append value to all aggregators
 func (a AggregatorList) Aggregate(v float64) {
 	for _, aggr := range a {
 		aggr.Aggregate(v)
 	}
 }
 
+// return update expression for aggregators
 func (a AggregatorList) UpdateExpr(col string, bucket int) string {
 	expr := ""
 	for _, aggr := range a {
@@ -102,6 +108,7 @@ func (a AggregatorList) UpdateExpr(col string, bucket int) string {
 	return expr
 }
 
+// return set (first value) or update expression for aggregators
 func (a AggregatorList) SetOrUpdateExpr(col string, bucket int, isNew bool) string {
 	if isNew {
 		return a.SetExpr(col, bucket)
@@ -117,6 +124,7 @@ func (a AggregatorList) SetExpr(col string, bucket int) string {
 	return expr
 }
 
+// return array init expression
 func (a AggregatorList) InitExpr(col string, buckets int) string {
 	expr := ""
 	for _, aggr := range a {
@@ -125,10 +133,9 @@ func (a AggregatorList) InitExpr(col string, buckets int) string {
 	return expr
 }
 
+// clear all aggregators
 func (a AggregatorList) Clear() {
 	for _, aggr := range a {
 		aggr.Clear()
 	}
 }
-
-type AggregatorMap map[AggrType]Aggregator

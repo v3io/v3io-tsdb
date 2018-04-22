@@ -201,7 +201,7 @@ func (s *seriesSet) Next() bool {
 			length := int((maxt - mint) / s.interval)
 
 			if s.overlapWin != nil {
-				s.baseTime = maxt - int64(s.overlapWin[0])*s.interval
+				s.baseTime = maxt //- int64(s.overlapWin[0]) * s.interval
 			} else {
 				s.baseTime = mint
 			}
@@ -257,7 +257,7 @@ func (s *seriesSet) chunks2IntervalAggregates() {
 func (s *seriesSet) chunks2WindowedAggregates() {
 
 	maxAligned := (s.maxt / s.interval) * s.interval
-	baseTime := maxAligned - int64(s.overlapWin[0])*s.interval
+	//baseTime := maxAligned - int64(s.overlapWin[0])*s.interval
 
 	iter := s.currSeries.Iterator()
 
@@ -268,7 +268,7 @@ func (s *seriesSet) chunks2WindowedAggregates() {
 			return
 		}
 
-		s.baseTime = baseTime
+		s.baseTime = maxAligned
 
 		for {
 			t, v := iter.At()

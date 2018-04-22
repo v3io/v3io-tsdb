@@ -26,6 +26,7 @@ import (
 	"github.com/prometheus/prometheus/storage"
 	"github.com/v3io/v3io-tsdb/config"
 	"github.com/v3io/v3io-tsdb/partmgr"
+	"github.com/v3io/v3io-tsdb/querier"
 	"math/rand"
 	"testing"
 	"time"
@@ -64,7 +65,7 @@ func TestTsdb(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	time.Sleep(time.Second * 5)
+	//time.Sleep(time.Second * 5)
 	//return
 
 	qry, err := adapter.Querier(nil, basetime-0*3600*1000, basetime+5*3600*1000)
@@ -73,8 +74,8 @@ func TestTsdb(t *testing.T) {
 	}
 
 	match := labels.Matcher{Type: labels.MatchEqual, Name: "__name__", Value: "http_req"}
-	params := storage.SelectParams{Func: "count,avg,sum", Step: 1000 * 3600}
-	//qry.(*querier.V3ioQuerier).SetTimeWindows([]int{1, 2, 4})
+	params := storage.SelectParams{Func: "count,avg,sum,min", Step: 1000 * 3600}
+	qry.(*querier.V3ioQuerier).SetTimeWindows([]int{4, 2, 1})
 	set, err := qry.Select(&params, &match)
 	if err != nil {
 		t.Fatal(err)
