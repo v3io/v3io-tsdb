@@ -1,5 +1,5 @@
 # V3IO-TSDB
-iguazio API lib for time-series DB access and Prometheus TSDB storage driver 
+iguazio API lib for time-series DB access and Prometheus TSDB storage driver. 
 
 > Note: This project is still under development 
 
