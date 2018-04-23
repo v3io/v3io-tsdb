@@ -30,6 +30,7 @@ import (
 	"github.com/v3io/v3io-tsdb/config"
 	"github.com/v3io/v3io-tsdb/partmgr"
 	"github.com/v3io/v3io-tsdb/v3ioutil"
+	"sort"
 	"strings"
 )
 
@@ -52,6 +53,8 @@ type V3ioQuerier struct {
 }
 
 func (q *V3ioQuerier) SetTimeWindows(win []int) {
+	// sort from oldest (biggest) to newest window
+	sort.Sort(sort.Reverse(sort.IntSlice(win)))
 	q.overlapWin = win
 }
 
