@@ -45,11 +45,13 @@ func NewDBPartition(pmgr *PartitionManager) *DBPartition {
 		prefix:        "",
 		retentionDays: pmgr.cfg.DaysRetention,
 		rollupTime:    int64(pmgr.cfg.RollupMin) * 60 * 1000,
-		rollupBuckets: pmgr.cfg.DaysPerObj * 24 * 60 / pmgr.cfg.RollupMin,
 	}
 
 	aggrType, _ := aggregate.AggrsFromString(pmgr.cfg.DefaultRollups) // TODO: error check & load part data from schema object
 	newPart.defaultRollups = aggrType
+	if pmgr.cfg.RollupMin != 0 {
+		newPart.rollupBuckets = pmgr.cfg.DaysPerObj * 24 * 60 / pmgr.cfg.RollupMin
+	}
 
 	return &newPart
 }

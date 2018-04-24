@@ -174,7 +174,7 @@ func (mc *MetricsCache) Start() error {
 				respErr := resp.Error
 
 				if respErr != nil {
-					mc.logger.ErrorWith("failed v3io GetItem request", "metric", resp.ID, "err", respErr,
+					mc.logger.DebugWith("failed v3io GetItem request", "metric", resp.ID, "err", respErr,
 						"key", resp.Request().Input.(*v3io.GetItemInput).Path)
 				} else {
 					mc.logger.DebugWith("Process GetItem resp", "id", resp.ID,
@@ -183,15 +183,19 @@ func (mc *MetricsCache) Start() error {
 
 				if ok {
 					metric.Lock()
-					metric.store.ProcessGetResp(mc, metric, resp)
+					if respErr != nil {
+						metric.store.ProcessGetResp(mc, metric, resp)
 
-					if metric.store.IsReady() {
-						// if there are no in flight requests, update the DB
-						err := metric.store.WriteChunks(mc, metric)
-						if err != nil {
-							mc.logger.ErrorWith("Async Submit failed", "metric", metric.Lset, "err", err)
-							metric.err = err
+						if metric.store.IsReady() {
+							// if there are no in flight requests, update the DB
+							err := metric.store.WriteChunks(mc, metric)
+							if err != nil {
+								mc.logger.ErrorWith("Async Submit failed", "metric", metric.Lset, "err", err)
+								metric.err = err
+							}
 						}
+					} else {
+						metric.store.state = storeStateReady
 					}
 
 					metric.Unlock()
