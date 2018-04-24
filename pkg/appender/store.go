@@ -23,9 +23,9 @@ package appender
 import (
 	"fmt"
 	"github.com/v3io/v3io-go-http"
-	"github.com/v3io/v3io-tsdb/aggregate"
-	"github.com/v3io/v3io-tsdb/chunkenc"
-	"github.com/v3io/v3io-tsdb/partmgr"
+	"github.com/v3io/v3io-tsdb/pkg/aggregate"
+	"github.com/v3io/v3io-tsdb/pkg/chunkenc"
+	"github.com/v3io/v3io-tsdb/pkg/partmgr"
 	"sort"
 )
 
@@ -147,7 +147,7 @@ func (cs *chunkStore) GetChunksState(mc *MetricsCache, metric *MetricState, t in
 
 	request, err := mc.container.GetItem(&getInput, mc.getRespChan)
 	if err != nil {
-		mc.logger.ErrorWith("GetItem Failed", "metric", metric.Lset, "err", err)
+		mc.logger.ErrorWith("GetItem Failed", "metric", metric.key, "err", err)
 		return err
 	}
 
@@ -301,14 +301,7 @@ func (cs *chunkStore) WriteChunks(mc *MetricsCache, metric *MetricState) error {
 
 	// if the table object wasnt initialized, insert init expression
 	if notInitialized { // TODO: not correct, need to init once per metric/partition, maybe use cond expressions
-		lblexpr := ""
-		for _, lbl := range metric.Lset {
-			if lbl.Name != "__name__" {
-				lblexpr = lblexpr + fmt.Sprintf("%s='%s'; ", lbl.Name, lbl.Value)
-			} else {
-				lblexpr = lblexpr + fmt.Sprintf("_name='%s'; ", lbl.Value)
-			}
-		}
+		lblexpr := metric.Lset.GetExpr()
 
 		// init aggregate arrays
 		lblexpr = lblexpr + cs.aggrList.InitExpr("v", numBuckets)

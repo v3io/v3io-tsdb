@@ -23,17 +23,17 @@ package appender
 import (
 	"fmt"
 	"github.com/nuclio/logger"
-	"github.com/prometheus/prometheus/pkg/labels"
 	"github.com/v3io/v3io-go-http"
 	"github.com/v3io/v3io-tsdb/config"
-	"github.com/v3io/v3io-tsdb/partmgr"
+	"github.com/v3io/v3io-tsdb/pkg/partmgr"
+	"github.com/v3io/v3io-tsdb/pkg/utils"
 	"sync"
 )
 
 // to add, rollups policy (cnt, sum, min/max, sum^2) + interval , or policy in per name lable
 type MetricState struct {
 	sync.RWMutex
-	Lset  labels.Labels
+	Lset  utils.LabelsIfc
 	key   string
 	name  string
 	hash  uint64
@@ -244,10 +244,10 @@ func (mc *MetricsCache) appendTV(metric *MetricState, t int64, v interface{}) {
 }
 
 // First time add time & value to metric (by label set)
-func (mc *MetricsCache) Add(lset labels.Labels, t int64, v interface{}) (uint64, error) {
+func (mc *MetricsCache) Add(lset utils.LabelsIfc, t int64, v interface{}) (uint64, error) {
 
-	name, key := labels2key(lset)
-	hash := lset.Hash()
+	name, key, hash := lset.GetKey()
+	//hash := lset.Hash()
 	metric, ok := mc.getMetric(hash)
 
 	if ok {
@@ -269,7 +269,7 @@ func (mc *MetricsCache) Add(lset labels.Labels, t int64, v interface{}) (uint64,
 }
 
 // fast Add to metric (by refId)
-func (mc *MetricsCache) AddFast(lset labels.Labels, ref uint64, t int64, v interface{}) error {
+func (mc *MetricsCache) AddFast(ref uint64, t int64, v interface{}) error {
 
 	metric, ok := mc.getMetricByRef(ref)
 	if !ok {
@@ -284,21 +284,4 @@ func (mc *MetricsCache) AddFast(lset labels.Labels, ref uint64, t int64, v inter
 	mc.appendTV(metric, t, v)
 	return nil
 
-}
-
-// convert Label set to a string in the form key1=v1,key2=v2..
-func labels2key(lset labels.Labels) (string, string) {
-	key := ""
-	name := ""
-	for _, lbl := range lset {
-		if lbl.Name == "__name__" {
-			name = lbl.Value
-		} else {
-			key = key + lbl.Name + "=" + lbl.Value + ","
-		}
-	}
-	if len(key) == 0 {
-		return name, ""
-	}
-	return name, key[:len(key)-1]
 }

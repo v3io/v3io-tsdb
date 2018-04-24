@@ -1,32 +1,11 @@
-/*
-Copyright 2018 Iguazio Systems Ltd.
-
-Licensed under the Apache License, Version 2.0 (the "License") with
-an addition restriction as set forth herein. You may not use this
-file except in compliance with the License. You may obtain a copy of
-the License at http://www.apache.org/licenses/LICENSE-2.0.
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
-implied. See the License for the specific language governing
-permissions and limitations under the License.
-
-In addition, you may not use the software for any purposes that are
-illegal under applicable law, and the grant of the foregoing license
-under the Apache 2.0 license is conditioned upon your compliance with
-such restriction.
-*/
-
-package v3io_tsdb
+package promtsdb
 
 import (
 	"fmt"
 	"github.com/prometheus/prometheus/pkg/labels"
 	"github.com/prometheus/prometheus/storage"
 	"github.com/v3io/v3io-tsdb/config"
-	"github.com/v3io/v3io-tsdb/partmgr"
-	"github.com/v3io/v3io-tsdb/querier"
+	"github.com/v3io/v3io-tsdb/pkg/partmgr"
 	"math/rand"
 	"testing"
 	"time"
@@ -38,13 +17,13 @@ func TestTsdb(t *testing.T) {
 
 	d, h := partmgr.TimeToDHM(basetime)
 	fmt.Println("base=", d, h)
-	cfg, err := config.LoadConfig("v3io.yaml")
+	cfg, err := config.LoadConfig("../v3io.yaml")
 	if err != nil {
 		t.Fatal(err)
 	}
 	fmt.Println(cfg)
 
-	adapter := NewV3ioAdapter(cfg, nil, nil)
+	adapter := NewV3ioProm(cfg, nil, nil)
 	err = adapter.Start()
 	if err != nil {
 		t.Fatal(err)
@@ -74,8 +53,8 @@ func TestTsdb(t *testing.T) {
 	}
 
 	match := labels.Matcher{Type: labels.MatchEqual, Name: "__name__", Value: "http_req"}
-	params := storage.SelectParams{Func: "count,avg,sum,min", Step: 1000 * 3600}
-	qry.(*querier.V3ioQuerier).SetTimeWindows([]int{4, 2, 1})
+	params := storage.SelectParams{Func: "count,avg,sum,max", Step: 1000 * 3600}
+	//qry.(*querier.V3ioQuerier).SetTimeWindows([]int{4, 2, 1})
 	set, err := qry.Select(&params, &match)
 	if err != nil {
 		t.Fatal(err)

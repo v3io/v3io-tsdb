@@ -21,56 +21,40 @@ such restriction.
 package querier
 
 import (
-	"github.com/prometheus/prometheus/pkg/labels"
-	"github.com/prometheus/prometheus/storage"
-	"github.com/v3io/v3io-tsdb/aggregate"
-	"github.com/v3io/v3io-tsdb/chunkenc"
-	"github.com/v3io/v3io-tsdb/v3ioutil"
+	"github.com/v3io/v3io-tsdb/pkg/aggregate"
+	"github.com/v3io/v3io-tsdb/pkg/chunkenc"
+	"github.com/v3io/v3io-tsdb/pkg/utils"
 	"math"
 	"strings"
 )
 
-func NewSeries(set *seriesSet) *series {
-	newSeries := series{set: set}
+func NewSeries(set *V3ioSeriesSet) Series {
+	newSeries := V3ioSeries{set: set}
 	newSeries.lset = initLabels(set)
 	newSeries.initSeriesIter()
 	return &newSeries
 }
 
-type series struct {
-	set  *seriesSet
-	lset labels.Labels
+type V3ioSeries struct {
+	set  *V3ioSeriesSet
+	lset utils.Labels
 	iter SeriesIterator
 }
 
-func (s *series) Labels() labels.Labels            { return s.lset }
-func (s *series) Iterator() storage.SeriesIterator { return s.iter }
-
-// SeriesIterator iterates over the data of a time series.
-type SeriesIterator interface {
-	// Seek advances the iterator forward to the given timestamp.
-	// If there's no value exactly at t, it advances to the first value
-	// after t.
-	Seek(t int64) bool
-	// At returns the current timestamp/value pair.
-	At() (t int64, v float64)
-	// Next advances the iterator by one.
-	Next() bool
-	// Err returns the current error.
-	Err() error
-}
+func (s *V3ioSeries) Labels() utils.Labels     { return s.lset }
+func (s *V3ioSeries) Iterator() SeriesIterator { return s.iter }
 
 // initialize the label set from _lset & name attributes
-func initLabels(set *seriesSet) labels.Labels {
+func initLabels(set *V3ioSeriesSet) utils.Labels {
 	name := set.iter.GetField("_name").(string)
 	lsetAttr := set.iter.GetField("_lset").(string)
-	lset := labels.Labels{labels.Label{Name: "__name__", Value: name}}
+	lset := utils.Labels{utils.Label{Name: "__name__", Value: name}}
 
 	splitLset := strings.Split(lsetAttr, ",")
 	for _, label := range splitLset {
 		kv := strings.Split(label, "=")
 		if len(kv) > 1 {
-			lset = append(lset, labels.Label{Name: kv[0], Value: kv[1]})
+			lset = append(lset, utils.Label{Name: kv[0], Value: kv[1]})
 		}
 	}
 
@@ -78,7 +62,7 @@ func initLabels(set *seriesSet) labels.Labels {
 }
 
 // initialize the series from value metadata & attributes
-func (s *series) initSeriesIter() {
+func (s *V3ioSeries) initSeriesIter() {
 
 	maxt := s.set.maxt
 	maxTime := s.set.iter.GetField("_maxtime")
@@ -98,7 +82,7 @@ func (s *series) initSeriesIter() {
 		return
 	}
 
-	metaArray := v3ioutil.AsInt64Array(metaAttr.([]byte))
+	metaArray := utils.AsInt64Array(metaAttr.([]byte))
 	s.set.logger.DebugWith("query meta", "array", metaArray, "attr", s.set.attrs)
 
 	for i, attr := range s.set.attrs {
@@ -221,16 +205,16 @@ func uintToTV(data uint64, curT int64, curV float64) (int64, float64) {
 	return curT + t, curV + v
 }
 
-func NewAggrSeries(set *seriesSet, aggr aggregate.AggrType) *series {
-	newSeries := series{set: set}
-	lset := append(initLabels(set), labels.Label{Name: "Aggregator", Value: aggr.String()})
+func NewAggrSeries(set *V3ioSeriesSet, aggr aggregate.AggrType) *V3ioSeries {
+	newSeries := V3ioSeries{set: set}
+	lset := append(initLabels(set), utils.Label{Name: "Aggregator", Value: aggr.String()})
 	newSeries.lset = lset
 	newSeries.iter = &aggrSeriesIterator{set: set, aggrType: aggr, index: -1}
 	return &newSeries
 }
 
 type aggrSeriesIterator struct {
-	set      *seriesSet
+	set      *V3ioSeriesSet
 	aggrType aggregate.AggrType
 	index    int
 	err      error

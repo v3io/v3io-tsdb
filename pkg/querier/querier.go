@@ -21,15 +21,12 @@ such restriction.
 package querier
 
 import (
-	"fmt"
 	"github.com/nuclio/logger"
-	"github.com/prometheus/prometheus/pkg/labels"
-	"github.com/prometheus/prometheus/storage"
 	"github.com/v3io/v3io-go-http"
-	"github.com/v3io/v3io-tsdb/aggregate"
 	"github.com/v3io/v3io-tsdb/config"
-	"github.com/v3io/v3io-tsdb/partmgr"
-	"github.com/v3io/v3io-tsdb/v3ioutil"
+	"github.com/v3io/v3io-tsdb/pkg/aggregate"
+	"github.com/v3io/v3io-tsdb/pkg/partmgr"
+	"github.com/v3io/v3io-tsdb/pkg/utils"
 	"sort"
 	"strings"
 )
@@ -52,32 +49,35 @@ type V3ioQuerier struct {
 	overlapWin    []int
 }
 
-func (q *V3ioQuerier) SetTimeWindows(win []int) {
-	// sort from oldest (biggest) to newest window
-	sort.Sort(sort.Reverse(sort.IntSlice(win)))
-	q.overlapWin = win
+func (q *V3ioQuerier) Select(functions string, step int64, filter string) (SeriesSet, error) {
+	return q.selectQry(functions, step, nil, filter)
 }
 
-func (q *V3ioQuerier) Select(params *storage.SelectParams, oms ...*labels.Matcher) (storage.SeriesSet, error) {
+func (q *V3ioQuerier) SelectOverlap(functions string, step int64, win []int, filter string) (SeriesSet, error) {
+	sort.Sort(sort.Reverse(sort.IntSlice(win)))
+	return q.selectQry(functions, step, win, filter)
+}
 
-	filter := match2filter(oms) // TODO: use special match for aggregates (allow to flexible qry from Prom)
+func (q *V3ioQuerier) selectQry(functions string, step int64, win []int, filter string) (SeriesSet, error) {
+
+	//filter := match2filter(oms) // TODO: use special match for aggregates (allow to flexible qry from Prom)
 
 	mint, maxt := q.mint, q.maxt
 	if q.partitionMngr.IsCyclic() {
 		partition := q.partitionMngr.GetHead()
 		mint = partition.CyclicMinTime(mint, maxt)
 		q.logger.DebugWith("Select - new cyclic series", "from", mint, "to", maxt, "filter", filter)
-		newSet := &seriesSet{mint: mint, maxt: maxt, partition: partition, logger: q.logger}
+		newSet := &V3ioSeriesSet{mint: mint, maxt: maxt, partition: partition, logger: q.logger}
 
 		newAggrSeries, err := aggregate.NewAggregateSeries(
-			params.Func, "v", partition.AggrBuckets(), params.Step, partition.RollupTime(), q.overlapWin)
+			functions, "v", partition.AggrBuckets(), step, partition.RollupTime(), q.overlapWin)
 		if err != nil {
 			return nil, err
 		}
 
-		if newAggrSeries != nil && params.Step != 0 {
+		if newAggrSeries != nil && step != 0 {
 			newSet.aggrSeries = newAggrSeries
-			newSet.interval = params.Step
+			newSet.interval = step
 			newSet.aggrIdx = newAggrSeries.NumFunctions() - 1
 			newSet.overlapWin = q.overlapWin
 		}
@@ -98,26 +98,6 @@ func (q *V3ioQuerier) Select(params *storage.SelectParams, oms ...*labels.Matche
 	return nullSeriesSet{}, nil
 }
 
-func match2filter(oms []*labels.Matcher) string {
-	filter := []string{}
-	//name := ""
-	for _, matcher := range oms {
-		if matcher.Name == "__name__" {
-			//name = matcher.Value
-			filter = append(filter, fmt.Sprintf("_name=='%s'", matcher.Value))
-		} else {
-			switch matcher.Type {
-			case labels.MatchEqual:
-				filter = append(filter, fmt.Sprintf("%s=='%s'", matcher.Name, matcher.Value))
-			case labels.MatchNotEqual:
-				filter = append(filter, fmt.Sprintf("%s!='%s'", matcher.Name, matcher.Value))
-
-			}
-		}
-	}
-	return strings.Join(filter, " and ")
-}
-
 func (q *V3ioQuerier) LabelValues(name string) ([]string, error) {
 	list := []string{}
 	for k, _ := range *q.Keymap {
@@ -130,16 +110,16 @@ func (q *V3ioQuerier) Close() error {
 	return nil
 }
 
-func newSeriesSet(partition *partmgr.DBPartition, mint, maxt int64) *seriesSet {
+func newSeriesSet(partition *partmgr.DBPartition, mint, maxt int64) *V3ioSeriesSet {
 
-	return &seriesSet{mint: mint, maxt: maxt, partition: partition}
+	return &V3ioSeriesSet{mint: mint, maxt: maxt, partition: partition}
 }
 
-type seriesSet struct {
+type V3ioSeriesSet struct {
 	err        error
 	logger     logger.Logger
 	partition  *partmgr.DBPartition
-	iter       *v3ioutil.V3ioItemsCursor
+	iter       *utils.V3ioItemsCursor
 	mint, maxt int64
 	attrs      []string
 	chunkIds   []int
@@ -148,13 +128,13 @@ type seriesSet struct {
 	overlapWin []int
 	aggrSeries *aggregate.AggregateSeries
 	aggrIdx    int
-	currSeries storage.Series
+	currSeries Series
 	aggrSet    *aggregate.AggregateSet
 	baseTime   int64
 }
 
 // TODO: get items per partition + merge, per partition calc attrs
-func (s *seriesSet) getItems(path, filter string, container *v3io.Container) error {
+func (s *V3ioSeriesSet) getItems(path, filter string, container *v3io.Container) error {
 
 	attrs := []string{"_lset", "_meta", "_name", "_maxtime"}
 
@@ -167,7 +147,7 @@ func (s *seriesSet) getItems(path, filter string, container *v3io.Container) err
 
 	s.logger.DebugWith("Select - GetItems", "path", path, "attr", attrs, "filter", filter)
 	input := v3io.GetItemsInput{Path: path, AttributeNames: attrs, Filter: filter}
-	iter, err := v3ioutil.NewItemsCursor(container, &input)
+	iter, err := utils.NewItemsCursor(container, &input)
 	if err != nil {
 		return err
 	}
@@ -177,7 +157,7 @@ func (s *seriesSet) getItems(path, filter string, container *v3io.Container) err
 
 }
 
-func (s *seriesSet) Next() bool {
+func (s *V3ioSeriesSet) Next() bool {
 	if s.aggrSeries == nil {
 		if s.iter.Next() {
 			s.currSeries = NewSeries(s)
@@ -233,7 +213,7 @@ func (s *seriesSet) Next() bool {
 	return true
 }
 
-func (s *seriesSet) chunks2IntervalAggregates() {
+func (s *V3ioSeriesSet) chunks2IntervalAggregates() {
 
 	iter := s.currSeries.Iterator()
 	if iter.Next() {
@@ -257,7 +237,7 @@ func (s *seriesSet) chunks2IntervalAggregates() {
 	}
 }
 
-func (s *seriesSet) chunks2WindowedAggregates() {
+func (s *V3ioSeriesSet) chunks2WindowedAggregates() {
 
 	maxAligned := (s.maxt / s.interval) * s.interval
 	//baseTime := maxAligned - int64(s.overlapWin[0])*s.interval
@@ -290,14 +270,14 @@ func (s *seriesSet) chunks2WindowedAggregates() {
 	}
 }
 
-func (s *seriesSet) Err() error {
+func (s *V3ioSeriesSet) Err() error {
 	if s.iter.Err() != nil {
 		return s.iter.Err()
 	}
 	return s.err
 }
 
-func (s *seriesSet) At() storage.Series {
+func (s *V3ioSeriesSet) At() Series {
 	if s.aggrSeries == nil {
 		return s.currSeries
 	}
@@ -309,9 +289,9 @@ type nullSeriesSet struct {
 	err error
 }
 
-func (s nullSeriesSet) Next() bool         { return false }
-func (s nullSeriesSet) At() storage.Series { return nil }
-func (s nullSeriesSet) Err() error         { return s.err }
+func (s nullSeriesSet) Next() bool { return false }
+func (s nullSeriesSet) At() Series { return nil }
+func (s nullSeriesSet) Err() error { return s.err }
 
 func mergeLables(a, b []string) []string {
 	maxl := len(a)

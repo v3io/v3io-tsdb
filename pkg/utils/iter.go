@@ -18,7 +18,7 @@ under the Apache 2.0 license is conditioned upon your compliance with
 such restriction.
 */
 
-package v3ioutil
+package utils
 
 import (
 	"encoding/binary"

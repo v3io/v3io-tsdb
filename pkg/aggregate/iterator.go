@@ -22,7 +22,7 @@ package aggregate
 
 import (
 	"fmt"
-	"github.com/v3io/v3io-tsdb/v3ioutil"
+	"github.com/v3io/v3io-tsdb/pkg/utils"
 	"math"
 	"strings"
 )
@@ -117,7 +117,7 @@ func (as *AggregateSeries) NewSetFromAttrs(
 			if !ok {
 				return nil, fmt.Errorf("Aggregation Attribute %s was not found", as.toAttrName(aggr))
 			}
-			aggrArrays[aggr] = v3ioutil.AsInt64Array(attrBlob.([]byte))
+			aggrArrays[aggr] = utils.AsInt64Array(attrBlob.([]byte))
 			dataArrays[aggr] = make([]float64, length, length)
 		}
 	}

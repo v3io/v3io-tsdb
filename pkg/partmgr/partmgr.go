@@ -24,8 +24,8 @@ package partmgr
 
 import (
 	"fmt"
-	"github.com/v3io/v3io-tsdb/aggregate"
 	"github.com/v3io/v3io-tsdb/config"
+	"github.com/v3io/v3io-tsdb/pkg/aggregate"
 	"sync"
 )
 
