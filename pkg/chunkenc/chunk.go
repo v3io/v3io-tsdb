@@ -55,6 +55,7 @@ const (
 // Chunk holds a sequence of sample pairs that can be iterated over and appended to.
 type Chunk interface {
 	Bytes() []byte
+	Clear()
 	Encoding() Encoding
 	Appender() (Appender, error)
 	Iterator() Iterator

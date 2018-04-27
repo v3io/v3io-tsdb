@@ -59,10 +59,8 @@ import (
 
 // bstream is a stream of bits.
 type bstream struct {
-	stream     []byte // the data stream
-	count      uint8  // how many bits are valid in current byte
-	rptr, wptr uint16
-	isStream   bool
+	stream []byte // the data stream
+	count  uint8  // how many bits are valid in current byte
 }
 
 func newBReader(b []byte) *bstream {
@@ -70,46 +68,20 @@ func newBReader(b []byte) *bstream {
 }
 
 func newBWriter(size int) *bstream {
-	bstr := bstream{count: 0}
-	if size == 0 {
-		bstr.stream = []byte{}
-	} else {
-		bstr.isStream = true
-		bstr.stream = make([]byte, size, size)
-	}
-	return &bstr
+	return &bstream{stream: make([]byte, 0, size), count: 0}
 }
 
 func (b *bstream) clone() *bstream {
 	d := make([]byte, len(b.stream))
 	copy(d, b.stream)
-	return &bstream{stream: d, count: b.count, wptr: b.wptr}
+	return &bstream{stream: d, count: b.count}
 }
 
 func (b *bstream) bytes() []byte {
-	//fmt.Println("bytes: rptr, wptr, bits =", b.wrapPtr(b.rptr), b.wrapPtr(b.wptr), b.count, len(b.stream), cap(b.stream), b.stream)
-
-	if !b.isStream {
-		return b.stream
+	if b.count == 8 {
+		return b.stream[0 : len(b.stream)-1]
 	}
-
-	wptr := b.getLen()
-	if b.wrapPtr(b.rptr) <= b.wrapPtr(wptr) {
-		return b.stream[b.wrapPtr(b.rptr):b.wrapPtr(wptr)]
-	}
-
-	return append(b.stream[b.wrapPtr(b.rptr):len(b.stream)], b.stream[0:b.wrapPtr(wptr)]...)
-}
-
-func (b *bstream) getOffset() uint16 {
-	return b.rptr
-}
-
-func (b *bstream) getLen() uint16 {
-	if b.count != 8 {
-		return b.wptr + 1
-	}
-	return b.wptr
+	return b.stream
 }
 
 type bit bool
@@ -119,40 +91,46 @@ const (
 	one  bit = true
 )
 
-func (b *bstream) wrapPtr(ptr uint16) uint16 {
-	if !b.isStream {
-		return ptr
-	}
-
-	return ptr & uint16(len(b.stream)-1)
-}
-
-func (b *bstream) writeBit(bit bit) {
-	if b.count == 0 {
-		b.appendZero()
-	}
-
-	if bit {
-		b.stream[b.wrapPtr(b.wptr)] |= 1 << (b.count - 1)
-	}
-
-	b.count--
-}
-
 func (b *bstream) padToByte() {
 	if b.count != 8 {
 		b.count = 0
 	}
 }
 
-func (b *bstream) writeByte(byt byte) {
+func (b *bstream) clear() {
+	b.stream = b.stream[:0]
+	b.count = 0
+}
+
+func (b *bstream) writeBit(bit bit) {
 	if b.count == 0 {
-		b.appendZero()
+		b.stream = append(b.stream, 0)
+		b.count = 8
 	}
 
+	i := len(b.stream) - 1
+
+	if bit {
+		b.stream[i] |= 1 << (b.count - 1)
+	}
+
+	b.count--
+}
+
+func (b *bstream) writeByte(byt byte) {
+	if b.count == 0 {
+		b.stream = append(b.stream, 0)
+		b.count = 8
+	}
+
+	i := len(b.stream) - 1
+
 	// fill up b.b with b.count bits from byt
-	b.stream[b.wrapPtr(b.wptr)] |= byt >> (8 - b.count)
-	b.wrapAppend(byt << b.count)
+	b.stream[i] |= byt >> (8 - b.count)
+
+	b.stream = append(b.stream, 0)
+	i++
+	b.stream[i] = byt << b.count
 }
 
 func (b *bstream) writeBits(u uint64, nbits int) {
@@ -169,30 +147,6 @@ func (b *bstream) writeBits(u uint64, nbits int) {
 		u <<= 1
 		nbits--
 	}
-}
-
-func (b *bstream) wrapAppend(byt byte) {
-
-	b.wptr = b.wptr + 1
-	if b.isStream {
-		b.stream[b.wrapPtr(b.wptr)] = byt
-	} else {
-		b.stream = append(b.stream, byt)
-	}
-
-}
-
-func (b *bstream) appendZero() {
-
-	if b.wptr != 0 {
-		b.wptr = b.wptr + 1
-	}
-	if b.isStream {
-		b.stream[b.wrapPtr(b.wptr)] = 0
-	} else {
-		b.stream = append(b.stream, 0)
-	}
-	b.count = 8
 }
 
 func (b *bstream) readBit() (bit, error) {

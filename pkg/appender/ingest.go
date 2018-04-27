@@ -23,6 +23,7 @@ package appender
 import (
 	"fmt"
 	"github.com/nuclio/logger"
+	"github.com/pkg/errors"
 	"github.com/v3io/v3io-go-http"
 	"github.com/v3io/v3io-tsdb/config"
 	"github.com/v3io/v3io-tsdb/pkg/partmgr"
@@ -39,9 +40,12 @@ type MetricState struct {
 	hash  uint64
 	refId uint64
 
-	store *chunkStore
-	err   error
+	store      *chunkStore
+	err        error
+	retryCount uint8
 }
+
+const MAX_WRITE_RETRY = 2
 
 func (m *MetricState) Err() error {
 	m.RLock()
@@ -124,12 +128,17 @@ func (mc *MetricsCache) Start() error {
 					if respErr == nil {
 						// Set fields so next write will not include redundant info (bytes, lables, init_array)
 						metric.store.ProcessWriteResp()
+					} else {
+						metric.retryCount++
+						if metric.retryCount == MAX_WRITE_RETRY {
+							metric.err = errors.Wrap(respErr, "chunk update failed")
+						}
 					}
 
 					err := metric.store.WriteChunks(mc, metric)
 					if err != nil {
 						mc.logger.ErrorWith("Submit failed", "metric", metric.Lset, "err", err)
-						metric.err = err
+						metric.err = errors.Wrap(err, "chunk write submit failed")
 					}
 
 					metric.Unlock()
@@ -183,19 +192,15 @@ func (mc *MetricsCache) Start() error {
 
 				if ok {
 					metric.Lock()
-					if respErr != nil {
-						metric.store.ProcessGetResp(mc, metric, resp)
+					metric.store.ProcessGetResp(mc, metric, resp)
 
-						if metric.store.IsReady() {
-							// if there are no in flight requests, update the DB
-							err := metric.store.WriteChunks(mc, metric)
-							if err != nil {
-								mc.logger.ErrorWith("Async Submit failed", "metric", metric.Lset, "err", err)
-								metric.err = err
-							}
+					if metric.store.IsReady() {
+						// if there are no in flight requests, update the DB
+						err := metric.store.WriteChunks(mc, metric)
+						if err != nil {
+							mc.logger.ErrorWith("Async Submit failed", "metric", metric.Lset, "err", err)
+							metric.err = err
 						}
-					} else {
-						metric.store.state = storeStateReady
 					}
 
 					metric.Unlock()

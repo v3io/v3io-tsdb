@@ -75,24 +75,14 @@ func (s *V3ioSeries) initSeriesIter() {
 		isCyclic: s.set.partition.IsCyclic()}
 	newIterator.chunks = []chunkenc.Chunk{}
 
-	metaAttr := s.set.iter.GetField("_meta")
-	if metaAttr == nil {
-		s.set.logger.ErrorWith("Nil Metadata Array", "Lset", s.lset)
-		s.iter = &nullSeriesIterator{}
-		return
-	}
-
-	metaArray := utils.AsInt64Array(metaAttr.([]byte))
-	s.set.logger.DebugWith("query meta", "array", metaArray, "attr", s.set.attrs)
-
-	for i, attr := range s.set.attrs {
+	for _, attr := range s.set.attrs {
 		values := s.set.iter.GetField(attr)
-		chunkID := s.set.chunkIds[i]
+		//chunkID := s.set.chunkIds[i]
 
-		if values != nil && len(values.([]byte)) >= 24 && metaArray[chunkID] != 0 {
+		if values != nil { //&& len(values.([]byte)) >= 24 && metaArray[chunkID] != 0 {
 			bytes := values.([]byte)
-			meta := metaArray[chunkID]
-			chunk, err := chunkenc.FromBuffer(meta, bytes[16:])
+			//meta := metaArray[chunkID]
+			chunk, err := chunkenc.FromData(chunkenc.EncXOR, bytes, 0)
 			if err != nil {
 				s.set.logger.ErrorWith("Error reading chunk buffer", "Lset", s.lset, "err", err)
 			} else {

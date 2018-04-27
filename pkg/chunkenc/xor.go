@@ -80,29 +80,35 @@ func (c *XORChunk) Encoding() Encoding {
 
 // Bytes returns the underlying byte slice of the chunk.
 func (c *XORChunk) Bytes() []byte {
+	//return c.b.getbytes()
 	return c.b.bytes()
+}
+
+func (c *XORChunk) Clear() {
+	//c.b.rptr = c.b.getLen()
+	c.b.clear()
 }
 
 // GetMeta returns offset, samples, length, bits, encoding
 func (c *XORChunk) GetMeta() (uint16, uint16, uint16, uint8, uint8) {
-	return c.b.rptr, c.samples, c.b.getLen(), c.b.count, 1
+	return 0, c.samples, 0, c.b.count, 1
 }
 
 // GetMeta returns offset, samples, length, bits, encoding
 func (c *XORChunk) GetChunkBuffer() (uint64, int, []byte) {
 	bytes := c.b.bytes()
-	meta := toMetadata(c.samples, c.b.getLen(), 0, c.b.count, 1)
-	return meta, int(c.b.rptr), bytes
+	meta := toMetadata(c.samples, 0, 0, c.b.count, 1)
+	return meta, 0, bytes
 }
 
 // MoveOffset removes first bytes that were committed to storage.
 func (c *XORChunk) MoveOffset(num uint16) error {
 
-	if num >= c.b.wptr {
+	if num >= 0 {
 		return fmt.Errorf("Read pointer passed write pointer in byte stream ring")
 	}
 
-	c.b.rptr = num
+	//c.b.rptr = num
 	return nil
 }
 
@@ -112,7 +118,17 @@ func (c *XORChunk) NumSamples() int {
 }
 
 // Appender implements the Chunk interface.
+// new implementation, doesnt read the existing buffer, assume its new
 func (c *XORChunk) Appender() (Appender, error) {
+	a := &xorAppender{c: c, b: c.b, samples: &c.samples}
+	if c.samples == 0 {
+		a.leading = 0xff
+	}
+	return a, nil
+}
+
+// old Appender TODO: do we need to append to existing bugger? maybe in stateless/slow clients
+func (c *XORChunk) aAppender() (Appender, error) {
 	it := c.iterator()
 
 	// To get an appender we must know the state it would have if we had
@@ -177,10 +193,9 @@ func (a *xorAppender) Append(t int64, v float64) {
 	num := *a.samples
 
 	if num == 0 {
-		buf := make([]byte, binary.MaxVarintLen64)
-		for _, b := range buf[:binary.PutVarint(buf, t)] {
-			a.b.writeByte(b)
-		}
+		// add a signature 11111 to indicate start of cseries in case we put few in the same chunk (append to existing)
+		a.b.writeBits(0x1f, 5)
+		a.b.writeBits(uint64(t), 51)
 		a.b.writeBits(math.Float64bits(v), 64)
 
 	} else if num == 1 {
@@ -212,8 +227,8 @@ func (a *xorAppender) Append(t int64, v float64) {
 			a.b.writeBits(0x0e, 4) // '1110'
 			a.b.writeBits(uint64(dod), 20)
 		default:
-			a.b.writeBits(0x0f, 4) // '1111'
-			a.b.writeBits(uint64(dod), 64)
+			a.b.writeBits(0x1e, 5) // '11110'
+			a.b.writeBits(uint64(dod), 32)
 		}
 
 		a.writeVDelta(v)
@@ -290,16 +305,18 @@ func (it *xorIterator) Err() error {
 }
 
 func (it *xorIterator) Next() bool {
-	if it.err != nil || it.numRead == it.numTotal {
+	if it.err != nil || len(it.br.stream) == 0 || (len(it.br.stream) == 1 && it.br.count == 0) {
 		return false
 	}
 
 	if it.numRead == 0 {
-		t, err := binary.ReadVarint(it.br)
+		t, err := it.br.readBits(56) // unlike Gorilla we read a 56bit cropped int (time in year 2000+ has 48bit)
+		//t, err := binary.ReadVarint(it.br)
 		if err != nil {
 			it.err = err
 			return false
 		}
+		t = t & ((0x80 << 40) - 1)
 		v, err := it.br.readBits(64)
 		if err != nil {
 			it.err = err
@@ -320,12 +337,15 @@ func (it *xorIterator) Next() bool {
 		it.tDelta = tDelta
 		it.t = it.t + int64(it.tDelta)
 
-		return it.readValue()
+		rv := it.readValue()
+		it.br.padToByte()
+
+		return rv
 	}
 
 	var d byte
 	// read delta-of-delta
-	for i := 0; i < 4; i++ {
+	for i := 0; i < 5; i++ {
 		d <<= 1
 		bit, err := it.br.readBit()
 		if err != nil {
@@ -348,14 +368,37 @@ func (it *xorIterator) Next() bool {
 		sz = 17
 	case 0x0e:
 		sz = 20
-	case 0x0f:
-		bits, err := it.br.readBits(64)
+	case 0x1e:
+		bits, err := it.br.readBits(32)
 		if err != nil {
 			it.err = err
 			return false
 		}
 
 		dod = int64(bits)
+	case 0x1f:
+		// added this case to allow append of a new Gorilla series on an existing chunk (restart from t0)
+
+		fmt.Println(it.br.count, it.br.stream)
+
+		t, err := it.br.readBits(51)
+		fmt.Println("t", t)
+		//t, err := binary.ReadVarint(it.br)
+		if err != nil {
+			it.err = err
+			return false
+		}
+		//t = t & ((0x80 << 40) - 1)
+		v, err := it.br.readBits(64)
+		if err != nil {
+			it.err = err
+			return false
+		}
+		it.t = int64(t)
+		it.val = math.Float64frombits(v)
+
+		it.numRead = 1
+		return true
 	}
 
 	if sz != 0 {
@@ -375,7 +418,7 @@ func (it *xorIterator) Next() bool {
 	it.t = it.t + int64(it.tDelta)
 
 	rv := it.readValue()
-	it.br.padToByte() // TODO: pad, align to next byte
+	it.br.padToByte()
 
 	return rv
 }

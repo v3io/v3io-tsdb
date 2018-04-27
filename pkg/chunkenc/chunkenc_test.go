@@ -23,58 +23,77 @@ package chunkenc
 import (
 	"fmt"
 	"testing"
-	//"github.com/prometheus/tsdb/chunkenc"
+
+	"math/rand"
 )
 
-const basetime = 1520346654002
+const basetime = 1524690488000
+
+type sample struct {
+	t int64
+	v float64
+}
 
 // [132 180 199 187 191 88 63 240 - 0 0 0 0 0 0 154 8 - 194 95 255 108 7 126 113 172 - 46 18 195 104 59 202 237 129 - 119 243 146]
 
-func TestXor(t *testing.T) {
-	ts1 := []int64{2000, 3050, 4100, 4950, 7000, 8200, 9300}
-	arr1 := []float64{1, 2, 3, 4, 5, 6, 7}
-	barr := make([]byte, 128, 128)
-	var cmeta uint64
+func TestXor(tst *testing.T) {
+	//ts1 := []int64{2000, 3050, 4100, 4950, 7000, 8200, 9300}
+	//arr1 := []float64{1, 2, 3, 4, 5, 6, 7}
+	samples := GenSamples(9, 1)
+	byteArray := []byte{}
 
 	ch := NewXORChunk()
 	appender, err := ch.Appender()
 	if err != nil {
-		t.Fatal(err)
+		tst.Fatal(err)
 	}
 
-	for i := 0; i < len(arr1); i++ {
-		fmt.Println("t,v: ", basetime+ts1[i], arr1[i])
-		appender.Append(basetime+ts1[i], arr1[i])
-		//b := ch.Bytes()
-		meta, offset, b := ch.GetChunkBuffer()
-		fmt.Println(getMetadata(meta), offset, b, len(b))
-		cmeta = meta
-		for i := 0; i < len(b); i++ {
-			barr[i+offset] = b[i]
+	for i, s := range samples {
+		fmt.Println("t,v: ", s.t, s.v)
+		appender.Append(s.t, s.v)
+		b := ch.Bytes()
+		fmt.Println(b, len(b))
+		byteArray = append(byteArray, b...)
+		ch.Clear()
+		if i == 4 {
+			fmt.Println("restarted appender")
+			ch = NewXORChunk()
+			appender, err = ch.Appender()
+			if err != nil {
+				tst.Fatal(err)
+			}
+
 		}
-		//fmt.Println()
-		//ch.MoveOffset(uint16((offset+len(b)-1)/8) * 8)
-		//if i == 4 { ch.MoveOffset(16)}
 	}
 
-	fmt.Println("barr", barr)
+	fmt.Println("byteArray", byteArray, len(byteArray))
 
-	ch2, err := FromBuffer(cmeta, barr)
+	ch2, err := FromData(EncXOR, byteArray, 0)
 	if err != nil {
-		t.Fatal(err)
+		tst.Fatal(err)
 	}
 
 	iter := ch2.Iterator()
+	i := 0
 	for iter.Next() {
 
 		if iter.Err() != nil {
-			t.Fatal(iter.Err())
+			tst.Fatal(iter.Err())
 		}
 
 		t, v := iter.At()
-		fmt.Printf("t=%d,v=%f ", t, v)
+		isMatch := t == samples[i].t && v == samples[i].v
+		fmt.Println("t, v, match: ", t, v, isMatch)
+		if !isMatch {
+			tst.Fatalf("iterator t or v doesnt match appended", i, len(samples))
+		}
+		i++
 	}
 	fmt.Println()
+
+	if i != len(samples) {
+		tst.Fatalf("number of iterator samples (%d) != num of appended (%d)", i, len(samples))
+	}
 
 }
 
@@ -84,10 +103,10 @@ func TestBstream(t *testing.T) {
 	bs := newBWriter(8)
 	byt, _ := src.readByte()
 	bs.writeByte(byt)
-	fmt.Println(bs.count, bs.stream, bs.wptr)
+	fmt.Println(bs.count, bs.stream)
 	for i := 1; i < 18; i++ {
 		bit, _ := src.readBit()
-		fmt.Println(bs.count, bs.stream, bs.wptr, bit)
+		fmt.Println(bs.count, bs.stream, bit)
 		bs.writeBit(bit)
 	}
 
@@ -99,4 +118,19 @@ func TestBstream(t *testing.T) {
 		fmt.Println(bs2.count, bs2.stream, bit)
 	}
 
+}
+
+func GenSamples(num, interval int) []sample {
+	samples := []sample{}
+	curTime := int64(basetime)
+
+	for i := 0; i <= num; i++ {
+		curTime += int64(interval * 1000)
+		t := curTime + int64(rand.Intn(100)) - 50
+		v := rand.Float64() * 1000
+		//fmt.Printf("t-%d,v%.2f ", t, v)
+		samples = append(samples, sample{t: t, v: v})
+	}
+
+	return samples
 }

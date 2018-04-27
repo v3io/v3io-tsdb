@@ -30,7 +30,7 @@ import (
 	"time"
 )
 
-const basetime = 15222481971234
+const basetime = 1524690488000
 
 func TestTsdb(t *testing.T) {
 
@@ -58,7 +58,7 @@ func TestTsdb(t *testing.T) {
 	lset := utils.Labels{utils.Label{Name: "__name__", Value: "http_req"},
 		utils.Label{Name: "method", Value: "post"}}
 
-	err = DoAppend(lset, appender, 150, 120)
+	err = DoAppend(lset, appender, 10, 30)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -71,7 +71,8 @@ func TestTsdb(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	set, err := qry.Select("count,avg,sum,max", 1000*3600, "_name=='http_req'")
+	set, err := qry.Select("", 0, "_name=='http_req'")
+	//set, err := qry.Select("count,avg,sum,max", 1000*3600, "_name=='http_req'")
 	//set, err := qry.SelectOverlap("count,avg,sum,max", 1000*3600, []int{4, 2, 1}, "_name=='http_req'")
 	if err != nil {
 		t.Fatal(err)
@@ -107,7 +108,7 @@ func TestTsdb(t *testing.T) {
 }
 
 func DoAppend(lset utils.Labels, app Appender, num, interval int) error {
-	return nil
+	//return nil
 	//time.Sleep(time.Second * 1)
 	curTime := int64(basetime)
 
