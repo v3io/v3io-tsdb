@@ -31,6 +31,7 @@ import (
 	"strings"
 )
 
+// Create a new Querier interface
 func NewV3ioQuerier(container *v3io.Container, logger logger.Logger, mint, maxt int64,
 	keymap *map[string]bool, cfg *config.TsdbConfig, partMngr *partmgr.PartitionManager) *V3ioQuerier {
 	newQuerier := V3ioQuerier{container: container, mint: mint, maxt: maxt,
@@ -44,20 +45,24 @@ type V3ioQuerier struct {
 	container     *v3io.Container
 	cfg           *config.TsdbConfig
 	mint, maxt    int64
-	Keymap        *map[string]bool
+	Keymap        *map[string]bool // link to Appender metric names, TODO: use queries instead
 	partitionMngr *partmgr.PartitionManager
 	overlapWin    []int
 }
 
+// Standard Time Series Query, return a set of series which match the condition
 func (q *V3ioQuerier) Select(functions string, step int64, filter string) (SeriesSet, error) {
 	return q.selectQry(functions, step, nil, filter)
 }
 
+// Overlapping windows Time Series Query, return a set of series each with a list of aggregated results per window
+// e.g. get the last 1hr, 6hr, 24hr stats per metric (specify a 1hr step of 3600*1000, 1,6,24 windows, and max time)
 func (q *V3ioQuerier) SelectOverlap(functions string, step int64, win []int, filter string) (SeriesSet, error) {
 	sort.Sort(sort.Reverse(sort.IntSlice(win)))
 	return q.selectQry(functions, step, win, filter)
 }
 
+// base query function
 func (q *V3ioQuerier) selectQry(functions string, step int64, win []int, filter string) (SeriesSet, error) {
 
 	//filter := match2filter(oms) // TODO: use special match for aggregates (allow to flexible qry from Prom)
@@ -98,6 +103,7 @@ func (q *V3ioQuerier) selectQry(functions string, step int64, win []int, filter 
 	return nullSeriesSet{}, nil
 }
 
+// return the current metric names, TODO: read from DB vs from local cache
 func (q *V3ioQuerier) LabelValues(name string) ([]string, error) {
 	list := []string{}
 	for k, _ := range *q.Keymap {
@@ -115,6 +121,7 @@ func newSeriesSet(partition *partmgr.DBPartition, mint, maxt int64) *V3ioSeriesS
 	return &V3ioSeriesSet{mint: mint, maxt: maxt, partition: partition}
 }
 
+// holds the query result set
 type V3ioSeriesSet struct {
 	err        error
 	logger     logger.Logger
@@ -133,6 +140,7 @@ type V3ioSeriesSet struct {
 	baseTime   int64
 }
 
+// Get relevant items & attributes from the DB, and create an iterator
 // TODO: get items per partition + merge, per partition calc attrs
 func (s *V3ioSeriesSet) getItems(path, filter string, container *v3io.Container) error {
 
@@ -157,7 +165,10 @@ func (s *V3ioSeriesSet) getItems(path, filter string, container *v3io.Container)
 
 }
 
+// advance to the next series
 func (s *V3ioSeriesSet) Next() bool {
+
+	// create raw chunks series (not aggregated)
 	if s.aggrSeries == nil {
 		if s.iter.Next() {
 			s.currSeries = NewSeries(s)
@@ -166,6 +177,7 @@ func (s *V3ioSeriesSet) Next() bool {
 		return false
 	}
 
+	// create multiple aggregation series (one per aggregation function)
 	if s.aggrIdx == s.aggrSeries.NumFunctions()-1 {
 		if !s.iter.Next() {
 			return false
@@ -173,11 +185,13 @@ func (s *V3ioSeriesSet) Next() bool {
 
 		if s.aggrSeries.CanAggregate(s.partition.AggrType()) {
 
+			// create series from aggregation arrays (in DB) if the partition stored the desired aggregates
 			maxt := s.maxt
 			maxTime := s.iter.GetField("_maxtime")
 			if maxTime != nil && int64(maxTime.(int)) < maxt {
 				maxt = int64(maxTime.(int))
 			}
+
 			mint := s.partition.CyclicMinTime(s.mint, maxt)
 			start := s.partition.Time2Bucket(mint)
 			end := s.partition.Time2Bucket(maxt)
@@ -198,6 +212,8 @@ func (s *V3ioSeriesSet) Next() bool {
 			s.aggrSet = aggrSet
 
 		} else {
+
+			// create series from raw chunks
 			s.currSeries = NewSeries(s)
 			s.aggrSet = s.aggrSeries.NewSetFromChunks(int((s.maxt-s.mint)/s.interval) + 1)
 			if s.overlapWin != nil {
@@ -213,6 +229,7 @@ func (s *V3ioSeriesSet) Next() bool {
 	return true
 }
 
+// convert raw chunks to fixed interval aggragator
 func (s *V3ioSeriesSet) chunks2IntervalAggregates() {
 
 	iter := s.currSeries.Iterator()
@@ -237,6 +254,7 @@ func (s *V3ioSeriesSet) chunks2IntervalAggregates() {
 	}
 }
 
+// convert chunks to overlapping windows aggregator
 func (s *V3ioSeriesSet) chunks2WindowedAggregates() {
 
 	maxAligned := (s.maxt / s.interval) * s.interval
@@ -270,6 +288,7 @@ func (s *V3ioSeriesSet) chunks2WindowedAggregates() {
 	}
 }
 
+// return current error
 func (s *V3ioSeriesSet) Err() error {
 	if s.iter.Err() != nil {
 		return s.iter.Err()
@@ -277,6 +296,7 @@ func (s *V3ioSeriesSet) Err() error {
 	return s.err
 }
 
+// return a series iterator
 func (s *V3ioSeriesSet) At() Series {
 	if s.aggrSeries == nil {
 		return s.currSeries
@@ -285,6 +305,7 @@ func (s *V3ioSeriesSet) At() Series {
 	return NewAggrSeries(s, s.aggrSeries.GetFunctions()[s.aggrIdx])
 }
 
+// empty series set
 type nullSeriesSet struct {
 	err error
 }
@@ -293,6 +314,7 @@ func (s nullSeriesSet) Next() bool { return false }
 func (s nullSeriesSet) At() Series { return nil }
 func (s nullSeriesSet) Err() error { return s.err }
 
+// for future use, merge sort labels from multiple partitions
 func mergeLables(a, b []string) []string {
 	maxl := len(a)
 	if len(b) > len(a) {

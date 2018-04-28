@@ -24,10 +24,10 @@ import (
 	"github.com/v3io/v3io-tsdb/pkg/aggregate"
 	"github.com/v3io/v3io-tsdb/pkg/chunkenc"
 	"github.com/v3io/v3io-tsdb/pkg/utils"
-	"math"
 	"strings"
 )
 
+// Create a new series from chunks
 func NewSeries(set *V3ioSeriesSet) Series {
 	newSeries := V3ioSeries{set: set}
 	newSeries.lset = initLabels(set)
@@ -75,13 +75,12 @@ func (s *V3ioSeries) initSeriesIter() {
 		isCyclic: s.set.partition.IsCyclic()}
 	newIterator.chunks = []chunkenc.Chunk{}
 
+	// create and init chunk encoder per chunk blob
 	for _, attr := range s.set.attrs {
 		values := s.set.iter.GetField(attr)
-		//chunkID := s.set.chunkIds[i]
 
-		if values != nil { //&& len(values.([]byte)) >= 24 && metaArray[chunkID] != 0 {
+		if values != nil {
 			bytes := values.([]byte)
-			//meta := metaArray[chunkID]
 			chunk, err := chunkenc.FromData(chunkenc.EncXOR, bytes, 0)
 			if err != nil {
 				s.set.logger.ErrorWith("Error reading chunk buffer", "Lset", s.lset, "err", err)
@@ -101,6 +100,7 @@ func (s *V3ioSeries) initSeriesIter() {
 	}
 }
 
+// chunk list series iterator
 type v3ioSeriesIterator struct {
 	mint, maxt int64 // TBD per block
 	err        error
@@ -112,7 +112,7 @@ type v3ioSeriesIterator struct {
 	iter       chunkenc.Iterator
 }
 
-// advance the iterator to the specified time
+// advance the iterator to the specified chunk and time
 func (it *v3ioSeriesIterator) Seek(t int64) bool {
 
 	// Seek time is after the max time in object
@@ -189,11 +189,7 @@ func (it *v3ioSeriesIterator) At() (t int64, v float64) { return it.iter.At() }
 
 func (it *v3ioSeriesIterator) Err() error { return it.iter.Err() }
 
-func uintToTV(data uint64, curT int64, curV float64) (int64, float64) {
-	v := float64(math.Float32frombits(uint32(data)))
-	t := int64(data >> 32)
-	return curT + t, curV + v
-}
+// Aggregation (count, avg, sum, ..) series and iterator
 
 func NewAggrSeries(set *V3ioSeriesSet, aggr aggregate.AggrType) *V3ioSeries {
 	newSeries := V3ioSeries{set: set}
@@ -210,6 +206,7 @@ type aggrSeriesIterator struct {
 	err      error
 }
 
+// advance iterator to time t
 func (s *aggrSeriesIterator) Seek(t int64) bool {
 	if t <= s.set.baseTime {
 		return true
@@ -222,6 +219,8 @@ func (s *aggrSeriesIterator) Seek(t int64) bool {
 	s.index = int((t - s.set.baseTime) / s.set.interval)
 	return true
 }
+
+// advance to the next time interval/bucket
 func (s *aggrSeriesIterator) Next() bool {
 	if s.index >= s.set.aggrSet.GetMaxCell() {
 		return false
@@ -231,12 +230,15 @@ func (s *aggrSeriesIterator) Next() bool {
 	return true
 }
 
+// return the time & value at the current bucket
 func (s *aggrSeriesIterator) At() (t int64, v float64) {
 	val := s.set.aggrSet.GetCellValue(s.aggrType, s.index)
 	return s.set.aggrSet.GetCellTime(s.set.baseTime, s.index), val
 }
+
 func (s *aggrSeriesIterator) Err() error { return s.err }
 
+// null series iterator
 type nullSeriesIterator struct {
 	err error
 }
