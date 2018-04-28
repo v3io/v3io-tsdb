@@ -29,12 +29,14 @@ import (
 	"sync"
 )
 
+// Create new Partition Manager, for now confined to one Cyclic partition
 func NewPartitionMngr(cfg *config.TsdbConfig) *PartitionManager {
 	newMngr := &PartitionManager{cfg: cfg, cyclic: true, ignoreWrap: true}
 	newMngr.headPartition = NewDBPartition(newMngr)
 	return newMngr
 }
 
+// Create and Init a new Partition
 func NewDBPartition(pmgr *PartitionManager) *DBPartition {
 	newPart := DBPartition{
 		manager:       pmgr,
@@ -90,15 +92,15 @@ func (p *PartitionManager) GetHead() *DBPartition {
 
 type DBPartition struct {
 	manager        *PartitionManager
-	partID         int
-	startTime      int64
-	days           int
-	hoursInChunk   int
-	prefix         string
-	retentionDays  int
-	defaultRollups aggregate.AggrType
-	rollupTime     int64
-	rollupBuckets  int
+	partID         int                // PartitionID
+	startTime      int64              // Start from time/date
+	days           int                // Number of days stored in the partition
+	hoursInChunk   int                // number of hours stored in each chunk
+	prefix         string             // Path prefix
+	retentionDays  int                // Keep samples for N days
+	defaultRollups aggregate.AggrType // Default Aggregation functions to apply on sample update
+	rollupTime     int64              // Time range per aggregation bucket
+	rollupBuckets  int                // Total number of buckets per partition
 }
 
 func (p *DBPartition) IsCyclic() bool {
@@ -146,14 +148,17 @@ func (p *DBPartition) GetChunkMint(t int64) int64 {
 	return (t / 3600 / 1000 / int64(p.hoursInChunk)) * 3600 * 1000 * int64(p.hoursInChunk)
 }
 
+// is the time t in the range of the chunk starting at mint
 func (p *DBPartition) InChunkRange(mint, t int64) bool {
 	return t >= mint && t < (mint+3600*1000*int64(p.hoursInChunk))
 }
 
+// is the time t ahead of the range of the chunk starting at mint
 func (p *DBPartition) IsAheadOfChunk(mint, t int64) bool {
 	return t >= (mint + 3600*1000*int64(p.hoursInChunk))
 }
 
+// Get ID of the Chunk covering time t
 func (p *DBPartition) TimeToChunkId(t int64) int {
 	d, h := TimeToDHM(t - p.startTime)
 
@@ -166,6 +171,7 @@ func (p *DBPartition) TimeToChunkId(t int64) int {
 	return chunkIdx
 }
 
+// is t covered by this partition
 func (p *DBPartition) InRange(t int64) bool {
 	if p.manager.cyclic {
 		return true
@@ -173,6 +179,7 @@ func (p *DBPartition) InRange(t int64) bool {
 	return (t >= p.startTime) && (t < p.startTime+int64(p.days)*24*3600*1000)
 }
 
+// return the valid minimum time in a cyclic partition based on max time
 func (p *DBPartition) CyclicMinTime(mint, maxt int64) int64 {
 	maxSec := maxt / 1000
 	//if !p.manager.ignoreWrap {
@@ -186,10 +193,12 @@ func (p *DBPartition) CyclicMinTime(mint, maxt int64) int64 {
 	return newMin
 }
 
+// Attribute name of a chunk
 func (p *DBPartition) ChunkID2Attr(col string, id int) string {
 	return fmt.Sprintf("_%s%d", col, id*p.hoursInChunk)
 }
 
+// Return the attributes that need to be retrieved for a given time range
 func (p *DBPartition) Range2Attrs(col string, mint, maxt int64) ([]string, []int) {
 	list := p.Range2Cids(mint, maxt)
 	strList := []string{}
@@ -199,6 +208,7 @@ func (p *DBPartition) Range2Attrs(col string, mint, maxt int64) ([]string, []int
 	return strList, list
 }
 
+// All the chunk IDs which match the time range
 func (p *DBPartition) Range2Cids(mint, maxt int64) []int {
 	list := []int{}
 	start := p.TimeToChunkId(mint)
@@ -222,6 +232,7 @@ func (p *DBPartition) Range2Cids(mint, maxt int64) []int {
 	return list
 }
 
+// Convert time in milisec to Day index and hour
 func TimeToDHM(tmilli int64) (int, int) {
 	t := int(tmilli / 1000)
 	//m := t/60 - ((t/3600) * 60)

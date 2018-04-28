@@ -27,36 +27,52 @@ import (
 )
 
 type TsdbConfig struct {
-	V3ioUrl        string                  `json:"v3ioUrl"`
-	Container      string                  `json:"container"`
-	Path           string                  `json:"path"`
-	Username       string                  `json:"username"`
-	Password       string                  `json:"password"`
-	Disabled       bool                    `json:"disabled,omitempty"`
-	Verbose        bool                    `json:"verbose,omitempty"`
-	Workers        int                     `json:"workers"`
-	ChanSize       int                     `json:"chanSize"`
-	MaxBehind      int                     `json:"maxBehind"`
-	OverrideOld    bool                    `json:"overrideOld"`
-	ArraySize      int                     `json:"arraySize,omitempty"`
-	HrInChunk      int                     `json:"hrInChunk,omitempty"`
-	DaysPerObj     int                     `json:"daysPerObj,omitempty"`
-	DaysRetention  int                     `json:"daysRetention,omitempty"`
-	PartFormat     string                  `json:"partFormat,omitempty"`
-	DefaultRollups string                  `json:"defaultRollups,omitempty"`
-	RollupMin      int                     `json:"rollupMin,omitempty"`
-	DelRawSamples  bool                    `json:"delRawSamples,omitempty"`
-	MetricsConfig  map[string]MetricConfig `json:"metricsConfig,omitempty"`
+	// V3IO Connection details: Url, Data container, relative path for this dataset, credentials
+	V3ioUrl   string `json:"v3ioUrl"`
+	Container string `json:"container"`
+	Path      string `json:"path"`
+	Username  string `json:"username"`
+	Password  string `json:"password"`
+
+	// Disable is use in Prometheus to disable v3io and work with the internal TSDB
+	Disabled bool `json:"disabled,omitempty"`
+	// True will turn on Debug mode
+	Verbose bool `json:"verbose,omitempty"`
+	// Number of parallel V3IO worker routines
+	Workers int `json:"workers"`
+	// Max uncommitted (delayed) samples allowed per metric
+	MaxBehind int `json:"maxBehind"`
+	// Override last chunk (by default on restart it will append from the last point if possible)
+	OverrideOld bool `json:"overrideOld"`
+
+	// Number of hours per chunk (1hr default)
+	HrInChunk int `json:"hrInChunk,omitempty"`
+	// Days per table/object (in a partition), after N days will use a new table or go to start (Cyclic partition)
+	DaysPerObj int `json:"daysPerObj,omitempty"`
+	// How many days to save samples
+	DaysRetention int `json:"daysRetention,omitempty"`
+	// Partition name format e.g. 'dd-mm-yy'
+	PartFormat string `json:"partFormat,omitempty"`
+
+	// Comma seperated list of default aggregation functions e.g. 'count,sum,avg,max'
+	DefaultRollups string `json:"defaultRollups,omitempty"`
+	// Number of minutes per aggregation bucket (aggregation interval)
+	RollupMin int `json:"rollupMin,omitempty"`
+	// If true, dont save raw samples/chunks, only aggregates
+	DelRawSamples bool `json:"delRawSamples,omitempty"`
+
+	// Metric specific policy
+	MetricsConfig map[string]MetricConfig `json:"metricsConfig,omitempty"`
 }
 
 type MetricConfig struct {
-	ArraySize     int      `json:"arraySize"`
-	HrInChunk     int      `json:"hrInChunk,omitempty"`
-	DaysPerObj    int      `json:"chunksInObj"`
-	Rollups       string   `json:"rollups,omitempty"`
-	RollupHrs     int      `json:"rollupHrs,omitempty"`
-	DelRawSamples bool     `json:"delRawSamples,omitempty"`
-	PreAggragate  []string `json:"preAggragate,omitempty"`
+	HrInChunk     int    `json:"hrInChunk,omitempty"`
+	DaysPerObj    int    `json:"chunksInObj"`
+	Rollups       string `json:"rollups,omitempty"`
+	RollupMin     int    `json:"rollupMin,omitempty"`
+	DelRawSamples bool   `json:"delRawSamples,omitempty"`
+	// Dimensions to pre aggregate (vertical aggregation)
+	PreAggragate []string `json:"preAggragate,omitempty"`
 }
 
 // TODO: add alerts config (name, match expr, for, lables, annotations)
@@ -89,12 +105,6 @@ func initDefaults(cfg *TsdbConfig) {
 	// Initialize defaults
 	if cfg.Workers == 0 {
 		cfg.Workers = 8
-	}
-	if cfg.ArraySize == 0 {
-		cfg.ArraySize = 2048
-	}
-	if cfg.ChanSize == 0 {
-		cfg.ChanSize = 2048
 	}
 	if cfg.DaysPerObj == 0 {
 		cfg.DaysPerObj = 1

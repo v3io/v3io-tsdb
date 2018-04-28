@@ -310,7 +310,7 @@ func (cs *chunkStore) WriteChunks(mc *MetricsCache, metric *MetricState) error {
 		// if the last item or last item in the same partition add expressions and break
 		if (i == len(cs.pending)-1) || !partition.InRange(cs.pending[i+1].t) {
 			expr = expr + cs.aggrList.SetOrUpdateExpr("v", bucket, isNewBucket)
-			expr = expr + cs.appendExpression(activeChunk, mc.cfg.ArraySize)
+			expr = expr + cs.appendExpression(activeChunk)
 			break
 		}
 
@@ -326,7 +326,7 @@ func (cs *chunkStore) WriteChunks(mc *MetricsCache, metric *MetricState) error {
 
 		// if the next item is in a new chuck, gen expression and init new chunk
 		if !activeChunk.inRange(nextT) {
-			expr = expr + cs.appendExpression(activeChunk, mc.cfg.ArraySize)
+			expr = expr + cs.appendExpression(activeChunk)
 			activeChunk = cs.chunkByTime(nextT)
 		}
 
@@ -388,7 +388,7 @@ func (cs *chunkStore) ProcessWriteResp() {
 }
 
 // return the chunk update expression
-func (cs *chunkStore) appendExpression(chunk *attrAppender, maxArray int) string {
+func (cs *chunkStore) appendExpression(chunk *attrAppender) string {
 
 	if chunk != nil {
 		bytes := chunk.appender.Chunk().Bytes()

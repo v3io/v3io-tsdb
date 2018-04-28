@@ -43,6 +43,8 @@ type V3ioAdapter struct {
 	partitionMngr   *partmgr.PartitionManager
 }
 
+// Create a new TSDB Adapter, similar to Prometheus TSDB Adapter with few extensions
+// Prometheus compliant Adapter is under /promtsdb
 func NewV3ioAdapter(cfg *config.TsdbConfig, container *v3io.Container, logger logger.Logger) *V3ioAdapter {
 
 	newV3ioAdapter := V3ioAdapter{}
@@ -63,8 +65,9 @@ func NewV3ioAdapter(cfg *config.TsdbConfig, container *v3io.Container, logger lo
 	return &newV3ioAdapter
 }
 
+// initialize the adapter and start event loops
 func (a *V3ioAdapter) Start() error {
-	msg := fmt.Sprintf("Starting V3IO TSDB client, server is at : %s/%s/%s\n",
+	msg := fmt.Sprintf("\nStarting V3IO TSDB client, server is at : %s/%s/%s\n",
 		a.cfg.V3ioUrl, a.cfg.Container, a.cfg.Path)
 	fmt.Println(msg)
 	a.logger.Info(msg)
@@ -92,6 +95,7 @@ func (a *V3ioAdapter) Start() error {
 	return nil
 }
 
+// Create an appender interface, for writing metrics
 func (a *V3ioAdapter) Appender() (Appender, error) {
 	newAppender := v3ioAppender{metricsCache: a.MetricsCache}
 	return newAppender, nil
@@ -106,6 +110,7 @@ func (a *V3ioAdapter) Close() error {
 	return nil
 }
 
+// create a querier interface, used for time series queries
 func (a *V3ioAdapter) Querier(_ context.Context, mint, maxt int64) (*querier.V3ioQuerier, error) {
 	return querier.NewV3ioQuerier(a.container, a.logger, mint, maxt, &a.MetricsCache.NameLabelMap, a.cfg, a.partitionMngr), nil
 }
@@ -114,18 +119,21 @@ type v3ioAppender struct {
 	metricsCache *appender.MetricsCache
 }
 
+// Add t/v value to metric and return refID (for AddFast)
 func (a v3ioAppender) Add(lset utils.Labels, t int64, v float64) (uint64, error) {
 	return a.metricsCache.Add(lset, t, v)
 }
 
+// faster Add using refID obtained from Add (avoid some hash/lookup overhead)
 func (a v3ioAppender) AddFast(lset utils.Labels, ref uint64, t int64, v float64) error {
 	return a.metricsCache.AddFast(ref, t, v)
 }
 
+// in V3IO all ops a committed (no client cache)
 func (a v3ioAppender) Commit() error   { return nil }
 func (a v3ioAppender) Rollback() error { return nil }
 
-// Appender provides batched appends against a storage.
+// Appender interface provides batched appends against a storage.
 type Appender interface {
 	Add(l utils.Labels, t int64, v float64) (uint64, error)
 	AddFast(l utils.Labels, ref uint64, t int64, v float64) error
