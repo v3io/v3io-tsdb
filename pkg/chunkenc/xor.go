@@ -379,10 +379,7 @@ func (it *xorIterator) Next() bool {
 	case 0x1f:
 		// added this case to allow append of a new Gorilla series on an existing chunk (restart from t0)
 
-		fmt.Println(it.br.count, it.br.stream)
-
 		t, err := it.br.readBits(51)
-		fmt.Println("t", t)
 		//t, err := binary.ReadVarint(it.br)
 		if err != nil {
 			it.err = err

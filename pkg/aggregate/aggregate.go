@@ -27,6 +27,7 @@ import (
 
 type AggrType uint8
 
+// aggregation functions
 const (
 	aggrTypeCount AggrType = 1
 	aggrTypeSum   AggrType = 2
@@ -54,7 +55,7 @@ var aggrToString = map[AggrType]string{
 
 func (a AggrType) String() string { return aggrToString[a] }
 
-// convert comma seperated string to aggregator mask
+// convert comma separated string to aggregator mask
 func AggrsFromString(list string) (AggrType, error) {
 	split := strings.Split(list, ",")
 	var aggrList AggrType

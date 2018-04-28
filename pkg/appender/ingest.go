@@ -46,6 +46,7 @@ type MetricState struct {
 }
 
 const MAX_WRITE_RETRY = 2
+const CHAN_SIZE = 1024
 
 func (m *MetricState) Err() error {
 	m.RLock()
@@ -53,6 +54,7 @@ func (m *MetricState) Err() error {
 	return m.err
 }
 
+// store the state and metadata for all the metrics
 type MetricsCache struct {
 	cfg           *config.TsdbConfig
 	partitionMngr *partmgr.PartitionManager
@@ -80,9 +82,9 @@ func NewMetricsCache(container *v3io.Container, logger logger.Logger, cfg *confi
 	newCache.cacheRefMap = map[uint64]*MetricState{}
 	newCache.requestsMap = map[uint64]*MetricState{}
 
-	newCache.responseChan = make(chan *v3io.Response, 1024)
-	newCache.getRespChan = make(chan *v3io.Response, 1024)
-	newCache.asyncAppendChan = make(chan *asyncAppend, 1024)
+	newCache.responseChan = make(chan *v3io.Response, CHAN_SIZE)
+	newCache.getRespChan = make(chan *v3io.Response, CHAN_SIZE)
+	newCache.asyncAppendChan = make(chan *asyncAppend, CHAN_SIZE)
 
 	newCache.NameLabelMap = map[string]bool{}
 	return &newCache
@@ -94,6 +96,8 @@ type asyncAppend struct {
 	v      interface{}
 }
 
+// loop for handling metric events (appends and Get/Update DB responses)
+// TODO: we can use multiple Go routines and spread the metrics across based on Hash LSB
 func (mc *MetricsCache) Start() error {
 
 	go func() {
@@ -103,7 +107,7 @@ func (mc *MetricsCache) Start() error {
 			case resp := <-mc.responseChan:
 				// Handle V3io update expression responses
 
-				// TODO: add metric interface to v3io req instead of using req map
+				// TODO: add metric interface to v3io req context instead of using req map
 				mc.rmapMtx.Lock()
 				metric, ok := mc.requestsMap[resp.ID]
 				delete(mc.requestsMap, resp.ID)
@@ -124,6 +128,7 @@ func (mc *MetricsCache) Start() error {
 				resp.Release()
 
 				if ok {
+					// process the response and initialize a new request to update uncommitted samples
 					metric.Lock()
 					if respErr == nil {
 						// Set fields so next write will not include redundant info (bytes, lables, init_array)
@@ -153,6 +158,7 @@ func (mc *MetricsCache) Start() error {
 				metric := app.metric
 				metric.Lock()
 
+				// if its the first Append we need to get the metric state from the DB
 				if metric.store.GetState() == storeStateInit {
 					err := metric.store.GetChunksState(mc, metric, app.t)
 					if err != nil {
@@ -191,6 +197,7 @@ func (mc *MetricsCache) Start() error {
 				}
 
 				if ok {
+					// process the Get response (update metric state) and commit pending samples to the DB
 					metric.Lock()
 					metric.store.ProcessGetResp(mc, metric, resp)
 

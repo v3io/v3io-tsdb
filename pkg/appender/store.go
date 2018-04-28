@@ -30,8 +30,6 @@ import (
 	"sort"
 )
 
-var MaxArraySize = 1024
-
 const MAX_LATE_WRITE = 59 * 3600 * 1000 // max late arrival of 59min
 
 // create a chunk store with two chunks (current, previous)
@@ -52,7 +50,8 @@ type chunkStore struct {
 	aggrList      *aggregate.AggregatorList
 	pending       pendingList
 	maxTime       int64
-	DelRawSamples bool // TODO: for metrics w aggregates only
+	initMaxTime   int64 // max time read from DB metric before first append
+	DelRawSamples bool  // TODO: for metrics w aggregates only
 }
 
 // Store states
@@ -71,9 +70,7 @@ type attrAppender struct {
 	state     chunkState
 	appender  chunkenc.Appender
 	partition *partmgr.DBPartition
-	//updCount  int
 	chunkMint int64
-	//writing   bool
 }
 
 type chunkState uint8
@@ -88,8 +85,6 @@ const (
 // initialize/clear the chunk appender
 func (a *attrAppender) initialize(partition *partmgr.DBPartition, t int64) {
 	a.state = 0
-	//a.updCount = 0
-	//a.writing = false
 	a.partition = partition
 	a.chunkMint = partition.GetChunkMint(t)
 }
@@ -131,10 +126,6 @@ func (cs *chunkStore) GetState() storeState {
 	return cs.state
 }
 
-func (cs *chunkStore) SetState(state storeState) {
-	cs.state = state
-}
-
 // return the DB path for storing the metric
 func (cs *chunkStore) GetMetricPath(metric *MetricState, basePath, table string) string {
 	return fmt.Sprintf("%s/%s.%d", basePath, metric.name, metric.hash) // TODO: use TableID
@@ -143,16 +134,14 @@ func (cs *chunkStore) GetMetricPath(metric *MetricState, basePath, table string)
 // Read (Async) the current chunk state and data from the storage, used in the first chunk access
 func (cs *chunkStore) GetChunksState(mc *MetricsCache, metric *MetricState, t int64) error {
 
-	// clac table mint
-	// Get record meta + relevant attr
-	// return get resp id & err
-
-	// init chunk and create aggregation list object based on partition aggregation policy
+	// init chunk and create aggregation list object based on partition policy
 	part := mc.partitionMngr.TimeToPart(t)
 	cs.chunks[0].initialize(part, t)
 	cs.aggrList = aggregate.NewAggregatorList(part.AggrType())
 
 	// TODO: if policy to merge w old chunks need to get prev chunk, vs restart appender
+
+	// issue DB GetItem command to load last state of metric
 	path := cs.GetMetricPath(metric, mc.cfg.Path, part.GetPath())
 	getInput := v3io.GetItemInput{
 		Path: path, AttributeNames: []string{"_maxtime"}}
@@ -176,8 +165,6 @@ func (cs *chunkStore) GetChunksState(mc *MetricsCache, metric *MetricState, t in
 
 // Process the GetItem response from the DB and initialize or restore the current chunk
 func (cs *chunkStore) ProcessGetResp(mc *MetricsCache, metric *MetricState, resp *v3io.Response) {
-	// init chunk from resp (attr)
-	// append last t/v into the chunk and clear pending
 
 	// TODO: init based on schema, use init function, recover old state vs append based on policy
 	chunk := chunkenc.NewXORChunk()
@@ -192,6 +179,7 @@ func (cs *chunkStore) ProcessGetResp(mc *MetricsCache, metric *MetricState, resp
 		return
 	}
 
+	// check and update metric Max timestamp, allow continuing from the last point in case of failure
 	item := resp.Output.(*v3io.GetItemOutput).Item
 	var maxTime int64
 	val := item["_maxtime"]
@@ -199,13 +187,17 @@ func (cs *chunkStore) ProcessGetResp(mc *MetricsCache, metric *MetricState, resp
 		maxTime = int64(val.(int))
 	}
 	mc.logger.DebugWith("Got Item", "name", metric.name, "key", metric.key, "maxt", maxTime)
-	cs.maxTime = maxTime
+
+	if !mc.cfg.OverrideOld {
+		cs.maxTime = maxTime
+		cs.initMaxTime = maxTime
+	}
 
 	if cs.chunks[0].inRange(maxTime) && !mc.cfg.OverrideOld {
 		cs.chunks[0].state |= chunkStateMerge
 	}
 
-	// set Last TableId, no need to create metric object
+	// set Last TableId, indicate that there is no need to create metric object
 	cs.lastTid = cs.chunks[0].partition.GetId()
 
 }
@@ -266,9 +258,10 @@ func (cs *chunkStore) WriteChunks(mc *MetricsCache, metric *MetricState) error {
 	}
 
 	expr := ""
-	notInitialized := false //TODO: init depend on get
+	notInitialized := false
 	sort.Sort(cs.pending)
 
+	// init partition info and find if we need to init the metric headers (labels, ..) in case of new partition
 	t0 := cs.pending[0].t
 	partition := mc.partitionMngr.TimeToPart(t0)
 	if partition.GetId() > cs.lastTid {
@@ -276,6 +269,7 @@ func (cs *chunkStore) WriteChunks(mc *MetricsCache, metric *MetricState) error {
 		cs.lastTid = partition.GetId()
 	}
 
+	// init aggregation buckets info
 	bucket := partition.Time2Bucket(t0)
 	numBuckets := partition.AggrBuckets()
 	isNewBucket := bucket > partition.Time2Bucket(cs.maxTime)
@@ -283,9 +277,15 @@ func (cs *chunkStore) WriteChunks(mc *MetricsCache, metric *MetricState) error {
 	var activeChunk *attrAppender
 	var i int
 
+	// loop over pending samples, add to chunks & aggregates (create required update expressions)
 	for i < len(cs.pending) && partition.InRange(cs.pending[i].t) {
 
 		t := cs.pending[i].t
+
+		if t <= cs.initMaxTime && !mc.cfg.OverrideOld {
+			i++
+			continue
+		}
 
 		// init activeChunk if nil (when samples are too old), if still too old skip to next sample
 		if activeChunk == nil {
@@ -334,7 +334,7 @@ func (cs *chunkStore) WriteChunks(mc *MetricsCache, metric *MetricState) error {
 	}
 
 	cs.aggrList.Clear()
-	cs.pending = cs.pending[:0] // TODO: leave pending from newer partitions if any !
+	cs.pending = cs.pending[:0] // TODO: leave pending from newer partitions if any, use [i:] !
 
 	if expr == "" {
 		return nil
@@ -343,20 +343,19 @@ func (cs *chunkStore) WriteChunks(mc *MetricsCache, metric *MetricState) error {
 	cs.state = storeStateUpdate
 
 	// if the table object wasnt initialized, insert init expression
-	if notInitialized { // TODO: not correct, need to init once per metric/partition, maybe use cond expressions
+	if notInitialized {
+		// init labels (dimension) attributes
 		lblexpr := metric.Lset.GetExpr()
 
 		// init aggregate arrays
 		lblexpr = lblexpr + cs.aggrList.InitExpr("v", numBuckets)
 
-		expr = lblexpr + fmt.Sprintf("_lset='%s'; ",
-			metric.key) + expr
+		expr = lblexpr + fmt.Sprintf("_lset='%s'; ", metric.key) + expr
 	}
 
-	//fmt.Println("\nEXPR", expr)
 	// Call V3IO async Update Item method
 	expr += fmt.Sprintf("_maxtime=%d;", cs.maxTime)   // TODO: use max() expr
-	path := cs.GetMetricPath(metric, mc.cfg.Path, "") // TODO: use TableID
+	path := cs.GetMetricPath(metric, mc.cfg.Path, "") // TODO: use TableID for multi-partition
 	request, err := mc.container.UpdateItem(&v3io.UpdateItemInput{Path: path, Expression: &expr}, mc.responseChan)
 	if err != nil {
 		mc.logger.ErrorWith("UpdateItem Failed", "err", err)
@@ -376,6 +375,7 @@ func (cs *chunkStore) WriteChunks(mc *MetricsCache, metric *MetricState) error {
 func (cs *chunkStore) ProcessWriteResp() {
 
 	for _, chunk := range cs.chunks {
+		// update chunk state (if it was written to)
 		if chunk.state&chunkStateWriting != 0 {
 			chunk.state |= chunkStateCommitted
 			chunk.state &^= chunkStateWriting
@@ -400,6 +400,7 @@ func (cs *chunkStore) appendExpression(chunk *attrAppender, maxArray int) string
 
 		val := base64.StdEncoding.EncodeToString(bytes)
 
+		// overwrite, merge, or append based on the chunk state
 		if chunk.state&chunkStateCommitted != 0 {
 			expr = fmt.Sprintf("%s=%s+blob('%s'); ", attr, attr, val)
 		} else if chunk.state&chunkStateMerge != 0 {

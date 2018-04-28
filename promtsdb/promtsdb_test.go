@@ -53,8 +53,7 @@ func TestTsdb(t *testing.T) {
 	}
 
 	match := labels.Matcher{Type: labels.MatchEqual, Name: "__name__", Value: "http_req"}
-	params := storage.SelectParams{Func: "count,avg,sum,max", Step: 1000 * 3600}
-	//qry.(*querier.V3ioQuerier).SetTimeWindows([]int{4, 2, 1})
+	params := storage.SelectParams{Func: "count,avg,sum", Step: 1000 * 3600}
 	set, err := qry.Select(&params, &match)
 	if err != nil {
 		t.Fatal(err)
@@ -90,7 +89,7 @@ func TestTsdb(t *testing.T) {
 }
 
 func DoAppend(lset labels.Labels, app storage.Appender, num, interval int) error {
-	return nil
+	//return nil
 	//time.Sleep(time.Second * 1)
 	curTime := int64(basetime)
 
