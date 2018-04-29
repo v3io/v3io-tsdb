@@ -20,7 +20,10 @@ such restriction.
 
 package aggregate
 
-import "fmt"
+import (
+	"fmt"
+	"math"
+)
 
 type Aggregator interface {
 	Aggregate(v float64)
@@ -76,18 +79,26 @@ func (a *FloatAggregator) InitExpr(col string, buckets int) string {
 // Sum Aggregator
 type SumAggregator struct{ FloatAggregator }
 
-func (a *SumAggregator) Aggregate(v float64) { a.val += v }
+func (a *SumAggregator) Aggregate(v float64) {
+	if !math.IsNaN(v) {
+		a.val += v
+	}
+}
 
 // Power of 2 Aggregator
 type SqrAggregator struct{ FloatAggregator }
 
-func (a *SqrAggregator) Aggregate(v float64) { a.val += v * v }
+func (a *SqrAggregator) Aggregate(v float64) {
+	if !math.IsNaN(v) {
+		a.val += v * v
+	}
+}
 
 // Minimum Aggregator
 type MinAggregator struct{ FloatAggregator }
 
 func (a *MinAggregator) Aggregate(v float64) {
-	if v < a.val {
+	if !math.IsNaN(v) && v < a.val {
 		a.val = v
 	}
 }
@@ -99,7 +110,7 @@ func (a *MinAggregator) UpdateExpr(col string, bucket int) string {
 type MaxAggregator struct{ FloatAggregator }
 
 func (a *MaxAggregator) Aggregate(v float64) {
-	if v > a.val {
+	if !math.IsNaN(v) && v > a.val {
 		a.val = v
 	}
 }

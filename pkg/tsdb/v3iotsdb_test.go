@@ -71,8 +71,8 @@ func TestTsdb(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	set, err := qry.Select("", 0, "_name=='http_req'")
-	//set, err := qry.Select("count,avg,sum,max", 1000*3600, "_name=='http_req'")
+	//set, err := qry.Select("", 0, "_name=='http_req'")
+	set, err := qry.Select("count,avg,sum", 1000*3600, "_name=='http_req'")
 	//set, err := qry.SelectOverlap("count,avg,sum,max", 1000*3600, []int{4, 2, 1}, "_name=='http_req'")
 	if err != nil {
 		t.Fatal(err)

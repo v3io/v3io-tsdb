@@ -103,7 +103,7 @@ example of creating an adpapter:
 	}
 
 	// create and start a new TSDB adapter 
-	adapter := NewV3ioAdapter(cfg, nil, nil)
+	adapter := tsdb.NewV3ioAdapter(cfg, nil, nil)
 	err = adapter.Start()
 	if err != nil {
 		panic(err)
