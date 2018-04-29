@@ -50,7 +50,12 @@ Metric names and labels are stored in search optimized keys and string attribute
 dimension scan (searches) in the rate of millions of metrics per second, or use selective range based queries to access 
 a specific metric family. 
 
-The use of v3io random access keys (Hash based) allow real-time sample data ingestion/retrieval and stream processing.      
+The use of v3io random access keys (Hash based) allow real-time sample data ingestion/retrieval and stream processing. 
+
+To maintain high-performance over low-speed connections we implement auto IO throttling, if the link is slow multiple 
+samples will be pushed in a single operation, users can configure the maximum allowed batch (trade efficiency with 
+consistency). IO is done using multiple parallel connections/workers enabling maximum throughput regardless of the 
+link latency.       
 
 ## How To Use  
 
@@ -131,7 +136,7 @@ Example:
 	}
 
 	// Add a second sample using AddFast and the refID from Add
-	err := appender.Add(nil, ref, time.Now().Unix * 1000 + 1000, 8.3)
+	err := appender.AddFast(nil, ref, time.Now().Unix * 1000 + 1000, 8.3)
 	if err != nil {
 		panic(err)
 	}
@@ -172,19 +177,19 @@ creating a querier:
 
 Simple select example (no aggregates):
 ```go
-	set, err := qry.Select("", 0, "_name=='http_req'")
+	set, err := qry.Select("", 0, "__name__=='http_req'")
 ```
 
 Select using aggregates:
 
 ```go
-	set, err := qry.Select("count,avg,sum,max", 1000*3600, "_name=='http_req'")
+	set, err := qry.Select("count,avg,sum,max", 1000*3600, "__name__=='http_req'")
 ```
 
 Using SelectOverlap (overlapping windows): 
 
 ```go
-	set, err := qry.SelectOverlap("count,avg,sum", 1000*3600, []int{24,6,1}, "_name=='http_req'")
+	set, err := qry.SelectOverlap("count,avg,sum", 1000*3600, []int{24,6,1}, "__name__=='http_req'")
 ```
 
 once we obtain a set using one of the methods above we can iterate over the set and the individual series in the following way:

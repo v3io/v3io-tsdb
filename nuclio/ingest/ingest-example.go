@@ -3,22 +3,16 @@ package ingest
 import (
 	"encoding/json"
 	"github.com/nuclio/nuclio-sdk-go"
-	"github.com/prometheus/prometheus/pkg/labels"
 	"github.com/v3io/v3io-go-http"
-	"github.com/v3io/v3io-tsdb"
 	"github.com/v3io/v3io-tsdb/config"
+	"github.com/v3io/v3io-tsdb/pkg/tsdb"
+	"github.com/v3io/v3io-tsdb/pkg/utils"
 	"time"
 )
 
 // Configuration
 const tsdbConfig = `
-container: "1"
 path: "pmetric"
-verbose: true 
-workers: 32
-maxBehind: 5
-arraySize: 9000
-overrideOld: true
 `
 
 // example event
@@ -31,7 +25,7 @@ const pushEvent = `
 `
 
 type Sample struct {
-	Lset  labels.Labels
+	Lset  utils.Labels
 	Time  int64
 	Value float64
 }
@@ -43,7 +37,7 @@ func Handler(context *nuclio.Context, event nuclio.Event) (interface{}, error) {
 	if err != nil {
 
 	}
-	app := context.UserData.(v3io_tsdb.Appender)
+	app := context.UserData.(tsdb.Appender)
 
 	// Add sample to metric, time is specified in Unix * 1000 (milisec)
 	_, err = app.Add(sample.Lset, time.Now().Unix()*1000, sample.Value)
@@ -55,7 +49,7 @@ func Handler(context *nuclio.Context, event nuclio.Event) (interface{}, error) {
 func InitContext(context *nuclio.Context) error {
 	cfg, _ := config.LoadFromData([]byte(tsdbConfig))
 	data := context.DataBinding["db0"].(*v3io.Container)
-	adapter := v3io_tsdb.NewV3ioAdapter(cfg, data, context.Logger)
+	adapter := tsdb.NewV3ioAdapter(cfg, data, context.Logger)
 	err := adapter.Start()
 	if err != nil {
 		return err

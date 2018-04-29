@@ -65,7 +65,10 @@ func (q *V3ioQuerier) SelectOverlap(functions string, step int64, win []int, fil
 // base query function
 func (q *V3ioQuerier) selectQry(functions string, step int64, win []int, filter string) (SeriesSet, error) {
 
-	//filter := match2filter(oms) // TODO: use special match for aggregates (allow to flexible qry from Prom)
+	// TODO: use special match for aggregates (allow to flexible qry from Prom)
+
+	filter = strings.Replace(filter, "__name__", "_name", -1)
+	q.logger.DebugWith("Select query", "func", functions, "step", step, "filter", filter)
 
 	mint, maxt := q.mint, q.maxt
 	if q.partitionMngr.IsCyclic() {
@@ -73,6 +76,10 @@ func (q *V3ioQuerier) selectQry(functions string, step int64, win []int, filter 
 		mint = partition.CyclicMinTime(mint, maxt)
 		q.logger.DebugWith("Select - new cyclic series", "from", mint, "to", maxt, "filter", filter)
 		newSet := &V3ioSeriesSet{mint: mint, maxt: maxt, partition: partition, logger: q.logger}
+
+		if functions != "" && step == 0 && partition.RollupTime() != 0 {
+			step = partition.RollupTime()
+		}
 
 		newAggrSeries, err := aggregate.NewAggregateSeries(
 			functions, "v", partition.AggrBuckets(), step, partition.RollupTime(), q.overlapWin)
@@ -132,6 +139,7 @@ type V3ioSeriesSet struct {
 	chunkIds   []int
 
 	interval   int64
+	nullSeries bool
 	overlapWin []int
 	aggrSeries *aggregate.AggregateSeries
 	aggrIdx    int
@@ -146,7 +154,7 @@ func (s *V3ioSeriesSet) getItems(path, filter string, container *v3io.Container)
 
 	attrs := []string{"_lset", "_meta", "_name", "_maxtime"}
 
-	if s.aggrSeries != nil && s.aggrSeries.CanAggregate(s.partition.AggrType()) {
+	if s.aggrSeries != nil && s.aggrSeries.CanAggregate(s.partition.AggrType()) && s.maxt-s.mint >= s.interval {
 		s.attrs = s.aggrSeries.GetAttrNames()
 	} else {
 		s.attrs, s.chunkIds = s.partition.Range2Attrs("v", s.mint, s.maxt)
@@ -183,7 +191,9 @@ func (s *V3ioSeriesSet) Next() bool {
 			return false
 		}
 
-		if s.aggrSeries.CanAggregate(s.partition.AggrType()) {
+		s.nullSeries = false
+
+		if s.aggrSeries.CanAggregate(s.partition.AggrType()) && s.maxt-s.mint > s.interval {
 
 			// create series from aggregation arrays (in DB) if the partition stored the desired aggregates
 			maxt := s.maxt
@@ -191,8 +201,8 @@ func (s *V3ioSeriesSet) Next() bool {
 			if maxTime != nil && int64(maxTime.(int)) < maxt {
 				maxt = int64(maxTime.(int))
 			}
-
 			mint := s.partition.CyclicMinTime(s.mint, maxt)
+
 			start := s.partition.Time2Bucket(mint)
 			end := s.partition.Time2Bucket(maxt)
 			length := int((maxt - mint) / s.interval)
@@ -203,13 +213,17 @@ func (s *V3ioSeriesSet) Next() bool {
 				s.baseTime = mint
 			}
 
-			aggrSet, err := s.aggrSeries.NewSetFromAttrs(length, start, end, mint, maxt, s.iter.GetFields())
-			if err != nil {
-				s.err = err
-				return false
-			}
+			if length != 0 {
+				aggrSet, err := s.aggrSeries.NewSetFromAttrs(length, start, end, mint, maxt, s.iter.GetFields())
+				if err != nil {
+					s.err = err
+					return false
+				}
 
-			s.aggrSet = aggrSet
+				s.aggrSet = aggrSet
+			} else {
+				s.nullSeries = true
+			}
 
 		} else {
 

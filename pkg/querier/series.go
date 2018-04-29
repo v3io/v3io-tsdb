@@ -195,7 +195,11 @@ func NewAggrSeries(set *V3ioSeriesSet, aggr aggregate.AggrType) *V3ioSeries {
 	newSeries := V3ioSeries{set: set}
 	lset := append(initLabels(set), utils.Label{Name: "Aggregator", Value: aggr.String()})
 	newSeries.lset = lset
-	newSeries.iter = &aggrSeriesIterator{set: set, aggrType: aggr, index: -1}
+	if set.nullSeries {
+		newSeries.iter = &nullSeriesIterator{}
+	} else {
+		newSeries.iter = &aggrSeriesIterator{set: set, aggrType: aggr, index: -1}
+	}
 	return &newSeries
 }
 

@@ -54,8 +54,11 @@ type V3ioPromQuerier struct {
 
 // Select returns a set of series that matches the given label matchers.
 func (q *V3ioPromQuerier) Select(params *storage.SelectParams, oms ...*labels.Matcher) (storage.SeriesSet, error) {
-	filter := match2filter(oms)
-	set, err := q.q.Select(params.Func, params.Step, filter)
+	filter, functions := match2filter(oms)
+	if params.Func != "" {
+		functions = params.Func
+	}
+	set, err := q.q.Select(functions, params.Step, filter)
 	return &V3ioPromSeriesSet{s: set}, err
 }
 
@@ -69,13 +72,13 @@ func (q *V3ioPromQuerier) Close() error {
 	return nil
 }
 
-func match2filter(oms []*labels.Matcher) string {
+func match2filter(oms []*labels.Matcher) (string, string) {
 	filter := []string{}
+	aggregator := ""
 	//name := ""
 	for _, matcher := range oms {
-		if matcher.Name == "__name__" {
-			//name = matcher.Value
-			filter = append(filter, fmt.Sprintf("_name=='%s'", matcher.Value))
+		if matcher.Name == "Aggregator" {
+			aggregator = matcher.Value
 		} else {
 			switch matcher.Type {
 			case labels.MatchEqual:
@@ -86,7 +89,7 @@ func match2filter(oms []*labels.Matcher) string {
 			}
 		}
 	}
-	return strings.Join(filter, " and ")
+	return strings.Join(filter, " and "), aggregator
 }
 
 type V3ioPromSeriesSet struct {

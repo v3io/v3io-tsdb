@@ -39,7 +39,7 @@ type AggregateSeries struct {
 
 func NewAggregateSeries(functions, col string, buckets int, interval, rollupTime int64, windows []int) (*AggregateSeries, error) {
 
-	if functions == "" {
+	if functions == "" || interval == 0 {
 		return nil, nil
 	}
 

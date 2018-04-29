@@ -39,7 +39,7 @@ func TestTsdb(t *testing.T) {
 	lset := labels.Labels{labels.Label{Name: "__name__", Value: "http_req"},
 		labels.Label{Name: "method", Value: "post"}}
 
-	err = DoAppend(lset, appender, 150, 120)
+	err = DoAppend(lset, appender, 50, 120)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -53,8 +53,10 @@ func TestTsdb(t *testing.T) {
 	}
 
 	match := labels.Matcher{Type: labels.MatchEqual, Name: "__name__", Value: "http_req"}
-	params := storage.SelectParams{Func: "count,avg,sum", Step: 1000 * 3600}
-	set, err := qry.Select(&params, &match)
+	match2 := labels.Matcher{Type: labels.MatchEqual, Name: "Aggregator", Value: "count,avg,sum"}
+	//params := storage.SelectParams{Func: "count,avg,sum", Step: 1000 * 3600}
+	params := storage.SelectParams{Func: "", Step: 0}
+	set, err := qry.Select(&params, &match, &match2)
 	if err != nil {
 		t.Fatal(err)
 	}
