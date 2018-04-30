@@ -146,7 +146,7 @@ func (cs *chunkStore) GetChunksState(mc *MetricsCache, metric *MetricState, t in
 	getInput := v3io.GetItemInput{
 		Path: path, AttributeNames: []string{"_maxtime"}}
 
-	request, err := mc.container.GetItem(&getInput, mc.getRespChan)
+	request, err := mc.container.GetItem(&getInput, metric, mc.getRespChan)
 	if err != nil {
 		mc.logger.ErrorWith("GetItem Failed", "metric", metric.key, "err", err)
 		return err
@@ -356,7 +356,8 @@ func (cs *chunkStore) WriteChunks(mc *MetricsCache, metric *MetricState) error {
 	// Call V3IO async Update Item method
 	expr += fmt.Sprintf("_maxtime=%d;", cs.maxTime)   // TODO: use max() expr
 	path := cs.GetMetricPath(metric, mc.cfg.Path, "") // TODO: use TableID for multi-partition
-	request, err := mc.container.UpdateItem(&v3io.UpdateItemInput{Path: path, Expression: &expr}, mc.responseChan)
+	request, err := mc.container.UpdateItem(
+		&v3io.UpdateItemInput{Path: path, Expression: &expr}, metric, mc.responseChan)
 	if err != nil {
 		mc.logger.ErrorWith("UpdateItem Failed", "err", err)
 		return err
