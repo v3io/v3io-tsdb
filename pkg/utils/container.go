@@ -21,6 +21,7 @@ such restriction.
 package utils
 
 import (
+	"encoding/binary"
 	"github.com/nuclio/logger"
 	"github.com/nuclio/zap"
 	"github.com/pkg/errors"
@@ -61,4 +62,15 @@ func CreateContainer(logger logger.Logger, addr, cont string, workers int) (*v3i
 	}
 
 	return container, nil
+}
+
+// convert v3io blob to Int array
+func AsInt64Array(val []byte) []uint64 {
+	var array []uint64
+	bytes := val
+	for i := 16; i+8 <= len(bytes); i += 8 {
+		val := binary.LittleEndian.Uint64(bytes[i : i+8])
+		array = append(array, val)
+	}
+	return array
 }

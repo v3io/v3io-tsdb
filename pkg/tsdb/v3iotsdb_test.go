@@ -30,9 +30,11 @@ import (
 	"time"
 )
 
-const basetime = 1524690488000
+//const basetime = 1524690488000
+var basetime int64
 
 func TestTsdb(t *testing.T) {
+	basetime = time.Now().Unix() * 1000
 
 	d, h := partmgr.TimeToDHM(basetime)
 	fmt.Println("base=", d, h)
@@ -66,12 +68,12 @@ func TestTsdb(t *testing.T) {
 	//time.Sleep(time.Second * 5)
 	//return
 
-	qry, err := adapter.Querier(nil, basetime-0*3600*1000, basetime+5*3600*1000)
+	qry, err := adapter.Querier(nil, basetime-2*3600*1000, basetime)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	set, err := qry.Select("", 0, "_name=='http_req'")
+	set, err := qry.Select("", 0, "_name=='go_goroutines'")
 	//set, err := qry.Select("count,avg,sum", 1000*3600, "_name=='http_req'")
 	//set, err := qry.SelectOverlap("count,avg,sum,max", 1000*3600, []int{4, 2, 1}, "_name=='http_req'")
 	if err != nil {
@@ -99,7 +101,8 @@ func TestTsdb(t *testing.T) {
 			if h != lasth {
 				fmt.Println()
 			}
-			fmt.Printf("t=%d:%d,v=%.2f ", d, h, v)
+			m := (t % (3600 * 1000)) / 60000
+			fmt.Printf("t=%d:%d:%d,v=%.2f ", d, h, m, v)
 			lasth = h
 		}
 		fmt.Println()

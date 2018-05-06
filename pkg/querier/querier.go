@@ -26,7 +26,6 @@ import (
 	"github.com/v3io/v3io-tsdb/config"
 	"github.com/v3io/v3io-tsdb/pkg/aggregate"
 	"github.com/v3io/v3io-tsdb/pkg/partmgr"
-	"github.com/v3io/v3io-tsdb/pkg/utils"
 	"sort"
 	"strings"
 )
@@ -133,7 +132,7 @@ type V3ioSeriesSet struct {
 	err        error
 	logger     logger.Logger
 	partition  *partmgr.DBPartition
-	iter       *utils.V3ioItemsCursor
+	iter       *v3io.SyncItemsCursor //*utils.V3ioItemsCursor
 	mint, maxt int64
 	attrs      []string
 	chunkIds   []int
@@ -163,7 +162,8 @@ func (s *V3ioSeriesSet) getItems(path, filter string, container *v3io.Container)
 
 	s.logger.DebugWith("Select - GetItems", "path", path, "attr", attrs, "filter", filter)
 	input := v3io.GetItemsInput{Path: path, AttributeNames: attrs, Filter: filter}
-	iter, err := utils.NewItemsCursor(container, &input)
+	iter, err := container.Sync.GetItemsCursor(&input)
+	//iter, err := utils.NewItemsCursor(container, &input)
 	if err != nil {
 		return err
 	}
@@ -214,7 +214,8 @@ func (s *V3ioSeriesSet) Next() bool {
 			}
 
 			if length != 0 {
-				aggrSet, err := s.aggrSeries.NewSetFromAttrs(length, start, end, mint, maxt, s.iter.GetFields())
+				attrs := s.iter.GetFields()
+				aggrSet, err := s.aggrSeries.NewSetFromAttrs(length, start, end, mint, maxt, &attrs)
 				if err != nil {
 					s.err = err
 					return false
