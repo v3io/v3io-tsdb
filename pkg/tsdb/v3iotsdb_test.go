@@ -60,7 +60,7 @@ func TestTsdb(t *testing.T) {
 	lset := utils.Labels{utils.Label{Name: "__name__", Value: "http_req"},
 		utils.Label{Name: "method", Value: "post"}}
 
-	err = DoAppend(lset, appender, 12, 30)
+	err = DoAppend(lset, appender, 50, 30)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -73,7 +73,7 @@ func TestTsdb(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	set, err := qry.Select("", 0, "_name=='go_goroutines'")
+	set, err := qry.Select("", 0, "_name=='http_req'")
 	//set, err := qry.Select("count,avg,sum", 1000*3600, "_name=='http_req'")
 	//set, err := qry.SelectOverlap("count,avg,sum,max", 1000*3600, []int{4, 2, 1}, "_name=='http_req'")
 	if err != nil {

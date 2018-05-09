@@ -5,29 +5,30 @@ import (
 
 	"github.com/nuclio/nuclio/pkg/errors"
 
-	"github.com/nuclio/logger"
+	"fmt"
 	"github.com/spf13/cobra"
 	"github.com/spf13/cobra/doc"
-	"github.com/v3io/v3io-tsdb/pkg/utils"
+	"github.com/v3io/v3io-tsdb/config"
+	"github.com/v3io/v3io-tsdb/pkg/tsdb"
 )
 
 type RootCommandeer struct {
-	loggerInstance logger.Logger
-	cmd            *cobra.Command
-	v3io           string
-	dbpath         string
-	cfgPath        string
-	verbose        bool
+	adapter *tsdb.V3ioAdapter
+	cmd     *cobra.Command
+	v3io    string
+	dbpath  string
+	cfgPath string
+	verbose bool
 }
 
 func NewRootCommandeer() *RootCommandeer {
 	commandeer := &RootCommandeer{}
 
 	cmd := &cobra.Command{
-		Use:           "tsdbctl [command]",
-		Short:         "V3IO TSDB command-line interface",
-		SilenceUsage:  true,
-		SilenceErrors: true,
+		Use:   "tsdbctl [command]",
+		Short: "V3IO TSDB command-line interface",
+		//SilenceUsage:  true,
+		//SilenceErrors: true,
 	}
 
 	defaultV3ioServer := os.Getenv("V3IO_SERVICE_URL")
@@ -45,6 +46,7 @@ func NewRootCommandeer() *RootCommandeer {
 	// add children
 	cmd.AddCommand(
 		newAddCommandeer(commandeer).cmd,
+		newQueryCommandeer(commandeer).cmd,
 	)
 
 	commandeer.cmd = cmd
@@ -70,9 +72,16 @@ func (rc *RootCommandeer) CreateMarkdown(path string) error {
 func (rc *RootCommandeer) initialize() error {
 	var err error
 
-	rc.loggerInstance, err = utils.NewLogger(rc.verbose)
+	cfg, err := config.LoadConfig(rc.cfgPath)
 	if err != nil {
-		return errors.Wrap(err, "Failed to create logger")
+		return errors.Wrap(err, "Failed to load config")
+	}
+	fmt.Println(cfg)
+
+	rc.adapter = tsdb.NewV3ioAdapter(cfg, nil, nil)
+	err = rc.adapter.Start()
+	if err != nil {
+		return errors.Wrap(err, "Failed to start V3IO TSDB Adapter")
 	}
 
 	return nil
