@@ -154,10 +154,6 @@ func (cs *chunkStore) GetChunksState(mc *MetricsCache, metric *MetricState, t in
 
 	mc.logger.DebugWith("GetItems", "name", metric.name, "key", metric.key, "reqid", request.ID)
 
-	mc.rmapMtx.Lock()
-	defer mc.rmapMtx.Unlock()
-	mc.requestsMap[request.ID] = metric
-
 	cs.state = storeStateGet
 	return nil
 
@@ -365,9 +361,6 @@ func (cs *chunkStore) WriteChunks(mc *MetricsCache, metric *MetricState) error {
 
 	// add async request ID to the requests map (can be avoided if V3IO will add user data in request)
 	mc.logger.DebugWith("updateMetric expression", "name", metric.name, "key", metric.key, "expr", expr, "reqid", request.ID)
-	mc.rmapMtx.Lock()
-	defer mc.rmapMtx.Unlock()
-	mc.requestsMap[request.ID] = metric
 
 	return nil
 }

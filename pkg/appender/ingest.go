@@ -59,7 +59,6 @@ type MetricsCache struct {
 	cfg           *config.TsdbConfig
 	partitionMngr *partmgr.PartitionManager
 	mtx           sync.RWMutex
-	rmapMtx       sync.RWMutex
 	container     *v3io.Container
 	logger        logger.Logger
 
@@ -70,7 +69,6 @@ type MetricsCache struct {
 	lastMetric     uint64
 	cacheMetricMap map[uint64]*MetricState // TODO: maybe use hash as key & combine w ref
 	cacheRefMap    map[uint64]*MetricState // TODO: maybe turn to list + free list, periodically delete old matrics
-	requestsMap    map[uint64]*MetricState // v3io async requests
 
 	NameLabelMap map[string]bool // temp store all lable names
 }
@@ -80,7 +78,6 @@ func NewMetricsCache(container *v3io.Container, logger logger.Logger, cfg *confi
 	newCache := MetricsCache{container: container, logger: logger, cfg: cfg, partitionMngr: partMngr}
 	newCache.cacheMetricMap = map[uint64]*MetricState{}
 	newCache.cacheRefMap = map[uint64]*MetricState{}
-	newCache.requestsMap = map[uint64]*MetricState{}
 
 	newCache.responseChan = make(chan *v3io.Response, CHAN_SIZE)
 	newCache.getRespChan = make(chan *v3io.Response, CHAN_SIZE)
@@ -107,11 +104,7 @@ func (mc *MetricsCache) Start() error {
 			case resp := <-mc.responseChan:
 				// Handle V3io update expression responses
 
-				// TODO: add metric interface to v3io req context instead of using req map
-				mc.rmapMtx.Lock()
-				metric, ok := mc.requestsMap[resp.ID]
-				delete(mc.requestsMap, resp.ID)
-				mc.rmapMtx.Unlock()
+				metric, ok := resp.Context.(*MetricState)
 				respErr := resp.Error
 
 				if respErr != nil {
@@ -181,11 +174,7 @@ func (mc *MetricsCache) Start() error {
 			case resp := <-mc.getRespChan:
 				// Handle V3io GetItem responses
 
-				// TODO: add metric interface to v3io req instead of using req map
-				mc.rmapMtx.Lock()
-				metric, ok := mc.requestsMap[resp.ID]
-				delete(mc.requestsMap, resp.ID)
-				mc.rmapMtx.Unlock()
+				metric, ok := resp.Context.(*MetricState)
 				respErr := resp.Error
 
 				if respErr != nil {
