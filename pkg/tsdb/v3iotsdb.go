@@ -129,6 +129,11 @@ func (a v3ioAppender) AddFast(lset utils.Labels, ref uint64, t int64, v float64)
 	return a.metricsCache.AddFast(ref, t, v)
 }
 
+// faster Add using refID obtained from Add (avoid some hash/lookup overhead)
+func (a v3ioAppender) WaitForReady(ref uint64) error {
+	return a.metricsCache.WaitForReady(ref)
+}
+
 // in V3IO all ops a committed (no client cache)
 func (a v3ioAppender) Commit() error   { return nil }
 func (a v3ioAppender) Rollback() error { return nil }
@@ -137,6 +142,7 @@ func (a v3ioAppender) Rollback() error { return nil }
 type Appender interface {
 	Add(l utils.Labels, t int64, v float64) (uint64, error)
 	AddFast(l utils.Labels, ref uint64, t int64, v float64) error
+	WaitForReady(ref uint64) error
 	Commit() error
 	Rollback() error
 }

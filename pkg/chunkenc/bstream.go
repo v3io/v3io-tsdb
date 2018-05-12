@@ -172,6 +172,18 @@ func (b *bstream) ReadByte() (byte, error) {
 	return b.readByte()
 }
 
+// read one byte without moving the cursor
+func (b *bstream) PeekByte() byte {
+	if b.count == 0 {
+		if len(b.stream) < 1 {
+			return 0
+		}
+		return b.stream[1]
+	}
+
+	return b.stream[0]
+}
+
 func (b *bstream) readByte() (byte, error) {
 	if len(b.stream) == 0 {
 		return 0, io.EOF

@@ -24,6 +24,7 @@ import (
 	"fmt"
 	"testing"
 
+	"encoding/base64"
 	"math/rand"
 )
 
@@ -37,8 +38,6 @@ type sample struct {
 // [132 180 199 187 191 88 63 240 - 0 0 0 0 0 0 154 8 - 194 95 255 108 7 126 113 172 - 46 18 195 104 59 202 237 129 - 119 243 146]
 
 func TestXor(tst *testing.T) {
-	//ts1 := []int64{2000, 3050, 4100, 4950, 7000, 8200, 9300}
-	//arr1 := []float64{1, 2, 3, 4, 5, 6, 7}
 	samples := GenSamples(9, 1)
 	byteArray := []byte{}
 
@@ -116,6 +115,37 @@ func TestBstream(t *testing.T) {
 	for i := 1; i < 18; i++ {
 		bit, _ := bs2.readBit()
 		fmt.Println(bs2.count, bs2.stream, bit)
+	}
+
+}
+
+func TestDecode(tst *testing.T) {
+
+	blob := "+AFjT7+iCEBLgAAAAAAA+AFjT8A6YEBQgAAAAAAA"
+
+	data, err := base64.StdEncoding.DecodeString(blob)
+	if err != nil {
+		fmt.Println("error:", err)
+		return
+	}
+	fmt.Println(data)
+
+	chunk, err := FromData(EncXOR, data, 0)
+	if err != nil {
+		tst.Fatal(err)
+	}
+
+	iter := chunk.Iterator()
+	i := 0
+	for iter.Next() {
+
+		if iter.Err() != nil {
+			tst.Fatal(iter.Err())
+		}
+
+		t, v := iter.At()
+		fmt.Println("t, v: ", t, v)
+		i++
 	}
 
 }

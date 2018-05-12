@@ -54,7 +54,6 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 package chunkenc
 
 import (
-	"encoding/binary"
 	"fmt"
 	"math"
 	"math/bits"
@@ -201,11 +200,7 @@ func (a *xorAppender) Append(t int64, v float64) {
 	} else if num == 1 {
 		tDelta = uint64(t - a.t)
 
-		buf := make([]byte, binary.MaxVarintLen64)
-		for _, b := range buf[:binary.PutUvarint(buf, tDelta)] {
-			a.b.writeByte(b)
-		}
-
+		a.b.writeBits(tDelta, 32)
 		a.writeVDelta(v)
 
 	} else {
@@ -328,8 +323,12 @@ func (it *xorIterator) Next() bool {
 		it.numRead++
 		return true
 	}
-	if it.numRead == 1 {
-		tDelta, err := binary.ReadUvarint(it.br)
+
+	// check if this a starting from scratch, signature is 111110xx
+	isRestart := (it.br.PeekByte() & 0xfc) == 0xf8
+
+	if it.numRead == 1 && !isRestart {
+		tDelta, err := it.br.readBits(32)
 		if err != nil {
 			it.err = err
 			return false

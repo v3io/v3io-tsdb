@@ -29,6 +29,7 @@ import (
 	"github.com/v3io/v3io-tsdb/pkg/partmgr"
 	"github.com/v3io/v3io-tsdb/pkg/utils"
 	"sync"
+	"time"
 )
 
 // to add, rollups policy (cnt, sum, min/max, sum^2) + interval , or policy in per name lable
@@ -289,4 +290,31 @@ func (mc *MetricsCache) AddFast(ref uint64, t int64, v interface{}) error {
 	mc.appendTV(metric, t, v)
 	return nil
 
+}
+
+func (mc *MetricsCache) WaitForReady(ref uint64) error {
+	metric, ok := mc.getMetricByRef(ref)
+	if !ok {
+		mc.logger.ErrorWith("Ref not found", "ref", ref)
+		return fmt.Errorf("ref not found")
+	}
+
+	for i := 0; i < 100; i++ {
+		metric.RLock()
+		err := metric.err
+		ready := metric.store.IsReady()
+		metric.RUnlock()
+
+		if err != nil {
+			return errors.Wrap(err, "metric error")
+		}
+
+		if ready {
+			return nil
+		}
+
+		time.Sleep(time.Millisecond * 5)
+	}
+
+	return fmt.Errorf("Timeout waiting for metric to be ready")
 }

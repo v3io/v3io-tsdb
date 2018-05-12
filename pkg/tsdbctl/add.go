@@ -6,6 +6,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/v3io/v3io-tsdb/pkg/utils"
+	"math"
 	"strconv"
 	"strings"
 	"time"
@@ -59,6 +60,7 @@ func (ac *addCommandeer) add() error {
 
 	lset := utils.Labels{}
 	fmt.Println("str:", ac.lset)
+	//err := json.Unmarshal([]byte(`{"__name__":"cpu","os":"win","node":"xyz123"}`), &lset)
 	err := json.Unmarshal([]byte(ac.lset), &lset)
 	if err != nil {
 		return errors.Wrap(err, "cant unmarshal labels")
@@ -83,10 +85,18 @@ func (ac *addCommandeer) add() error {
 	varray := []float64{}
 
 	for i := 0; i < len(vlist); i++ {
-		v, err := strconv.ParseFloat(vlist[i], 64)
-		if err != nil {
-			return errors.Wrap(err, "not a valid float value")
+
+		var v float64
+		var err error
+		if vlist[i] == "NaN" {
+			v = math.NaN()
+		} else {
+			v, err = strconv.ParseFloat(vlist[i], 64)
+			if err != nil {
+				return errors.Wrap(err, "not a valid float value")
+			}
 		}
+
 		varray = append(varray, v)
 	}
 
@@ -102,18 +112,19 @@ func (ac *addCommandeer) add() error {
 		}
 	}
 
-	appender, err := ac.rootCommandeer.adapter.Appender()
-	ref, err := appender.Add(lset, tarray[0], varray[0])
+	fmt.Println("add:", lset, tarray, varray)
+	append, err := ac.rootCommandeer.adapter.Appender()
+	ref, err := append.Add(lset, tarray[0], varray[0])
 	if err != nil {
 		return errors.Wrap(err, "failed to Add")
 	}
 
 	for i := 1; i < len(varray); i++ {
-		err := appender.AddFast(lset, ref, tarray[i], varray[i])
+		err := append.AddFast(lset, ref, tarray[i], varray[i])
 		if err != nil {
 			return errors.Wrap(err, "failed to AddFast")
 		}
 	}
 
-	return nil
+	return append.WaitForReady(ref)
 }
