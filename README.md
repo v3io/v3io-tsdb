@@ -19,6 +19,7 @@ fast and scalable Time Series database engine which can be accessed simultaneous
 - [nuclio](https://github.com/nuclio/nuclio) serverless functions (for real-time ingestion, stream processing or queries) 
 - iguazio DynamoDB API (with extensions) 
 - Apache Presto & Spark (future item, for SQL & AI)
+- Built-in CLI (tsdbctl) for DB creation, ingestion, and queries 
 
 [nuclio](https://github.com/nuclio/nuclio) supports HTTP and a large variety of streaming/triggering options (Kafka, Kinesis
 , Azure event-hub, RabbitMQ, NATS, iguazio streams, MQTT, Cron tasks), it provides automatic deployment and auto-scaling 
@@ -70,6 +71,8 @@ executable (see details on configurations below).
 A developer using this library should first create a `NewV3ioAdapter`, with the adapter he can create an `Appender` for 
 adding samples or `Querier` for querying the database and retrieving a set of metrics or aggregates, see the following 
 sections for details.
+
+To use the CLI, build the code under [tsdbctl](cmd/tsdbctl), it has built-in help 
 
 For use with nuclio function you can see function example under [\nuclio](nuclio)
 
