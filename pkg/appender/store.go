@@ -127,8 +127,8 @@ func (cs *chunkStore) GetState() storeState {
 }
 
 // return the DB path for storing the metric
-func (cs *chunkStore) GetMetricPath(metric *MetricState, basePath, table string) string {
-	return fmt.Sprintf("%s/%s.%d", basePath, metric.name, metric.hash) // TODO: use TableID
+func (cs *chunkStore) GetMetricPath(metric *MetricState, tablePath string) string {
+	return fmt.Sprintf("%s/%s.%016x", tablePath, metric.name, metric.hash) // TODO: use TableID
 }
 
 // Read (Async) the current chunk state and data from the storage, used in the first chunk access
@@ -142,7 +142,7 @@ func (cs *chunkStore) GetChunksState(mc *MetricsCache, metric *MetricState, t in
 	// TODO: if policy to merge w old chunks need to get prev chunk, vs restart appender
 
 	// issue DB GetItem command to load last state of metric
-	path := cs.GetMetricPath(metric, mc.cfg.Path, part.GetPath())
+	path := cs.GetMetricPath(metric, part.GetPath())
 	getInput := v3io.GetItemInput{
 		Path: path, AttributeNames: []string{"_maxtime"}}
 
@@ -350,8 +350,8 @@ func (cs *chunkStore) WriteChunks(mc *MetricsCache, metric *MetricState) error {
 	}
 
 	// Call V3IO async Update Item method
-	expr += fmt.Sprintf("_maxtime=%d;", cs.maxTime)   // TODO: use max() expr
-	path := cs.GetMetricPath(metric, mc.cfg.Path, "") // TODO: use TableID for multi-partition
+	expr += fmt.Sprintf("_maxtime=%d;", cs.maxTime)       // TODO: use max() expr
+	path := cs.GetMetricPath(metric, partition.GetPath()) // TODO: use TableID for multi-partition
 	request, err := mc.container.UpdateItem(
 		&v3io.UpdateItemInput{Path: path, Expression: &expr}, metric, mc.responseChan)
 	if err != nil {

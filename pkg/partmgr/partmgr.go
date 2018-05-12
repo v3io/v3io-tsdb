@@ -40,6 +40,7 @@ func NewPartitionMngr(cfg *config.TsdbConfig) *PartitionManager {
 func NewDBPartition(pmgr *PartitionManager) *DBPartition {
 	newPart := DBPartition{
 		manager:       pmgr,
+		path:          pmgr.cfg.Path + "/0/", // TODO: format a string based on id & format
 		partID:        1,
 		startTime:     0,
 		days:          pmgr.cfg.DaysPerObj,
@@ -92,6 +93,7 @@ func (p *PartitionManager) GetHead() *DBPartition {
 
 type DBPartition struct {
 	manager        *PartitionManager
+	path           string             // Full path (in the DB) to the partition
 	partID         int                // PartitionID
 	startTime      int64              // Start from time/date
 	days           int                // Number of days stored in the partition
@@ -120,7 +122,7 @@ func (p *DBPartition) GetId() int {
 }
 
 func (p *DBPartition) GetPath() string {
-	return "0" // TODO: format a string based on id & format
+	return p.path
 }
 
 func (p *DBPartition) AggrType() aggregate.AggrType {

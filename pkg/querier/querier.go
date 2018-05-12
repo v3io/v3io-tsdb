@@ -93,7 +93,7 @@ func (q *V3ioQuerier) selectQry(functions string, step int64, win []int, filter 
 			newSet.overlapWin = q.overlapWin
 		}
 
-		err = newSet.getItems(q.cfg.Path+"/", filter, q.container)
+		err = newSet.getItems(partition.GetPath(), filter, q.container)
 		if err != nil {
 			return nil, err
 		}
