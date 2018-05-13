@@ -51,6 +51,7 @@ func NewRootCommandeer() *RootCommandeer {
 		newQueryCommandeer(commandeer).cmd,
 		newTimeCommandeer(commandeer).cmd,
 		newCreateCommandeer(commandeer).cmd,
+		newInfoCommandeer(commandeer).cmd,
 	)
 
 	commandeer.cmd = cmd

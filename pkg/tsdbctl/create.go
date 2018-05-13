@@ -22,7 +22,7 @@ func newCreateCommandeer(rootCommandeer *RootCommandeer) *createCommandeer {
 	}
 
 	cmd := &cobra.Command{
-		Use:   "create path",
+		Use:   "create",
 		Short: "create a new TSDB in the specifies path",
 		RunE: func(cmd *cobra.Command, args []string) error {
 

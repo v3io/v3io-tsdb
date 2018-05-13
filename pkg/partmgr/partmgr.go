@@ -72,6 +72,10 @@ func (p *PartitionManager) IsCyclic() bool {
 	return p.cyclic
 }
 
+func (p *PartitionManager) GetConfig() *config.DBPartConfig {
+	return p.cfg
+}
+
 func (p *PartitionManager) Init() error {
 
 	return nil

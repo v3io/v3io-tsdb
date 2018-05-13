@@ -62,6 +62,12 @@ func CreateTSDB(v3iocfg *config.V3ioConfig, dbconfig *config.DBPartConfig) error
 		return errors.Wrap(err, "Failed to Marshal DB config")
 	}
 
+	// check if the config file already exist, abort if it does
+	_, err = container.Sync.GetObject(&v3io.GetObjectInput{Path: v3iocfg.Path + "/dbconfig.json"})
+	if err == nil {
+		return fmt.Errorf("TSDB already exist in path: " + v3iocfg.Path)
+	}
+
 	err = container.Sync.PutObject(&v3io.PutObjectInput{Path: v3iocfg.Path + "/dbconfig.json", Body: data})
 
 	return err
@@ -96,6 +102,10 @@ func NewV3ioAdapter(cfg *config.V3ioConfig, container *v3io.Container, logger lo
 	err = newV3ioAdapter.connect(cfg.Path)
 
 	return &newV3ioAdapter, err
+}
+
+func (a *V3ioAdapter) GetDBConfig() *config.DBPartConfig {
+	return a.partitionMngr.GetConfig()
 }
 
 func (a *V3ioAdapter) connect(path string) error {
