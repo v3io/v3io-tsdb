@@ -68,17 +68,51 @@ For Prometheus you would need to use the fork found in `https://github.com/v3io/
 library, you would need to place a `v3io.yaml` file with relevant configuration in the same folder as the Prometheus
 executable (see details on configurations below).
 
-A developer using this library should first create a `NewV3ioAdapter`, with the adapter he can create an `Appender` for 
-adding samples or `Querier` for querying the database and retrieving a set of metrics or aggregates, see the following 
-sections for details.
+A developer using this library should first create a TSDB, this can be done using the CLI or an API call (`CreateTSDB`) 
+which builds the TSDB metadata in the DB. To use the DB you should create an Adapter using the method `NewV3ioAdapter()`
+, with the adapter he can create an `Appender` for adding samples or `Querier` for querying the database and retrieving 
+a set of metrics or aggregates, see the following sections for details.
 
-To use the CLI, build the code under [tsdbctl](cmd/tsdbctl), it has built-in help 
+A user can run the CLI to add (append) or query the DB, to use the CLI, build the code under [tsdbctl](cmd/tsdbctl), 
+it has built-in help, see the following add/query examples:
+
+```
+	# display all the CPU metrics for win servers from the last hours 
+	tsdbctl query "__name__=='cpu' and os=='win" -l 1h
+
+	# append a sample (73) to the specified metric at the current time
+	tsdbctl add '{"__name__":"cpu","os":"win","node":"xyz123"}' -d 73
+```
 
 For use with nuclio function you can see function example under [\nuclio](nuclio)
 
+## API Walkthrough 
+
 ### Creating and Configuring a TSDB Adapter 
 
-the first step is to create an adapter to the TSDB with relevant configuration, the `NewV3ioAdapter` function accepts 3
+the first step is to create a TSDB, this is done only once per TSDB and generates the required metadata and configuration
+such as partitioning strategy, retention, aggregators, etc. this can be done via the CLI or a function call.
+
+```go
+	// Load v3io connection/path details (see YAML below)
+	v3iocfg, _ := cfg, err = config.LoadConfig("v3io.yaml")
+
+	// Specify the default DB configuration (can be modified per partition)
+	dbcfg := config.DBPartConfig{
+		DaysPerObj:     1,
+		HrInChunk:      1,
+		DefaultRollups: "count,avg,sum,stddev",
+		RollupMin:      30,
+	}
+
+	return tsdb.CreateTSDB(v3iocfg, &dbcfg)
+```
+
+> if you plan on using pre-aggregation to speed aggregate queries you should specify the `Rollups` (function list) and 
+`RollupMin` (bucket time in minutes) parameters, the supported aggregation functions are: count, sum, avg, min, max, 
+stddev, stdvar.
+
+In order to use the TSDB we need to create an adapter, the `NewV3ioAdapter` function accepts 3
 parameters: the configuration structure, v3io data container object and logger object. the last 2 are optional, in case
 you already have container and logger (when using nuclio data bindings).
 
@@ -92,10 +126,6 @@ container: "tsdb"
 path: "metrics"
 ```
 
-> if you plan on using pre-aggregation to speed aggregate queries you should specify the `Rollups` (function list) and 
-`RollupMin` (bucket time in minutes) parameters, the supported aggregation functions are: count, sum, avg, min, max, 
-stddev, stdvar.
-
 example of creating an adpapter:
 
 ```go
@@ -106,8 +136,7 @@ example of creating an adpapter:
 	}
 
 	// create and start a new TSDB adapter 
-	adapter := tsdb.NewV3ioAdapter(cfg, nil, nil)
-	err = adapter.Start()
+	adapter, err := tsdb.NewV3ioAdapter(cfg, nil, nil)
 	if err != nil {
 		panic(err)
 	}

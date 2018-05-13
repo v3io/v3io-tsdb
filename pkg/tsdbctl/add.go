@@ -27,7 +27,7 @@ func newAddCommandeer(rootCommandeer *RootCommandeer) *addCommandeer {
 
 	cmd := &cobra.Command{
 		Use:     "add metric",
-		Aliases: []string{"put"},
+		Aliases: []string{"append"},
 		Short:   "add samples to metric",
 		RunE: func(cmd *cobra.Command, args []string) error {
 
