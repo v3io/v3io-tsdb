@@ -5,19 +5,22 @@ import (
 
 	"github.com/nuclio/nuclio/pkg/errors"
 
+	"fmt"
 	"github.com/spf13/cobra"
 	"github.com/spf13/cobra/doc"
 	"github.com/v3io/v3io-tsdb/config"
 	"github.com/v3io/v3io-tsdb/pkg/tsdb"
+	"strings"
 )
 
 type RootCommandeer struct {
-	adapter *tsdb.V3ioAdapter
-	cmd     *cobra.Command
-	v3io    string
-	dbpath  string
-	cfgPath string
-	verbose bool
+	adapter     *tsdb.V3ioAdapter
+	v3iocfg     *config.V3ioConfig
+	cmd         *cobra.Command
+	v3ioPath    string
+	dbPath      string
+	cfgFilePath string
+	verbose     bool
 }
 
 func NewRootCommandeer() *RootCommandeer {
@@ -38,9 +41,9 @@ func NewRootCommandeer() *RootCommandeer {
 	}
 
 	cmd.PersistentFlags().BoolVarP(&commandeer.verbose, "verbose", "v", false, "Verbose output")
-	cmd.PersistentFlags().StringVarP(&commandeer.dbpath, "dbpath", "p", "metrics", "sub path for the TSDB, inside the container")
-	cmd.PersistentFlags().StringVarP(&commandeer.v3io, "server", "s", defaultV3ioServer, "V3IO Service URL - ip:port/container")
-	cmd.PersistentFlags().StringVarP(&commandeer.cfgPath, "config", "c", defaultCfgPath, "path to yaml config file")
+	cmd.PersistentFlags().StringVarP(&commandeer.dbPath, "dbpath", "p", "", "sub path for the TSDB, inside the container")
+	cmd.PersistentFlags().StringVarP(&commandeer.v3ioPath, "server", "s", defaultV3ioServer, "V3IO Service URL - ip:port/container")
+	cmd.PersistentFlags().StringVarP(&commandeer.cfgFilePath, "config", "c", defaultCfgPath, "path to yaml config file")
 
 	// add children
 	cmd.AddCommand(
@@ -72,16 +75,43 @@ func (rc *RootCommandeer) CreateMarkdown(path string) error {
 
 func (rc *RootCommandeer) initialize() error {
 	var err error
+	cfg := &config.V3ioConfig{}
 
-	cfg, err := config.LoadConfig(rc.cfgPath)
-	if err != nil {
-		return errors.Wrap(err, "Failed to load config")
+	if rc.cfgFilePath != "" {
+		cfg, err = config.LoadConfig(rc.cfgFilePath)
+		if err != nil {
+			return errors.Wrap(err, "Failed to load config from file "+rc.cfgFilePath)
+		}
 	}
 
-	rc.adapter, err = tsdb.NewV3ioAdapter(cfg, nil, nil)
+	if rc.v3ioPath != "" {
+		slash := strings.LastIndex(rc.v3ioPath, "/")
+		if slash == -1 || len(rc.v3ioPath) <= slash+1 {
+			return fmt.Errorf("missing container name in V3IO URL")
+		}
+		cfg.V3ioUrl = rc.v3ioPath[0:slash]
+		cfg.Container = rc.v3ioPath[slash+1:]
+	}
+
+	if rc.dbPath != "" {
+		cfg.Path = rc.dbPath
+	}
+
+	if cfg.V3ioUrl == "" || cfg.Container == "" || cfg.Path == "" {
+		return fmt.Errorf("User must provide V3IO URL, container name, and table path via the confif file or flags")
+	}
+
+	rc.v3iocfg = cfg
+	return nil
+}
+
+func (rc *RootCommandeer) startAdapter() error {
+	var err error
+	rc.adapter, err = tsdb.NewV3ioAdapter(rc.v3iocfg, nil, nil)
 	if err != nil {
 		return errors.Wrap(err, "Failed to start TSDB Adapter")
 	}
 
 	return nil
+
 }

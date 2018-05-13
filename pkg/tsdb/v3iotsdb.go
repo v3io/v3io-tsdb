@@ -46,7 +46,7 @@ type V3ioAdapter struct {
 	partitionMngr   *partmgr.PartitionManager
 }
 
-func CreateTSDB(v3iocfg *config.V3ioConfig, path string, dbconfig *config.DBPartConfig) error {
+func CreateTSDB(v3iocfg *config.V3ioConfig, dbconfig *config.DBPartConfig) error {
 
 	logger, _ := utils.NewLogger(v3iocfg.Verbose)
 	container, err := utils.CreateContainer(logger, v3iocfg.V3ioUrl, v3iocfg.Container, v3iocfg.Workers)
@@ -62,7 +62,7 @@ func CreateTSDB(v3iocfg *config.V3ioConfig, path string, dbconfig *config.DBPart
 		return errors.Wrap(err, "Failed to Marshal DB config")
 	}
 
-	err = container.Sync.PutObject(&v3io.PutObjectInput{Path: path + "/dbconfig.json", Body: data})
+	err = container.Sync.PutObject(&v3io.PutObjectInput{Path: v3iocfg.Path + "/dbconfig.json", Body: data})
 
 	return err
 }
@@ -101,7 +101,7 @@ func NewV3ioAdapter(cfg *config.V3ioConfig, container *v3io.Container, logger lo
 func (a *V3ioAdapter) connect(path string) error {
 
 	fullpath := a.cfg.V3ioUrl + "/" + a.cfg.Container + "/" + path
-	resp, err := a.container.Sync.GetObject(&v3io.GetObjectInput{Path: path})
+	resp, err := a.container.Sync.GetObject(&v3io.GetObjectInput{Path: path + "/dbconfig.json"})
 	if err != nil {
 		return errors.Wrap(err, "Failed to read DB config at path: "+fullpath)
 	}
@@ -110,6 +110,10 @@ func (a *V3ioAdapter) connect(path string) error {
 	err = json.Unmarshal(resp.Body(), &dbcfg)
 	if err != nil {
 		return errors.Wrap(err, "Failed to Unmarshal DB config at path: "+fullpath)
+	}
+
+	if dbcfg.Signature != "TSDB" {
+		return fmt.Errorf("Bad TSDB signature at path %s", fullpath)
 	}
 
 	a.partitionMngr = partmgr.NewPartitionMngr(&dbcfg, path)

@@ -42,9 +42,13 @@ func newQueryCommandeer(rootCommandeer *RootCommandeer) *queryCommandeer {
 				commandeer.filter = args[0]
 			}
 
-			// initialize adapter
+			// initialize psrsmd snd adapter
 			if err := rootCommandeer.initialize(); err != nil {
-				return errors.Wrap(err, "Failed to initialize TSDB")
+				return err
+			}
+
+			if err := rootCommandeer.startAdapter(); err != nil {
+				return err
 			}
 
 			return commandeer.query()

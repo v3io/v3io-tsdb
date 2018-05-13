@@ -38,8 +38,12 @@ func newAddCommandeer(rootCommandeer *RootCommandeer) *addCommandeer {
 
 			commandeer.lset = args[0]
 
-			// initialize adapter
+			// initialize params and adapter
 			if err := rootCommandeer.initialize(); err != nil {
+				return err
+			}
+
+			if err := rootCommandeer.startAdapter(); err != nil {
 				return err
 			}
 

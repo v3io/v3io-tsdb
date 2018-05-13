@@ -1,7 +1,6 @@
 package tsdbctl
 
 import (
-	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/v3io/v3io-tsdb/config"
 	"github.com/v3io/v3io-tsdb/pkg/tsdb"
@@ -27,12 +26,10 @@ func newCreateCommandeer(rootCommandeer *RootCommandeer) *createCommandeer {
 		Short: "create a new TSDB in the specifies path",
 		RunE: func(cmd *cobra.Command, args []string) error {
 
-			// if we got positional arguments
-			if len(args) != 1 {
-				return errors.New("create require TSDB path")
+			// initialize params
+			if err := rootCommandeer.initialize(); err != nil {
+				return err
 			}
-
-			commandeer.path = args[0]
 
 			return commandeer.create()
 
@@ -52,11 +49,6 @@ func newCreateCommandeer(rootCommandeer *RootCommandeer) *createCommandeer {
 
 func (cc *createCommandeer) create() error {
 
-	v3iocfg, err := config.LoadV3ioConfig(cc.rootCommandeer.cfgPath)
-	if err != nil {
-		return errors.Wrap(err, "Failed to load config")
-	}
-
 	dbcfg := config.DBPartConfig{
 		DaysPerObj:     cc.daysPerObj,
 		HrInChunk:      cc.hrInChunk,
@@ -64,6 +56,6 @@ func (cc *createCommandeer) create() error {
 		RollupMin:      cc.rollupMin,
 	}
 
-	return tsdb.CreateTSDB(v3iocfg, cc.path, &dbcfg)
+	return tsdb.CreateTSDB(cc.rootCommandeer.v3iocfg, &dbcfg)
 
 }
