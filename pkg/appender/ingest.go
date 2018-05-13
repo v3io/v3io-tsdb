@@ -44,6 +44,7 @@ type MetricState struct {
 	store      *chunkStore
 	err        error
 	retryCount uint8
+	newName    bool
 }
 
 const MAX_WRITE_RETRY = 2
@@ -66,6 +67,7 @@ type MetricsCache struct {
 
 	responseChan    chan *v3io.Response
 	getRespChan     chan *v3io.Response
+	nameUpdateChan  chan *v3io.Response
 	asyncAppendChan chan *asyncAppend
 
 	lastMetric     uint64
@@ -83,6 +85,7 @@ func NewMetricsCache(container *v3io.Container, logger logger.Logger, cfg *confi
 
 	newCache.responseChan = make(chan *v3io.Response, CHAN_SIZE)
 	newCache.getRespChan = make(chan *v3io.Response, CHAN_SIZE)
+	newCache.nameUpdateChan = make(chan *v3io.Response, CHAN_SIZE)
 	newCache.asyncAppendChan = make(chan *asyncAppend, CHAN_SIZE)
 
 	newCache.NameLabelMap = map[string]bool{}
@@ -156,8 +159,24 @@ func (mc *MetricsCache) start() error {
 					metric.Unlock()
 
 				} else {
-					mc.logger.ErrorWith("Req ID not found", "id", resp.ID)
+					mc.logger.ErrorWith("Resp doesnt have a metric pointer", "id", resp.ID)
 				}
+
+			case resp := <-mc.nameUpdateChan:
+				// Handle V3io putItem in names table
+
+				metric, ok := resp.Context.(*MetricState)
+				if ok {
+					metric.Lock()
+					if resp.Error != nil {
+						mc.logger.ErrorWith("Process Update name failed", "id", resp.ID, "name", metric.name)
+					} else {
+						mc.logger.DebugWith("Process Update name resp", "id", resp.ID, "name", metric.name)
+					}
+					metric.Unlock()
+				}
+
+				resp.Release()
 
 			case app := <-mc.asyncAppendChan:
 				// Handle append requests (Add / AddFast)
@@ -245,7 +264,10 @@ func (mc *MetricsCache) addMetric(hash uint64, name string, metric *MetricState)
 	metric.refId = mc.lastMetric
 	mc.cacheRefMap[mc.lastMetric] = metric
 	mc.cacheMetricMap[hash] = metric
-	mc.NameLabelMap[name] = true // TODO: temporary until we get names from storage
+	if _, ok := mc.NameLabelMap[name]; !ok {
+		metric.newName = true
+		mc.NameLabelMap[name] = true // TODO: temporary until we get names from storage
+	}
 }
 
 // return metric struct by refID

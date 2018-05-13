@@ -10,6 +10,7 @@ import (
 type infoCommandeer struct {
 	cmd            *cobra.Command
 	rootCommandeer *RootCommandeer
+	getNames       bool
 }
 
 func newInfoCommandeer(rootCommandeer *RootCommandeer) *infoCommandeer {
@@ -31,19 +32,45 @@ func newInfoCommandeer(rootCommandeer *RootCommandeer) *infoCommandeer {
 				return err
 			}
 
-			dbconfig := rootCommandeer.adapter.GetDBConfig()
-			info, err := yaml.Marshal(dbconfig)
-			if err != nil {
-				return errors.Wrap(err, "Failed to get config")
-			}
-
-			fmt.Println(string(info))
-
-			return nil
+			return commandeer.info()
 		},
 	}
+
+	cmd.Flags().BoolVarP(&commandeer.getNames, "names", "n", false, "return metric names")
 
 	commandeer.cmd = cmd
 
 	return commandeer
+}
+
+func (ic *infoCommandeer) info() error {
+	dbconfig := ic.rootCommandeer.adapter.GetDBConfig()
+	info, err := yaml.Marshal(dbconfig)
+	if err != nil {
+		return errors.Wrap(err, "Failed to get config")
+	}
+
+	fmt.Println("TSDB Configuration:")
+	fmt.Println(string(info))
+
+	if ic.getNames {
+		// create a querier
+		qry, err := ic.rootCommandeer.adapter.Querier(nil, 0, 0)
+		if err != nil {
+			return errors.Wrap(err, "Failed to create querier")
+		}
+
+		// get all metric names
+		names, err := qry.LabelValues("")
+		if err != nil {
+			return errors.Wrap(err, "Failed to get labels")
+		}
+
+		fmt.Println("Metric Names:")
+		for _, name := range names {
+			fmt.Println(name)
+		}
+	}
+
+	return nil
 }

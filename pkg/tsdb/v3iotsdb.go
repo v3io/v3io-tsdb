@@ -99,7 +99,7 @@ func NewV3ioAdapter(cfg *config.V3ioConfig, container *v3io.Container, logger lo
 		}
 	}
 
-	err = newV3ioAdapter.connect(cfg.Path)
+	err = newV3ioAdapter.connect()
 
 	return &newV3ioAdapter, err
 }
@@ -108,10 +108,10 @@ func (a *V3ioAdapter) GetDBConfig() *config.DBPartConfig {
 	return a.partitionMngr.GetConfig()
 }
 
-func (a *V3ioAdapter) connect(path string) error {
+func (a *V3ioAdapter) connect() error {
 
-	fullpath := a.cfg.V3ioUrl + "/" + a.cfg.Container + "/" + path
-	resp, err := a.container.Sync.GetObject(&v3io.GetObjectInput{Path: path + "/dbconfig.json"})
+	fullpath := a.cfg.V3ioUrl + "/" + a.cfg.Container + "/" + a.cfg.Path
+	resp, err := a.container.Sync.GetObject(&v3io.GetObjectInput{Path: a.cfg.Path + "/dbconfig.json"})
 	if err != nil {
 		return errors.Wrap(err, "Failed to read DB config at path: "+fullpath)
 	}
@@ -126,7 +126,7 @@ func (a *V3ioAdapter) connect(path string) error {
 		return fmt.Errorf("Bad TSDB signature at path %s", fullpath)
 	}
 
-	a.partitionMngr = partmgr.NewPartitionMngr(&dbcfg, path)
+	a.partitionMngr = partmgr.NewPartitionMngr(&dbcfg, a.cfg.Path)
 	err = a.partitionMngr.Init()
 	if err != nil {
 		return errors.Wrap(err, "Failed to init DB partition manager at path: "+fullpath)
@@ -163,7 +163,7 @@ func (a *V3ioAdapter) Close() error {
 
 // create a querier interface, used for time series queries
 func (a *V3ioAdapter) Querier(_ context.Context, mint, maxt int64) (*querier.V3ioQuerier, error) {
-	return querier.NewV3ioQuerier(a.container, a.logger, mint, maxt, &a.MetricsCache.NameLabelMap, a.cfg, a.partitionMngr), nil
+	return querier.NewV3ioQuerier(a.container, a.logger, mint, maxt, a.cfg, a.partitionMngr), nil
 }
 
 type v3ioAppender struct {

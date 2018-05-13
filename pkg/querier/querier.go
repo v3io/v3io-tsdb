@@ -32,19 +32,19 @@ import (
 
 // Create a new Querier interface
 func NewV3ioQuerier(container *v3io.Container, logger logger.Logger, mint, maxt int64,
-	keymap *map[string]bool, cfg *config.V3ioConfig, partMngr *partmgr.PartitionManager) *V3ioQuerier {
+	cfg *config.V3ioConfig, partMngr *partmgr.PartitionManager) *V3ioQuerier {
 	newQuerier := V3ioQuerier{container: container, mint: mint, maxt: maxt,
-		logger: logger.GetChild("Querier"), Keymap: keymap, cfg: cfg}
+		logger: logger.GetChild("Querier"), cfg: cfg}
 	newQuerier.partitionMngr = partMngr
 	return &newQuerier
 }
 
 type V3ioQuerier struct {
-	logger        logger.Logger
-	container     *v3io.Container
-	cfg           *config.V3ioConfig
-	mint, maxt    int64
-	Keymap        *map[string]bool // link to Appender metric names, TODO: use queries instead
+	logger     logger.Logger
+	container  *v3io.Container
+	cfg        *config.V3ioConfig
+	mint, maxt int64
+	//Keymap        *map[string]bool // link to Appender metric names, TODO: use queries instead
 	partitionMngr *partmgr.PartitionManager
 	overlapWin    []int
 }
@@ -112,10 +112,23 @@ func (q *V3ioQuerier) selectQry(functions string, step int64, win []int, filter 
 // return the current metric names, TODO: read from DB vs from local cache
 func (q *V3ioQuerier) LabelValues(name string) ([]string, error) {
 	list := []string{}
-	for k, _ := range *q.Keymap {
-		list = append(list, k)
+	//for k, _ := range *q.Keymap {
+	//	list = append(list, k)
+	//}
+
+	input := v3io.GetItemsInput{Path: q.cfg.Path + "/names/", AttributeNames: []string{"__name"}, Filter: ""}
+	iter, err := q.container.Sync.GetItemsCursor(&input)
+	q.logger.DebugWith("GetItems to read names", "input", input, "err", err)
+	if err != nil {
+		return list, err
 	}
-	return list, nil
+
+	for iter.Next() {
+		name := iter.GetField("__name").(string)
+		list = append(list, name)
+	}
+
+	return list, iter.Err()
 }
 
 func (q *V3ioQuerier) Close() error {
