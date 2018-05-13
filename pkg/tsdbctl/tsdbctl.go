@@ -5,7 +5,6 @@ import (
 
 	"github.com/nuclio/nuclio/pkg/errors"
 
-	"fmt"
 	"github.com/spf13/cobra"
 	"github.com/spf13/cobra/doc"
 	"github.com/v3io/v3io-tsdb/config"
@@ -48,6 +47,7 @@ func NewRootCommandeer() *RootCommandeer {
 		newAddCommandeer(commandeer).cmd,
 		newQueryCommandeer(commandeer).cmd,
 		newTimeCommandeer(commandeer).cmd,
+		newCreateCommandeer(commandeer).cmd,
 	)
 
 	commandeer.cmd = cmd
@@ -77,12 +77,10 @@ func (rc *RootCommandeer) initialize() error {
 	if err != nil {
 		return errors.Wrap(err, "Failed to load config")
 	}
-	fmt.Println(cfg)
 
-	rc.adapter = tsdb.NewV3ioAdapter(cfg, nil, nil)
-	err = rc.adapter.Start()
+	rc.adapter, err = tsdb.NewV3ioAdapter(cfg, nil, nil)
 	if err != nil {
-		return errors.Wrap(err, "Failed to start V3IO TSDB Adapter")
+		return errors.Wrap(err, "Failed to start TSDB Adapter")
 	}
 
 	return nil

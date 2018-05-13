@@ -49,8 +49,7 @@ func Handler(context *nuclio.Context, event nuclio.Event) (interface{}, error) {
 func InitContext(context *nuclio.Context) error {
 	cfg, _ := config.LoadFromData([]byte(tsdbConfig))
 	data := context.DataBinding["db0"].(*v3io.Container)
-	adapter := tsdb.NewV3ioAdapter(cfg, data, context.Logger)
-	err := adapter.Start()
+	adapter, err := tsdb.NewV3ioAdapter(cfg, data, context.Logger)
 	if err != nil {
 		return err
 	}

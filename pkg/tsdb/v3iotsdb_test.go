@@ -44,8 +44,7 @@ func TestTsdb(t *testing.T) {
 	}
 	fmt.Println(cfg)
 
-	adapter := NewV3ioAdapter(cfg, nil, nil)
-	err = adapter.Start()
+	adapter, err := NewV3ioAdapter(cfg, nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

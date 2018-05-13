@@ -23,8 +23,7 @@ func TestTsdb(t *testing.T) {
 	}
 	fmt.Println(cfg)
 
-	adapter := NewV3ioProm(cfg, nil, nil)
-	err = adapter.Start()
+	adapter, err := NewV3ioProm(cfg, nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

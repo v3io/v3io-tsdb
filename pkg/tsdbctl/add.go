@@ -40,7 +40,7 @@ func newAddCommandeer(rootCommandeer *RootCommandeer) *addCommandeer {
 
 			// initialize adapter
 			if err := rootCommandeer.initialize(); err != nil {
-				return errors.Wrap(err, "Failed to initialize root")
+				return err
 			}
 
 			return commandeer.add()

@@ -18,18 +18,19 @@ type V3ioPromAdapter struct {
 	db *tsdb.V3ioAdapter
 }
 
-func NewV3ioProm(cfg *config.TsdbConfig, container *v3io.Container, logger logger.Logger) *V3ioPromAdapter {
+func NewV3ioProm(cfg *config.V3ioConfig, container *v3io.Container, logger logger.Logger) (*V3ioPromAdapter, error) {
 
-	newAdapter := V3ioPromAdapter{db: tsdb.NewV3ioAdapter(cfg, container, logger)}
-	return &newAdapter
-}
-
-func (a *V3ioPromAdapter) Start() error {
-
-	return a.db.Start()
+	adapter, err := tsdb.NewV3ioAdapter(cfg, container, logger)
+	newAdapter := V3ioPromAdapter{db: adapter}
+	return &newAdapter, err
 }
 
 func (a *V3ioPromAdapter) Appender() (storage.Appender, error) {
+	err := a.db.MetricsCache.StartIfNeeded()
+	if err != nil {
+		return nil, err
+	}
+
 	newAppender := v3ioAppender{metricsCache: a.db.MetricsCache}
 	return newAppender, nil
 }

@@ -32,7 +32,7 @@ import (
 
 // Create a new Querier interface
 func NewV3ioQuerier(container *v3io.Container, logger logger.Logger, mint, maxt int64,
-	keymap *map[string]bool, cfg *config.TsdbConfig, partMngr *partmgr.PartitionManager) *V3ioQuerier {
+	keymap *map[string]bool, cfg *config.V3ioConfig, partMngr *partmgr.PartitionManager) *V3ioQuerier {
 	newQuerier := V3ioQuerier{container: container, mint: mint, maxt: maxt,
 		logger: logger.GetChild("Querier"), Keymap: keymap, cfg: cfg}
 	newQuerier.partitionMngr = partMngr
@@ -42,7 +42,7 @@ func NewV3ioQuerier(container *v3io.Container, logger logger.Logger, mint, maxt 
 type V3ioQuerier struct {
 	logger        logger.Logger
 	container     *v3io.Container
-	cfg           *config.TsdbConfig
+	cfg           *config.V3ioConfig
 	mint, maxt    int64
 	Keymap        *map[string]bool // link to Appender metric names, TODO: use queries instead
 	partitionMngr *partmgr.PartitionManager

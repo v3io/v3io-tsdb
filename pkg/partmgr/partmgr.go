@@ -30,8 +30,8 @@ import (
 )
 
 // Create new Partition Manager, for now confined to one Cyclic partition
-func NewPartitionMngr(cfg *config.TsdbConfig) *PartitionManager {
-	newMngr := &PartitionManager{cfg: cfg, cyclic: true, ignoreWrap: true}
+func NewPartitionMngr(cfg *config.DBPartConfig, path string) *PartitionManager {
+	newMngr := &PartitionManager{cfg: cfg, path: path, cyclic: true, ignoreWrap: true}
 	newMngr.headPartition = NewDBPartition(newMngr)
 	return newMngr
 }
@@ -40,7 +40,7 @@ func NewPartitionMngr(cfg *config.TsdbConfig) *PartitionManager {
 func NewDBPartition(pmgr *PartitionManager) *DBPartition {
 	newPart := DBPartition{
 		manager:       pmgr,
-		path:          pmgr.cfg.Path + "/0/", // TODO: format a string based on id & format
+		path:          pmgr.path + "/0/", // TODO: format a string based on id & format
 		partID:        1,
 		startTime:     0,
 		days:          pmgr.cfg.DaysPerObj,
@@ -61,7 +61,8 @@ func NewDBPartition(pmgr *PartitionManager) *DBPartition {
 
 type PartitionManager struct {
 	mtx           sync.RWMutex
-	cfg           *config.TsdbConfig
+	path          string
+	cfg           *config.DBPartConfig
 	headPartition *DBPartition
 	cyclic        bool
 	ignoreWrap    bool

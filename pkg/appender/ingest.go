@@ -57,11 +57,12 @@ func (m *MetricState) Err() error {
 
 // store the state and metadata for all the metrics
 type MetricsCache struct {
-	cfg           *config.TsdbConfig
+	cfg           *config.V3ioConfig
 	partitionMngr *partmgr.PartitionManager
 	mtx           sync.RWMutex
 	container     *v3io.Container
 	logger        logger.Logger
+	started       bool
 
 	responseChan    chan *v3io.Response
 	getRespChan     chan *v3io.Response
@@ -74,7 +75,7 @@ type MetricsCache struct {
 	NameLabelMap map[string]bool // temp store all lable names
 }
 
-func NewMetricsCache(container *v3io.Container, logger logger.Logger, cfg *config.TsdbConfig,
+func NewMetricsCache(container *v3io.Container, logger logger.Logger, cfg *config.V3ioConfig,
 	partMngr *partmgr.PartitionManager) *MetricsCache {
 	newCache := MetricsCache{container: container, logger: logger, cfg: cfg, partitionMngr: partMngr}
 	newCache.cacheMetricMap = map[uint64]*MetricState{}
@@ -94,9 +95,21 @@ type asyncAppend struct {
 	v      interface{}
 }
 
+func (mc *MetricsCache) StartIfNeeded() error {
+	if !mc.started {
+		err := mc.start()
+		if err != nil {
+			return errors.Wrap(err, "Failed to start Appender loop")
+		}
+		mc.started = true
+	}
+
+	return nil
+}
+
 // loop for handling metric events (appends and Get/Update DB responses)
 // TODO: we can use multiple Go routines and spread the metrics across based on Hash LSB
-func (mc *MetricsCache) Start() error {
+func (mc *MetricsCache) start() error {
 
 	go func() {
 		for {

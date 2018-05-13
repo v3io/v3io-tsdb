@@ -22,6 +22,7 @@ package tsdb
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"github.com/nuclio/logger"
 	"github.com/pkg/errors"
@@ -34,69 +35,105 @@ import (
 	"time"
 )
 
+const DB_VERSION = "1.0"
+
 type V3ioAdapter struct {
 	startTimeMargin int64
 	logger          logger.Logger
 	container       *v3io.Container
 	MetricsCache    *appender.MetricsCache
-	cfg             *config.TsdbConfig
+	cfg             *config.V3ioConfig
 	partitionMngr   *partmgr.PartitionManager
+}
+
+func CreateTSDB(v3iocfg *config.V3ioConfig, path string, dbconfig *config.DBPartConfig) error {
+
+	logger, _ := utils.NewLogger(v3iocfg.Verbose)
+	container, err := utils.CreateContainer(logger, v3iocfg.V3ioUrl, v3iocfg.Container, v3iocfg.Workers)
+	if err != nil {
+		return errors.Wrap(err, "Failed to create data container")
+	}
+
+	dbconfig.Signature = "TSDB"
+	dbconfig.Version = DB_VERSION
+
+	data, err := json.Marshal(dbconfig)
+	if err != nil {
+		return errors.Wrap(err, "Failed to Marshal DB config")
+	}
+
+	err = container.Sync.PutObject(&v3io.PutObjectInput{Path: path + "/dbconfig.json", Body: data})
+
+	return err
 }
 
 // Create a new TSDB Adapter, similar to Prometheus TSDB Adapter with few extensions
 // Prometheus compliant Adapter is under /promtsdb
-func NewV3ioAdapter(cfg *config.TsdbConfig, container *v3io.Container, logger logger.Logger) *V3ioAdapter {
+func NewV3ioAdapter(cfg *config.V3ioConfig, container *v3io.Container, logger logger.Logger) (*V3ioAdapter, error) {
 
+	var err error
 	newV3ioAdapter := V3ioAdapter{}
 	newV3ioAdapter.cfg = cfg
 	if logger != nil {
 		newV3ioAdapter.logger = logger
 	} else {
-		newV3ioAdapter.logger, _ = utils.NewLogger(cfg.Verbose)
+		newV3ioAdapter.logger, err = utils.NewLogger(cfg.Verbose)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	if container != nil {
 		newV3ioAdapter.container = container
 	} else {
-		newV3ioAdapter.container, _ = utils.CreateContainer(newV3ioAdapter.logger,
+		newV3ioAdapter.container, err = utils.CreateContainer(newV3ioAdapter.logger,
 			cfg.V3ioUrl, cfg.Container, cfg.Workers)
+		if err != nil {
+			return nil, errors.Wrap(err, "Failed to create V3IO data container")
+		}
 	}
 
-	return &newV3ioAdapter
+	err = newV3ioAdapter.connect(cfg.Path)
+
+	return &newV3ioAdapter, err
 }
 
-// initialize the adapter and start event loops
-func (a *V3ioAdapter) Start() error {
-	msg := fmt.Sprintf("\nStarting V3IO TSDB client, server is at : %s/%s/%s\n",
-		a.cfg.V3ioUrl, a.cfg.Container, a.cfg.Path)
-	fmt.Println(msg)
+func (a *V3ioAdapter) connect(path string) error {
+
+	fullpath := a.cfg.V3ioUrl + "/" + a.cfg.Container + "/" + path
+	resp, err := a.container.Sync.GetObject(&v3io.GetObjectInput{Path: path})
+	if err != nil {
+		return errors.Wrap(err, "Failed to read DB config at path: "+fullpath)
+	}
+
+	dbcfg := config.DBPartConfig{}
+	err = json.Unmarshal(resp.Body(), &dbcfg)
+	if err != nil {
+		return errors.Wrap(err, "Failed to Unmarshal DB config at path: "+fullpath)
+	}
+
+	a.partitionMngr = partmgr.NewPartitionMngr(&dbcfg, path)
+	err = a.partitionMngr.Init()
+	if err != nil {
+		return errors.Wrap(err, "Failed to init DB partition manager at path: "+fullpath)
+	}
+
+	msg := "Starting V3IO TSDB client, server is at : " + fullpath
+	fmt.Printf("\n%s\n\n", msg)
 	a.logger.Info(msg)
 
-	a.partitionMngr = partmgr.NewPartitionMngr(a.cfg)
-	err := a.partitionMngr.Init()
-	if err != nil {
-		return err
-	}
-
 	a.MetricsCache = appender.NewMetricsCache(a.container, a.logger, a.cfg, a.partitionMngr)
-
-	err = a.MetricsCache.Start()
-	if err != nil {
-		return err
-	}
-
-	_, err = a.container.Sync.ListBucket(&v3io.ListBucketInput{})
-
-	if err != nil {
-		a.logger.ErrorWith("Failed to access v3io container", "url", a.cfg.V3ioUrl, "err", err)
-		return errors.Wrap(err, "Failed to access v3io container")
-	}
 
 	return nil
 }
 
 // Create an appender interface, for writing metrics
 func (a *V3ioAdapter) Appender() (Appender, error) {
+	err := a.MetricsCache.StartIfNeeded()
+	if err != nil {
+		return nil, err
+	}
+
 	newAppender := v3ioAppender{metricsCache: a.MetricsCache}
 	return newAppender, nil
 }
