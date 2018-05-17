@@ -54,7 +54,7 @@ type DBPartConfig struct {
 	// Description of this TSDB
 	Description string `json:"description,omitempty"`
 	// Partition Key, __name__ by default
-	PartitionKey string `json:"partitionKey,omitempty"`
+	ShardingKey string `json:"partitionKey,omitempty"`
 	// Sorting Key, dimensions used for sorting per DB shard
 	SortingKey string `json:"sortingKey,omitempty"`
 	// indicate if it is cyclic (single partition, return to first chunk after the last)
@@ -62,9 +62,14 @@ type DBPartConfig struct {
 	// Number of hours per chunk (1hr default)
 	HrInChunk int `json:"hrInChunk,omitempty"`
 	// Days per table/object (in a partition), after N days will use a new table or go to start (Cyclic partition)
+	// this is used only for the Head configuration, per partition we look at StartTime & EndTime
 	DaysPerObj int `json:"daysPerObj,omitempty"`
 	// How many days to save samples
 	DaysRetention int `json:"daysRetention,omitempty"`
+	// Start from time/date in Unix milisec
+	StartTime int64 `json:"startTime,omitempty"`
+	// End by time/date in Unix milisec
+	EndTime int64 `json:"endTime,omitempty"`
 	// Partition name format e.g. 'dd-mm-yy'
 	PartFormat string `json:"partFormat,omitempty"`
 
