@@ -1,7 +1,7 @@
 # V3IO-TSDB
 iguazio API lib for time-series DB access and Prometheus TSDB storage driver. 
 
-> Note: This project is still under development, it requiers the latest 1.7 release of iguazio DB (with Blob functions)
+> Note: This project is still under development, it requires the latest 1.7 release of iguazio DB (with Blob functions)
 
 ## Overview
 iguazio provides a real-time flexible document database engine which accelerates popular BigData and open-source 
@@ -13,9 +13,9 @@ a unique low-level design with highly parallel processing and OS bypass which tr
 iguazio DB low-level APIs (v3io) has rich API semantics and multiple indexing types, those allow it to run multiple
 workloads and processing engines on exactly the same data, and consistently read/write the data in different tools.
 
-This project uses v3io semantics (row & col layouts, arrays, random & sequential indexes, etc.) to provide extreamly
+This project uses v3io semantics (row & col layouts, arrays, random & sequential indexes, etc.) to provide extremely 
 fast and scalable Time Series database engine which can be accessed simultaneously by multiple engines and APIs, such as:
-- Prometheus TimeSeries DB (for metrics scraping & queries)
+- [Prometheus](https://prometheus.io/) Time Series DB (for metrics scraping & queries)
 - [nuclio](https://github.com/nuclio/nuclio) serverless functions (for real-time ingestion, stream processing or queries) 
 - iguazio DynamoDB API (with extensions) 
 - Apache Presto & Spark (future item, for SQL & AI)
@@ -23,8 +23,8 @@ fast and scalable Time Series database engine which can be accessed simultaneous
 
 [nuclio](https://github.com/nuclio/nuclio) supports HTTP and a large variety of streaming/triggering options (Kafka, Kinesis
 , Azure event-hub, RabbitMQ, NATS, iguazio streams, MQTT, Cron tasks), it provides automatic deployment and auto-scaling 
-enabeling ingestion from variety of sources at endless scalability. using nuclio functions can be customized to pre-process 
-incoming data e.g. examin metric data, alert, convert formarts, etc.  
+enabling ingestion from variety of sources at endless scalability. using nuclio functions can be customized to pre-process 
+incoming data e.g. examine metric data, alert, convert formats, etc.  
 
 <br>
 
@@ -60,7 +60,7 @@ link latency.
 
 ## How To Use  
 
-the code is separated to prometheus complient adapter in [/promtsdb](promtsdb) and more generic/advanced adapter in 
+the code is separated to Prometheus compliant adapter in [/promtsdb](promtsdb) and more generic/advanced adapter in 
 [/pkg/tsdb](pkg/tsdb), you should use the later for custom functions and code. see a full usage example in 
 [v3iotsdb_test.go](/pkg/tsdb/v3iotsdb_test.go), both have similar semantics.
 
@@ -126,7 +126,7 @@ container: "tsdb"
 path: "metrics"
 ```
 
-example of creating an adpapter:
+example of creating an adapter:
 
 ```go
 	// create configuration object from file
@@ -156,7 +156,7 @@ Example:
 		panic(err)
 	}
 
-	// create metrics labels, `__name__` lable specify the metric name (e.g. cpu, temperature, ..), the other labels can be
+	// create metrics labels, `__name__` label specify the metric name (e.g. cpu, temperature, ..), the other labels can be
 	// used in searches (filtering or grouping) or aggregations  
 	lset := utils.Labels{utils.Label{Name: "__name__", Value: "http_req"},
 		utils.Label{Name: "method", Value: "post"}}
