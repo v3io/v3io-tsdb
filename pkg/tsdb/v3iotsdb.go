@@ -108,6 +108,10 @@ func (a *V3ioAdapter) GetDBConfig() *config.DBPartConfig {
 	return a.partitionMngr.GetConfig()
 }
 
+func (a *V3ioAdapter) GetLogger(child string) logger.Logger {
+	return a.logger.GetChild(child)
+}
+
 func (a *V3ioAdapter) connect() error {
 
 	fullpath := a.cfg.V3ioUrl + "/" + a.cfg.Container + "/" + a.cfg.Path

@@ -56,8 +56,7 @@ func TestTsdb(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	lset := utils.Labels{utils.Label{Name: "__name__", Value: "http_req"},
-		utils.Label{Name: "method", Value: "post"}}
+	lset := utils.FromStrings("__name__","http_req", "method", "post")
 
 	err = DoAppend(lset, appender, 50, 30)
 	if err != nil {

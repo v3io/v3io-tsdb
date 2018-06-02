@@ -11,10 +11,12 @@ import (
 	"github.com/v3io/v3io-tsdb/config"
 	"github.com/v3io/v3io-tsdb/pkg/tsdb"
 	"strings"
+	"github.com/nuclio/logger"
 )
 
 type RootCommandeer struct {
 	adapter     *tsdb.V3ioAdapter
+	logger      logger.Logger
 	v3iocfg     *config.V3ioConfig
 	cmd         *cobra.Command
 	v3ioPath    string
@@ -112,6 +114,8 @@ func (rc *RootCommandeer) startAdapter() error {
 	if err != nil {
 		return errors.Wrap(err, "Failed to start TSDB Adapter")
 	}
+
+	rc.logger = rc.adapter.GetLogger("cli")
 
 	return nil
 

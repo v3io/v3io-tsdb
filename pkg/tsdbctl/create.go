@@ -26,11 +26,6 @@ func newCreateCommandeer(rootCommandeer *RootCommandeer) *createCommandeer {
 		Short: "create a new TSDB in the specifies path",
 		RunE: func(cmd *cobra.Command, args []string) error {
 
-			// initialize params
-			if err := rootCommandeer.initialize(); err != nil {
-				return err
-			}
-
 			return commandeer.create()
 
 		},
@@ -48,6 +43,11 @@ func newCreateCommandeer(rootCommandeer *RootCommandeer) *createCommandeer {
 }
 
 func (cc *createCommandeer) create() error {
+
+	// initialize params
+	if err := cc.rootCommandeer.initialize(); err != nil {
+		return err
+	}
 
 	dbcfg := config.DBPartConfig{
 		DaysPerObj:     cc.daysPerObj,

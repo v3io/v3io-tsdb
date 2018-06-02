@@ -24,14 +24,6 @@ func newInfoCommandeer(rootCommandeer *RootCommandeer) *infoCommandeer {
 		RunE: func(cmd *cobra.Command, args []string) error {
 
 			// initialize params
-			if err := rootCommandeer.initialize(); err != nil {
-				return err
-			}
-
-			if err := rootCommandeer.startAdapter(); err != nil {
-				return err
-			}
-
 			return commandeer.info()
 		},
 	}
@@ -44,6 +36,15 @@ func newInfoCommandeer(rootCommandeer *RootCommandeer) *infoCommandeer {
 }
 
 func (ic *infoCommandeer) info() error {
+
+	if err := ic.rootCommandeer.initialize(); err != nil {
+		return err
+	}
+
+	if err := ic.rootCommandeer.startAdapter(); err != nil {
+		return err
+	}
+
 	dbconfig := ic.rootCommandeer.adapter.GetDBConfig()
 	info, err := yaml.Marshal(dbconfig)
 	if err != nil {

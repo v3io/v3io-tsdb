@@ -1,7 +1,6 @@
 package tsdbctl
 
 import (
-	"encoding/json"
 	"fmt"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
@@ -10,11 +9,13 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"sort"
 )
 
 type addCommandeer struct {
 	cmd            *cobra.Command
 	rootCommandeer *RootCommandeer
+	name           string
 	lset           string
 	tArr           string
 	vArr           string
@@ -26,25 +27,20 @@ func newAddCommandeer(rootCommandeer *RootCommandeer) *addCommandeer {
 	}
 
 	cmd := &cobra.Command{
-		Use:     "add metric",
+		Use:     "add metric [labels] [flags]",
 		Aliases: []string{"append"},
-		Short:   "add samples to metric",
+		Short:   "add samples to metric. e.g. add http_req method=get -d 99.9",
 		RunE: func(cmd *cobra.Command, args []string) error {
 
 			// if we got positional arguments
-			if len(args) != 1 {
-				return errors.New("add require metric labels")
+			if len(args) == 0 {
+				return errors.New("add require metric name and/or labels")
 			}
 
-			commandeer.lset = args[0]
+			commandeer.name = args[0]
 
-			// initialize params and adapter
-			if err := rootCommandeer.initialize(); err != nil {
-				return err
-			}
-
-			if err := rootCommandeer.startAdapter(); err != nil {
-				return err
+			if len(args) > 1 {
+				commandeer.lset = args[1]
 			}
 
 			return commandeer.add()
@@ -62,13 +58,29 @@ func newAddCommandeer(rootCommandeer *RootCommandeer) *addCommandeer {
 
 func (ac *addCommandeer) add() error {
 
-	lset := utils.Labels{}
-	fmt.Println("str:", ac.lset)
-	//err := json.Unmarshal([]byte(`{"__name__":"cpu","os":"win","node":"xyz123"}`), &lset)
-	err := json.Unmarshal([]byte(ac.lset), &lset)
-	if err != nil {
-		return errors.Wrap(err, "cant unmarshal labels")
+	var err error
+	// initialize params and adapter
+	if err = ac.rootCommandeer.initialize(); err != nil {
+		return err
 	}
+
+	if err = ac.rootCommandeer.startAdapter(); err != nil {
+		return err
+	}
+
+	lset := utils.Labels{utils.Label{Name:"__name__", Value: ac.name}}
+
+	if ac.lset != "" {
+		splitLset := strings.Split(ac.lset, ",")
+		for _, l := range splitLset {
+			splitLbl := strings.Split(l, "=")
+			if len(splitLbl) != 2 {
+				return errors.Wrap(err, "labels must be in the form: key1=label1,key2=label2,...")
+			}
+			lset = append(lset, utils.Label{Name:splitLbl[0], Value: splitLbl[1]})
+		}
+	}
+	sort.Sort(lset)
 
 	if ac.vArr == "" {
 		return errors.Wrap(err, "must have at least one value")
@@ -115,6 +127,8 @@ func (ac *addCommandeer) add() error {
 			tarray = append(tarray, int64(t))
 		}
 	}
+
+	ac.rootCommandeer.logger.DebugWith("adding value to metric", "lset", lset, "t", tarray, "v", varray)
 
 	fmt.Println("add:", lset, tarray, varray)
 	append, err := ac.rootCommandeer.adapter.Appender()

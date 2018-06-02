@@ -13,6 +13,7 @@ import (
 type queryCommandeer struct {
 	cmd            *cobra.Command
 	rootCommandeer *RootCommandeer
+	name           string
 	filter         string
 	//to             string
 	//from           string
@@ -28,27 +29,14 @@ func newQueryCommandeer(rootCommandeer *RootCommandeer) *queryCommandeer {
 	}
 
 	cmd := &cobra.Command{
-		Use:     "query filter",
+		Use:     "query name [flags]",
 		Aliases: []string{"get"},
 		Short:   "query time series metrics",
 		RunE: func(cmd *cobra.Command, args []string) error {
 
 			// if we got positional arguments
-			if len(args) != 1 {
-				return errors.New("query require a filter string or '*'")
-			}
-
-			if args[0] != "*" {
-				commandeer.filter = args[0]
-			}
-
-			// initialize psrsmd snd adapter
-			if err := rootCommandeer.initialize(); err != nil {
-				return err
-			}
-
-			if err := rootCommandeer.startAdapter(); err != nil {
-				return err
+			if len(args) > 0 {
+				commandeer.name = args[0]
 			}
 
 			return commandeer.query()
@@ -58,9 +46,11 @@ func newQueryCommandeer(rootCommandeer *RootCommandeer) *queryCommandeer {
 
 	//cmd.Flags().StringVarP(&commandeer.to, "to", "t", "", "to time")
 	//cmd.Flags().StringVarP(&commandeer.from, "from", "f", "", "from time")
+	cmd.Flags().StringVarP(&commandeer.filter, "filter", "f", "", "last min/hours/days e.g. 15m")
 	cmd.Flags().StringVarP(&commandeer.last, "last", "l", "", "last min/hours/days e.g. 15m")
 	cmd.Flags().StringVarP(&commandeer.windows, "windows", "w", "", "comma separated list of overlapping windows")
-	cmd.Flags().StringVarP(&commandeer.functions, "functions", "f", "", "comma separated list of aggregation functions")
+	cmd.Flags().StringVarP(&commandeer.functions, "aggregators", "a", "",
+		"comma separated list of aggregation functions, e.g. count,avg,sum,min,max,stddev,stdvar")
 	cmd.Flags().StringVarP(&commandeer.step, "step", "i", "", "interval step for aggregation functions")
 
 	commandeer.cmd = cmd
@@ -69,6 +59,18 @@ func newQueryCommandeer(rootCommandeer *RootCommandeer) *queryCommandeer {
 }
 
 func (qc *queryCommandeer) query() error {
+
+	if qc.name == "" && qc.filter == "" {
+		return errors.New("query must have a metric name or filter string")
+	}
+	// initialize psrsmd snd adapter
+	if err := qc.rootCommandeer.initialize(); err != nil {
+		return err
+	}
+
+	if err := qc.rootCommandeer.startAdapter(); err != nil {
+		return err
+	}
 
 	step, err := str2duration(qc.step)
 	if err != nil {
@@ -86,6 +88,9 @@ func (qc *queryCommandeer) query() error {
 		from = to - last
 	}
 
+	qc.rootCommandeer.logger.DebugWith("Query", "from", from, "to", to, "name", qc.name,
+		"filter", qc.filter, "functions", qc.functions, "step", qc.step)
+
 	fmt.Println("Qry:", from, to, qc.filter)
 	qry, err := qc.rootCommandeer.adapter.Querier(nil, from, to)
 	if err != nil {
@@ -94,7 +99,7 @@ func (qc *queryCommandeer) query() error {
 
 	var set querier.SeriesSet
 	if qc.windows == "" {
-		set, err = qry.Select(qc.functions, step, qc.filter)
+		set, err = qry.Select(qc.name, qc.functions, step, qc.filter)
 	} else {
 		list := strings.Split(qc.windows, ",")
 		win := []int{}
@@ -107,7 +112,7 @@ func (qc *queryCommandeer) query() error {
 
 		}
 
-		set, err = qry.SelectOverlap(qc.functions, step, win, qc.filter)
+		set, err = qry.SelectOverlap(qc.name, qc.functions, step, win, qc.filter)
 	}
 
 	if err != nil {
@@ -144,7 +149,8 @@ func (qc *queryCommandeer) printSet(set querier.SeriesSet) error {
 }
 
 func str2duration(duration string) (int64, error) {
-	multiply := 3600 * 1000
+
+	multiply := 3600 * 1000  // hour by default
 	if len(duration) > 0 {
 		last := duration[len(duration)-1:]
 		if last == "m" || last == "h" || last == "d" {
