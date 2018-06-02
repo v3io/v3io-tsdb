@@ -34,7 +34,7 @@ import (
 var basetime int64
 
 func TestTsdb(t *testing.T) {
-	basetime = time.Now().Unix() * 1000
+	basetime = time.Now().Unix() * 1000 - 3600000  // now - 1hr
 
 	d, h := partmgr.TimeToDHM(basetime)
 	fmt.Println("base=", d, h)
@@ -64,15 +64,15 @@ func TestTsdb(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	//time.Sleep(time.Second * 5)
+	time.Sleep(time.Second * 2)
 	//return
 
-	qry, err := adapter.Querier(nil, basetime-2*3600*1000, basetime)
+	qry, err := adapter.Querier(nil, basetime-6*3600*1000, basetime+2*3600*1000)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	set, err := qry.Select("", 0, "_name=='http_req'")
+	set, err := qry.Select("http_req", "", 0, "")
 	//set, err := qry.Select("count,avg,sum", 1000*3600, "_name=='http_req'")
 	//set, err := qry.SelectOverlap("count,avg,sum,max", 1000*3600, []int{4, 2, 1}, "_name=='http_req'")
 	if err != nil {

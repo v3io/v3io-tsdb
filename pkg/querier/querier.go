@@ -50,19 +50,19 @@ type V3ioQuerier struct {
 }
 
 // Standard Time Series Query, return a set of series which match the condition
-func (q *V3ioQuerier) Select(functions string, step int64, filter string) (SeriesSet, error) {
-	return q.selectQry(functions, step, nil, filter)
+func (q *V3ioQuerier) Select(name, functions string, step int64, filter string) (SeriesSet, error) {
+	return q.selectQry(name, functions, step, nil, filter)
 }
 
 // Overlapping windows Time Series Query, return a set of series each with a list of aggregated results per window
 // e.g. get the last 1hr, 6hr, 24hr stats per metric (specify a 1hr step of 3600*1000, 1,6,24 windows, and max time)
-func (q *V3ioQuerier) SelectOverlap(functions string, step int64, win []int, filter string) (SeriesSet, error) {
+func (q *V3ioQuerier) SelectOverlap(name, functions string, step int64, win []int, filter string) (SeriesSet, error) {
 	sort.Sort(sort.Reverse(sort.IntSlice(win)))
-	return q.selectQry(functions, step, win, filter)
+	return q.selectQry(name, functions, step, win, filter)
 }
 
 // base query function
-func (q *V3ioQuerier) selectQry(functions string, step int64, win []int, filter string) (SeriesSet, error) {
+func (q *V3ioQuerier) selectQry(name, functions string, step int64, win []int, filter string) (SeriesSet, error) {
 
 	// TODO: use special match for aggregates (allow to flexible qry from Prom)
 
@@ -73,7 +73,7 @@ func (q *V3ioQuerier) selectQry(functions string, step int64, win []int, filter 
 	if q.partitionMngr.IsCyclic() {
 		partition := q.partitionMngr.GetHead()
 		mint = partition.CyclicMinTime(mint, maxt)
-		q.logger.DebugWith("Select - new cyclic series", "from", mint, "to", maxt, "filter", filter)
+		q.logger.DebugWith("Select - new cyclic series", "from", mint, "to", maxt, "name", name, "filter", filter)
 		newSet := &V3ioSeriesSet{mint: mint, maxt: maxt, partition: partition, logger: q.logger}
 
 		if functions != "" && step == 0 && partition.RollupTime() != 0 {
@@ -93,7 +93,7 @@ func (q *V3ioQuerier) selectQry(functions string, step int64, win []int, filter 
 			newSet.overlapWin = q.overlapWin
 		}
 
-		err = newSet.getItems(partition.GetPath(), filter, q.container)
+		err = newSet.getItems(partition.GetPath(), name, filter, q.container)
 		if err != nil {
 			return nil, err
 		}
@@ -162,7 +162,7 @@ type V3ioSeriesSet struct {
 
 // Get relevant items & attributes from the DB, and create an iterator
 // TODO: get items per partition + merge, per partition calc attrs
-func (s *V3ioSeriesSet) getItems(path, filter string, container *v3io.Container) error {
+func (s *V3ioSeriesSet) getItems(path, name, filter string, container *v3io.Container) error {
 
 	attrs := []string{"_lset", "_meta", "_name", "_maxtime"}
 
@@ -173,8 +173,8 @@ func (s *V3ioSeriesSet) getItems(path, filter string, container *v3io.Container)
 	}
 	attrs = append(attrs, s.attrs...)
 
-	s.logger.DebugWith("Select - GetItems", "path", path, "attr", attrs, "filter", filter)
-	input := v3io.GetItemsInput{Path: path, AttributeNames: attrs, Filter: filter}
+	s.logger.DebugWith("Select - GetItems", "path", path, "attr", attrs, "filter", filter, "name", name)
+	input := v3io.GetItemsInput{Path: path, AttributeNames: attrs, Filter: filter, ShardingKey: name}
 	iter, err := container.Sync.GetItemsCursor(&input)
 	//iter, err := utils.NewItemsCursor(container, &input)
 	if err != nil {
