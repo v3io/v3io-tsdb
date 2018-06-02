@@ -78,10 +78,10 @@ it has built-in help, see the following add/query examples:
 
 ```
 	# display all the CPU metrics for win servers from the last hours 
-	tsdbctl query "__name__=='cpu' and os=='win" -l 1h
+	tsdbctl query cpu -f "os=='win'" -l 1h
 
-	# append a sample (73) to the specified metric at the current time
-	tsdbctl add '{"__name__":"cpu","os":"win","node":"xyz123"}' -d 73
+	# append a sample (73.2) to the specified metric type (cpu) + labels at the current time
+	tsdbctl add cpu os=win,node=xyz123 -d 73.2
 ```
 
 For use with nuclio function you can see function example under [\nuclio](nuclio)
@@ -156,10 +156,10 @@ Example:
 		panic(err)
 	}
 
-	// create metrics labels, `__name__` label specify the metric name (e.g. cpu, temperature, ..), the other labels can be
-	// used in searches (filtering or grouping) or aggregations  
-	lset := utils.Labels{utils.Label{Name: "__name__", Value: "http_req"},
-		utils.Label{Name: "method", Value: "post"}}
+	// create metrics labels, `__name__` label specify the metric type (e.g. cpu, temperature, ..)
+	// the other labels can be used in searches (filtering or grouping) or aggregations
+	// use utils.FromStrings(s ...string) for string list input or utils.FromMap(m map[string]string) for map input
+	lset := utils.FromStrings("__name__","http_req", "method", "post")
 
 	// Add a sample with current time (in milisec) and the value of 7.9
 	ref, err := appender.Add(lset, time.Now().Unix * 1000, 7.9)
@@ -183,7 +183,8 @@ return a list of series (as an iterator object).
 Every returned series have two interfaces, `Labels()` which returns the series or aggregator labels, and `Iterator()`
 which returns an iterator over the series or aggregator values.
 
-The `Select()` call accepts 3 parameters:
+The `Select()` call accepts 4 parameters:
+* name (string) - optional, metric type (e.g. cpu, memory, ..), specifying it accelerate performance (use range queries)   
 * functions (string) - optional, a comma separated list of aggregation functions e.g. `"count,sum,avg,stddev"`
 * step (int64) - optional, the step interval used for the aggregation functions in milisec 
 * filter (string) - V3IO GetItems filter string for selecting the desired metrics e.g. `__name__=='http_req'`
@@ -209,19 +210,19 @@ creating a querier:
 
 Simple select example (no aggregates):
 ```go
-	set, err := qry.Select("", 0, "__name__=='http_req'")
+	set, err := qry.Select("http_req", "", 0, "method=='post'")
 ```
 
 Select using aggregates:
 
 ```go
-	set, err := qry.Select("count,avg,sum,max", 1000*3600, "__name__=='http_req'")
+	set, err := qry.Select("http_req", "count,avg,sum,max", 1000*3600, "method=='post'")
 ```
 
 Using SelectOverlap (overlapping windows): 
 
 ```go
-	set, err := qry.SelectOverlap("count,avg,sum", 1000*3600, []int{24,6,1}, "__name__=='http_req'")
+	set, err := qry.SelectOverlap("http_req", "count,avg,sum", 1000*3600, []int{24,6,1}, "method=='post'")
 ```
 
 once we obtain a set using one of the methods above we can iterate over the set and the individual series in the following way:
