@@ -77,8 +77,14 @@ A user can run the CLI to add (append) or query the DB, to use the CLI, build th
 it has built-in help, see the following add/query examples:
 
 ```
-	# display all the CPU metrics for win servers from the last hours 
-	tsdbctl query cpu -f "os=='win'" -l 1h
+	# create a DB with some aggregates (at 30 min interval) 
+	tsdbctl create -p <path> -r count,sum,max -i 30
+
+	# display DB info with metric names (types) 
+	tsdbctl info -n
+
+	# display all the CPU metrics for win servers from the last hours, in CSV format 
+	tsdbctl query cpu -f "os=='win'" -l 1h -o csv
 
 	# append a sample (73.2) to the specified metric type (cpu) + labels at the current time
 	tsdbctl add cpu os=win,node=xyz123 -d 73.2

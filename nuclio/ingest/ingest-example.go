@@ -19,7 +19,7 @@ path: "pmetric"
 const pushEvent = `
 {
   "Lset": { "__name__":"cpu", "os" : "win", "node" : "xyz123"},
-  "Time" : 1000,
+  "Time" : 0,
   "Value" : 3.5
 }
 `
@@ -35,12 +35,16 @@ func Handler(context *nuclio.Context, event nuclio.Event) (interface{}, error) {
 	sample := Sample{}
 	err := json.Unmarshal(event.GetBody(), &sample)
 	if err != nil {
-
+		return nil, err
 	}
 	app := context.UserData.(tsdb.Appender)
 
 	// Add sample to metric, time is specified in Unix * 1000 (milisec)
-	_, err = app.Add(sample.Lset, time.Now().Unix()*1000, sample.Value)
+	t := sample.Time
+	if t == 0 {
+		t = time.Now().Unix()*1000
+	}
+	_, err = app.Add(sample.Lset,t , sample.Value)
 
 	return "", err
 }
