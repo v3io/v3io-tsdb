@@ -22,7 +22,7 @@ type RootCommandeer struct {
 	v3ioPath    string
 	dbPath      string
 	cfgFilePath string
-	verbose     bool
+	verbose     string
 }
 
 func NewRootCommandeer() *RootCommandeer {
@@ -42,7 +42,8 @@ func NewRootCommandeer() *RootCommandeer {
 		defaultCfgPath = "v3io.yaml"
 	}
 
-	cmd.PersistentFlags().BoolVarP(&commandeer.verbose, "verbose", "v", false, "Verbose output")
+	cmd.PersistentFlags().StringVarP(&commandeer.verbose, "verbose", "v", "", "Verbose output")
+	cmd.PersistentFlags().Lookup("verbose").NoOptDefVal = "debug"
 	cmd.PersistentFlags().StringVarP(&commandeer.dbPath, "dbpath", "p", "", "sub path for the TSDB, inside the container")
 	cmd.PersistentFlags().StringVarP(&commandeer.v3ioPath, "server", "s", defaultV3ioServer, "V3IO Service URL - ip:port/container")
 	cmd.PersistentFlags().StringVarP(&commandeer.cfgFilePath, "config", "c", defaultCfgPath, "path to yaml config file")
@@ -102,6 +103,10 @@ func (rc *RootCommandeer) initialize() error {
 
 	if cfg.V3ioUrl == "" || cfg.Container == "" || cfg.Path == "" {
 		return fmt.Errorf("User must provide V3IO URL, container name, and table path via the confif file or flags")
+	}
+
+	if rc.verbose != "" {
+		cfg.Verbose = rc.verbose
 	}
 
 	rc.v3iocfg = cfg

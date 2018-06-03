@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"github.com/v3io/v3io-tsdb/pkg/formatter"
 )
 
 type queryCommandeer struct {
@@ -21,6 +22,7 @@ type queryCommandeer struct {
 	windows   string
 	functions string
 	step      string
+	output    string
 }
 
 func newQueryCommandeer(rootCommandeer *RootCommandeer) *queryCommandeer {
@@ -46,6 +48,7 @@ func newQueryCommandeer(rootCommandeer *RootCommandeer) *queryCommandeer {
 
 	//cmd.Flags().StringVarP(&commandeer.to, "to", "t", "", "to time")
 	//cmd.Flags().StringVarP(&commandeer.from, "from", "f", "", "from time")
+	cmd.Flags().StringVarP(&commandeer.output, "output", "o", "", "output format: text,csv,json")
 	cmd.Flags().StringVarP(&commandeer.filter, "filter", "f", "", "last min/hours/days e.g. 15m")
 	cmd.Flags().StringVarP(&commandeer.last, "last", "l", "", "last min/hours/days e.g. 15m")
 	cmd.Flags().StringVarP(&commandeer.windows, "windows", "w", "", "comma separated list of overlapping windows")
@@ -91,7 +94,6 @@ func (qc *queryCommandeer) query() error {
 	qc.rootCommandeer.logger.DebugWith("Query", "from", from, "to", to, "name", qc.name,
 		"filter", qc.filter, "functions", qc.functions, "step", qc.step)
 
-	fmt.Println("Qry:", from, to, qc.filter)
 	qry, err := qc.rootCommandeer.adapter.Querier(nil, from, to)
 	if err != nil {
 		return errors.Wrap(err, "Failed to initialize Querier")
@@ -119,7 +121,15 @@ func (qc *queryCommandeer) query() error {
 		return errors.Wrap(err, "Select Failed")
 	}
 
-	return qc.printSet(set)
+	f, err := formatter.NewFormatter(qc.output, nil)
+	if err != nil {
+		return errors.Wrap(err, "failed to start formatter " + qc.output)
+	}
+
+	return f.Write(qc.cmd.OutOrStdout(), set)
+
+
+	//return qc.printSet(set)
 }
 
 func (qc *queryCommandeer) printSet(set querier.SeriesSet) error {
