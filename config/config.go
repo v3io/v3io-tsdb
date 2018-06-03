@@ -36,8 +36,8 @@ type V3ioConfig struct {
 
 	// Disable is use in Prometheus to disable v3io and work with the internal TSDB
 	Disabled bool `json:"disabled,omitempty"`
-	// True will turn on Debug mode
-	Verbose bool `json:"verbose,omitempty"`
+	// Set logging level: debug | info | warn | error (info by default)
+	Verbose  string `json:"verbose,omitempty"`
 	// Number of parallel V3IO worker routines
 	Workers int `json:"workers"`
 	// Max uncommitted (delayed) samples allowed per metric

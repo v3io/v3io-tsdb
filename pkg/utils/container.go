@@ -28,13 +28,21 @@ import (
 	"github.com/v3io/v3io-go-http"
 )
 
-func NewLogger(verbose bool) (logger.Logger, error) {
+func NewLogger(verbose string) (logger.Logger, error) {
 	var logLevel nucliozap.Level
-	if verbose {
+	switch verbose {
+	case "debug":
 		logLevel = nucliozap.DebugLevel
-	} else {
+	case "info":
+		logLevel = nucliozap.InfoLevel
+	case "warn":
 		logLevel = nucliozap.WarnLevel
+	case "error":
+		logLevel = nucliozap.ErrorLevel
+	default:
+		logLevel = nucliozap.InfoLevel
 	}
+
 	log, err := nucliozap.NewNuclioZapCmd("v3io-prom", logLevel)
 	if err != nil {
 		return nil, err

@@ -137,7 +137,6 @@ func (a *V3ioAdapter) connect() error {
 	}
 
 	msg := "Starting V3IO TSDB client, server is at : " + fullpath
-	fmt.Printf("\n%s\n\n", msg)
 	a.logger.Info(msg)
 
 	a.MetricsCache = appender.NewMetricsCache(a.container, a.logger, a.cfg, a.partitionMngr)
