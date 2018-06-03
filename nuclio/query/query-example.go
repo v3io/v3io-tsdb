@@ -85,7 +85,7 @@ func InitContext(context *nuclio.Context) error {
 		return err
 	}
 
-	// Store adapter in user cache 
+	// Store adapter in user cache
 	context.UserData = adapter
 	return nil
 }
