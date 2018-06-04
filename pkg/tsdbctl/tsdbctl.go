@@ -55,6 +55,7 @@ func NewRootCommandeer() *RootCommandeer {
 		newTimeCommandeer(commandeer).cmd,
 		newCreateCommandeer(commandeer).cmd,
 		newInfoCommandeer(commandeer).cmd,
+		newDeleteCommandeer(commandeer).cmd,
 	)
 
 	commandeer.cmd = cmd
@@ -83,7 +84,8 @@ func (rc *RootCommandeer) initialize() error {
 
 	if rc.cfgFilePath != "" {
 		cfg, err = config.LoadConfig(rc.cfgFilePath)
-		if err != nil {
+		if err != nil && rc.cfgFilePath != "v3io.yaml" {
+			// if we couldn't load the file and its not the default
 			return errors.Wrap(err, "Failed to load config from file "+rc.cfgFilePath)
 		}
 	}
@@ -102,7 +104,7 @@ func (rc *RootCommandeer) initialize() error {
 	}
 
 	if cfg.V3ioUrl == "" || cfg.Container == "" || cfg.Path == "" {
-		return fmt.Errorf("User must provide V3IO URL, container name, and table path via the confif file or flags")
+		return fmt.Errorf("User must provide V3IO URL, container name, and table path via the config file or flags")
 	}
 
 	if rc.verbose != "" {
@@ -119,6 +121,7 @@ func (rc *RootCommandeer) startAdapter() error {
 	if err != nil {
 		return errors.Wrap(err, "Failed to start TSDB Adapter")
 	}
+	fmt.Println("Started DB")
 
 	rc.logger = rc.adapter.GetLogger("cli")
 

@@ -82,3 +82,38 @@ func AsInt64Array(val []byte) []uint64 {
 	}
 	return array
 }
+
+
+func DeleteTable(container *v3io.Container, path string) error {
+
+	input := v3io.GetItemsInput{ Path: path, AttributeNames: []string{"__name"}}
+	iter, err := container.Sync.GetItemsCursor(&input)
+	if err != nil {
+		return err
+	}
+
+	responseChan := make(chan *v3io.Response, 1000)
+	reqMap := map[uint64]bool{}
+
+	for iter.Next() {
+		name := iter.GetField("__name").(string)
+		req, err := container.DeleteObject(&v3io.DeleteObjectInput{Path: path +"/" + name}, nil, responseChan)
+		if err != nil {
+			return errors.Wrap(err, "failed to delete object " + name)
+		}
+		reqMap[req.ID] = true
+	}
+
+	for len(reqMap) > 0 {
+		select {
+		case resp := <-responseChan:
+			if resp.Error != nil {
+				return errors.Wrap(err, "failed Delete response")
+			}
+
+			delete(reqMap, resp.ID)
+		}
+	}
+
+	return nil
+}

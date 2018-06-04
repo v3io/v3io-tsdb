@@ -36,6 +36,7 @@ import (
 )
 
 const DB_VERSION = "1.0"
+const DB_CONFIG_PATH = "/dbconfig.json"
 
 type V3ioAdapter struct {
 	startTimeMargin int64
@@ -63,12 +64,12 @@ func CreateTSDB(v3iocfg *config.V3ioConfig, dbconfig *config.DBPartConfig) error
 	}
 
 	// check if the config file already exist, abort if it does
-	_, err = container.Sync.GetObject(&v3io.GetObjectInput{Path: v3iocfg.Path + "/dbconfig.json"})
+	_, err = container.Sync.GetObject(&v3io.GetObjectInput{Path: v3iocfg.Path + DB_CONFIG_PATH})
 	if err == nil {
 		return fmt.Errorf("TSDB already exist in path: " + v3iocfg.Path)
 	}
 
-	err = container.Sync.PutObject(&v3io.PutObjectInput{Path: v3iocfg.Path + "/dbconfig.json", Body: data})
+	err = container.Sync.PutObject(&v3io.PutObjectInput{Path: v3iocfg.Path + DB_CONFIG_PATH, Body: data})
 
 	return err
 }
@@ -167,6 +168,39 @@ func (a *V3ioAdapter) Close() error {
 // create a querier interface, used for time series queries
 func (a *V3ioAdapter) Querier(_ context.Context, mint, maxt int64) (*querier.V3ioQuerier, error) {
 	return querier.NewV3ioQuerier(a.container, a.logger, mint, maxt, a.cfg, a.partitionMngr), nil
+}
+
+func (a *V3ioAdapter) DeleteDB(config bool, force bool) error {
+
+	path := a.partitionMngr.GetHead().GetPath()
+	a.logger.Info("Delete partition %s", path)
+	err := utils.DeleteTable(a.container, path)
+	if err != nil && !force {
+		return err
+	}
+	// delete the Directory object
+	a.container.Sync.DeleteObject(&v3io.DeleteObjectInput{Path: path})
+
+	path = a.cfg.Path + "/names/"
+	a.logger.Info("Delete metric names in path %s", path)
+	err = utils.DeleteTable(a.container, path)
+	if err != nil && !force {
+		return err
+	}
+	// delete the Directory object
+	a.container.Sync.DeleteObject(&v3io.DeleteObjectInput{Path: path})
+
+	if config {
+		a.logger.Info("Delete TSDB config in path %s", a.cfg.Path + DB_CONFIG_PATH)
+		err = a.container.Sync.DeleteObject(&v3io.DeleteObjectInput{Path: a.cfg.Path + DB_CONFIG_PATH})
+		if err != nil  && !force {
+			return errors.New("Cant delete config or not found in " + a.cfg.Path + DB_CONFIG_PATH)
+		}
+		// delete the Directory object
+		a.container.Sync.DeleteObject(&v3io.DeleteObjectInput{Path: a.cfg.Path + "/"})
+	}
+
+	return nil
 }
 
 type v3ioAppender struct {

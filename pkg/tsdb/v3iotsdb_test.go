@@ -109,7 +109,7 @@ func TestTsdb(t *testing.T) {
 }
 
 func DoAppend(lset utils.Labels, app Appender, num, interval int) error {
-	//return nil
+	return nil
 	//time.Sleep(time.Second * 1)
 	curTime := int64(basetime)
 
