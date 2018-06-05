@@ -121,7 +121,6 @@ func (rc *RootCommandeer) startAdapter() error {
 	if err != nil {
 		return errors.Wrap(err, "Failed to start TSDB Adapter")
 	}
-	fmt.Println("Started DB")
 
 	rc.logger = rc.adapter.GetLogger("cli")
 
