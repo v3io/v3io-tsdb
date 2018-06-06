@@ -266,7 +266,7 @@ func (mc *MetricsCache) addMetric(hash uint64, name string, metric *MetricState)
 	mc.cacheMetricMap[hash] = metric
 	if _, ok := mc.NameLabelMap[name]; !ok {
 		metric.newName = true
-		mc.NameLabelMap[name] = true // TODO: temporary until we get names from storage
+		mc.NameLabelMap[name] = true
 	}
 }
 

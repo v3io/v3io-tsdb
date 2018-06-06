@@ -44,7 +44,6 @@ type V3ioQuerier struct {
 	container  *v3io.Container
 	cfg        *config.V3ioConfig
 	mint, maxt int64
-	//Keymap        *map[string]bool // link to Appender metric names, TODO: use queries instead
 	partitionMngr *partmgr.PartitionManager
 	overlapWin    []int
 }
@@ -63,8 +62,6 @@ func (q *V3ioQuerier) SelectOverlap(name, functions string, step int64, win []in
 
 // base query function
 func (q *V3ioQuerier) selectQry(name, functions string, step int64, win []int, filter string) (SeriesSet, error) {
-
-	// TODO: use special match for aggregates (allow to flexible qry from Prom)
 
 	filter = strings.Replace(filter, "__name__", "_name", -1)
 	q.logger.DebugWith("Select query", "func", functions, "step", step, "filter", filter)
@@ -109,7 +106,7 @@ func (q *V3ioQuerier) selectQry(name, functions string, step int64, win []int, f
 	return nullSeriesSet{}, nil
 }
 
-// return the current metric names, TODO: read from DB vs from local cache
+// return the current metric names
 func (q *V3ioQuerier) LabelValues(name string) ([]string, error) {
 	list := []string{}
 	//for k, _ := range *q.Keymap {

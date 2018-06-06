@@ -214,7 +214,7 @@ func (cs *chunkStore) ProcessGetResp(mc *MetricsCache, metric *MetricState, resp
 // Append data to the right chunk and table based on the time and state
 func (cs *chunkStore) Append(t int64, v interface{}) {
 
-	cs.pending = append(cs.pending, pendingData{t: t, v: v}) // TODO make it prime option
+	cs.pending = append(cs.pending, pendingData{t: t, v: v})
 
 }
 

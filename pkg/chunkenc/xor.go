@@ -126,7 +126,7 @@ func (c *XORChunk) Appender() (Appender, error) {
 	return a, nil
 }
 
-// old Appender TODO: do we need to append to existing bugger? maybe in stateless/slow clients
+/* old Appender TODO: do we need to append to existing buffer? maybe in stateless/slow clients
 func (c *XORChunk) aAppender() (Appender, error) {
 	it := c.iterator()
 
@@ -154,6 +154,7 @@ func (c *XORChunk) aAppender() (Appender, error) {
 	}
 	return a, nil
 }
+*/
 
 func (c *XORChunk) iterator() *xorIterator {
 	// Should iterators guarantee to act on a copy of the data so it doesn't lock append?
@@ -234,7 +235,7 @@ func (a *xorAppender) Append(t int64, v float64) {
 	(*a.samples)++
 	a.tDelta = tDelta
 
-	a.b.padToByte() // TODO: pad, align to next byte
+	a.b.padToByte()
 }
 
 func bitRange(x int64, nbits uint8) bool {
