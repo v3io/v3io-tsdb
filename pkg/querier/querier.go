@@ -28,6 +28,7 @@ import (
 	"github.com/v3io/v3io-tsdb/pkg/partmgr"
 	"sort"
 	"strings"
+	"github.com/v3io/v3io-tsdb/pkg/utils"
 )
 
 // Create a new Querier interface
@@ -90,7 +91,7 @@ func (q *V3ioQuerier) selectQry(name, functions string, step int64, win []int, f
 			newSet.overlapWin = q.overlapWin
 		}
 
-		err = newSet.getItems(partition.GetPath(), name, filter, q.container)
+		err = newSet.getItems(partition.GetPath(), name, filter, q.container, q.cfg.QryWorkers)
 		if err != nil {
 			return nil, err
 		}
@@ -114,7 +115,8 @@ func (q *V3ioQuerier) LabelValues(name string) ([]string, error) {
 	//}
 
 	input := v3io.GetItemsInput{Path: q.cfg.Path + "/names/", AttributeNames: []string{"__name"}, Filter: ""}
-	iter, err := q.container.Sync.GetItemsCursor(&input)
+	//iter, err := q.container.Sync.GetItemsCursor(&input)
+	iter, err := utils.NewAsyncItemsCursor(q.container, &input, q.cfg.QryWorkers)
 	q.logger.DebugWith("GetItems to read names", "input", input, "err", err)
 	if err != nil {
 		return list, err
@@ -125,7 +127,10 @@ func (q *V3ioQuerier) LabelValues(name string) ([]string, error) {
 		list = append(list, name)
 	}
 
-	return list, iter.Err()
+	if iter.Err() != nil {
+		q.logger.InfoWith("Failed to read names, assume empty list", "err", iter.Err().Error())
+	}
+	return list, nil
 }
 
 func (q *V3ioQuerier) Close() error {
@@ -142,7 +147,7 @@ type V3ioSeriesSet struct {
 	err        error
 	logger     logger.Logger
 	partition  *partmgr.DBPartition
-	iter       *v3io.SyncItemsCursor //*utils.V3ioItemsCursor
+	iter       utils.ItemsCursor //*v3io.SyncItemsCursor //*utils.V3ioItemsCursor
 	mint, maxt int64
 	attrs      []string
 	chunkIds   []int
@@ -159,7 +164,7 @@ type V3ioSeriesSet struct {
 
 // Get relevant items & attributes from the DB, and create an iterator
 // TODO: get items per partition + merge, per partition calc attrs
-func (s *V3ioSeriesSet) getItems(path, name, filter string, container *v3io.Container) error {
+func (s *V3ioSeriesSet) getItems(path, name, filter string, container *v3io.Container, workers int) error {
 
 	attrs := []string{"_lset", "_meta", "_name", "_maxtime"}
 
@@ -172,7 +177,8 @@ func (s *V3ioSeriesSet) getItems(path, name, filter string, container *v3io.Cont
 
 	s.logger.DebugWith("Select - GetItems", "path", path, "attr", attrs, "filter", filter, "name", name)
 	input := v3io.GetItemsInput{Path: path, AttributeNames: attrs, Filter: filter, ShardingKey: name}
-	iter, err := container.Sync.GetItemsCursor(&input)
+	//iter, err := container.Sync.GetItemsCursor(&input)
+	iter, err := utils.NewAsyncItemsCursor(container, &input, workers)
 	//iter, err := utils.NewItemsCursor(container, &input)
 	if err != nil {
 		return err
