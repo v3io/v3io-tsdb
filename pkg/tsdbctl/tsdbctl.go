@@ -31,22 +31,15 @@ func NewRootCommandeer() *RootCommandeer {
 	cmd := &cobra.Command{
 		Use:   "tsdbctl [command]",
 		Short: "V3IO TSDB command-line interface",
-		//SilenceUsage:  true,
-		//SilenceErrors: true,
 	}
 
 	defaultV3ioServer := os.Getenv("V3IO_SERVICE_URL")
-
-	defaultCfgPath := os.Getenv("V3IO_FILE_PATH")
-	if defaultCfgPath == "" {
-		defaultCfgPath = "v3io.yaml"
-	}
 
 	cmd.PersistentFlags().StringVarP(&commandeer.verbose, "verbose", "v", "", "Verbose output")
 	cmd.PersistentFlags().Lookup("verbose").NoOptDefVal = "debug"
 	cmd.PersistentFlags().StringVarP(&commandeer.dbPath, "dbpath", "p", "", "sub path for the TSDB, inside the container")
 	cmd.PersistentFlags().StringVarP(&commandeer.v3ioPath, "server", "s", defaultV3ioServer, "V3IO Service URL - ip:port/container")
-	cmd.PersistentFlags().StringVarP(&commandeer.cfgFilePath, "config", "c", defaultCfgPath, "path to yaml config file")
+	cmd.PersistentFlags().StringVarP(&commandeer.cfgFilePath, "config", "c", "", "path to yaml config file")
 
 	// add children
 	cmd.AddCommand(
@@ -79,15 +72,15 @@ func (rc *RootCommandeer) CreateMarkdown(path string) error {
 }
 
 func (rc *RootCommandeer) initialize() error {
-	var err error
-	cfg := &config.V3ioConfig{}
 
-	if rc.cfgFilePath != "" {
-		cfg, err = config.LoadConfig(rc.cfgFilePath)
-		if err != nil && rc.cfgFilePath != "v3io.yaml" {
-			// if we couldn't load the file and its not the default
+	cfg, err := config.LoadConfig(rc.cfgFilePath)
+	if err != nil {
+		// if we couldn't load the file and its not the default
+		if rc.cfgFilePath != "" {
 			return errors.Wrap(err, "Failed to load config from file "+rc.cfgFilePath)
 		}
+		cfg = &config.V3ioConfig{}  // initialize struct, will try and set it from individual flags
+		config.InitDefaults(cfg)
 	}
 
 	if rc.v3ioPath != "" {

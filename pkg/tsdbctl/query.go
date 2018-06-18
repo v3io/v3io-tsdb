@@ -49,7 +49,7 @@ func newQueryCommandeer(rootCommandeer *RootCommandeer) *queryCommandeer {
 	//cmd.Flags().StringVarP(&commandeer.to, "to", "t", "", "to time")
 	//cmd.Flags().StringVarP(&commandeer.from, "from", "f", "", "from time")
 	cmd.Flags().StringVarP(&commandeer.output, "output", "o", "", "output format: text,csv,json")
-	cmd.Flags().StringVarP(&commandeer.filter, "filter", "f", "", "last min/hours/days e.g. 15m")
+	cmd.Flags().StringVarP(&commandeer.filter, "filter", "f", "", "v3io query filter e.g. method=='get'")
 	cmd.Flags().StringVarP(&commandeer.last, "last", "l", "", "last min/hours/days e.g. 15m")
 	cmd.Flags().StringVarP(&commandeer.windows, "windows", "w", "", "comma separated list of overlapping windows")
 	cmd.Flags().StringVarP(&commandeer.functions, "aggregators", "a", "",

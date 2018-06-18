@@ -20,6 +20,7 @@ func newDeleteCommandeer(rootCommandeer *RootCommandeer) *delCommandeer {
 	cmd := &cobra.Command{
 		Use:   "del",
 		Short: "delete a TSDB",
+		Aliases: []string{"delete"},
 		RunE: func(cmd *cobra.Command, args []string) error {
 
 			// initialize params

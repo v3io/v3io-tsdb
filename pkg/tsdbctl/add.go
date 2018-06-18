@@ -16,6 +16,8 @@ import (
 	"github.com/v3io/v3io-tsdb/pkg/tsdb"
 )
 
+const ARRAY_SEPARATOR = ";"
+
 type addCommandeer struct {
 	cmd            *cobra.Command
 	rootCommandeer *RootCommandeer
@@ -210,8 +212,8 @@ func strToLabels(name, lbls string) (utils.Labels, error) {
 
 func strToTV(tarr, varr string) ([]int64, []float64, error) {
 
-	tlist := strings.Split(tarr, ",")
-	vlist := strings.Split(varr, ",")
+	tlist := strings.Split(tarr, ARRAY_SEPARATOR)
+	vlist := strings.Split(varr, ARRAY_SEPARATOR)
 
 	if tarr == "" && len(vlist) > 1 {
 		return nil, nil, errors.New("time array must be provided when using a value array")
