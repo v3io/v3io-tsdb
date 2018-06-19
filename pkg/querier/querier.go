@@ -231,7 +231,7 @@ func (s *V3ioSeriesSet) Next() bool {
 				s.baseTime = mint
 			}
 
-			if length != 0 {
+			if length > 0 {
 				attrs := s.iter.GetFields()
 				aggrSet, err := s.aggrSeries.NewSetFromAttrs(length, start, end, mint, s.maxt, &attrs)
 				if err != nil {
