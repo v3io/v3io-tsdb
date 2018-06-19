@@ -242,15 +242,27 @@ func strToTV(tarr, varr string) ([]int64, []float64, error) {
 		varray = append(varray, v)
 	}
 
+	now := int64(time.Now().Unix() * 1000)
 	if tarr == "" {
-		tarray = append(tarray, int64(time.Now().Unix()*1000))
+		tarray = append(tarray, now)
 	} else {
 		for i := 0; i < len(vlist); i++ {
-			t, err := strconv.Atoi(tlist[i])
-			if err != nil {
-				return nil, nil, errors.Wrap(err, "not a valid (unix mili) time")
+			tstr := strings.TrimSpace(tlist[i])
+			if tstr == "now" || tstr == "now-" {
+				tarray = append(tarray, now)
+			} else if strings.HasPrefix(tstr, "now-")  {
+				t, err := str2duration(tstr[4:])
+				if err != nil {
+					return nil, nil, errors.Wrap(err, "not a valid time 'now-??', 'now' need to follow with nn[s|h|m|d]")
+				}
+				tarray = append(tarray, now - int64(t))
+			} else {
+				t, err := strconv.Atoi(tlist[i])
+				if err != nil {
+					return nil, nil, errors.Wrap(err, "not a valid (unix mili) time")
+				}
+				tarray = append(tarray, int64(t))
 			}
-			tarray = append(tarray, int64(t))
 		}
 	}
 
