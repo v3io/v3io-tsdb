@@ -197,7 +197,7 @@ func (as *AggregateSet) GetMaxCell() int {
 // append the value to a cell in all relevant aggregation arrays
 func (as *AggregateSet) AppendAllCells(cell int, val float64) {
 
-	if cell > as.length {
+	if cell >= as.length {
 		return
 	}
 
@@ -214,7 +214,7 @@ func (as *AggregateSet) AppendAllCells(cell int, val float64) {
 // if the requested step interval is higher than stored interval we need to collapse multiple cells to one
 func (as *AggregateSet) mergeArrayCell(aggr AggrType, cell int, val uint64) {
 
-	if cell > as.length {
+	if cell >= as.length {
 		return
 	}
 
@@ -255,12 +255,8 @@ func (as *AggregateSet) updateCell(aggr AggrType, cell int, val float64) {
 // return the value per aggregate or complex function
 func (as *AggregateSet) GetCellValue(aggr AggrType, cell int) float64 {
 
-	if cell > as.maxCell {
+	if cell > as.maxCell || cell >= as.length {  // TODO: should >Len return NaN or Zero ?
 		return math.NaN()
-	}
-
-	if cell > as.length {
-		return 0
 	}
 
 	switch aggr {

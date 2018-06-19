@@ -147,7 +147,7 @@ type V3ioSeriesSet struct {
 	err        error
 	logger     logger.Logger
 	partition  *partmgr.DBPartition
-	iter       utils.ItemsCursor //*v3io.SyncItemsCursor //*utils.V3ioItemsCursor
+	iter       utils.ItemsCursor //*v3io.SyncItemsCursor
 	mint, maxt int64
 	attrs      []string
 	chunkIds   []int
@@ -212,26 +212,28 @@ func (s *V3ioSeriesSet) Next() bool {
 		if s.aggrSeries.CanAggregate(s.partition.AggrType()) && s.maxt-s.mint > s.interval {
 
 			// create series from aggregation arrays (in DB) if the partition stored the desired aggregates
-			maxt := s.maxt
+			maxtUpdate := s.maxt
 			maxTime := s.iter.GetField("_maxtime")
-			if maxTime != nil && int64(maxTime.(int)) < maxt {
-				maxt = int64(maxTime.(int))
+			if maxTime != nil && int64(maxTime.(int)) < s.maxt {
+				maxtUpdate = int64(maxTime.(int))
 			}
-			mint := s.partition.CyclicMinTime(s.mint, maxt)
+			mint := s.partition.CyclicMinTime(s.mint, maxtUpdate)
 
 			start := s.partition.Time2Bucket(mint)
-			end := s.partition.Time2Bucket(maxt)
-			length := int((maxt - mint) / s.interval)
+			end := s.partition.Time2Bucket(s.maxt + s.interval)
+
+			// len of the returned array, cropped at the end in case of cyclic overlap
+			length := int((maxtUpdate - mint) / s.interval) + 2
 
 			if s.overlapWin != nil {
-				s.baseTime = maxt //- int64(s.overlapWin[0]) * s.interval
+				s.baseTime = s.maxt //- int64(s.overlapWin[0]) * s.interval
 			} else {
 				s.baseTime = mint
 			}
 
 			if length != 0 {
 				attrs := s.iter.GetFields()
-				aggrSet, err := s.aggrSeries.NewSetFromAttrs(length, start, end, mint, maxt, &attrs)
+				aggrSet, err := s.aggrSeries.NewSetFromAttrs(length, start, end, mint, s.maxt, &attrs)
 				if err != nil {
 					s.err = err
 					return false
