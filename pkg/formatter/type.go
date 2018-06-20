@@ -12,7 +12,7 @@ import (
 
 func NewFormatter(format string, cfg *FormatterConfig) (Formatter, error) {
 	if cfg == nil {
-		cfg = &FormatterConfig{}
+		cfg = &FormatterConfig{ TimeFormat: time.RFC3339 }
 	}
 	switch format {
 	case "", "text":
