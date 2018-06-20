@@ -47,7 +47,7 @@ func BenchmarkIngest(b *testing.B) {
 	}
 
 	data := nutest.DataBind{Name: DEFAULT_DB_NAME, Url: endpointUrl, Container: DEFAULT_CONTAINER_ID}
-	tc, err := nutest.NewTestContext(Handler, true, &data)
+	tc, err := nutest.NewTestContext(Handler, false, &data)
 	if err != nil {
 		b.Fatal(err)
 	}
