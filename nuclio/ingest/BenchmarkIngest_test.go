@@ -21,10 +21,10 @@ const DEFAULT_CONTAINER_ID = "bigdata"
 var count = 0 // count real number of samples to compare with query result
 var osNames = [...]string{"Windows", "Linux", "Unix", "OS X", "iOS", "Android", "Nokia"}
 var metricKeys = [...]string{"cpu", "eth", "mem"}
-var metricRange map[string][3]int = map[string][3]int{"cpu": {0, 100, 20}, "eth": {0, 10, 10}, "mem": {1, 1024, 0}}
+var metricRange map[string][3]int = map[string][3]int{"cpu": {0, 100, 20}, "eth": {0, 1024 * 1024 * 1024, 10}, "mem": {1, 1024, 0}}
 
 func generateSample() (sample string) {
-	offsetMinutes := -1 * randomInt(0, 24*60)
+	offsetMinutes := - randomInt(0, 24*60)
 	sampleTime := time.Now().Add(time.Duration(offsetMinutes) * time.Minute).Unix() * 1000 // x1000 converts seconds to millis
 	metricKey := metricKeys[randomInt(0, len(metricKeys))]
 	diversity := metricRange[metricKey][2]
@@ -57,7 +57,7 @@ func BenchmarkRandomIngest(b *testing.B) {
 	}
 
 	data := nutest.DataBind{Name: DEFAULT_DB_NAME, Url: endpointUrl, Container: DEFAULT_CONTAINER_ID}
-	tc, err := nutest.NewTestContext(Handler, true, &data)
+	tc, err := nutest.NewTestContext(Handler, false, &data)
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -72,7 +72,7 @@ func BenchmarkRandomIngest(b *testing.B) {
 		runTest(tc, b)
 	}
 
-	tc.Logger.Info("Test complete. Count: %d", count)
+	tc.Logger.Warn("Test complete. Count: %d", count)
 }
 
 // InitContext runs only once when the function runtime starts
