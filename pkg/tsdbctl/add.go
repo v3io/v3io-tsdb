@@ -156,7 +156,8 @@ func (ac *addCommandeer) add() error {
 			time.Sleep( time.Duration(ac.delay) * time.Millisecond)
 		}
 
-		if num % 10 == 0 {
+		// print a dot on every 100 inserts
+		if num % 100 == 1 {
 			fmt.Printf(".")
 		}
 
