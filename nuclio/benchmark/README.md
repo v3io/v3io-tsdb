@@ -66,7 +66,7 @@ Use the following script as a reference:
     echo "Ingesting random samples (Bench Time: $BENCH_TIME) ..."
     
     cd $HOME/go/src/github.com/v3io/v3io-tsdb/cmd/tsdbctl
-    time V3IO_URL="localhost:8081" V3IO_TSDBCFG_PATH="$HOME/go/bin/v3io-custom.yaml" go test -benchtime $BENCH_TIME -run=DO_NOT_RUN_TESTS -bench=RandomIngest ../../nuclio/ingest/benchmark
+    time V3IO_URL="localhost:8081" V3IO_TSDBCFG_PATH="$HOME/go/bin/v3io-custom.yaml" go test -benchtime $BENCH_TIME -run=DO_NOT_RUN_TESTS -bench=RandomIngest ../../nuclio/benchmark
     
     echo Done
 ```
