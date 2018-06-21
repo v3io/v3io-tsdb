@@ -29,6 +29,7 @@ import (
 	"strings"
 	"time"
 	"github.com/v3io/v3io-tsdb/pkg/formatter"
+	"github.com/v3io/v3io-tsdb/pkg/utils"
 )
 
 type queryCommandeer struct {
@@ -95,7 +96,7 @@ func (qc *queryCommandeer) query() error {
 		return err
 	}
 
-	step, err := str2duration(qc.step)
+	step, err := utils.Str2duration(qc.step)
 	if err != nil {
 		return err
 	}
@@ -103,7 +104,7 @@ func (qc *queryCommandeer) query() error {
 	// TODO: start & end times
 	to := time.Now().Unix() * 1000
 	if qc.to != "" {
-		to, err = str2unixTime(qc.to)
+		to, err = utils.Str2unixTime(qc.to)
 		if err != nil {
 			return err
 		}
@@ -111,14 +112,14 @@ func (qc *queryCommandeer) query() error {
 
 	from := to - 1000*3600 // default of last hour
 	if qc.from != "" {
-		from, err = str2unixTime(qc.from)
+		from, err = utils.Str2unixTime(qc.from)
 		if err != nil {
 			return err
 		}
 	}
 
 	if qc.last != "" {
-		last, err := str2duration(qc.last)
+		last, err := utils.Str2duration(qc.last)
 		if err != nil {
 			return err
 		}
@@ -192,36 +193,3 @@ func (qc *queryCommandeer) printSet(set querier.SeriesSet) error {
 	return nil
 }
 
-func str2duration(duration string) (int64, error) {
-
-	multiply := 3600 * 1000  // hour by default
-	if len(duration) > 0 {
-		last := duration[len(duration)-1:]
-		if last == "m" || last == "h" || last == "d" {
-			duration = duration[0 : len(duration)-1]
-			switch last {
-			case "m":
-				multiply = 60 * 1000
-			case "h":
-				multiply = 3600 * 1000
-			case "d":
-				multiply = 24 * 3600 * 1000
-			case "w":
-				multiply = 7 * 24 * 3600 * 1000
-			case "y":
-				multiply = 365 * 24 * 3600 * 1000
-			}
-		}
-	}
-
-	if duration == "" {
-		return 0, nil
-	}
-
-	i, err := strconv.Atoi(duration)
-	if err != nil {
-		return 0, errors.Wrap(err, "not a valid duration")
-	}
-
-	return int64(i * multiply), nil
-}

@@ -25,8 +25,6 @@ import (
 	"github.com/spf13/cobra"
 	"strconv"
 	"time"
-	"strings"
-	"github.com/pkg/errors"
 )
 
 type timeCommandeer struct {
@@ -73,28 +71,3 @@ func newTimeCommandeer(rootCommandeer *RootCommandeer) *timeCommandeer {
 	return commandeer
 }
 
-
-func str2unixTime(tstr string) (int64, error) {
-
-	if tstr == "now" || tstr == "now-" {
-		return time.Now().Unix() * 1000, nil
-	} else if strings.HasPrefix(tstr, "now-") {
-		t, err := str2duration(tstr[4:])
-		if err != nil {
-			return 0, errors.Wrap(err, "not a valid time 'now-??', 'now' need to follow with nn[s|h|m|d]")
-		}
-		return time.Now().Unix() * 1000 - int64(t), nil
-	}
-
-	tint, err := strconv.Atoi(tstr)
-	if err == nil {
-		//fmt.Println(time.Unix(int64(tint), 0).Format(time.RFC3339))
-		return int64(tint) * 1000, nil
-	}
-
-	t, err := time.Parse(time.RFC3339, tstr)
-	if err != nil {
-		return 0, errors.Wrap(err, "Not an RFC 3339 time format")
-	}
-	return t.Unix() * 1000, nil
-}

@@ -46,6 +46,7 @@ func newCheckCommandeer(rootCommandeer *RootCommandeer) *checkCommandeer {
 	cmd := &cobra.Command{
 		Use:   "check",
 		Short: "check TSDB metric object",
+		Hidden: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 
 			if len(args) == 0 {
@@ -89,15 +90,25 @@ func (cc *checkCommandeer) check() error {
 		return err
 	}
 
+	// get metric data and metadata
+	allAtters := append(cc.attrs, "__name", "_name", "_lset", "_maxtime")
 	container, path := cc.rootCommandeer.adapter.GetContainer()
 	objPath := fmt.Sprintf("%s/0/%s.%016x", path , cc.name, lset.Hash())
-	input := v3io.GetItemInput{ Path: objPath, AttributeNames: cc.attrs}
+	input := v3io.GetItemInput{ Path: objPath, AttributeNames: allAtters}
 	resp, err := container.Sync.GetItem(&input)
 	if err != nil {
 		return errors.Wrap(err, "GetItems err")
 	}
 
+	// print metadata
 	item := resp.Output.(*v3io.GetItemOutput).Item
+	objName, _ := item.GetFieldString("__name")
+	metricName, _ := item.GetFieldString("_name")
+	lsetString, _ := item.GetFieldString("_lset")
+	maxtime, _ := item.GetFieldInt("_maxtime")
+	fmt.Printf("Object: %s,  %s {%s}  maxtime: %d\n", objName, metricName, lsetString, maxtime)
+
+	// decompress and print metrics
 	for k, attr := range cc.attrs {
 
 		values := item.GetField(attr)
@@ -110,12 +121,20 @@ func (cc *checkCommandeer) check() error {
 				cc.rootCommandeer.logger.ErrorWith("Error reading chunk buffer", "Lset", lset, "err", err)
 				return err
 			} else {
+				count := 0
 				iter := chunk.Iterator()
 				for iter.Next() {
 					t, v := iter.At()
 					tstr := time.Unix(int64(t/1000), 0).Format(time.RFC3339)
 					fmt.Printf("unix=%d, t=%s, v=%.4f \n", t, tstr, v)
+					count++
 				}
+				if iter.Err() != nil {
+					return errors.Wrap(iter.Err(), "failed to read iterator")
+				}
+
+				fmt.Printf("Total Size: %d, Count: %d\n", len(bytes), count)
+
 			}
 		}
 
