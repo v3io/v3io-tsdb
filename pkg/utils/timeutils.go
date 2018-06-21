@@ -33,7 +33,7 @@ func Str2duration(duration string) (int64, error) {
 	multiply := 3600 * 1000  // hour by default
 	if len(duration) > 0 {
 		last := duration[len(duration)-1:]
-		if last == "m" || last == "h" || last == "d" {
+		if last == "m" || last == "h" || last == "d" || last == "y" {
 			duration = duration[0 : len(duration)-1]
 			switch last {
 			case "m":
@@ -56,7 +56,7 @@ func Str2duration(duration string) (int64, error) {
 
 	i, err := strconv.Atoi(duration)
 	if err != nil {
-		return 0, errors.Wrap(err, "not a valid duration")
+		return 0, errors.Wrap(err, "not a valid duration, use nn[s|h|m|d|y]")
 	}
 
 	return int64(i * multiply), nil
@@ -70,7 +70,7 @@ func Str2unixTime(tstr string) (int64, error) {
 	} else if strings.HasPrefix(tstr, "now-") {
 		t, err := Str2duration(tstr[4:])
 		if err != nil {
-			return 0, errors.Wrap(err, "not a valid time 'now-??', 'now' need to follow with nn[s|h|m|d]")
+			return 0, errors.Wrap(err, "not a valid time 'now-??', 'now' need to follow with nn[s|h|m|d|y]")
 		}
 		return time.Now().Unix() * 1000 - int64(t), nil
 	}
