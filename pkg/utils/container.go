@@ -84,10 +84,11 @@ func AsInt64Array(val []byte) []uint64 {
 }
 
 
-func DeleteTable(container *v3io.Container, path string) error {
+func DeleteTable(container *v3io.Container, path string, workers int) error {
 
 	input := v3io.GetItemsInput{ Path: path, AttributeNames: []string{"__name"}}
-	iter, err := container.Sync.GetItemsCursor(&input)
+	iter, err := NewAsyncItemsCursor(container, &input, workers)
+	//iter, err := container.Sync.GetItemsCursor(&input)
 	if err != nil {
 		return err
 	}
@@ -102,6 +103,9 @@ func DeleteTable(container *v3io.Container, path string) error {
 			return errors.Wrap(err, "failed to delete object " + name)
 		}
 		reqMap[req.ID] = true
+	}
+	if iter.Err() != nil {
+		return errors.Wrap(iter.Err(), "failed to delete object ")
 	}
 
 	for len(reqMap) > 0 {
