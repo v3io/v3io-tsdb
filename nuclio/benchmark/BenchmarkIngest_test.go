@@ -24,30 +24,8 @@ var startTime = (time.Now().UnixNano() - defaultStartTime.Nanoseconds()) / int64
 var count = 0 // count real number of samples to compare with query result
 var osNames = [...]string{"Windows", "Linux", "Unix", "OS X", "iOS", "Android", "Nokia"}
 var metricKeys = [...]string{"cpu", "eth", "mem"}
+var deviceIds = [...]string{"0", "1"}
 var metricRange = map[string][3]int{"cpu": {0, 100, 20}, "eth": {0, 1024 * 1024 * 1024, 10}, "mem": {1, 1024, 0}}
-
-func generateSample(sampleTimeMs int64) (sample string) {
-	metricKey := metricKeys[randomInt(0, len(metricKeys))]
-	diversity := metricRange[metricKey][2]
-	var sampleKey string
-	if diversity > 0 {
-		sampleKey = fmt.Sprintf("%s_%d", metricKey, randomInt(0, diversity))
-	} else {
-		sampleKey = metricKey
-	}
-	sampleValue := rand.Float64() * float64(randomInt(metricRange[metricKey][0], metricRange[metricKey][1]))
-
-	sampleOS := osNames[randomInt(0, len(osNames))]
-	sampleDevice := fmt.Sprintf("node_%d", randomInt(0, 2))
-
-	sampleJsonString := `{
-  "Lset": { "__name__":"%s", "os" : "%s", "node" : "%s"},
-  "Time" : %d,
-  "Value" : %f
-}
-`
-	return fmt.Sprintf(sampleJsonString, sampleKey, sampleOS, sampleDevice, sampleTimeMs, sampleValue)
-}
 
 func BenchmarkRandomIngest(b *testing.B) {
 	log.SetFlags(0)
@@ -103,19 +81,42 @@ func randomInt(min, max int) int {
 }
 
 func runTest(i int, tc *nutest.TestContext, b *testing.B) {
-	sampleTimeMs := startTime + int64(i)
-	sampleData := generateSample(sampleTimeMs)
+	const sampleStepSize = 5 // post metrics with 5 seconds intervals
+	sampleTimeMs := startTime + int64(i)*sampleStepSize
 
-	tc.Logger.Debug("Sample data: %s", sampleData)
+	for _, metricKey := range metricKeys {
+		diversity := metricRange[metricKey][2]
 
-	testEvent := nutest.TestEvent{
-		Body: []byte(sampleData),
+		var sampleKey = metricKey
+		if diversity > 0 {
+			sampleKey = fmt.Sprintf("%s_%d", metricKey, randomInt(0, diversity))
+		}
+
+		for _, sampleOS := range osNames {
+			for _, sampleDeviceId := range deviceIds {
+				sampleDevice := fmt.Sprintf("node_%s", sampleDeviceId)
+				sampleValue := rand.Float64() * float64(randomInt(metricRange[metricKey][0], metricRange[metricKey][1]))
+
+				sampleJsonString := `{
+  "Lset": { "__name__":"%s", "os" : "%s", "node" : "%s"},
+  "Time" : %d,
+  "Value" : %f
+}
+`
+				sampleData := fmt.Sprintf(sampleJsonString, sampleKey, sampleOS, sampleDevice, sampleTimeMs, sampleValue)
+				tc.Logger.Debug("Sample data: %s", sampleData)
+
+				testEvent := nutest.TestEvent{
+					Body: []byte(sampleData),
+				}
+
+				resp, err := tc.Invoke(&testEvent)
+
+				if err != nil {
+					b.Fatalf("Request has failed!\nError: %s\nResponse: %s\n", err, resp)
+				}
+				count ++
+			}
+		}
 	}
-
-	resp, err := tc.Invoke(&testEvent)
-
-	if err != nil {
-		b.Fatalf("Request has failed!\nError: %s\nResponse: %s\n", err, resp)
-	}
-	count ++
 }
