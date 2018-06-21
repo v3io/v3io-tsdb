@@ -54,7 +54,6 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 package chunkenc
 
 import (
-	"fmt"
 	"math"
 	"math/bits"
 )
@@ -86,34 +85,6 @@ func (c *XORChunk) Bytes() []byte {
 func (c *XORChunk) Clear() {
 	//c.b.rptr = c.b.getLen()
 	c.b.clear()
-}
-
-// GetMeta returns offset, samples, length, bits, encoding
-func (c *XORChunk) GetMeta() (uint16, uint16, uint16, uint8, uint8) {
-	return 0, c.samples, 0, c.b.count, 1
-}
-
-// GetMeta returns offset, samples, length, bits, encoding
-func (c *XORChunk) GetChunkBuffer() (uint64, int, []byte) {
-	bytes := c.b.bytes()
-	meta := toMetadata(c.samples, 0, 0, c.b.count, 1)
-	return meta, 0, bytes
-}
-
-// MoveOffset removes first bytes that were committed to storage.
-func (c *XORChunk) MoveOffset(num uint16) error {
-
-	if num >= 0 {
-		return fmt.Errorf("Read pointer passed write pointer in byte stream ring")
-	}
-
-	//c.b.rptr = num
-	return nil
-}
-
-// NumSamples returns the number of samples in the chunk.
-func (c *XORChunk) NumSamples() int {
-	return int(c.samples)
 }
 
 // Appender implements the Chunk interface.
@@ -224,7 +195,7 @@ func (a *xorAppender) Append(t int64, v float64) {
 			a.b.writeBits(uint64(dod), 20)
 		default:
 			a.b.writeBits(0x1e, 5) // '11110'
-			a.b.writeBits(uint64(dod), 32)
+			a.b.writeBits(uint64(dod), 64)
 		}
 
 		a.writeVDelta(v)
@@ -369,7 +340,7 @@ func (it *xorIterator) Next() bool {
 	case 0x0e:
 		sz = 20
 	case 0x1e:
-		bits, err := it.br.readBits(32)
+		bits, err := it.br.readBits(64)
 		if err != nil {
 			it.err = err
 			return false
