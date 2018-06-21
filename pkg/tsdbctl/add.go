@@ -152,13 +152,13 @@ func (ac *addCommandeer) add() error {
 
 	for num, line := range records {
 
-		if ac.delay > 0 && (num % 16) == 15 {
-			time.Sleep( time.Duration(ac.delay) * time.Millisecond)
-		}
 
 		// print a dot on every 100 inserts
-		if num % 100 == 1 {
+		if num % 100 == 99 {
 			fmt.Printf(".")
+			if ac.delay > 0 {
+				time.Sleep( time.Duration(ac.delay) * time.Millisecond)
+			}
 		}
 
 		if len(line) < 3 || len(line) > 4  {
