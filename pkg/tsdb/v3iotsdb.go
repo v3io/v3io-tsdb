@@ -113,6 +113,10 @@ func (a *V3ioAdapter) GetLogger(child string) logger.Logger {
 	return a.logger.GetChild(child)
 }
 
+func (a *V3ioAdapter) GetContainer() (*v3io.Container, string) {
+	return a.container, a.cfg.Path
+}
+
 func (a *V3ioAdapter) connect() error {
 
 	fullpath := a.cfg.V3ioUrl + "/" + a.cfg.Container + "/" + a.cfg.Path

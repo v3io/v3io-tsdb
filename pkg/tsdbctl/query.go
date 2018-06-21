@@ -1,3 +1,23 @@
+/*
+Copyright 2018 Iguazio Systems Ltd.
+
+Licensed under the Apache License, Version 2.0 (the "License") with
+an addition restriction as set forth herein. You may not use this
+file except in compliance with the License. You may obtain a copy of
+the License at http://www.apache.org/licenses/LICENSE-2.0.
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
+implied. See the License for the specific language governing
+permissions and limitations under the License.
+
+In addition, you may not use the software for any purposes that are
+illegal under applicable law, and the grant of the foregoing license
+under the Apache 2.0 license is conditioned upon your compliance with
+such restriction.
+*/
+
 package tsdbctl
 
 import (
@@ -16,8 +36,8 @@ type queryCommandeer struct {
 	rootCommandeer *RootCommandeer
 	name           string
 	filter         string
-	//to             string
-	//from           string
+	to             string
+	from           string
 	last      string
 	windows   string
 	functions string
@@ -46,8 +66,8 @@ func newQueryCommandeer(rootCommandeer *RootCommandeer) *queryCommandeer {
 		},
 	}
 
-	//cmd.Flags().StringVarP(&commandeer.to, "to", "t", "", "to time")
-	//cmd.Flags().StringVarP(&commandeer.from, "from", "f", "", "from time")
+	cmd.Flags().StringVarP(&commandeer.to, "end", "e", "", "to time")
+	cmd.Flags().StringVarP(&commandeer.from, "begin", "b", "", "from time")
 	cmd.Flags().StringVarP(&commandeer.output, "output", "o", "", "output format: text,csv,json")
 	cmd.Flags().StringVarP(&commandeer.filter, "filter", "f", "", "v3io query filter e.g. method=='get'")
 	cmd.Flags().StringVarP(&commandeer.last, "last", "l", "", "last min/hours/days e.g. 15m")
@@ -82,7 +102,21 @@ func (qc *queryCommandeer) query() error {
 
 	// TODO: start & end times
 	to := time.Now().Unix() * 1000
+	if qc.to != "" {
+		to, err = str2unixTime(qc.to)
+		if err != nil {
+			return err
+		}
+	}
+
 	from := to - 1000*3600 // default of last hour
+	if qc.from != "" {
+		from, err = str2unixTime(qc.from)
+		if err != nil {
+			return err
+		}
+	}
+
 	if qc.last != "" {
 		last, err := str2duration(qc.last)
 		if err != nil {
@@ -172,6 +206,10 @@ func str2duration(duration string) (int64, error) {
 				multiply = 3600 * 1000
 			case "d":
 				multiply = 24 * 3600 * 1000
+			case "w":
+				multiply = 7 * 24 * 3600 * 1000
+			case "y":
+				multiply = 365 * 24 * 3600 * 1000
 			}
 		}
 	}
