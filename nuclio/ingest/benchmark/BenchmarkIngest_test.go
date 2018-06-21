@@ -13,6 +13,7 @@ import (
 	"github.com/v3io/v3io-tsdb/config"
 	"github.com/v3io/v3io-go-http"
 	"github.com/v3io/v3io-tsdb/pkg/tsdb"
+	"github.com/v3io/v3io-tsdb/nuclio/ingest"
 )
 
 const DEFAULT_DB_NAME = "db0"
@@ -57,7 +58,7 @@ func BenchmarkRandomIngest(b *testing.B) {
 	}
 
 	data := nutest.DataBind{Name: DEFAULT_DB_NAME, Url: endpointUrl, Container: DEFAULT_CONTAINER_ID}
-	tc, err := nutest.NewTestContext(Handler, false, &data)
+	tc, err := nutest.NewTestContext(ingest.Handler, false, &data)
 	if err != nil {
 		b.Fatal(err)
 	}
