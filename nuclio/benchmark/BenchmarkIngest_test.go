@@ -18,7 +18,7 @@ import (
 
 const defaultDbName = "db0"
 const defaultContainerId = "bigdata"
-const defaultStartTime = 24 * time.Millisecond
+const defaultStartTime = 24 * time.Hour
 
 var startTime = (time.Now().UnixNano() - defaultStartTime.Nanoseconds()) / int64(time.Millisecond)
 var count = 0 // count real number of samples to compare with query result
@@ -81,7 +81,7 @@ func randomInt(min, max int) int {
 }
 
 func runTest(i int, tc *nutest.TestContext, b *testing.B) {
-	const sampleStepSize = 5 // post metrics with 5 seconds intervals
+	const sampleStepSize = 5 * 1000 // post metrics with 5 seconds intervals
 	sampleTimeMs := startTime + int64(i)*sampleStepSize
 
 	for _, metricKey := range metricKeys {
