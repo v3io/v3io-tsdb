@@ -1,3 +1,23 @@
+/*
+Copyright 2018 Iguazio Systems Ltd.
+
+Licensed under the Apache License, Version 2.0 (the "License") with
+an addition restriction as set forth herein. You may not use this
+file except in compliance with the License. You may obtain a copy of
+the License at http://www.apache.org/licenses/LICENSE-2.0.
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
+implied. See the License for the specific language governing
+permissions and limitations under the License.
+
+In addition, you may not use the software for any purposes that are
+illegal under applicable law, and the grant of the foregoing license
+under the Apache 2.0 license is conditioned upon your compliance with
+such restriction.
+*/
+
 package tsdbctl
 
 import (
@@ -26,6 +46,7 @@ type addCommandeer struct {
 	tArr           string
 	vArr           string
 	inFile         string
+	delay          int
 }
 
 func newAddCommandeer(rootCommandeer *RootCommandeer) *addCommandeer {
@@ -60,6 +81,7 @@ func newAddCommandeer(rootCommandeer *RootCommandeer) *addCommandeer {
 	cmd.Flags().StringVarP(&commandeer.tArr, "times", "t", "", "time array, comma separated")
 	cmd.Flags().StringVarP(&commandeer.vArr, "values", "d", "", "values array, comma separated")
 	cmd.Flags().StringVarP(&commandeer.inFile, "file", "f", "", "CSV input file")
+	cmd.Flags().IntVar(&commandeer.delay, "delay", 0, "Add delay per insert batch in milisec")
 
 	commandeer.cmd = cmd
 
@@ -100,7 +122,7 @@ func (ac *addCommandeer) add() error {
 			return errors.Wrap(err, "failed to create Appender")
 		}
 
-		ref, err := ac.appendMetric(append, lset, tarray, varray)
+		ref, err := ac.appendMetric(append, lset, tarray, varray, true)
 		if err != nil {
 			return err
 		}
@@ -130,6 +152,15 @@ func (ac *addCommandeer) add() error {
 
 	for num, line := range records {
 
+
+		// print a dot on every 100 inserts
+		if num % 100 == 99 {
+			fmt.Printf(".")
+			if ac.delay > 0 {
+				time.Sleep( time.Duration(ac.delay) * time.Millisecond)
+			}
+		}
+
 		if len(line) < 3 || len(line) > 4  {
 			return fmt.Errorf("must have 3-4 columns per row name,labels,value[,time] in line %d (%v)", num, line)
 		}
@@ -148,13 +179,14 @@ func (ac *addCommandeer) add() error {
 			return err
 		}
 
-		ref, err := ac.appendMetric(append, lset, tarray, varray)
+		ref, err := ac.appendMetric(append, lset, tarray, varray, false)
 		if err != nil {
 			return err
 		}
 
 		refMap[ref] = true
 	}
+	fmt.Println("\nDone!")
 
 	// make sure all writes are committed
 	return ac.waitForWrites(append, &refMap)
@@ -171,11 +203,14 @@ func (ac *addCommandeer) waitForWrites(append tsdb.Appender, refMap *map[uint64]
 	return nil
 }
 
-func (ac *addCommandeer) appendMetric(append tsdb.Appender, lset utils.Labels, tarray []int64, varray []float64) (uint64, error) {
+func (ac *addCommandeer) appendMetric(
+	append tsdb.Appender, lset utils.Labels, tarray []int64, varray []float64, print bool) (uint64, error) {
 
 	ac.rootCommandeer.logger.DebugWith("adding value to metric", "lset", lset, "t", tarray, "v", varray)
 
-	fmt.Println("add:", lset, tarray, varray)
+	if print {
+		fmt.Println("add:", lset, tarray, varray)
+	}
 	ref, err := append.Add(lset, tarray[0], varray[0])
 	if err != nil {
 		return 0, errors.Wrap(err, "failed to Add")
@@ -251,7 +286,7 @@ func strToTV(tarr, varr string) ([]int64, []float64, error) {
 			if tstr == "now" || tstr == "now-" {
 				tarray = append(tarray, now)
 			} else if strings.HasPrefix(tstr, "now-")  {
-				t, err := str2duration(tstr[4:])
+				t, err := utils.Str2duration(tstr[4:])
 				if err != nil {
 					return nil, nil, errors.Wrap(err, "not a valid time 'now-??', 'now' need to follow with nn[s|h|m|d]")
 				}

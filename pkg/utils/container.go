@@ -26,6 +26,8 @@ import (
 	"github.com/nuclio/zap"
 	"github.com/pkg/errors"
 	"github.com/v3io/v3io-go-http"
+	"fmt"
+	"time"
 )
 
 func NewLogger(verbose string) (logger.Logger, error) {
@@ -84,36 +86,79 @@ func AsInt64Array(val []byte) []uint64 {
 }
 
 
-func DeleteTable(container *v3io.Container, path string) error {
+func DeleteTable(container *v3io.Container, path string, workers int) error {
 
 	input := v3io.GetItemsInput{ Path: path, AttributeNames: []string{"__name"}}
-	iter, err := container.Sync.GetItemsCursor(&input)
+	iter, err := NewAsyncItemsCursor(container, &input, workers)
+	//iter, err := container.Sync.GetItemsCursor(&input)
 	if err != nil {
 		return err
 	}
 
 	responseChan := make(chan *v3io.Response, 1000)
+	commChan := make(chan int, 2)
+	doneChan := respWaitLoop(commChan, responseChan, 10 * time.Second)
 	reqMap := map[uint64]bool{}
 
+	i:=0
 	for iter.Next() {
 		name := iter.GetField("__name").(string)
 		req, err := container.DeleteObject(&v3io.DeleteObjectInput{Path: path +"/" + name}, nil, responseChan)
 		if err != nil {
+			commChan <- i
 			return errors.Wrap(err, "failed to delete object " + name)
 		}
 		reqMap[req.ID] = true
+		fmt.Println("REQ:",i)
+		i++
 	}
 
-	for len(reqMap) > 0 {
-		select {
-		case resp := <-responseChan:
-			if resp.Error != nil {
-				return errors.Wrap(err, "failed Delete response")
-			}
-
-			delete(reqMap, resp.ID)
-		}
+	commChan <- i
+	if iter.Err() != nil {
+		return errors.Wrap(iter.Err(), "failed to delete object ")
 	}
+
+	<- doneChan
 
 	return nil
+}
+
+func respWaitLoop(comm chan int, responseChan chan *v3io.Response, timeout time.Duration) chan bool {
+	responses := 0
+	requests := -1
+	done := make(chan bool)
+
+	go func() {
+		for {
+			select {
+
+			case resp := <-responseChan:
+				responses++
+				fmt.Printf("x")
+				if resp.Error != nil {
+					fmt.Println(resp.Error, "failed Delete response")
+				}
+
+				if requests == responses {
+					fmt.Println()
+					done <- true
+					return
+				}
+
+			case requests = <- comm:
+				if requests <= responses {
+					done <- true
+					return
+				}
+
+			case <-time.After(timeout):
+				fmt.Println("Resp loop timed out! ",requests, responses)
+				done <- true
+				return
+
+			}
+		}
+	}()
+
+	return done
 }

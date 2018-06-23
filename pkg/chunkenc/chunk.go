@@ -59,10 +59,6 @@ type Chunk interface {
 	Encoding() Encoding
 	Appender() (Appender, error)
 	Iterator() Iterator
-	NumSamples() int
-	MoveOffset(num uint16) error
-	GetMeta() (uint16, uint16, uint16, uint8, uint8)
-	GetChunkBuffer() (uint64, int, []byte)
 }
 
 // FromData returns a chunk from a byte slice of chunk data.
@@ -72,16 +68,6 @@ func FromData(e Encoding, d []byte, samples uint16) (Chunk, error) {
 		return &XORChunk{b: &bstream{count: 0, stream: d}, samples: samples}, nil
 	}
 	return nil, fmt.Errorf("unknown chunk encoding: %d", e)
-}
-
-// FromBuffer returns a chunk from a byte slice of chunk data.
-func FromBuffer(metaint uint64, buffer []byte) (Chunk, error) {
-	meta := getMetadata(metaint)
-	switch meta.Encode {
-	case EncXOR:
-		return &XORChunk{b: &bstream{count: meta.Bits, stream: buffer}, samples: meta.Count}, nil
-	}
-	return nil, fmt.Errorf("unknown chunk encoding: %d", meta.Encode)
 }
 
 func ToUint64(bytes []byte) []uint64 {
@@ -101,28 +87,6 @@ func ToUint64(bytes []byte) []uint64 {
 
 	return array
 
-}
-
-type ChunkMetadata struct {
-	Count, Length, Private uint16
-	Encode                 Encoding
-	Bits                   uint8
-}
-
-func getMetadata(data uint64) ChunkMetadata {
-	meta := ChunkMetadata{
-		Count:   uint16(data),
-		Length:  uint16(data >> 32),
-		Private: uint16(data >> 16),
-		Encode:  Encoding(data >> 56),
-		Bits:    uint8(data >> 48),
-	}
-
-	return meta
-}
-
-func toMetadata(count, length, priv uint16, bits, encode uint8) uint64 {
-	return uint64(encode)<<56 | uint64(bits)<<48 | uint64(length)<<32 | uint64(priv)<<16 | uint64(count)
 }
 
 // Appender adds sample pairs to a chunk.

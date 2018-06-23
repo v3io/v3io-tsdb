@@ -90,10 +90,6 @@ func TestTsdb(t *testing.T) {
 		//iter.Seek(basetime-1*3600*1000)
 		for iter.Next() {
 
-			if iter.Err() != nil {
-				t.Fatal(iter.Err())
-			}
-
 			t, v := iter.At()
 			d, h := partmgr.TimeToDHM(t)
 			if h != lasth {
@@ -103,6 +99,10 @@ func TestTsdb(t *testing.T) {
 			fmt.Printf("t=%d:%d:%d,v=%.2f ", d, h, m, v)
 			lasth = h
 		}
+		if iter.Err() != nil {
+			t.Fatal(iter.Err())
+		}
+
 		fmt.Println()
 	}
 

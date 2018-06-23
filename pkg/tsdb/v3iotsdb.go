@@ -113,6 +113,10 @@ func (a *V3ioAdapter) GetLogger(child string) logger.Logger {
 	return a.logger.GetChild(child)
 }
 
+func (a *V3ioAdapter) GetContainer() (*v3io.Container, string) {
+	return a.container, a.cfg.Path
+}
+
 func (a *V3ioAdapter) connect() error {
 
 	fullpath := a.cfg.V3ioUrl + "/" + a.cfg.Container + "/" + a.cfg.Path
@@ -174,7 +178,7 @@ func (a *V3ioAdapter) DeleteDB(config bool, force bool) error {
 
 	path := a.partitionMngr.GetHead().GetPath()
 	a.logger.Info("Delete partition %s", path)
-	err := utils.DeleteTable(a.container, path)
+	err := utils.DeleteTable(a.container, path, a.cfg.QryWorkers)
 	if err != nil && !force {
 		return err
 	}
@@ -183,7 +187,7 @@ func (a *V3ioAdapter) DeleteDB(config bool, force bool) error {
 
 	path = a.cfg.Path + "/names/"
 	a.logger.Info("Delete metric names in path %s", path)
-	err = utils.DeleteTable(a.container, path)
+	err = utils.DeleteTable(a.container, path, a.cfg.QryWorkers)
 	if err != nil && !force {
 		return err
 	}
@@ -201,6 +205,26 @@ func (a *V3ioAdapter) DeleteDB(config bool, force bool) error {
 	}
 
 	return nil
+}
+
+// return number of objects in a table
+func (a *V3ioAdapter) CountMetrics(part string) (int, error) {
+
+	input := v3io.GetItemsInput{ Path: a.partitionMngr.GetHead().GetPath(), AttributeNames: []string{"__size"}}
+	iter, err := utils.NewAsyncItemsCursor(a.container, &input, a.cfg.QryWorkers)
+	if err != nil {
+		return 0, err
+	}
+
+	count := 0
+	for iter.Next() {
+		count++
+	}
+	if iter.Err() != nil {
+		return count, errors.Wrap(iter.Err(), "failed on count iterator")
+	}
+
+	return count, nil
 }
 
 type v3ioAppender struct {

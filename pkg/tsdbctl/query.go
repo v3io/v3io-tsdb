@@ -1,3 +1,23 @@
+/*
+Copyright 2018 Iguazio Systems Ltd.
+
+Licensed under the Apache License, Version 2.0 (the "License") with
+an addition restriction as set forth herein. You may not use this
+file except in compliance with the License. You may obtain a copy of
+the License at http://www.apache.org/licenses/LICENSE-2.0.
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
+implied. See the License for the specific language governing
+permissions and limitations under the License.
+
+In addition, you may not use the software for any purposes that are
+illegal under applicable law, and the grant of the foregoing license
+under the Apache 2.0 license is conditioned upon your compliance with
+such restriction.
+*/
+
 package tsdbctl
 
 import (
@@ -9,6 +29,7 @@ import (
 	"strings"
 	"time"
 	"github.com/v3io/v3io-tsdb/pkg/formatter"
+	"github.com/v3io/v3io-tsdb/pkg/utils"
 )
 
 type queryCommandeer struct {
@@ -16,8 +37,8 @@ type queryCommandeer struct {
 	rootCommandeer *RootCommandeer
 	name           string
 	filter         string
-	//to             string
-	//from           string
+	to             string
+	from           string
 	last      string
 	windows   string
 	functions string
@@ -46,8 +67,8 @@ func newQueryCommandeer(rootCommandeer *RootCommandeer) *queryCommandeer {
 		},
 	}
 
-	//cmd.Flags().StringVarP(&commandeer.to, "to", "t", "", "to time")
-	//cmd.Flags().StringVarP(&commandeer.from, "from", "f", "", "from time")
+	cmd.Flags().StringVarP(&commandeer.to, "end", "e", "", "to time")
+	cmd.Flags().StringVarP(&commandeer.from, "begin", "b", "", "from time")
 	cmd.Flags().StringVarP(&commandeer.output, "output", "o", "", "output format: text,csv,json")
 	cmd.Flags().StringVarP(&commandeer.filter, "filter", "f", "", "v3io query filter e.g. method=='get'")
 	cmd.Flags().StringVarP(&commandeer.last, "last", "l", "", "last min/hours/days e.g. 15m")
@@ -75,16 +96,30 @@ func (qc *queryCommandeer) query() error {
 		return err
 	}
 
-	step, err := str2duration(qc.step)
+	step, err := utils.Str2duration(qc.step)
 	if err != nil {
 		return err
 	}
 
 	// TODO: start & end times
 	to := time.Now().Unix() * 1000
+	if qc.to != "" {
+		to, err = utils.Str2unixTime(qc.to)
+		if err != nil {
+			return err
+		}
+	}
+
 	from := to - 1000*3600 // default of last hour
+	if qc.from != "" {
+		from, err = utils.Str2unixTime(qc.from)
+		if err != nil {
+			return err
+		}
+	}
+
 	if qc.last != "" {
-		last, err := str2duration(qc.last)
+		last, err := utils.Str2duration(qc.last)
 		if err != nil {
 			return err
 		}
@@ -119,6 +154,11 @@ func (qc *queryCommandeer) query() error {
 
 	if err != nil {
 		return errors.Wrap(err, "Select Failed")
+	}
+
+	if qc.output == "png" {
+		qc.rootCommandeer.logger.Debug("Drawing output png")
+		return formatter.MakePlot(set, "plot.png")
 	}
 
 	f, err := formatter.NewFormatter(qc.output, nil)
@@ -158,32 +198,3 @@ func (qc *queryCommandeer) printSet(set querier.SeriesSet) error {
 	return nil
 }
 
-func str2duration(duration string) (int64, error) {
-
-	multiply := 3600 * 1000  // hour by default
-	if len(duration) > 0 {
-		last := duration[len(duration)-1:]
-		if last == "m" || last == "h" || last == "d" {
-			duration = duration[0 : len(duration)-1]
-			switch last {
-			case "m":
-				multiply = 60 * 1000
-			case "h":
-				multiply = 3600 * 1000
-			case "d":
-				multiply = 24 * 3600 * 1000
-			}
-		}
-	}
-
-	if duration == "" {
-		return 0, nil
-	}
-
-	i, err := strconv.Atoi(duration)
-	if err != nil {
-		return 0, errors.Wrap(err, "not a valid duration")
-	}
-
-	return int64(i * multiply), nil
-}
