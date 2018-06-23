@@ -152,7 +152,7 @@ func respWaitLoop(comm chan int, responseChan chan *v3io.Response, timeout time.
 				}
 
 			case <-time.After(timeout):
-				fmt.Println("Resp loop timed out!")
+				fmt.Println("Resp loop timed out! ",requests, responses)
 				done <- true
 				return
 
