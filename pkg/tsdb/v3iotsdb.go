@@ -207,6 +207,26 @@ func (a *V3ioAdapter) DeleteDB(config bool, force bool) error {
 	return nil
 }
 
+// return number of objects in a table
+func (a *V3ioAdapter) CountMetrics(part string) (int, error) {
+
+	input := v3io.GetItemsInput{ Path: a.partitionMngr.GetHead().GetPath(), AttributeNames: []string{"__size"}}
+	iter, err := utils.NewAsyncItemsCursor(a.container, &input, a.cfg.QryWorkers)
+	if err != nil {
+		return 0, err
+	}
+
+	count := 0
+	for iter.Next() {
+		count++
+	}
+	if iter.Err() != nil {
+		return count, errors.Wrap(iter.Err(), "failed on count iterator")
+	}
+
+	return count, nil
+}
+
 type v3ioAppender struct {
 	metricsCache *appender.MetricsCache
 }
