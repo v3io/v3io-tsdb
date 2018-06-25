@@ -81,7 +81,7 @@ func randomInt(min, max int) int {
 }
 
 func runTest(i int, tc *nutest.TestContext, b *testing.B) {
-	const sampleStepSize = 5 * 1000 // post metrics with 5 seconds intervals
+	const sampleStepSize = 1000 // post metrics with one second interval
 	sampleTimeMs := startTime + int64(i)*sampleStepSize
 
 	for _, metricKey := range metricKeys {
