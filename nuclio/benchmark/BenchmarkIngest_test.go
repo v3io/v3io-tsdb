@@ -83,7 +83,12 @@ func randomInt(min, max int) int {
 func runTest(i int, tc *nutest.TestContext, b *testing.B) {
 	const sampleStepSize = 1000 // post metrics with one second interval
 	sampleTimeMs := startTime + int64(i)*sampleStepSize
-
+	sampleJsonString := `{
+  "Lset": { "__name__":"%s", "os" : "%s", "node" : "%s"},
+  "Time" : %d,
+  "Value" : %f
+}
+`
 	for _, metricKey := range metricKeys {
 		diversity := metricRange[metricKey][2]
 
@@ -97,12 +102,6 @@ func runTest(i int, tc *nutest.TestContext, b *testing.B) {
 				sampleDevice := fmt.Sprintf("node_%s", sampleDeviceId)
 				sampleValue := rand.Float64() * float64(randomInt(metricRange[metricKey][0], metricRange[metricKey][1]))
 
-				sampleJsonString := `{
-  "Lset": { "__name__":"%s", "os" : "%s", "node" : "%s"},
-  "Time" : %d,
-  "Value" : %f
-}
-`
 				sampleData := fmt.Sprintf(sampleJsonString, sampleKey, sampleOS, sampleDevice, sampleTimeMs, sampleValue)
 				tc.Logger.Debug("Sample data: %s", sampleData)
 
