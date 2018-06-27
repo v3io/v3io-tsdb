@@ -178,7 +178,7 @@ func (a *V3ioAdapter) DeleteDB(config bool, force bool) error {
 
 	path := a.partitionMngr.GetHead().GetPath()
 	a.logger.Info("Delete partition %s", path)
-	err := utils.DeleteTable(a.container, path, a.cfg.QryWorkers)
+	err := utils.DeleteTable(a.container, path, "", a.cfg.QryWorkers)
 	if err != nil && !force {
 		return err
 	}
@@ -187,7 +187,7 @@ func (a *V3ioAdapter) DeleteDB(config bool, force bool) error {
 
 	path = a.cfg.Path + "/names/"
 	a.logger.Info("Delete metric names in path %s", path)
-	err = utils.DeleteTable(a.container, path, a.cfg.QryWorkers)
+	err = utils.DeleteTable(a.container, path, "", a.cfg.QryWorkers)
 	if err != nil && !force {
 		return err
 	}
