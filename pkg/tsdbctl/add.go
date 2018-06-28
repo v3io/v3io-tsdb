@@ -153,8 +153,8 @@ func (ac *addCommandeer) add() error {
 	for num, line := range records {
 
 
-		// print a dot on every 100 inserts
-		if num % 100 == 99 {
+		// print a dot on every 1000 inserts
+		if num % 1000 == 999 {
 			fmt.Printf(".")
 			if ac.delay > 0 {
 				time.Sleep( time.Duration(ac.delay) * time.Millisecond)

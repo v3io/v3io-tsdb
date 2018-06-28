@@ -109,7 +109,6 @@ func DeleteTable(container *v3io.Container, path, filter string, workers int) er
 			return errors.Wrap(err, "failed to delete object " + name)
 		}
 		reqMap[req.ID] = true
-		fmt.Println("REQ:",i)
 		i++
 	}
 
@@ -134,7 +133,6 @@ func respWaitLoop(comm chan int, responseChan chan *v3io.Response, timeout time.
 
 			case resp := <-responseChan:
 				responses++
-				fmt.Printf("x")
 				if resp.Error != nil {
 					fmt.Println(resp.Error, "failed Delete response")
 				}
@@ -152,10 +150,9 @@ func respWaitLoop(comm chan int, responseChan chan *v3io.Response, timeout time.
 				}
 
 			case <-time.After(timeout):
-				fmt.Println("Resp loop timed out! ",requests, responses)
+				fmt.Println("\nResp loop timed out! ",requests, responses)
 				done <- true
 				return
-
 			}
 		}
 	}()
