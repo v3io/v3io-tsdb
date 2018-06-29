@@ -195,7 +195,7 @@ func (a *xorAppender) Append(t int64, v float64) {
 			a.b.writeBits(uint64(dod), 20)
 		default:
 			a.b.writeBits(0x1e, 5) // '11110'
-			a.b.writeBits(uint64(dod), 64)
+			a.b.writeBits(uint64(dod), 32)
 		}
 
 		a.writeVDelta(v)
@@ -340,13 +340,13 @@ func (it *xorIterator) Next() bool {
 	case 0x0e:
 		sz = 20
 	case 0x1e:
-		bits, err := it.br.readBits(64)
+		bits, err := it.br.readBits(32)
 		if err != nil {
 			it.err = err
 			return false
 		}
 
-		dod = int64(bits)
+		dod = int64(int32(bits))
 	case 0x1f:
 		// added this case to allow append of a new Gorilla series on an existing chunk (restart from t0)
 

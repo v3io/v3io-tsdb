@@ -40,8 +40,8 @@ type sample struct {
 
 func TestXor(tst *testing.T) {
 
-	//samples := GenSamples(9, 1)
-	samples := RealSample(6)
+	samples := GenSamples(1000, 5, 1000, 100)
+	//samples := RealSample(1000)
 	byteArray := []byte{}
 
 	ch := NewXORChunk()
@@ -68,7 +68,7 @@ func TestXor(tst *testing.T) {
 		}
 	}
 
-	fmt.Println("byteArray", byteArray, len(byteArray))
+	fmt.Println("Samples:", len(samples), "byteArray:", byteArray, len(byteArray))
 
 	ch2, err := FromData(EncXOR, byteArray, 0)
 	if err != nil {
@@ -154,14 +154,15 @@ func DecodeTest(blob string) error {
 	return nil
 }
 
-func GenSamples(num, interval int) []sample {
+func GenSamples(num, interval int, start, step float64) []sample {
 	samples := []sample{}
 	curTime := int64(basetime)
+	v := start
 
 	for i := 0; i <= num; i++ {
 		curTime += int64(interval * 1000)
 		t := curTime + int64(rand.Intn(100)) - 50
-		v := rand.Float64() * 1000
+		v += float64(rand.Intn(100)-50) / 100 * step
 		//fmt.Printf("t-%d,v%.2f ", t, v)
 		samples = append(samples, sample{t: t, v: v})
 	}
