@@ -52,7 +52,7 @@ func NewLogger(verbose string) (logger.Logger, error) {
 	return log, nil
 }
 
-func CreateContainer(logger logger.Logger, addr, cont string, workers int) (*v3io.Container, error) {
+func CreateContainer(logger logger.Logger, addr, cont, username, password string, workers int) (*v3io.Container, error) {
 	// create context
 	context, err := v3io.NewContext(logger, addr, workers)
 	if err != nil {
@@ -60,7 +60,7 @@ func CreateContainer(logger logger.Logger, addr, cont string, workers int) (*v3i
 	}
 
 	// create session
-	session, err := context.NewSession("", "", "v3test")
+	session, err := context.NewSession(username, password, "v3test")
 	if err != nil {
 		return nil, errors.Wrap(err, "Failed to create session")
 	}
