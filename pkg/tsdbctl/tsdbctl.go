@@ -23,7 +23,6 @@ package tsdbctl
 import (
 	"os"
 
-	"github.com/nuclio/nuclio/pkg/errors"
 
 	"fmt"
 	"github.com/spf13/cobra"
@@ -32,6 +31,7 @@ import (
 	"github.com/v3io/v3io-tsdb/pkg/tsdb"
 	"strings"
 	"github.com/nuclio/logger"
+	"github.com/pkg/errors"
 )
 
 type RootCommandeer struct {
