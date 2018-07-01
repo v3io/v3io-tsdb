@@ -223,7 +223,7 @@ func (s *V3ioSeriesSet) Next() bool {
 			end := s.partition.Time2Bucket(s.maxt + s.interval)
 
 			// len of the returned array, cropped at the end in case of cyclic overlap
-			length := int((maxtUpdate - mint) / s.interval) + 2
+			length := int((s.maxt - mint) / s.interval) + 2
 
 			if s.overlapWin != nil {
 				s.baseTime = s.maxt //- int64(s.overlapWin[0]) * s.interval
