@@ -14,6 +14,7 @@ import (
 	"github.com/v3io/v3io-go-http"
 	"github.com/v3io/v3io-tsdb/pkg/tsdb"
 	"github.com/v3io/v3io-tsdb/nuclio/ingest"
+	"bytes"
 )
 
 const defaultDbName = "db0"
@@ -22,10 +23,6 @@ const defaultStartTime = 24 * time.Hour
 
 var startTime = (time.Now().UnixNano() - defaultStartTime.Nanoseconds()) / int64(time.Millisecond)
 var count = 0 // count real number of samples to compare with query result
-var osNames = [...]string{"Windows", "Linux", "Unix", "OS X", "iOS", "Android", "Nokia"}
-var metricKeys = [...]string{"cpu", "eth", "mem"}
-var deviceIds = [...]string{"0", "1"}
-var metricRange = map[string][3]int{"cpu": {0, 100, 20}, "eth": {0, 1024 * 1024 * 1024, 10}, "mem": {1, 1024, 0}}
 
 func BenchmarkRandomIngest(b *testing.B) {
 	log.SetFlags(0)
@@ -75,47 +72,129 @@ func initContext(context *nuclio.Context) error {
 	return nil
 }
 
-func randomInt(min, max int) int {
-	rand.Seed(time.Now().UTC().UnixNano())
-	return rand.Intn(max-min) + min
-}
-
 func runTest(i int, tc *nutest.TestContext, b *testing.B) {
 	const sampleStepSize = 1000 // post metrics with one second interval
 	sampleTimeMs := startTime + int64(i)*sampleStepSize
-	sampleJsonString := `{
-  "Lset": { "__name__":"%s", "os" : "%s", "node" : "%s"},
-  "Time" : %d,
-  "Value" : %f
-}
-`
-	for _, metricKey := range metricKeys {
-		diversity := metricRange[metricKey][2]
 
-		var sampleKey = metricKey
-		if diversity > 0 {
-			sampleKey = fmt.Sprintf("%s_%d", metricKey, randomInt(0, diversity))
+	namesCount := 200
+	namesDiversity := 1
+	lablesCount := 10
+	lablesDiversity := 10
+	lableValuesCount := 1
+	lablesValueDiversity := 1
+
+	samples := makeSamples(
+		namesCount, namesDiversity, lablesCount, lablesDiversity, lableValuesCount, lablesValueDiversity, sampleTimeMs)
+
+	for _, sample := range *samples {
+		tc.Logger.Debug("Sample data: %s", sample)
+
+		testEvent := nutest.TestEvent{
+			Body: []byte(sample),
 		}
 
-		for _, sampleOS := range osNames {
-			for _, sampleDeviceId := range deviceIds {
-				sampleDevice := fmt.Sprintf("node_%s", sampleDeviceId)
-				sampleValue := rand.Float64() * float64(randomInt(metricRange[metricKey][0], metricRange[metricKey][1]))
+		resp, err := tc.Invoke(&testEvent)
 
-				sampleData := fmt.Sprintf(sampleJsonString, sampleKey, sampleOS, sampleDevice, sampleTimeMs, sampleValue)
-				tc.Logger.Debug("Sample data: %s", sampleData)
+		if err != nil {
+			b.Fatalf("Request has failed!\nError: %s\nResponse: %s\n", err, resp)
+		}
+		count ++
+	}
+}
 
-				testEvent := nutest.TestEvent{
-					Body: []byte(sampleData),
-				}
+func makeSamples(namesCount, namesDiversity, lablesCount, lableDiversity, lableValueCount,
+lableValueDiversity int, timeStamp int64) *[] string {
+	names, err := makeNamesRange("Name", namesCount, 1, namesDiversity)
+	if err != nil {
+		panic(err)
+	}
+	labels, err := makeNamesRange("Label", lablesCount, 1, lableDiversity)
+	if err != nil {
+		panic(err)
+	}
 
-				resp, err := tc.Invoke(&testEvent)
+	sizeEstimate := namesCount * namesDiversity * lablesCount * lableDiversity
+	model := make(map[string]map[string][]string, sizeEstimate) // names -> labels -> label values
 
-				if err != nil {
-					b.Fatalf("Request has failed!\nError: %s\nResponse: %s\n", err, resp)
-				}
-				count ++
+	for _, name := range names {
+		model[name] = make(map[string][]string)
+		for _, label := range labels {
+			model[name][label] = []string{}
+			labelValues, err := makeNamesRange("", lableValueCount, 1, lableValueDiversity)
+			if err != nil {
+				panic(err)
+			}
+			for _, labelValues := range labelValues {
+				model[name][label] = append(model[name][label], labelValues)
 			}
 		}
 	}
+
+	samples := makeSampleTemplates(model)
+
+	for i, sample := range *samples {
+		rand.Seed(time.Now().UnixNano())
+		(*samples)[i] = fmt.Sprintf(sample, timeStamp, rand.Float64()*100)
+	}
+
+	return samples
+}
+
+func makeSampleTemplates(model map[string]map[string][]string) *[]string {
+	var result = make([]string, 0)
+	for name, labels := range model {
+		valSetLenght := 0
+		// TODO: find better way to get size of the label values array
+		for _, labelValues := range labels {
+			valSetLenght = len(labelValues)
+			break
+		}
+		for index := 0; index < valSetLenght; index++ {
+			var buffer bytes.Buffer
+			buffer.WriteString(fmt.Sprintf("{\"Lset\": { \"__name__\":\"%s\"", name))
+			for label, labelValues := range labels {
+				buffer.WriteString(", \"")
+				buffer.WriteString(label)
+				buffer.WriteString(fmt.Sprintf("\" : \"%s\"", labelValues[index]))
+			}
+			buffer.WriteString("}, \"Time\" : %d, \"Value\" : %f}")
+			result = append(result, buffer.String())
+		}
+	}
+
+	return &result
+}
+
+func makeNamesRange(prefix string, count, minIndex, maxIndex int) ([]string, error) {
+	if count < 1 {
+		return nil, fmt.Errorf("makeNamesRange(%s): Minimal count is 1 but actual is %d", prefix, count)
+	}
+
+	if count > 26 {
+		// Maximal range contains 26 elements, i.e. <prefix>_[A to Z]
+		return nil, fmt.Errorf("makeNamesRange(%s): Maximal number of names is 26 [A..Z], but actual number is %d", prefix, count)
+	}
+
+	normalizedPrefix := prefix
+	if len(prefix) > 0 {
+		normalizedPrefix = fmt.Sprintf("%s_", prefix)
+	}
+
+	limit := maxIndex - minIndex + 1
+	size := 1
+	if count == 1 {
+		size = limit
+	} else {
+		size = count * limit
+	}
+	array := make([]string, size)
+
+	for i := range array {
+		if limit > 1 {
+			array[i] = fmt.Sprintf("%s%s_%d", normalizedPrefix, string(65+(i/limit)%count), minIndex+i%limit)
+		} else {
+			array[i] = fmt.Sprintf("%s%s", normalizedPrefix, string(65+(i/limit)%count))
+		}
+	}
+	return array, nil
 }
