@@ -76,8 +76,8 @@ func runTest(i int, tc *nutest.TestContext, b *testing.B) {
 	const sampleStepSize = 1000 // post metrics with one second interval
 	sampleTimeMs := startTime + int64(i)*sampleStepSize
 
-	namesCount := 200
-	namesDiversity := 1
+	namesCount := 26
+	namesDiversity := 10
 	lablesCount := 10
 	lablesDiversity := 10
 	lableValuesCount := 1
