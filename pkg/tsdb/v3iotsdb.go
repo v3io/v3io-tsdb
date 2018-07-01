@@ -50,7 +50,8 @@ type V3ioAdapter struct {
 func CreateTSDB(v3iocfg *config.V3ioConfig, dbconfig *config.DBPartConfig) error {
 
 	logger, _ := utils.NewLogger(v3iocfg.Verbose)
-	container, err := utils.CreateContainer(logger, v3iocfg.V3ioUrl, v3iocfg.Container, v3iocfg.Workers)
+	container, err := utils.CreateContainer(
+		logger, v3iocfg.V3ioUrl, v3iocfg.Container, v3iocfg.Username, v3iocfg.Password, v3iocfg.Workers)
 	if err != nil {
 		return errors.Wrap(err, "Failed to create data container")
 	}
@@ -94,7 +95,7 @@ func NewV3ioAdapter(cfg *config.V3ioConfig, container *v3io.Container, logger lo
 		newV3ioAdapter.container = container
 	} else {
 		newV3ioAdapter.container, err = utils.CreateContainer(newV3ioAdapter.logger,
-			cfg.V3ioUrl, cfg.Container, cfg.Workers)
+			cfg.V3ioUrl, cfg.Container, cfg.Username, cfg.Password, cfg.Workers)
 		if err != nil {
 			return nil, errors.Wrap(err, "Failed to create V3IO data container")
 		}
@@ -178,7 +179,7 @@ func (a *V3ioAdapter) DeleteDB(config bool, force bool) error {
 
 	path := a.partitionMngr.GetHead().GetPath()
 	a.logger.Info("Delete partition %s", path)
-	err := utils.DeleteTable(a.container, path, a.cfg.QryWorkers)
+	err := utils.DeleteTable(a.container, path, "", a.cfg.QryWorkers)
 	if err != nil && !force {
 		return err
 	}
@@ -187,7 +188,7 @@ func (a *V3ioAdapter) DeleteDB(config bool, force bool) error {
 
 	path = a.cfg.Path + "/names/"
 	a.logger.Info("Delete metric names in path %s", path)
-	err = utils.DeleteTable(a.container, path, a.cfg.QryWorkers)
+	err = utils.DeleteTable(a.container, path, "", a.cfg.QryWorkers)
 	if err != nil && !force {
 		return err
 	}

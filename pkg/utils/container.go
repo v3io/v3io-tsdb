@@ -52,7 +52,7 @@ func NewLogger(verbose string) (logger.Logger, error) {
 	return log, nil
 }
 
-func CreateContainer(logger logger.Logger, addr, cont string, workers int) (*v3io.Container, error) {
+func CreateContainer(logger logger.Logger, addr, cont, username, password string, workers int) (*v3io.Container, error) {
 	// create context
 	context, err := v3io.NewContext(logger, addr, workers)
 	if err != nil {
@@ -60,7 +60,7 @@ func CreateContainer(logger logger.Logger, addr, cont string, workers int) (*v3i
 	}
 
 	// create session
-	session, err := context.NewSession("", "", "v3test")
+	session, err := context.NewSession(username, password, "v3test")
 	if err != nil {
 		return nil, errors.Wrap(err, "Failed to create session")
 	}
@@ -86,9 +86,9 @@ func AsInt64Array(val []byte) []uint64 {
 }
 
 
-func DeleteTable(container *v3io.Container, path string, workers int) error {
+func DeleteTable(container *v3io.Container, path, filter string, workers int) error {
 
-	input := v3io.GetItemsInput{ Path: path, AttributeNames: []string{"__name"}}
+	input := v3io.GetItemsInput{ Path: path, AttributeNames: []string{"__name"}, Filter:filter}
 	iter, err := NewAsyncItemsCursor(container, &input, workers)
 	//iter, err := container.Sync.GetItemsCursor(&input)
 	if err != nil {
@@ -109,7 +109,6 @@ func DeleteTable(container *v3io.Container, path string, workers int) error {
 			return errors.Wrap(err, "failed to delete object " + name)
 		}
 		reqMap[req.ID] = true
-		fmt.Println("REQ:",i)
 		i++
 	}
 
@@ -134,7 +133,6 @@ func respWaitLoop(comm chan int, responseChan chan *v3io.Response, timeout time.
 
 			case resp := <-responseChan:
 				responses++
-				fmt.Printf("x")
 				if resp.Error != nil {
 					fmt.Println(resp.Error, "failed Delete response")
 				}
@@ -152,10 +150,9 @@ func respWaitLoop(comm chan int, responseChan chan *v3io.Response, timeout time.
 				}
 
 			case <-time.After(timeout):
-				fmt.Println("Resp loop timed out! ",requests, responses)
+				fmt.Println("\nResp loop timed out! ",requests, responses)
 				done <- true
 				return
-
 			}
 		}
 	}()

@@ -128,7 +128,7 @@ func (cs *chunkStore) GetState() storeState {
 
 // return the DB path for storing the metric
 func (cs *chunkStore) GetMetricPath(metric *MetricState, tablePath string) string {
-	return fmt.Sprintf("%s/%s.%016x", tablePath, metric.name, metric.hash) // TODO: use TableID
+	return fmt.Sprintf("%s%s.%016x", tablePath, metric.name, metric.hash) // TODO: use TableID
 }
 
 // Read (Async) the current chunk state and data from the storage, used in the first chunk access
