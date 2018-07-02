@@ -17,32 +17,29 @@ import (
 	"github.com/ghodss/yaml"
 	"github.com/pkg/errors"
 	"log"
+	"github.com/v3io/v3io-tsdb/pkg/utils"
 )
 
 const defaultDbName = "db0"
-const defaultContainerId = "bigdata"
-const defaultStartTime = 24 * time.Hour
 
-// TODO: make start time configurable
-var startTime = (time.Now().UnixNano() - defaultStartTime.Nanoseconds()) / int64(time.Millisecond)
 var count = 0 // count real number of samples to compare with query result
 
 type BenchmarkRandomIngestConfig struct {
-	v3ioUrl              string `json:"v3ioUrl,omitempty"`
-	container            string `json:"container,omitempty"`
-	startTimeOffset      string `json:"startTimeOffset,omitempty"`
-	sampleStepSize       string `json:"sampleStepSize,omitempty"`
-	namesCount           int    `json:"namesCount,omitempty"`
-	namesDiversity       int    `json:"namesDiversity,omitempty"`
-	labelsCount          int    `json:"labelsCount,omitempty"`
-	labelsDiversity      int    `json:"labelsDiversity,omitempty"`
-	labelValuesCount     int    `json:"labelValuesCount,omitempty"`
-	labelsValueDiversity int    `json:"labelsValueDiversity,omitempty"`
+	V3ioUrl              string `json:"V3ioUrl,omitempty" yaml:"V3ioUrl"`
+	Container            string `json:"Container,omitempty" yaml:"Container"`
+	StartTimeOffset      string `json:"StartTimeOffset,omitempty" yaml:"StartTimeOffset"`
+	SampleStepSize       int    `json:"SampleStepSize,omitempty" yaml:"SampleStepSize"`
+	NamesCount           int    `json:"NamesCount,omitempty" yaml:"NamesCount"`
+	NamesDiversity       int    `json:"NamesDiversity,omitempty" yaml:"NamesDiversity"`
+	LabelsCount          int    `json:"LabelsCount,omitempty" yaml:"LabelsCount"`
+	LabelsDiversity      int    `json:"LabelsDiversity,omitempty" yaml:"LabelsDiversity"`
+	LabelValuesCount     int    `json:"LabelValuesCount,omitempty" yaml:"LabelValuesCount"`
+	LabelsValueDiversity int    `json:"LabelsValueDiversity,omitempty" yaml:"LabelsValueDiversity"`
 }
 
 func loadFromData(data []byte) (*BenchmarkRandomIngestConfig, error) {
 	cfg := BenchmarkRandomIngestConfig{}
-	err := yaml.Unmarshal(data, cfg)
+	err := yaml.Unmarshal(data, &cfg)
 	if err != nil {
 		return nil, err
 	}
@@ -53,18 +50,27 @@ func loadFromData(data []byte) (*BenchmarkRandomIngestConfig, error) {
 }
 
 func initDefaults(cfg *BenchmarkRandomIngestConfig) {
-	if cfg.v3ioUrl == "" {
+	if cfg.V3ioUrl == "" {
 		var v3ioUrl = os.Getenv("V3IO_URL")
 		if v3ioUrl == "" {
 			v3ioUrl = "localhost:8081"
 		}
-		cfg.v3ioUrl = v3ioUrl
+		cfg.V3ioUrl = v3ioUrl
+	}
+
+	if cfg.Container == "" {
+		cfg.Container = "bigdata"
+	}
+
+	if cfg.StartTimeOffset == "" {
+		cfg.StartTimeOffset = "48h"
 	}
 }
 
 func BenchmarkRandomIngest(b *testing.B) {
 	log.SetFlags(0)
 	log.SetOutput(ioutil.Discard)
+	testStartTimeNano := time.Now().UnixNano()
 
 	var benchConfigFile = os.Getenv("TSDB_BENCH_RANDOM_INGEST_CONFIG")
 	if benchConfigFile == "" {
@@ -74,7 +80,7 @@ func BenchmarkRandomIngest(b *testing.B) {
 	configData, err := ioutil.ReadFile(benchConfigFile)
 	if err != nil {
 		log.Fatal(err)
-		os.Exit(123)
+		os.Exit(2)
 	}
 
 	cfg, err := loadFromData(configData)
@@ -85,9 +91,7 @@ func BenchmarkRandomIngest(b *testing.B) {
 		}
 	}
 
-	fmt.Printf("%+v\n", cfg)
-
-	data := nutest.DataBind{Name: defaultDbName, Url: cfg.v3ioUrl, Container: cfg.container}
+	data := nutest.DataBind{Name: defaultDbName, Url: cfg.V3ioUrl, Container: cfg.Container}
 
 	tc, err := nutest.NewTestContext(ingest.Handler, false, &data)
 	if err != nil {
@@ -100,8 +104,14 @@ func BenchmarkRandomIngest(b *testing.B) {
 	}
 
 	// run the runTest function b.N times
+	relativeTimeOffsetMs, err := utils.Str2duration(cfg.StartTimeOffset)
+	if err != nil {
+		b.Fatal("Unable to resolve start time. Check configuration.")
+	}
+	testStartTimeMs := testStartTimeNano/int64(time.Millisecond) - relativeTimeOffsetMs
+
 	for i := 0; i < b.N; i++ {
-		runTest(i, tc, b)
+		runTest(i, tc, b, cfg, testStartTimeMs)
 	}
 
 	tc.Logger.Warn("Test complete. Count: %d", count)
@@ -128,19 +138,16 @@ func initContext(context *nuclio.Context) error {
 	return nil
 }
 
-func runTest(i int, tc *nutest.TestContext, b *testing.B) {
-	const sampleStepSize = 1000 // post metrics with one second interval
-	sampleTimeMs := startTime + int64(i)*sampleStepSize
-
-	namesCount := 200
-	namesDiversity := 1
-	labelsCount := 10
-	labelsDiversity := 10
-	labelValuesCount := 1
-	labelsValueDiversity := 1
-
+func runTest(i int, tc *nutest.TestContext, b *testing.B, cfg *BenchmarkRandomIngestConfig, testStartTimeMs int64) {
+	sampleTimeMs := testStartTimeMs + int64(i*cfg.SampleStepSize)
 	samples := makeSamples(
-		namesCount, namesDiversity, labelsCount, labelsDiversity, labelValuesCount, labelsValueDiversity, sampleTimeMs)
+		cfg.NamesCount,
+		cfg.NamesDiversity,
+		cfg.LabelsCount,
+		cfg.LabelsDiversity,
+		cfg.LabelValuesCount,
+		cfg.LabelsValueDiversity,
+		sampleTimeMs)
 
 	for _, sample := range *samples {
 		tc.Logger.Debug("Sample data: %s", sample)

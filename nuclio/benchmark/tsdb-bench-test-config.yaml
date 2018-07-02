@@ -1,10 +1,31 @@
-v3ioUrl: localhost:8081
-container: bigdata
-startTimeOffset: 24h
-sampleStepSize: 1000
-namesCount: 26
-namesDiversity: 200
-labelsCount: 10
-labelsDiversity: 10
-labelValuesCount: 10
-labelsValueDiversity: 10
+# File: tsdb-bench-test-config.yaml
+
+# V3IO NGINX
+V3ioUrl: "localhost:8081"
+
+# V3IO container identifier
+Container: "bigdata"
+
+# Relative time, i.e. now() - startTimeOffset
+StartTimeOffset: "24h"
+
+# Interval in milliseconds between samples
+SampleStepSize: 1000
+
+# should be in range [1..26], i.e [A..Z]
+NamesCount: 26
+
+# Pattern: Name_[A..Z][_[1..200]]
+NamesDiversity: 200
+
+# should be in range [1..26]
+LabelsCount: 10
+
+# Pattern: Label_[A..Z][_[1..10]]
+LabelsDiversity: 10
+
+# should be in range [1..26], i.e [A..Z]
+LabelValuesCount: 10
+
+# Pattern: [A..Z][_[1..10]]
+LabelsValueDiversity: 10
