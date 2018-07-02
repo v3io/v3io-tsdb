@@ -17,7 +17,7 @@
     container: "bigdata"
     
     # Path in the container
-    path: "igor"
+    path: "tsdb-1"
     
     # Logging level. Valid values: debug,info,warn,error (Default: info)
     verbose: "warn"
@@ -38,7 +38,7 @@ Use the following shell script for reference:
     
     # Create TSDB instance "tsdb" with some pre-aggregations and interval of 5 seconds (-v for verbose mode)
     SCRIPTPATH="$( cd "$(dirname "$0")" ; pwd -P )"
-    $SCRIPTPATH/tsdbctl create -p $TSDB_PATH -r avg,count,sum,max -i 5 -v -c $SCRIPTPATH/v3io-custom.yaml
+    $SCRIPTPATH/tsdbctl create -p $TSDB_PATH -r count,sum,min,max -i 5 -v -c $SCRIPTPATH/v3io-custom.yaml
     
     echo Done.
 ```
@@ -77,22 +77,21 @@ Use the following script as a reference:
 ```
     #!/bin/bash
     
-    # File: query.sh
+    #File: query.sh
     
     GOBIN=$HOME/go/bin
+    LOOK_BACK_INTERVAL=47h
     TSDB_ROLLUP_INTERVAL=5m
+    V3IO_CONFIG_PATH=$GOBIN/v3io-custom.yaml
     
-    for ((i =0; i < 20; i++))
+    for x in {A..Z}
     do
-      $GOBIN/tsdbctl query cpu_$i -a count -l 23h -i $TSDB_ROLLUP_INTERVAL  -c $GOBIN/v3io-custom.yaml
+      for ((i =0; i < 10; i++))
+      do
+        echo Querying Name_${x}_${i} ...
+        $GOBIN/tsdbctl query Name_${x}_${i} -a count -l $LOOK_BACK_INTERVAL -i $TSDB_ROLLUP_INTERVAL  -c $V3IO_CONFIG_PATH
+      done
     done
-    
-    for ((i =0; i < 10; i++))
-    do
-      $GOBIN/tsdbctl query eth_$i -a count -l 23h -i $TSDB_ROLLUP_INTERVAL  -c $GOBIN/v3io-custom.yaml
-    done
-    
-    $GOBIN/tsdbctl query mem -a count -l 23h -i $TSDB_ROLLUP_INTERVAL  -c $GOBIN/v3io-custom.yaml
     
     echo Done
 ```

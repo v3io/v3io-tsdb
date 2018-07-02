@@ -7,7 +7,6 @@ import (
 	"time"
 	"github.com/nuclio/nuclio-test-go"
 	"math/rand"
-	"log"
 	"io/ioutil"
 	"github.com/nuclio/nuclio-sdk-go"
 	"github.com/v3io/v3io-tsdb/config"
@@ -15,24 +14,81 @@ import (
 	"github.com/v3io/v3io-tsdb/pkg/tsdb"
 	"github.com/v3io/v3io-tsdb/nuclio/ingest"
 	"bytes"
+	"github.com/ghodss/yaml"
+	"github.com/pkg/errors"
+	"log"
 )
 
 const defaultDbName = "db0"
 const defaultContainerId = "bigdata"
 const defaultStartTime = 24 * time.Hour
 
+// TODO: make start time configurable
 var startTime = (time.Now().UnixNano() - defaultStartTime.Nanoseconds()) / int64(time.Millisecond)
 var count = 0 // count real number of samples to compare with query result
+
+type BenchmarkRandomIngestConfig struct {
+	v3ioUrl              string `json:"v3ioUrl,omitempty"`
+	container            string `json:"container,omitempty"`
+	startTimeOffset      string `json:"startTimeOffset,omitempty"`
+	sampleStepSize       string `json:"sampleStepSize,omitempty"`
+	namesCount           int    `json:"namesCount,omitempty"`
+	namesDiversity       int    `json:"namesDiversity,omitempty"`
+	labelsCount          int    `json:"labelsCount,omitempty"`
+	labelsDiversity      int    `json:"labelsDiversity,omitempty"`
+	labelValuesCount     int    `json:"labelValuesCount,omitempty"`
+	labelsValueDiversity int    `json:"labelsValueDiversity,omitempty"`
+}
+
+func loadFromData(data []byte) (*BenchmarkRandomIngestConfig, error) {
+	cfg := BenchmarkRandomIngestConfig{}
+	err := yaml.Unmarshal(data, cfg)
+	if err != nil {
+		return nil, err
+	}
+
+	initDefaults(&cfg)
+
+	return &cfg, err
+}
+
+func initDefaults(cfg *BenchmarkRandomIngestConfig) {
+	if cfg.v3ioUrl == "" {
+		var v3ioUrl = os.Getenv("V3IO_URL")
+		if v3ioUrl == "" {
+			v3ioUrl = "localhost:8081"
+		}
+		cfg.v3ioUrl = v3ioUrl
+	}
+}
 
 func BenchmarkRandomIngest(b *testing.B) {
 	log.SetFlags(0)
 	log.SetOutput(ioutil.Discard)
-	var endpointUrl = os.Getenv("V3IO_URL")
-	if endpointUrl == "" {
-		endpointUrl = "localhost:8081"
+
+	var benchConfigFile = os.Getenv("TSDB_BENCH_RANDOM_INGEST_CONFIG")
+	if benchConfigFile == "" {
+		benchConfigFile = "tsdb-bench-test-config.yaml"
 	}
 
-	data := nutest.DataBind{Name: defaultDbName, Url: endpointUrl, Container: defaultContainerId}
+	configData, err := ioutil.ReadFile(benchConfigFile)
+	if err != nil {
+		log.Fatal(err)
+		os.Exit(123)
+	}
+
+	cfg, err := loadFromData(configData)
+	if err != nil {
+		// if we couldn't load the file and its not the default
+		if benchConfigFile != "" {
+			panic(errors.Wrap(err, fmt.Sprintf("Failed to load config from file %s", benchConfigFile)))
+		}
+	}
+
+	fmt.Printf("%+v\n", cfg)
+
+	data := nutest.DataBind{Name: defaultDbName, Url: cfg.v3ioUrl, Container: cfg.container}
+
 	tc, err := nutest.NewTestContext(ingest.Handler, false, &data)
 	if err != nil {
 		b.Fatal(err)
@@ -78,13 +134,13 @@ func runTest(i int, tc *nutest.TestContext, b *testing.B) {
 
 	namesCount := 200
 	namesDiversity := 1
-	lablesCount := 10
-	lablesDiversity := 10
-	lableValuesCount := 1
-	lablesValueDiversity := 1
+	labelsCount := 10
+	labelsDiversity := 10
+	labelValuesCount := 1
+	labelsValueDiversity := 1
 
 	samples := makeSamples(
-		namesCount, namesDiversity, lablesCount, lablesDiversity, lableValuesCount, lablesValueDiversity, sampleTimeMs)
+		namesCount, namesDiversity, labelsCount, labelsDiversity, labelValuesCount, labelsValueDiversity, sampleTimeMs)
 
 	for _, sample := range *samples {
 		tc.Logger.Debug("Sample data: %s", sample)
@@ -102,25 +158,25 @@ func runTest(i int, tc *nutest.TestContext, b *testing.B) {
 	}
 }
 
-func makeSamples(namesCount, namesDiversity, lablesCount, lableDiversity, lableValueCount,
-lableValueDiversity int, timeStamp int64) *[] string {
+func makeSamples(namesCount, namesDiversity, labelsCount, labelDiversity, labelValueCount,
+labelValueDiversity int, timeStamp int64) *[] string {
 	names, err := makeNamesRange("Name", namesCount, 1, namesDiversity)
 	if err != nil {
 		panic(err)
 	}
-	labels, err := makeNamesRange("Label", lablesCount, 1, lableDiversity)
+	labels, err := makeNamesRange("Label", labelsCount, 1, labelDiversity)
 	if err != nil {
 		panic(err)
 	}
 
-	sizeEstimate := namesCount * namesDiversity * lablesCount * lableDiversity
+	sizeEstimate := namesCount * namesDiversity * labelsCount * labelDiversity
 	model := make(map[string]map[string][]string, sizeEstimate) // names -> labels -> label values
 
 	for _, name := range names {
 		model[name] = make(map[string][]string)
 		for _, label := range labels {
 			model[name][label] = []string{}
-			labelValues, err := makeNamesRange("", lableValueCount, 1, lableValueDiversity)
+			labelValues, err := makeNamesRange("", labelValueCount, 1, labelValueDiversity)
 			if err != nil {
 				panic(err)
 			}

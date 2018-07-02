@@ -1,0 +1,10 @@
+v3ioUrl: localhost:8081
+container: bigdata
+startTimeOffset: 24h
+sampleStepSize: 1000
+namesCount: 26
+namesDiversity: 200
+labelsCount: 10
+labelsDiversity: 10
+labelValuesCount: 10
+labelsValueDiversity: 10
