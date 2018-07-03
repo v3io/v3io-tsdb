@@ -42,11 +42,45 @@ Use the following shell script for reference:
     
     echo Done.
 ```
+### Create test configuration file `tsdb-bench-test-config.yaml` 
+   Use the following example for reference:
+```
+    # V3IO NGINX address
+    V3ioUrl: "localhost:8081"
+    
+    # V3IO container identifier
+    Container: "bigdata"
+    
+    # Relative start time, i.e. now() - startTimeOffset
+    StartTimeOffset: "24h"
+    
+    # Interval in milliseconds between samples, i.e. 1 second
+    SampleStepSize: 1000
+    
+    # should be in range [1..26], i.e [A..Z]
+    NamesCount: 26
+    
+    # Pattern: Name_[A..Z][_[1..200]]
+    NamesDiversity: 20
+    
+    # should be in range [1..26]
+    LabelsCount: 10
+    
+    # Pattern: Label_[A..Z][_[1..10]]
+    LabelsDiversity: 10
+    
+    # should be in range [1..26], i.e [A..Z]
+    LabelValuesCount: 10
+    
+    # Pattern: [A..Z][_[1..10]]
+    LabelsValueDiversity: 10
+``` 
 ### Define following environment variables.
 > Note: you can also define variables locally in a script
 
     * V3IO_URL="<Application Node Address>:8081" 
     * V3IO_TSDBCFG_PATH="$HOME/go/bin/v3io-custom.yaml"
+    * TSDB_BENCH_RANDOM_INGEST_CONFIG"$HOME/go/bin/tsdb-bench-test-config.yaml"
 ### Run RundomIngest benchmark test for desired time period to populate the TSDB.
 Use the following script as a reference:
 > Note: you can pass test duration to the script.
@@ -66,7 +100,7 @@ Use the following script as a reference:
     echo "Ingesting random samples (Bench Time: $BENCH_TIME) ..."
     
     cd $HOME/go/src/github.com/v3io/v3io-tsdb/cmd/tsdbctl
-    time V3IO_URL="localhost:8081" V3IO_TSDBCFG_PATH="$HOME/go/bin/v3io-custom.yaml" go test -benchtime $BENCH_TIME -run=DO_NOT_RUN_TESTS -bench=RandomIngest ../../nuclio/benchmark
+    time V3IO_URL="localhost:8081" V3IO_TSDBCFG_PATH="$HOME/go/bin/v3io-custom.yaml" TSDB_BENCH_RANDOM_INGEST_CONFIG"$HOME/go/bin/tsdb-bench-test-config.yaml" go test -benchtime $BENCH_TIME -run=DO_NOT_RUN_TESTS -bench=RandomIngest ../../nuclio/benchmark
     
     echo Done
 ```
