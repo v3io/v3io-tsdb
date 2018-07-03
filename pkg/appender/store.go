@@ -311,7 +311,7 @@ func (cs *chunkStore) WriteChunks(mc *MetricsCache, metric *MetricState) error {
 		}
 
 		// add value to aggregators
-		cs.aggrList.Aggregate(cs.pending[i].v.(float64)) // TODO only do aggr for float types
+		cs.aggrList.Aggregate(t, cs.pending[i].v)
 
 		// add value to compressed raw value chunk
 		activeChunk.appendAttr(t, cs.pending[i].v.(float64))

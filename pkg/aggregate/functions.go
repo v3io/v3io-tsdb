@@ -26,7 +26,7 @@ import (
 )
 
 type Aggregator interface {
-	Aggregate(v float64)
+	Aggregate(t int64, v float64)
 	Clear()
 	GetAttr() string
 	UpdateExpr(col string, bucket int) string
@@ -39,7 +39,7 @@ type CountAggregator struct {
 	count int
 }
 
-func (a *CountAggregator) Aggregate(v float64) { a.count++ }
+func (a *CountAggregator) Aggregate(t int64, v float64) { a.count++ }
 func (a *CountAggregator) Clear()              { a.count = 0 }
 func (a *CountAggregator) GetAttr() string     { return "count" }
 
@@ -79,7 +79,7 @@ func (a *FloatAggregator) InitExpr(col string, buckets int) string {
 // Sum Aggregator
 type SumAggregator struct{ FloatAggregator }
 
-func (a *SumAggregator) Aggregate(v float64) {
+func (a *SumAggregator) Aggregate(t int64, v float64) {
 	if !math.IsNaN(v) {
 		a.val += v
 	}
@@ -88,7 +88,7 @@ func (a *SumAggregator) Aggregate(v float64) {
 // Power of 2 Aggregator
 type SqrAggregator struct{ FloatAggregator }
 
-func (a *SqrAggregator) Aggregate(v float64) {
+func (a *SqrAggregator) Aggregate(t int64, v float64) {
 	if !math.IsNaN(v) {
 		a.val += v * v
 	}
@@ -97,8 +97,10 @@ func (a *SqrAggregator) Aggregate(v float64) {
 // Minimum Aggregator
 type MinAggregator struct{ FloatAggregator }
 
-func (a *MinAggregator) Aggregate(v float64) {
-	if !math.IsNaN(v) && v < a.val {
+func (a *MinAggregator) Clear() { a.val = math.NaN() }
+
+func (a *MinAggregator) Aggregate(t int64, v float64) {
+	if !math.IsNaN(v) && (math.IsNaN(a.val) || v < a.val) {
 		a.val = v
 	}
 }
@@ -109,11 +111,31 @@ func (a *MinAggregator) UpdateExpr(col string, bucket int) string {
 // Maximum Aggregator
 type MaxAggregator struct{ FloatAggregator }
 
-func (a *MaxAggregator) Aggregate(v float64) {
-	if !math.IsNaN(v) && v > a.val {
+func (a *MaxAggregator) Clear() { a.val = math.NaN() }
+
+func (a *MaxAggregator) Aggregate(t int64, v float64) {
+	if !math.IsNaN(v) && (math.IsNaN(a.val) || v > a.val) {
 		a.val = v
 	}
 }
 func (a *MaxAggregator) UpdateExpr(col string, bucket int) string {
 	return fmt.Sprintf("_%s_%s[%d]=max(_%s_%s[%d],%f);", col, a.attr, bucket, col, a.attr, bucket, a.val)
+}
+
+// Last value Aggregator
+type LastAggregator struct{
+	FloatAggregator
+	lastT            int64
+}
+
+func (a *LastAggregator) Clear() { a.val = math.NaN() }
+
+func (a *LastAggregator) Aggregate(t int64, v float64) {
+	if t > a.lastT  {
+		a.val = v
+		a.lastT = t
+	}
+}
+func (a *LastAggregator) UpdateExpr(col string, bucket int) string {
+	return fmt.Sprintf("_%s_%s[%d]=%f;", col, a.attr, bucket, a.val)
 }

@@ -249,6 +249,8 @@ func (as *AggregateSet) updateCell(aggr AggrType, cell int, val float64) {
 		if val > as.dataArrays[aggr][cell] {
 			as.dataArrays[aggr][cell] = val
 		}
+	case aggrTypeLast:
+		as.dataArrays[aggr][cell] = val
 	}
 }
 
@@ -272,6 +274,13 @@ func (as *AggregateSet) GetCellValue(aggr AggrType, cell int) float64 {
 		sum := as.dataArrays[aggrTypeSum][cell]
 		sqr := as.dataArrays[aggrTypeSqr][cell]
 		return (cnt*sqr - sum*sum) / (cnt * (cnt - 1))
+	case aggrTypeRate:
+		if cell == 0 {
+			return math.NaN()
+		}
+		last := as.dataArrays[aggrTypeLast][cell-1]
+		this := as.dataArrays[aggrTypeLast][cell]
+		return (this - last) / float64(as.interval / 1000)  // clac rate per sec
 	default:
 		return as.dataArrays[aggr][cell]
 	}
