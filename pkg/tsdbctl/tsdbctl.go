@@ -58,7 +58,7 @@ func NewRootCommandeer() *RootCommandeer {
 	cmd.PersistentFlags().StringVarP(&commandeer.verbose, "verbose", "v", "", "Verbose output")
 	cmd.PersistentFlags().Lookup("verbose").NoOptDefVal = "debug"
 	cmd.PersistentFlags().StringVarP(&commandeer.dbPath, "dbpath", "p", "", "sub path for the TSDB, inside the container")
-	cmd.PersistentFlags().StringVarP(&commandeer.v3ioPath, "server", "s", defaultV3ioServer, "V3IO Service URL - ip:port/container")
+	cmd.PersistentFlags().StringVarP(&commandeer.v3ioPath, "server", "s", defaultV3ioServer, "V3IO Service URL - username:password@ip:port/container")
 	cmd.PersistentFlags().StringVarP(&commandeer.cfgFilePath, "config", "c", "", "path to yaml config file")
 
 	// add children
@@ -105,6 +105,17 @@ func (rc *RootCommandeer) initialize() error {
 	}
 
 	if rc.v3ioPath != "" {
+
+		// read username and password
+		if i := strings.Index(rc.v3ioPath, "@"); i > 0 {
+			cfg.Username = rc.v3ioPath[0:i]
+			rc.v3ioPath = rc.v3ioPath[i+1:]
+			if userpass := strings.Split(cfg.Username, ":"); len(userpass)>1 {
+				cfg.Username = userpass[0]
+				cfg.Password = userpass[1]
+			}
+		}
+
 		slash := strings.LastIndex(rc.v3ioPath, "/")
 		if slash == -1 || len(rc.v3ioPath) <= slash+1 {
 			return fmt.Errorf("missing container name in V3IO URL")

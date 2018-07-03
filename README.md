@@ -36,8 +36,10 @@ The solution stores the raw data in highly compressed column chunks (using Goril
 chunk for every n hours (1hr default), queries will only retrieve and decompress the specific columns based on the 
 requested time range. 
 
-Users can define pre-aggregates (count, avg, sum, min, max, stddev, stdvar) which use v3io update expressions and store
+Users can define pre-aggregates (count, avg, sum, min, max, stddev, stdvar, last, rate) which use v3io update expressions and store
 data consistently in arrays per user defined intervals (RollupMin) and/or dimensions (labels). 
+
+![data layout](dataorg.png)
 
 High-resolution queries will detect the pre-aggregates automatically and selectively access the array ranges 
 (skip chunk retrieval, decompression, and aggregation) which significantly accelerate searches and provide real-time 
@@ -130,6 +132,8 @@ options in [config](config/config.go), a minimal configuration looks like:
 v3ioUrl: "v3io address:port"
 container: "tsdb"
 path: "metrics"
+username: "<username>"
+password: "<password>"
 ```
 
 example of creating an adapter:
