@@ -4,35 +4,39 @@ import (
 	"github.com/nuclio/nuclio-sdk-go"
 	"encoding/json"
 	"github.com/v3io/v3io-tsdb/pkg/tsdb"
-	"time"
 	"github.com/v3io/v3io-tsdb/config"
 	"github.com/pkg/errors"
 	"strings"
 	"github.com/v3io/v3io-tsdb/pkg/formatter"
 	"bytes"
 	"github.com/v3io/v3io-go-http"
+	"github.com/v3io/v3io-tsdb/pkg/utils"
 )
 
 // Configuration
 const tsdbConfig = `
-path: "metrpath"
+path: "pmetric"
 `
 
 type tsdbQuery struct {
 	Name          string
 	Aggregators   []string
-	Step          int64
+	Step          string
 	Filter        string
-	From          int64
-	To            int64
+	From          string
+	To            string
+	Last          string
 }
 
 // example query event
 const queryEvent = `
 {
-  "Name": "http_req"
+  "Name": "cpu", 
+  "Last":"2h"
 }
 `
+
+// Note: the user must define the v3io data binding in the nuclio function with path, username, password and name it db0
 
 func Handler(context *nuclio.Context, event nuclio.Event) (interface{}, error) {
 
@@ -42,24 +46,22 @@ func Handler(context *nuclio.Context, event nuclio.Event) (interface{}, error) {
 		return nil, err
 	}
 
-	if query.To == 0 {
-		query.To = time.Now().Unix() * 1000
-	}
-
-	if query.From == 0 {
-		query.From = query.To - 3600 * 1000   // 1 hour earlier
+	// convert string times (unix or RFC3339 or relative like now-2h) to unix milisec times
+	from, to, step, err := utils.GetTimeFromRange(query.From, query.To, query.Last, query.Step)
+	if err != nil {
+		return nil, errors.Wrap(err, "Error parsing query time range")
 	}
 
 	// Create TSDB Querier
 	context.Logger.DebugWith("Query", "params", query)
 	adapter := context.UserData.(*tsdb.V3ioAdapter)
-	qry, err := adapter.Querier(nil, query.From, query.To)
+	qry, err := adapter.Querier(nil, from, to)
 	if err != nil {
 		return nil, errors.Wrap(err, "Failed to initialize Querier")
 	}
 
 	// Select Query to get back a series set iterator
-	set, err := qry.Select(query.Name, strings.Join(query.Aggregators, ","), query.Step, query.Filter)
+	set, err := qry.Select(query.Name, strings.Join(query.Aggregators, ","), step, query.Filter)
 	if err != nil {
 		return nil, errors.Wrap(err, "Select Failed")
 	}

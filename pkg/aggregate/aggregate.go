@@ -25,7 +25,7 @@ import (
 	"strings"
 )
 
-type AggrType uint8
+type AggrType uint16
 
 // aggregation functions
 const (
@@ -34,23 +34,27 @@ const (
 	aggrTypeSqr   AggrType = 4
 	aggrTypeMax   AggrType = 8
 	aggrTypeMin   AggrType = 16
+	aggrTypeLast  AggrType = 32
 
 	// derived aggregators
 	aggrTypeAvg    AggrType = aggrTypeCount | aggrTypeSum
+	aggrTypeRate   AggrType = aggrTypeLast  | 0x8000
 	aggrTypeStddev AggrType = aggrTypeCount | aggrTypeSum | aggrTypeSqr
-	aggrTypeStdvar AggrType = aggrTypeCount | aggrTypeSum | aggrTypeSqr | 0x80
-	aggrTypeAll    AggrType = 0xff
+	aggrTypeStdvar AggrType = aggrTypeCount | aggrTypeSum | aggrTypeSqr | 0x8000
+	aggrTypeAll    AggrType = 0xffff
 )
 
-var rawAggregators = []AggrType{aggrTypeCount, aggrTypeSum, aggrTypeSqr, aggrTypeMax, aggrTypeMin}
+var rawAggregators = []AggrType{aggrTypeCount, aggrTypeSum, aggrTypeSqr, aggrTypeMax, aggrTypeMin, aggrTypeLast}
 
 var aggrTypeString = map[string]AggrType{
-	"count": aggrTypeCount, "sum": aggrTypeSum, "sqr": aggrTypeSqr, "min": aggrTypeMin,
-	"max": aggrTypeMax, "avg": aggrTypeAvg, "stddev": aggrTypeStddev, "stdvar": aggrTypeStdvar, "*": aggrTypeAll}
+	"count": aggrTypeCount, "sum": aggrTypeSum, "sqr": aggrTypeSqr, "max": aggrTypeMax, "min": aggrTypeMin,
+	"last": aggrTypeLast, "avg": aggrTypeAvg, "rate": aggrTypeRate,
+	"stddev": aggrTypeStddev, "stdvar": aggrTypeStdvar, "*": aggrTypeAll}
 
 var aggrToString = map[AggrType]string{
-	aggrTypeCount: "count", aggrTypeSum: "sum", aggrTypeSqr: "sqr", aggrTypeMin: "min",
-	aggrTypeMax: "max", aggrTypeAvg: "avg", aggrTypeStddev: "stddev", aggrTypeStdvar: "stdvar", aggrTypeAll: "*",
+	aggrTypeCount: "count", aggrTypeSum: "sum", aggrTypeSqr: "sqr", aggrTypeMin: "min", aggrTypeMax: "max",
+	aggrTypeLast: "last", aggrTypeAvg: "avg", aggrTypeRate: "rate",
+	aggrTypeStddev: "stddev", aggrTypeStdvar: "stdvar", aggrTypeAll: "*",
 }
 
 func (a AggrType) String() string { return aggrToString[a] }
@@ -87,6 +91,9 @@ func NewAggregatorList(aggrType AggrType) *AggregatorList {
 	if (aggrType & aggrTypeMax) != 0 {
 		list = append(list, &MaxAggregator{FloatAggregator{attr: "max"}})
 	}
+	if (aggrType & aggrTypeLast) != 0 {
+		list = append(list, &LastAggregator{FloatAggregator{attr: "last"}, 0})
+	}
 	return &list
 }
 
@@ -94,9 +101,10 @@ func NewAggregatorList(aggrType AggrType) *AggregatorList {
 type AggregatorList []Aggregator
 
 // append value to all aggregators
-func (a AggregatorList) Aggregate(v float64) {
+func (a AggregatorList) Aggregate(t int64, val interface{}) {
+	v := val.(float64)
 	for _, aggr := range a {
-		aggr.Aggregate(v)
+		aggr.Aggregate(t, v)
 	}
 }
 

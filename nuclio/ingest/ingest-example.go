@@ -7,10 +7,12 @@ import (
 	"github.com/v3io/v3io-tsdb/config"
 	"github.com/v3io/v3io-tsdb/pkg/tsdb"
 	"github.com/v3io/v3io-tsdb/pkg/utils"
-	"time"
+	"sync"
 )
 
 // Configuration
+// Note: the TSDB (path) must be first created using the CLI or API
+// the user must also define the v3io data binding in the nuclio function with path, username, password and name it db0
 const tsdbConfig = `
 path: "pmetric"
 `
@@ -19,16 +21,19 @@ path: "pmetric"
 const pushEvent = `
 {
   "Lset": { "__name__":"cpu", "os" : "win", "node" : "xyz123"},
-  "Time" : 0,
-  "Value" : 3.5
+  "Time" : "now-5m",
+  "Value" : 3.7
 }
 `
 
 type Sample struct {
 	Lset  utils.Labels
-	Time  int64
+	Time  string
 	Value float64
 }
+
+var adapter *tsdb.V3ioAdapter
+var adapterMtx sync.RWMutex
 
 func Handler(context *nuclio.Context, event nuclio.Event) (interface{}, error) {
 
@@ -39,11 +44,18 @@ func Handler(context *nuclio.Context, event nuclio.Event) (interface{}, error) {
 	}
 	app := context.UserData.(tsdb.Appender)
 
-	// Add sample to metric, time is specified in Unix * 1000 (milisec)
-	t := sample.Time
-	if t == 0 {
-		t = time.Now().Unix()*1000
+	// if time is not specified assume "now"
+	if sample.Time == "" {
+		sample.Time = "now"
 	}
+
+	// convert time string to time int, string can be: now, now-2h, int (unix milisec time), or RFC3339 date string
+	t, err := utils.Str2unixTime(sample.Time)
+	if err != nil {
+		return "", err
+	}
+
+	// Append sample to metric
 	_, err = app.Add(sample.Lset,t , sample.Value)
 
 	return "", err
@@ -51,11 +63,19 @@ func Handler(context *nuclio.Context, event nuclio.Event) (interface{}, error) {
 
 // InitContext runs only once when the function runtime starts
 func InitContext(context *nuclio.Context) error {
-	cfg, _ := config.LoadFromData([]byte(tsdbConfig))
-	data := context.DataBinding["db0"].(*v3io.Container)
-	adapter, err := tsdb.NewV3ioAdapter(cfg, data, context.Logger)
-	if err != nil {
-		return err
+
+	var err error
+	defer adapterMtx.Unlock()
+	adapterMtx.Lock()
+
+	if adapter == nil {
+		// create adapter once for all contexts
+		cfg, _ := config.LoadFromData([]byte(tsdbConfig))
+		data := context.DataBinding["db0"].(*v3io.Container)
+		adapter, err = tsdb.NewV3ioAdapter(cfg, data, context.Logger)
+		if err != nil {
+			return err
+		}
 	}
 
 	appender, err := adapter.Appender()

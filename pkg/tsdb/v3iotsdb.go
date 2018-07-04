@@ -163,7 +163,7 @@ func (a *V3ioAdapter) Appender() (Appender, error) {
 
 func (a *V3ioAdapter) StartTime() (int64, error) {
 	startTime := int64(time.Now().Unix() * 1000)
-	return startTime + a.startTimeMargin, nil
+	return startTime - 1000 * 3600 * 24 * 1000, nil // TODO: from config or DB w default
 }
 
 func (a *V3ioAdapter) Close() error {
