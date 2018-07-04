@@ -77,7 +77,6 @@ func Str2unixTime(tstr string) (int64, error) {
 
 	tint, err := strconv.Atoi(tstr)
 	if err == nil {
-		//fmt.Println(time.Unix(int64(tint), 0).Format(time.RFC3339))
 		return int64(tint) * 1000, nil
 	}
 
@@ -86,4 +85,39 @@ func Str2unixTime(tstr string) (int64, error) {
 		return 0, errors.Wrap(err, "Not an RFC 3339 time format")
 	}
 	return t.Unix() * 1000, nil
+}
+
+func GetTimeFromRange(from, to, last , step string) (f int64, t int64, s int64, err error) {
+
+	s, err = Str2duration(step)
+	if err != nil {
+		return
+	}
+
+	t = time.Now().Unix() * 1000
+	if to != "" {
+		t, err = Str2unixTime(to)
+		if err != nil {
+			return
+		}
+	}
+
+	f = t - 1000*3600 // default of last hour
+	if from != "" {
+		f, err = Str2unixTime(from)
+		if err != nil {
+			return
+		}
+	}
+
+	if last != "" {
+		var l int64
+		l, err = Str2duration(last)
+		if err != nil {
+			return
+		}
+		f = t - l
+	}
+
+	return 
 }

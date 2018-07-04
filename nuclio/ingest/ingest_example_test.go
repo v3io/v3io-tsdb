@@ -3,13 +3,14 @@ package ingest
 import (
 	"fmt"
 	"github.com/nuclio/nuclio-test-go"
-	"os"
 	"testing"
 	"time"
+	"os"
 )
 
 func TestIngest(t *testing.T) {
-	data := nutest.DataBind{Name: "db0", Url: os.Getenv("V3IO_URL"), Container: "1"}
+	data := nutest.DataBind{
+		Name: "db0", Url: os.Getenv("V3IO_URL"), Container: "1", User:"<TDB>", Password:"<TBD>"}
 	tc, err := nutest.NewTestContext(Handler, true, &data)
 	if err != nil {
 		t.Fatal(err)
@@ -23,9 +24,6 @@ func TestIngest(t *testing.T) {
 		Body: []byte(pushEvent),
 	}
 	resp, err := tc.Invoke(&testEvent)
-	tc.Logger.InfoWith("Run complete", "resp", resp, "err", err)
-	resp, err = tc.Invoke(&testEvent)
-	time.Sleep(time.Second * 1)
 	tc.Logger.InfoWith("Run complete", "resp", resp, "err", err)
 	fmt.Println(resp)
 
