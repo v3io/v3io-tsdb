@@ -20,7 +20,7 @@ import (
 	"github.com/v3io/v3io-tsdb/pkg/utils"
 )
 
-const defaultDbName = "db0"
+const defaultDbName = "tsdb-test-01"
 
 var count = 0 // count real number of samples to compare with query result
 
@@ -83,7 +83,7 @@ func BenchmarkRandomIngest(b *testing.B) {
 		os.Exit(2)
 	}
 
-	cfg, err := loadFromData(configData)
+	testConfig, err := loadFromData(configData)
 	if err != nil {
 		// if we couldn't load the file and its not the default
 		if benchConfigFile != "" {
@@ -91,9 +91,20 @@ func BenchmarkRandomIngest(b *testing.B) {
 		}
 	}
 
-	data := nutest.DataBind{Name: defaultDbName, Url: cfg.V3ioUrl, Container: cfg.Container}
+	v3ioConfigFile := os.Getenv("V3IO_TSDBCFG_PATH")
+	v3ioConfig, err := config.LoadConfig(v3ioConfigFile)
+	if err != nil {
+		panic(errors.Wrap(err, fmt.Sprintf("Failed to load config from file %s", v3ioConfigFile)))
+	}
+	data := nutest.DataBind{
+		Name:      defaultDbName,
+		Url:       testConfig.V3ioUrl,
+		Container: testConfig.Container,
+		User:      v3ioConfig.Username,
+		Password:  v3ioConfig.Password,
+	}
 
-	tc, err := nutest.NewTestContext(ingest.Handler, false, &data)
+	tc, err := nutest.NewTestContext(ingest.Handler, true, &data)
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -104,14 +115,14 @@ func BenchmarkRandomIngest(b *testing.B) {
 	}
 
 	// run the runTest function b.N times
-	relativeTimeOffsetMs, err := utils.Str2duration(cfg.StartTimeOffset)
+	relativeTimeOffsetMs, err := utils.Str2duration(testConfig.StartTimeOffset)
 	if err != nil {
 		b.Fatal("Unable to resolve start time. Check configuration.")
 	}
 	testStartTimeMs := testStartTimeNano/int64(time.Millisecond) - relativeTimeOffsetMs
 
 	for i := 0; i < b.N; i++ {
-		runTest(i, tc, b, cfg, testStartTimeMs)
+		runTest(i, tc, b, testConfig, testStartTimeMs)
 	}
 
 	tc.Logger.Warn("Test complete. Count: %d", count)
