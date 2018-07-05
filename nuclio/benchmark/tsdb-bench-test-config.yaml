@@ -19,13 +19,13 @@ NamesCount: 26
 NamesDiversity: 20
 
 # should be in range [1..26]
-LabelsCount: 10
+LabelsCount: 3
 
 # Pattern: Label_[A..Z][_[1..10]]
-LabelsDiversity: 10
+LabelsDiversity: 1
 
 # should be in range [1..26], i.e [A..Z]
-LabelValuesCount: 10
+LabelValuesCount: 26
 
 # Pattern: [A..Z][_[1..10]]
-LabelsValueDiversity: 10
+LabelsValueDiversity: 100

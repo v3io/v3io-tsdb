@@ -20,7 +20,7 @@ import (
 	"github.com/v3io/v3io-tsdb/pkg/utils"
 )
 
-const defaultDbName = "tsdb-test-01"
+const defaultDbName = "db0"
 
 var count = 0 // count real number of samples to compare with query result
 
@@ -231,7 +231,7 @@ func makeSampleTemplates(model map[string]map[string][]string) *[]string {
 				buffer.WriteString(label)
 				buffer.WriteString(fmt.Sprintf("\" : \"%s\"", labelValues[index]))
 			}
-			buffer.WriteString("}, \"Time\" : %d, \"Value\" : %f}")
+			buffer.WriteString("}, \"Time\" : \"%d\", \"Value\" : %f}")
 			result = append(result, buffer.String())
 		}
 	}
