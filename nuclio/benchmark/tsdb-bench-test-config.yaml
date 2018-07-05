@@ -1,10 +1,7 @@
 # File: tsdb-bench-test-config.yaml
 
-# V3IO NGINX
-V3ioUrl: "localhost:8081"
-
-# V3IO container identifier
-Container: "bigdata"
+# Control Nuclio test verbosity
+Verbose: false
 
 # Relative time, i.e. now() - startTimeOffset
 StartTimeOffset: "24h"

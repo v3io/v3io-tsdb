@@ -25,8 +25,7 @@ const defaultDbName = "db0"
 var count = 0 // count real number of samples to compare with query result
 
 type BenchmarkRandomIngestConfig struct {
-	V3ioUrl              string `json:"V3ioUrl,omitempty" yaml:"V3ioUrl"`
-	Container            string `json:"Container,omitempty" yaml:"Container"`
+	Verbose              bool   `json:"Verbose,omitempty" yaml:"Verbose"`
 	StartTimeOffset      string `json:"StartTimeOffset,omitempty" yaml:"StartTimeOffset"`
 	SampleStepSize       int    `json:"SampleStepSize,omitempty" yaml:"SampleStepSize"`
 	NamesCount           int    `json:"NamesCount,omitempty" yaml:"NamesCount"`
@@ -50,18 +49,6 @@ func loadFromData(data []byte) (*BenchmarkRandomIngestConfig, error) {
 }
 
 func initDefaults(cfg *BenchmarkRandomIngestConfig) {
-	if cfg.V3ioUrl == "" {
-		var v3ioUrl = os.Getenv("V3IO_URL")
-		if v3ioUrl == "" {
-			v3ioUrl = "localhost:8081"
-		}
-		cfg.V3ioUrl = v3ioUrl
-	}
-
-	if cfg.Container == "" {
-		cfg.Container = "bigdata"
-	}
-
 	if cfg.StartTimeOffset == "" {
 		cfg.StartTimeOffset = "48h"
 	}
@@ -98,13 +85,13 @@ func BenchmarkRandomIngest(b *testing.B) {
 	}
 	data := nutest.DataBind{
 		Name:      defaultDbName,
-		Url:       testConfig.V3ioUrl,
-		Container: testConfig.Container,
+		Url:       v3ioConfig.V3ioUrl,
+		Container: v3ioConfig.Container,
 		User:      v3ioConfig.Username,
 		Password:  v3ioConfig.Password,
 	}
 
-	tc, err := nutest.NewTestContext(ingest.Handler, true, &data)
+	tc, err := nutest.NewTestContext(ingest.Handler, testConfig.Verbose, &data)
 	if err != nil {
 		b.Fatal(err)
 	}
