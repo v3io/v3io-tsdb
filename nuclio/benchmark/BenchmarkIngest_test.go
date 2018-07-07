@@ -12,12 +12,12 @@ import (
 	"github.com/v3io/v3io-tsdb/config"
 	"github.com/v3io/v3io-go-http"
 	"github.com/v3io/v3io-tsdb/pkg/tsdb"
-	"github.com/v3io/v3io-tsdb/nuclio/ingest"
 	"bytes"
 	"github.com/ghodss/yaml"
 	"github.com/pkg/errors"
 	"log"
 	"github.com/v3io/v3io-tsdb/pkg/utils"
+	"encoding/json"
 )
 
 const defaultDbName = "db0"
@@ -91,7 +91,7 @@ func BenchmarkRandomIngest(b *testing.B) {
 		Password:  v3ioConfig.Password,
 	}
 
-	tc, err := nutest.NewTestContext(ingest.Handler, testConfig.Verbose, &data)
+	tc, err := nutest.NewTestContext(handler, testConfig.Verbose, &data)
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -258,4 +258,36 @@ func makeNamesRange(prefix string, count, minIndex, maxIndex int) ([]string, err
 		}
 	}
 	return array, nil
+}
+
+func handler(context *nuclio.Context, event nuclio.Event) (interface{}, error) {
+
+	sample := sample{}
+	err := json.Unmarshal(event.GetBody(), &sample)
+	if err != nil {
+		return nil, err
+	}
+	app := context.UserData.(tsdb.Appender)
+
+	// if time is not specified assume "now"
+	if sample.Time == "" {
+		sample.Time = "now"
+	}
+
+	// convert time string to time int, string can be: now, now-2h, int (unix milisec time), or RFC3339 date string
+	t, err := utils.Str2unixTime(sample.Time)
+	if err != nil {
+		return "", err
+	}
+
+	// Append sample to metric
+	_, err = app.Add(sample.Lset,t , sample.Value)
+
+	return "", err
+}
+
+type sample struct {
+	Lset  utils.Labels
+	Time  string
+	Value float64
 }

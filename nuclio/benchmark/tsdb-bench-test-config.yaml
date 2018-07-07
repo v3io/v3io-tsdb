@@ -4,7 +4,7 @@
 Verbose: false
 
 # Relative time, i.e. now() - startTimeOffset
-StartTimeOffset: "24h"
+StartTimeOffset: "72h"
 
 # Interval in milliseconds between samples
 SampleStepSize: 1000
@@ -25,4 +25,4 @@ LabelsDiversity: 1
 LabelValuesCount: 26
 
 # Pattern: [A..Z][_[1..10]]
-LabelsValueDiversity: 100
+LabelsValueDiversity: 10
