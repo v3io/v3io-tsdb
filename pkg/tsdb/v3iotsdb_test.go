@@ -33,13 +33,13 @@ import (
 //const basetime = 1524690488000
 var basetime int64
 
-func TestTsdb(t *testing.T) {
+func TestTsdbIntegration(t *testing.T) {
 
 	if testing.Short() {
 		t.Skip("Skipping integration test.")
 	}
 
-	basetime = time.Now().Unix() * 1000 - 3600000  // now - 1hr
+	basetime = time.Now().Unix()*1000 - 3600000 // now - 1hr
 
 	d, h := partmgr.TimeToDHM(basetime)
 	fmt.Println("base=", d, h)
@@ -61,7 +61,7 @@ func TestTsdb(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	lset := utils.FromStrings("__name__","http_req", "method", "post")
+	lset := utils.FromStrings("__name__", "http_req", "method", "post")
 
 	err = DoAppend(lset, appender, 50, 30)
 	if err != nil {

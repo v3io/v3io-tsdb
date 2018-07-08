@@ -13,7 +13,7 @@ import (
 
 const basetime = 15222481971234
 
-func TestTsdb(t *testing.T) {
+func TestTsdbIntegration(t *testing.T) {
 
 	if testing.Short() {
 		t.Skip("Skipping integration test.")
