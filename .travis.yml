@@ -4,4 +4,5 @@ go:
   - "1.10.x"
 
 script:
-  - go test -short -v ./...
+  - make test
+  - make lint
