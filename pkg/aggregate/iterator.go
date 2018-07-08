@@ -257,7 +257,7 @@ func (as *AggregateSet) updateCell(aggr AggrType, cell int, val float64) {
 // return the value per aggregate or complex function
 func (as *AggregateSet) GetCellValue(aggr AggrType, cell int) float64 {
 
-	if cell > as.maxCell || cell >= as.length {  // TODO: should >Len return NaN or Zero ?
+	if cell > as.maxCell || cell >= as.length { // TODO: should >Len return NaN or Zero ?
 		return math.NaN()
 	}
 
@@ -280,7 +280,7 @@ func (as *AggregateSet) GetCellValue(aggr AggrType, cell int) float64 {
 		}
 		last := as.dataArrays[aggrTypeLast][cell-1]
 		this := as.dataArrays[aggrTypeLast][cell]
-		return (this - last) / float64(as.interval / 1000)  // clac rate per sec
+		return (this - last) / float64(as.interval/1000) // clac rate per sec
 	default:
 		return as.dataArrays[aggr][cell]
 	}

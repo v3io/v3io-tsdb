@@ -21,8 +21,8 @@ such restriction.
 package tsdbctl
 
 import (
-	"github.com/spf13/cobra"
 	"github.com/pkg/errors"
+	"github.com/spf13/cobra"
 )
 
 type delCommandeer struct {
@@ -38,8 +38,8 @@ func newDeleteCommandeer(rootCommandeer *RootCommandeer) *delCommandeer {
 	}
 
 	cmd := &cobra.Command{
-		Use:   "del",
-		Short: "delete a TSDB",
+		Use:     "del",
+		Short:   "delete a TSDB",
 		Aliases: []string{"delete"},
 		RunE: func(cmd *cobra.Command, args []string) error {
 
@@ -72,4 +72,3 @@ func (ic *delCommandeer) delete() error {
 
 	return nil
 }
-

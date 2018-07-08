@@ -3,8 +3,8 @@ package query
 import (
 	"fmt"
 	"github.com/nuclio/nuclio-test-go"
-	"testing"
 	"os"
+	"testing"
 )
 
 func TestQueryIntegration(t *testing.T) {

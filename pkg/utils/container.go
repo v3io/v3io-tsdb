@@ -22,11 +22,11 @@ package utils
 
 import (
 	"encoding/binary"
+	"fmt"
 	"github.com/nuclio/logger"
 	"github.com/nuclio/zap"
 	"github.com/pkg/errors"
 	"github.com/v3io/v3io-go-http"
-	"fmt"
 	"time"
 )
 
@@ -85,10 +85,9 @@ func AsInt64Array(val []byte) []uint64 {
 	return array
 }
 
-
 func DeleteTable(container *v3io.Container, path, filter string, workers int) error {
 
-	input := v3io.GetItemsInput{ Path: path, AttributeNames: []string{"__name"}, Filter:filter}
+	input := v3io.GetItemsInput{Path: path, AttributeNames: []string{"__name"}, Filter: filter}
 	iter, err := NewAsyncItemsCursor(container, &input, workers)
 	//iter, err := container.Sync.GetItemsCursor(&input)
 	if err != nil {
@@ -97,16 +96,16 @@ func DeleteTable(container *v3io.Container, path, filter string, workers int) er
 
 	responseChan := make(chan *v3io.Response, 1000)
 	commChan := make(chan int, 2)
-	doneChan := respWaitLoop(commChan, responseChan, 10 * time.Second)
+	doneChan := respWaitLoop(commChan, responseChan, 10*time.Second)
 	reqMap := map[uint64]bool{}
 
-	i:=0
+	i := 0
 	for iter.Next() {
 		name := iter.GetField("__name").(string)
-		req, err := container.DeleteObject(&v3io.DeleteObjectInput{Path: path +"/" + name}, nil, responseChan)
+		req, err := container.DeleteObject(&v3io.DeleteObjectInput{Path: path + "/" + name}, nil, responseChan)
 		if err != nil {
 			commChan <- i
-			return errors.Wrap(err, "failed to delete object " + name)
+			return errors.Wrap(err, "failed to delete object "+name)
 		}
 		reqMap[req.ID] = true
 		i++
@@ -117,7 +116,7 @@ func DeleteTable(container *v3io.Container, path, filter string, workers int) er
 		return errors.Wrap(iter.Err(), "failed to delete object ")
 	}
 
-	<- doneChan
+	<-doneChan
 
 	return nil
 }
@@ -143,14 +142,14 @@ func respWaitLoop(comm chan int, responseChan chan *v3io.Response, timeout time.
 					return
 				}
 
-			case requests = <- comm:
+			case requests = <-comm:
 				if requests <= responses {
 					done <- true
 					return
 				}
 
 			case <-time.After(timeout):
-				fmt.Println("\nResp loop timed out! ",requests, responses)
+				fmt.Println("\nResp loop timed out! ", requests, responses)
 				done <- true
 				return
 			}
