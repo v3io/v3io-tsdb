@@ -1,3 +1,5 @@
+[![Build Status](https://travis-ci.org/v3io/v3io-tsdb.svg?branch=master)](https://travis-ci.org/v3io/v3io-tsdb)
+
 # V3IO-TSDB
 iguazio API lib for time-series DB access and Prometheus TSDB storage driver. 
 
