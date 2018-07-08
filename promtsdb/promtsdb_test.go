@@ -15,6 +15,10 @@ const basetime = 15222481971234
 
 func TestTsdb(t *testing.T) {
 
+	if testing.Short() {
+		t.Skip("Skipping integration test.")
+	}
+
 	d, h := partmgr.TimeToDHM(basetime)
 	fmt.Println("base=", d, h)
 	cfg, err := config.LoadConfig("../v3io.yaml")

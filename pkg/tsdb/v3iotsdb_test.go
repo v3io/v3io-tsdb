@@ -34,6 +34,11 @@ import (
 var basetime int64
 
 func TestTsdb(t *testing.T) {
+
+	if testing.Short() {
+		t.Skip("Skipping integration test.")
+	}
+
 	basetime = time.Now().Unix() * 1000 - 3600000  // now - 1hr
 
 	d, h := partmgr.TimeToDHM(basetime)
