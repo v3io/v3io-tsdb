@@ -1,26 +1,26 @@
 package formatter
 
 import (
-	"io"
-	"github.com/v3io/v3io-tsdb/pkg/querier"
 	"fmt"
-	"time"
+	"github.com/v3io/v3io-tsdb/pkg/querier"
+	"github.com/v3io/v3io-tsdb/pkg/utils"
+	"io"
 	"strconv"
 	"strings"
-	"github.com/v3io/v3io-tsdb/pkg/utils"
+	"time"
 )
 
 func NewFormatter(format string, cfg *FormatterConfig) (Formatter, error) {
 	if cfg == nil {
-		cfg = &FormatterConfig{ TimeFormat: time.RFC3339 }
+		cfg = &FormatterConfig{TimeFormat: time.RFC3339}
 	}
 	switch format {
 	case "", "text":
-		return textFormatter{baseFormatter{cfg:cfg}}, nil
+		return textFormatter{baseFormatter{cfg: cfg}}, nil
 	case "csv":
-		return csvFormatter{baseFormatter{cfg:cfg}}, nil
+		return csvFormatter{baseFormatter{cfg: cfg}}, nil
 	case "json":
-		return simpleJsonFormatter{baseFormatter{cfg:cfg}}, nil
+		return simpleJsonFormatter{baseFormatter{cfg: cfg}}, nil
 
 	default:
 		return nil, fmt.Errorf("unknown formatter type %s", format)
@@ -32,11 +32,11 @@ type Formatter interface {
 }
 
 type FormatterConfig struct {
-	TimeFormat    string
+	TimeFormat string
 }
 
 type baseFormatter struct {
-	cfg  *FormatterConfig
+	cfg *FormatterConfig
 }
 
 func (f baseFormatter) timeString(t int64) string {
@@ -54,7 +54,7 @@ func labelsToStr(labels utils.Labels) (string, string) {
 		if lbl.Name == "__name__" {
 			name = lbl.Value
 		} else {
-			lbls = append(lbls, lbl.Name + "=" + lbl.Value)
+			lbls = append(lbls, lbl.Name+"="+lbl.Value)
 		}
 	}
 	return name, strings.Join(lbls, ",")

@@ -3,9 +3,9 @@ package ingest
 import (
 	"fmt"
 	"github.com/nuclio/nuclio-test-go"
+	"os"
 	"testing"
 	"time"
-	"os"
 )
 
 func TestIngestIntegration(t *testing.T) {
