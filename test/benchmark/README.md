@@ -53,13 +53,13 @@ Use the following shell script for reference:
     StartTimeOffset: "24h"
     
     # Interval in milliseconds between samples, i.e. 1 second
-    SampleStepSize: 5000
+    SampleStepSize: 1000
     
     # should be in range [1..26], i.e [A..Z]
     NamesCount: 26
     
     # Pattern: Name_[A..Z][_[1..200]]
-    NamesDiversity: 10
+    NamesDiversity: 20
     
     # should be in range [1..26]
     LabelsCount: 10
