@@ -163,7 +163,7 @@ func (a *V3ioAdapter) Appender() (Appender, error) {
 
 func (a *V3ioAdapter) StartTime() (int64, error) {
 	startTime := int64(time.Now().Unix() * 1000)
-	return startTime - 1000 * 3600 * 24 * 1000, nil // TODO: from config or DB w default
+	return startTime - 1000*3600*24*1000, nil // TODO: from config or DB w default
 }
 
 func (a *V3ioAdapter) Close() error {
@@ -196,9 +196,9 @@ func (a *V3ioAdapter) DeleteDB(config bool, force bool) error {
 	a.container.Sync.DeleteObject(&v3io.DeleteObjectInput{Path: path})
 
 	if config {
-		a.logger.Info("Delete TSDB config in path %s", a.cfg.Path + DB_CONFIG_PATH)
+		a.logger.Info("Delete TSDB config in path %s", a.cfg.Path+DB_CONFIG_PATH)
 		err = a.container.Sync.DeleteObject(&v3io.DeleteObjectInput{Path: a.cfg.Path + DB_CONFIG_PATH})
-		if err != nil  && !force {
+		if err != nil && !force {
 			return errors.New("Cant delete config or not found in " + a.cfg.Path + DB_CONFIG_PATH)
 		}
 		// delete the Directory object
@@ -211,7 +211,7 @@ func (a *V3ioAdapter) DeleteDB(config bool, force bool) error {
 // return number of objects in a table
 func (a *V3ioAdapter) CountMetrics(part string) (int, error) {
 
-	input := v3io.GetItemsInput{ Path: a.partitionMngr.GetHead().GetPath(), AttributeNames: []string{"__size"}}
+	input := v3io.GetItemsInput{Path: a.partitionMngr.GetHead().GetPath(), AttributeNames: []string{"__size"}}
 	iter, err := utils.NewAsyncItemsCursor(a.container, &input, a.cfg.QryWorkers)
 	if err != nil {
 		return 0, err

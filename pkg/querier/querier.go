@@ -26,9 +26,9 @@ import (
 	"github.com/v3io/v3io-tsdb/config"
 	"github.com/v3io/v3io-tsdb/pkg/aggregate"
 	"github.com/v3io/v3io-tsdb/pkg/partmgr"
+	"github.com/v3io/v3io-tsdb/pkg/utils"
 	"sort"
 	"strings"
-	"github.com/v3io/v3io-tsdb/pkg/utils"
 )
 
 // Create a new Querier interface
@@ -41,10 +41,10 @@ func NewV3ioQuerier(container *v3io.Container, logger logger.Logger, mint, maxt 
 }
 
 type V3ioQuerier struct {
-	logger     logger.Logger
-	container  *v3io.Container
-	cfg        *config.V3ioConfig
-	mint, maxt int64
+	logger        logger.Logger
+	container     *v3io.Container
+	cfg           *config.V3ioConfig
+	mint, maxt    int64
 	partitionMngr *partmgr.PartitionManager
 	overlapWin    []int
 }
@@ -223,7 +223,7 @@ func (s *V3ioSeriesSet) Next() bool {
 			end := s.partition.Time2Bucket(s.maxt + s.interval)
 
 			// len of the returned array, cropped at the end in case of cyclic overlap
-			length := int((s.maxt - mint) / s.interval) + 2
+			length := int((maxtUpdate-mint)/s.interval) + 2
 
 			if s.overlapWin != nil {
 				s.baseTime = s.maxt //- int64(s.overlapWin[0]) * s.interval

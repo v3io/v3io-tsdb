@@ -3,13 +3,18 @@ package query
 import (
 	"fmt"
 	"github.com/nuclio/nuclio-test-go"
-	"testing"
 	"os"
+	"testing"
 )
 
-func TestQuery(t *testing.T) {
+func TestQueryIntegration(t *testing.T) {
+
+	if testing.Short() {
+		t.Skip("Skipping integration test.")
+	}
+
 	data := nutest.DataBind{
-		Name: "db0", Url: os.Getenv("V3IO_URL"), Container: "1", User:"<TDB>", Password:"<TBD>"}
+		Name: "db0", Url: os.Getenv("V3IO_URL"), Container: "1", User: "<TDB>", Password: "<TBD>"}
 	tc, err := nutest.NewTestContext(Handler, false, &data)
 	if err != nil {
 		t.Fatal(err)
@@ -27,4 +32,3 @@ func TestQuery(t *testing.T) {
 	fmt.Println(resp)
 
 }
-

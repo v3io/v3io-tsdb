@@ -1,11 +1,11 @@
 package formatter
 
 import (
-	"gonum.org/v1/plot"
-	"gonum.org/v1/plot/plotutil"
-	"github.com/v3io/v3io-tsdb/pkg/querier"
 	"fmt"
+	"github.com/v3io/v3io-tsdb/pkg/querier"
+	"gonum.org/v1/plot"
 	"gonum.org/v1/plot/plotter"
+	"gonum.org/v1/plot/plotutil"
 	"gonum.org/v1/plot/vg"
 )
 
@@ -20,7 +20,6 @@ func MakePlot(set querier.SeriesSet, path string) error {
 	//p.X.Label.Text = "time"
 	//p.Y.Label.Text = "Y"
 	p.X.Tick.Marker = plot.TimeTicks{Format: "2006-01-02\n15:04"}
-
 
 	var vs []interface{}
 	for set.Next() {
@@ -49,12 +48,12 @@ func MakePlot(set querier.SeriesSet, path string) error {
 
 // randomPoints returns some random x, y points.
 func addLine(p *plot.Plot, series querier.Series) (plotter.XYs, error) {
-	pts :=plotter.XYs{}
+	pts := plotter.XYs{}
 
 	iter := series.Iterator()
 	for iter.Next() {
 		t, v := iter.At()
-		pts = append(pts, struct{ X, Y float64 }{X:float64(t)/1000, Y:v})
+		pts = append(pts, struct{ X, Y float64 }{X: float64(t) / 1000, Y: v})
 	}
 
 	return pts, iter.Err()

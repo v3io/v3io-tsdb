@@ -1,16 +1,16 @@
 package query
 
 import (
-	"github.com/nuclio/nuclio-sdk-go"
-	"encoding/json"
-	"github.com/v3io/v3io-tsdb/pkg/tsdb"
-	"github.com/v3io/v3io-tsdb/config"
-	"github.com/pkg/errors"
-	"strings"
-	"github.com/v3io/v3io-tsdb/pkg/formatter"
 	"bytes"
+	"encoding/json"
+	"github.com/nuclio/nuclio-sdk-go"
+	"github.com/pkg/errors"
 	"github.com/v3io/v3io-go-http"
+	"github.com/v3io/v3io-tsdb/config"
+	"github.com/v3io/v3io-tsdb/pkg/formatter"
+	"github.com/v3io/v3io-tsdb/pkg/tsdb"
 	"github.com/v3io/v3io-tsdb/pkg/utils"
+	"strings"
 )
 
 // Configuration
@@ -19,13 +19,13 @@ path: "pmetric"
 `
 
 type tsdbQuery struct {
-	Name          string
-	Aggregators   []string
-	Step          string
-	Filter        string
-	From          string
-	To            string
-	Last          string
+	Name        string
+	Aggregators []string
+	Step        string
+	Filter      string
+	From        string
+	To          string
+	Last        string
 }
 
 // example query event
@@ -91,4 +91,3 @@ func InitContext(context *nuclio.Context) error {
 	context.UserData = adapter
 	return nil
 }
-
