@@ -4,25 +4,28 @@
 Verbose: false
 
 # Relative time, i.e. now() - startTimeOffset
-StartTimeOffset: "72h"
+StartTimeOffset: "48h"
 
 # Interval in milliseconds between samples
-SampleStepSize: 1000
+SampleStepSize: 5000
 
 # should be in range [1..26], i.e [A..Z]
 NamesCount: 26
 
 # Pattern: Name_[A..Z][_[1..200]]
-NamesDiversity: 20
+NamesDiversity: 10
 
 # should be in range [1..26]
-LabelsCount: 3
+LabelsCount: 1
 
 # Pattern: Label_[A..Z][_[1..10]]
-LabelsDiversity: 1
+LabelsDiversity: 3
 
 # should be in range [1..26], i.e [A..Z]
-LabelValuesCount: 26
+LabelValuesCount: 1
 
 # Pattern: [A..Z][_[1..10]]
 LabelsValueDiversity: 10
+
+# Flush frequency - flush metrics after every N steps
+FlushFrequency: 10

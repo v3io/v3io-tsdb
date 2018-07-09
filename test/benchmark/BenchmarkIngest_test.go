@@ -29,6 +29,7 @@ type BenchmarkIngestConfig struct {
 	LabelsDiversity      int    `json:"LabelsDiversity,omitempty" yaml:"LabelsDiversity"`
 	LabelValuesCount     int    `json:"LabelValuesCount,omitempty" yaml:"LabelValuesCount"`
 	LabelsValueDiversity int    `json:"LabelsValueDiversity,omitempty" yaml:"LabelsValueDiversity"`
+	FlushFrequency       int    `json:"FlushFrequency,omitempty" yaml:"FlushFrequency"`
 }
 
 func loadFromData(data []byte) (*BenchmarkIngestConfig, error) {
@@ -113,19 +114,19 @@ func BenchmarkIngest(b *testing.B) {
 			testConfig.LabelsValueDiversity))
 
 	for i := 0; i < b.N; i++ {
-		runTest(i, appender, b, timeStamps, sampleTemplates)
+		runTest(appender, b, timeStamps, sampleTemplates, testConfig.FlushFrequency)
 	}
 
 	fmt.Printf("\nTest complete. Count: %d\n", count)
 }
 
 func runTest(
-	cycleId int,
 	appender tsdb.Appender,
 	b *testing.B,
 	timeStamps []int64,
-	sampleTemplates []string) {
-	rowsAdded := appendAll(appender, b, sampleTemplates, timeStamps, cycleId)
+	sampleTemplates []string,
+	flushFrequency int) {
+	rowsAdded := appendAll(appender, b, sampleTemplates, timeStamps, flushFrequency)
 
 	count = count + rowsAdded
 }
@@ -219,7 +220,7 @@ func makeNamesRange(prefix string, count, minIndex, maxIndex int) ([]string, err
 	return array, nil
 }
 
-func appendAll(appender tsdb.Appender, testCtx *testing.B, sampleTemplates []string, timeStamps []int64, cycleId int) int {
+func appendAll(appender tsdb.Appender, testCtx *testing.B, sampleTemplates []string, timeStamps []int64, flushFrequency int) int {
 	count := 0
 
 	samplesCount := len(sampleTemplates)
@@ -227,26 +228,39 @@ func appendAll(appender tsdb.Appender, testCtx *testing.B, sampleTemplates []str
 
 	if samplesCount > 0 && tsCount > 0 {
 		refsMap := map[uint64]bool{}
-
-		// Add remaining
-		for _, sampleTemplateJson := range sampleTemplates {
+		refsArray := make([]uint64, len(sampleTemplates))
+		// First pass - populate references for add fast
+		initialTimeStamp := timeStamps[0]
+		for i, sampleTemplateJson := range sampleTemplates {
 			// Add first & get reference
-			sample := jsonTemplate2Sample(sampleTemplateJson, testCtx, timeStamps[0], makeRandomValue())
-			ref, err := appender.Add(sample.Lset, timeStamps[0], sample.Value)
+			sample := jsonTemplate2Sample(sampleTemplateJson, testCtx, initialTimeStamp, makeRandomValue())
+			ref, err := appender.Add(sample.Lset, initialTimeStamp, sample.Value)
 			if err != nil {
 				testCtx.Fatalf("Add request has failed!\nError: %s", err)
 			}
-			for _, timeStamp := range timeStamps[1:] {
-				sample = jsonTemplate2Sample(sampleTemplateJson, testCtx, timeStamp, makeRandomValue())
-				err = appender.AddFast(sample.Lset, ref, timeStamp, sample.Value)
+			refsArray[i] = ref
+			refsMap[ref] = true
+			count++
+		}
+
+		for dataPointIndex := 1; dataPointIndex < len(timeStamps); dataPointIndex++ {
+			for refIndex, sampleTemplateJson := range sampleTemplates {
+				sample := jsonTemplate2Sample(sampleTemplateJson, testCtx, timeStamps[dataPointIndex], makeRandomValue())
+				err := appender.AddFast(sample.Lset, refsArray[refIndex], timeStamps[dataPointIndex], sample.Value)
 				if err != nil {
 					testCtx.Fatalf("AddFast request has failed!\nSample:%v\nError: %s", sample, err)
 				}
 				count++
+				fmt.Printf("\rTotal samples count: %d\tTime: %s", count,
+					time.Unix(int64(timeStamps[dataPointIndex])/1000, 0).Format(time.RFC3339))
 			}
-			refsMap[ref] = true
+
+			if dataPointIndex%flushFrequency == 0 {
+				// block and flush all metrics every flush interval
+				waitForWrites(appender, &refsMap, testCtx)
+			}
 		}
-		waitForWrites(appender, &refsMap)
+		waitForWrites(appender, &refsMap, testCtx)
 	} else {
 		testCtx.Fatalf("Insufficient input. "+
 			"Samples count: [%d] and timestamps count [%d] should be positive numbers", samplesCount, tsCount)
@@ -255,15 +269,13 @@ func appendAll(appender tsdb.Appender, testCtx *testing.B, sampleTemplates []str
 	return count
 }
 
-func waitForWrites(append tsdb.Appender, refMap *map[uint64]bool) error {
-
+func waitForWrites(append tsdb.Appender, refMap *map[uint64]bool, testCtx *testing.B) {
 	for ref := range *refMap {
 		err := append.WaitForReady(ref)
 		if err != nil {
-			return err
+			testCtx.Fatalf("waitForWrites has failed!\nError: %s", err)
 		}
 	}
-	return nil
 }
 
 func makeRandomValue() float64 {
