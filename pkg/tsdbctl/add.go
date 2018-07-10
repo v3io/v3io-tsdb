@@ -21,22 +21,22 @@ such restriction.
 package tsdbctl
 
 import (
+	"bytes"
+	"encoding/csv"
 	"fmt"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
+	"github.com/v3io/v3io-tsdb/pkg/tsdb"
 	"github.com/v3io/v3io-tsdb/pkg/utils"
+	"io/ioutil"
 	"math"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
-	"sort"
-	"encoding/csv"
-	"bytes"
-	"io/ioutil"
-	"github.com/v3io/v3io-tsdb/pkg/tsdb"
 )
 
-const ARRAY_SEPARATOR = ";"
+const ArraySeparator = ","
 
 type addCommandeer struct {
 	cmd            *cobra.Command
@@ -55,13 +55,13 @@ func newAddCommandeer(rootCommandeer *RootCommandeer) *addCommandeer {
 	}
 
 	cmd := &cobra.Command{
-		Use:     "add metric [labels] [flags]",
+		Use:     "add <metric> [labels] [flags]",
 		Aliases: []string{"append"},
 		Short:   "add samples to metric. e.g. add http_req method=get -d 99.9",
 		RunE: func(cmd *cobra.Command, args []string) error {
 
 			if commandeer.inFile == "" {
-				// if its not using an input CSV file check for name & labels arguments 
+				// if its not using an input CSV file check for name & labels arguments
 				if len(args) == 0 {
 					return errors.New("add require metric name and/or labels")
 				}
@@ -133,7 +133,7 @@ func (ac *addCommandeer) add() error {
 	// process a CSV file input
 	data, err := ioutil.ReadFile(ac.inFile)
 	if err != nil {
-		errors.Wrap(err, "cant open/read CSV input file: " + ac.inFile)
+		errors.Wrap(err, "cant open/read CSV input file: "+ac.inFile)
 	}
 
 	r := csv.NewReader(bytes.NewReader(data))
@@ -152,16 +152,15 @@ func (ac *addCommandeer) add() error {
 
 	for num, line := range records {
 
-
 		// print a dot on every 1000 inserts
-		if num % 1000 == 999 {
+		if num%1000 == 999 {
 			fmt.Printf(".")
 			if ac.delay > 0 {
-				time.Sleep( time.Duration(ac.delay) * time.Millisecond)
+				time.Sleep(time.Duration(ac.delay) * time.Millisecond)
 			}
 		}
 
-		if len(line) < 3 || len(line) > 4  {
+		if len(line) < 3 || len(line) > 4 {
 			return fmt.Errorf("must have 3-4 columns per row name,labels,value[,time] in line %d (%v)", num, line)
 		}
 
@@ -170,7 +169,7 @@ func (ac *addCommandeer) add() error {
 		}
 
 		tarr := ""
-		if len(line)==4 {
+		if len(line) == 4 {
 			tarr = line[3]
 		}
 
@@ -226,10 +225,9 @@ func (ac *addCommandeer) appendMetric(
 	return ref, nil
 }
 
-
 func strToLabels(name, lbls string) (utils.Labels, error) {
 
-	lset := utils.Labels{utils.Label{Name:"__name__", Value: name}}
+	lset := utils.Labels{utils.Label{Name: "__name__", Value: name}}
 
 	if lbls != "" {
 		splitLset := strings.Split(lbls, ",")
@@ -238,7 +236,7 @@ func strToLabels(name, lbls string) (utils.Labels, error) {
 			if len(splitLbl) != 2 {
 				return nil, errors.New("labels must be in the form: key1=label1,key2=label2,...")
 			}
-			lset = append(lset, utils.Label{Name:splitLbl[0], Value: splitLbl[1]})
+			lset = append(lset, utils.Label{Name: splitLbl[0], Value: splitLbl[1]})
 		}
 	}
 	sort.Sort(lset)
@@ -247,8 +245,8 @@ func strToLabels(name, lbls string) (utils.Labels, error) {
 
 func strToTV(tarr, varr string) ([]int64, []float64, error) {
 
-	tlist := strings.Split(tarr, ARRAY_SEPARATOR)
-	vlist := strings.Split(varr, ARRAY_SEPARATOR)
+	tlist := strings.Split(tarr, ArraySeparator)
+	vlist := strings.Split(varr, ArraySeparator)
 
 	if tarr == "" && len(vlist) > 1 {
 		return nil, nil, errors.New("time array must be provided when using a value array")
@@ -285,12 +283,12 @@ func strToTV(tarr, varr string) ([]int64, []float64, error) {
 			tstr := strings.TrimSpace(tlist[i])
 			if tstr == "now" || tstr == "now-" {
 				tarray = append(tarray, now)
-			} else if strings.HasPrefix(tstr, "now-")  {
+			} else if strings.HasPrefix(tstr, "now-") {
 				t, err := utils.Str2duration(tstr[4:])
 				if err != nil {
 					return nil, nil, errors.Wrap(err, "not a valid time 'now-??', 'now' need to follow with nn[s|h|m|d]")
 				}
-				tarray = append(tarray, now - int64(t))
+				tarray = append(tarray, now-int64(t))
 			} else {
 				t, err := strconv.Atoi(tlist[i])
 				if err != nil {

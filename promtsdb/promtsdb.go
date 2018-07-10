@@ -77,7 +77,7 @@ func match2filter(oms []*labels.Matcher) (string, string, string) {
 	filter := []string{}
 	aggregator := ""
 	name := ""
-	
+
 	for _, matcher := range oms {
 		if matcher.Name == "Aggregator" {
 			aggregator = matcher.Value
