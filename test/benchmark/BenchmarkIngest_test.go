@@ -114,10 +114,10 @@ func BenchmarkIngest(b *testing.B) {
 			testConfig.LabelsValueDiversity))
 
 	for i := 0; i < b.N; i++ {
-		runTest(appender, b, timeStamps, sampleTemplates, testConfig.FlushFrequency)
+		runTest(appender, b, timeStamps, sampleTemplates, testConfig.FlushFrequency, testConfig.Verbose)
 	}
 
-	fmt.Printf("\nTest complete. Count: %d\n", count)
+	b.Logf("\nTest complete. Count: %d\n", count)
 }
 
 func runTest(
@@ -125,8 +125,9 @@ func runTest(
 	b *testing.B,
 	timeStamps []int64,
 	sampleTemplates []string,
-	flushFrequency int) {
-	rowsAdded := appendAll(appender, b, sampleTemplates, timeStamps, flushFrequency)
+	flushFrequency int,
+	verbose bool) {
+	rowsAdded := appendAll(appender, b, sampleTemplates, timeStamps, flushFrequency, verbose)
 
 	count = count + rowsAdded
 }
@@ -220,7 +221,8 @@ func makeNamesRange(prefix string, count, minIndex, maxIndex int) ([]string, err
 	return array, nil
 }
 
-func appendAll(appender tsdb.Appender, testCtx *testing.B, sampleTemplates []string, timeStamps []int64, flushFrequency int) int {
+func appendAll(appender tsdb.Appender, testCtx *testing.B, sampleTemplates []string, timeStamps []int64,
+	flushFrequency int, verbose bool) int {
 	count := 0
 
 	samplesCount := len(sampleTemplates)
@@ -243,7 +245,8 @@ func appendAll(appender tsdb.Appender, testCtx *testing.B, sampleTemplates []str
 			count++
 		}
 
-		for dataPointIndex := 1; dataPointIndex < len(timeStamps); dataPointIndex++ {
+		timeSerieSize := len(timeStamps)
+		for dataPointIndex := 1; dataPointIndex < timeSerieSize; dataPointIndex++ {
 			for refIndex, sampleTemplateJson := range sampleTemplates {
 				sample := jsonTemplate2Sample(sampleTemplateJson, testCtx, timeStamps[dataPointIndex], makeRandomValue())
 				err := appender.AddFast(sample.Lset, refsArray[refIndex], timeStamps[dataPointIndex], sample.Value)
@@ -251,11 +254,16 @@ func appendAll(appender tsdb.Appender, testCtx *testing.B, sampleTemplates []str
 					testCtx.Fatalf("AddFast request has failed!\nSample:%v\nError: %s", sample, err)
 				}
 				count++
-				fmt.Printf("\rTotal samples count: %d\tTime: %s", count,
-					time.Unix(int64(timeStamps[dataPointIndex])/1000, 0).Format(time.RFC3339))
+
+				if verbose {
+					testCtx.Logf("\rTotal samples count: %d [%d %%]\tTime: %s",
+						count,
+						dataPointIndex*100/timeSerieSize,
+						time.Unix(int64(timeStamps[dataPointIndex])/1000, 0).Format(time.RFC3339))
+				}
 			}
 
-			if dataPointIndex%flushFrequency == 0 {
+			if flushFrequency > 0 && dataPointIndex%flushFrequency == 0 {
 				// block and flush all metrics every flush interval
 				waitForWrites(appender, &refsMap, testCtx)
 			}
