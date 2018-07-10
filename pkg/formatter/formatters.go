@@ -14,25 +14,26 @@ type textFormatter struct {
 func (f textFormatter) Write(out io.Writer, set querier.SeriesSet) error {
 
 	for set.Next() {
-		if set.Err() != nil {
-			return set.Err()
-		}
-
 		series := set.At()
 		name, lbls := labelsToStr(series.Labels())
 		fmt.Fprintf(out, "Name: %s  Labels: %s\n", name, lbls)
 		iter := series.Iterator()
 		for iter.Next() {
-
-			if iter.Err() != nil {
-				return iter.Err()
-			}
-
 			t, v := iter.At()
 			fmt.Fprintf(out, "  %s  v=%.2f\n", f.timeString(t), v)
 		}
-		fmt.Fprintln(out, "")
+
+		if iter.Err() != nil {
+			return iter.Err()
+		}
+
+		fmt.Fprintln(out,"")
 	}
+
+	if set.Err() != nil {
+		return set.Err()
+	}
+
 
 	return nil
 }
@@ -45,9 +46,6 @@ func (f csvFormatter) Write(out io.Writer, set querier.SeriesSet) error {
 
 	writer := csv.NewWriter(out)
 	for set.Next() {
-		if set.Err() != nil {
-			return set.Err()
-		}
 
 		series := set.At()
 		name, labelStr := labelsToStr(series.Labels())
@@ -55,13 +53,17 @@ func (f csvFormatter) Write(out io.Writer, set querier.SeriesSet) error {
 		iter := series.Iterator()
 		for iter.Next() {
 
-			if iter.Err() != nil {
-				return iter.Err()
-			}
-
 			t, v := iter.At()
 			writer.Write([]string{name, labelStr, fmt.Sprintf("%.6f", v), f.timeString(t)})
 		}
+
+		if iter.Err() != nil {
+			return iter.Err()
+		}
+	}
+
+	if set.Err() != nil {
+		return set.Err()
 	}
 
 	writer.Flush()
@@ -84,10 +86,6 @@ func (f simpleJsonFormatter) Write(out io.Writer, set querier.SeriesSet) error {
 	output := "["
 
 	for set.Next() {
-		if set.Err() != nil {
-			return set.Err()
-		}
-
 		series := set.At()
 		name, labelStr := labelsToStr(series.Labels())
 		datapoints := ""
@@ -95,10 +93,6 @@ func (f simpleJsonFormatter) Write(out io.Writer, set querier.SeriesSet) error {
 		iter := series.Iterator()
 		firstItem := true
 		for iter.Next() {
-
-			if iter.Err() != nil {
-				return iter.Err()
-			}
 
 			t, v := iter.At()
 			if !firstItem {
@@ -108,11 +102,19 @@ func (f simpleJsonFormatter) Write(out io.Writer, set querier.SeriesSet) error {
 			firstItem = false
 		}
 
+		if iter.Err() != nil {
+			return iter.Err()
+		}
+
 		if !firstSeries {
 			output = output + ","
 		}
 		output = output + fmt.Sprintf(metricTemplate, name, labelStr, datapoints)
 		firstSeries = false
+	}
+
+	if set.Err() != nil {
+		return set.Err()
 	}
 
 	_, err := out.Write([]byte(output + "\n]"))
