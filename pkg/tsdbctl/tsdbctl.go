@@ -28,7 +28,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/cobra/doc"
-	"github.com/v3io/v3io-tsdb/config"
+	"github.com/v3io/v3io-tsdb/internal/pkg/config"
 	"github.com/v3io/v3io-tsdb/pkg/tsdb"
 	"strings"
 )

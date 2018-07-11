@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"github.com/prometheus/prometheus/pkg/labels"
 	"github.com/prometheus/prometheus/storage"
-	"github.com/v3io/v3io-tsdb/config"
+	"github.com/v3io/v3io-tsdb/internal/pkg/config"
 	"github.com/v3io/v3io-tsdb/pkg/partmgr"
 	"math/rand"
 	"testing"
