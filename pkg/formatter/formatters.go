@@ -27,13 +27,12 @@ func (f textFormatter) Write(out io.Writer, set querier.SeriesSet) error {
 			return iter.Err()
 		}
 
-		fmt.Fprintln(out,"")
+		fmt.Fprintln(out, "")
 	}
 
 	if set.Err() != nil {
 		return set.Err()
 	}
-
 
 	return nil
 }
