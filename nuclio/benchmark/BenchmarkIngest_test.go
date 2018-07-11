@@ -1,23 +1,23 @@
 package benchmark
 
 import (
-	"fmt"
-	"testing"
-	"os"
-	"time"
-	"github.com/nuclio/nuclio-test-go"
-	"math/rand"
-	"io/ioutil"
-	"github.com/nuclio/nuclio-sdk-go"
-	"github.com/v3io/v3io-tsdb/config"
-	"github.com/v3io/v3io-go-http"
-	"github.com/v3io/v3io-tsdb/pkg/tsdb"
 	"bytes"
-	"github.com/ghodss/yaml"
-	"github.com/pkg/errors"
-	"log"
-	"github.com/v3io/v3io-tsdb/pkg/utils"
 	"encoding/json"
+	"fmt"
+	"github.com/ghodss/yaml"
+	"github.com/nuclio/nuclio-sdk-go"
+	"github.com/nuclio/nuclio-test-go"
+	"github.com/pkg/errors"
+	"github.com/v3io/v3io-go-http"
+	"github.com/v3io/v3io-tsdb/config"
+	"github.com/v3io/v3io-tsdb/pkg/tsdb"
+	"github.com/v3io/v3io-tsdb/pkg/utils"
+	"io/ioutil"
+	"log"
+	"math/rand"
+	"os"
+	"testing"
+	"time"
 )
 
 const defaultDbName = "db0"
@@ -159,12 +159,12 @@ func runTest(i int, tc *nutest.TestContext, b *testing.B, cfg *BenchmarkRandomIn
 		if err != nil {
 			b.Fatalf("Request has failed!\nError: %s\nResponse: %s\n", err, resp)
 		}
-		count ++
+		count++
 	}
 }
 
 func makeSamples(namesCount, namesDiversity, labelsCount, labelDiversity, labelValueCount,
-labelValueDiversity int, timeStamp int64) *[] string {
+	labelValueDiversity int, timeStamp int64) *[]string {
 	names, err := makeNamesRange("Name", namesCount, 1, namesDiversity)
 	if err != nil {
 		panic(err)
@@ -281,7 +281,7 @@ func handler(context *nuclio.Context, event nuclio.Event) (interface{}, error) {
 	}
 
 	// Append sample to metric
-	_, err = app.Add(sample.Lset,t , sample.Value)
+	_, err = app.Add(sample.Lset, t, sample.Value)
 
 	return "", err
 }

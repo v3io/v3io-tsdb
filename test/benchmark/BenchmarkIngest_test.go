@@ -11,10 +11,10 @@ import (
 	"github.com/v3io/v3io-tsdb/pkg/utils"
 	"io/ioutil"
 	"log"
+	"math/rand"
 	"os"
 	"testing"
 	"time"
-	"math/rand"
 )
 
 var count = 0 // count real number of samples to compare with query result
@@ -133,7 +133,7 @@ func runTest(
 }
 
 func makeSamplesModel(namesCount, namesDiversity, labelsCount, labelDiversity, labelValueCount,
-labelValueDiversity int) map[string]map[string][]string {
+	labelValueDiversity int) map[string]map[string][]string {
 	names, err := makeNamesRange("Name", namesCount, 1, namesDiversity)
 	if err != nil {
 		panic(err)
