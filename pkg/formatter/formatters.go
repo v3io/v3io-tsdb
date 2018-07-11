@@ -1,10 +1,10 @@
 package formatter
 
 import (
-	"io"
-	"github.com/v3io/v3io-tsdb/pkg/querier"
-	"fmt"
 	"encoding/csv"
+	"fmt"
+	"github.com/v3io/v3io-tsdb/pkg/querier"
+	"io"
 )
 
 type textFormatter struct {
@@ -20,7 +20,7 @@ func (f textFormatter) Write(out io.Writer, set querier.SeriesSet) error {
 		iter := series.Iterator()
 		for iter.Next() {
 			t, v := iter.At()
-			fmt.Fprintf(out,"  %s  v=%.2f\n", f.timeString(t), v)
+			fmt.Fprintf(out, "  %s  v=%.2f\n", f.timeString(t), v)
 		}
 
 		if iter.Err() != nil {
@@ -37,7 +37,6 @@ func (f textFormatter) Write(out io.Writer, set querier.SeriesSet) error {
 
 	return nil
 }
-
 
 type csvFormatter struct {
 	baseFormatter
@@ -122,4 +121,3 @@ func (f simpleJsonFormatter) Write(out io.Writer, set querier.SeriesSet) error {
 
 	return err
 }
-

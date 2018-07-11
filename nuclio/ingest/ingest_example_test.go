@@ -3,14 +3,19 @@ package ingest
 import (
 	"fmt"
 	"github.com/nuclio/nuclio-test-go"
+	"os"
 	"testing"
 	"time"
-	"os"
 )
 
-func TestIngest(t *testing.T) {
+func TestIngestIntegration(t *testing.T) {
+
+	if testing.Short() {
+		t.Skip("Skipping integration test.")
+	}
+
 	data := nutest.DataBind{
-		Name: "db0", Url: os.Getenv("V3IO_URL"), Container: "1", User:"<TDB>", Password:"<TBD>"}
+		Name: "db0", Url: os.Getenv("V3IO_URL"), Container: "1", User: "<TDB>", Password: "<TBD>"}
 	tc, err := nutest.NewTestContext(Handler, true, &data)
 	if err != nil {
 		t.Fatal(err)

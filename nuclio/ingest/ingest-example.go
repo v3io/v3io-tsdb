@@ -56,7 +56,7 @@ func Handler(context *nuclio.Context, event nuclio.Event) (interface{}, error) {
 	}
 
 	// Append sample to metric
-	_, err = app.Add(sample.Lset,t , sample.Value)
+	_, err = app.Add(sample.Lset, t, sample.Value)
 
 	return "", err
 }

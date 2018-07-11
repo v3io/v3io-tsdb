@@ -23,15 +23,14 @@ package tsdbctl
 import (
 	"os"
 
-
 	"fmt"
+	"github.com/nuclio/logger"
+	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/cobra/doc"
 	"github.com/v3io/v3io-tsdb/config"
 	"github.com/v3io/v3io-tsdb/pkg/tsdb"
 	"strings"
-	"github.com/nuclio/logger"
-	"github.com/pkg/errors"
 )
 
 type RootCommandeer struct {
@@ -100,7 +99,7 @@ func (rc *RootCommandeer) initialize() error {
 		if rc.cfgFilePath != "" {
 			return errors.Wrap(err, "Failed to load config from file "+rc.cfgFilePath)
 		}
-		cfg = &config.V3ioConfig{}  // initialize struct, will try and set it from individual flags
+		cfg = &config.V3ioConfig{} // initialize struct, will try and set it from individual flags
 		config.InitDefaults(cfg)
 	}
 
@@ -110,7 +109,7 @@ func (rc *RootCommandeer) initialize() error {
 		if i := strings.Index(rc.v3ioPath, "@"); i > 0 {
 			cfg.Username = rc.v3ioPath[0:i]
 			rc.v3ioPath = rc.v3ioPath[i+1:]
-			if userpass := strings.Split(cfg.Username, ":"); len(userpass)>1 {
+			if userpass := strings.Split(cfg.Username, ":"); len(userpass) > 1 {
 				cfg.Username = userpass[0]
 				cfg.Password = userpass[1]
 			}

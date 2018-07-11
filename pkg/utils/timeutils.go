@@ -21,16 +21,16 @@ such restriction.
 package utils
 
 import (
-	"strconv"
 	"github.com/pkg/errors"
-	"time"
+	"strconv"
 	"strings"
+	"time"
 )
 
 // convert duration string e.g. 24h to time (unix milisecond)
 func Str2duration(duration string) (int64, error) {
 
-	multiply := 3600 * 1000  // hour by default
+	multiply := 3600 * 1000 // hour by default
 	if len(duration) > 0 {
 		last := duration[len(duration)-1:]
 		if last == "m" || last == "h" || last == "d" || last == "y" {
@@ -72,7 +72,7 @@ func Str2unixTime(tstr string) (int64, error) {
 		if err != nil {
 			return 0, errors.Wrap(err, "not a valid time 'now-??', 'now' need to follow with nn[s|h|m|d|y]")
 		}
-		return time.Now().Unix() * 1000 - int64(t), nil
+		return time.Now().Unix()*1000 - int64(t), nil
 	}
 
 	tint, err := strconv.Atoi(tstr)
@@ -87,7 +87,7 @@ func Str2unixTime(tstr string) (int64, error) {
 	return t.Unix() * 1000, nil
 }
 
-func GetTimeFromRange(from, to, last , step string) (f int64, t int64, s int64, err error) {
+func GetTimeFromRange(from, to, last, step string) (f int64, t int64, s int64, err error) {
 
 	s, err = Str2duration(step)
 	if err != nil {
@@ -119,5 +119,5 @@ func GetTimeFromRange(from, to, last , step string) (f int64, t int64, s int64, 
 		f = t - l
 	}
 
-	return 
+	return
 }

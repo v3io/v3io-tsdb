@@ -21,9 +21,9 @@ such restriction.
 package utils
 
 import (
-	"github.com/v3io/v3io-go-http"
-	"github.com/pkg/errors"
 	"github.com/nuclio/logger"
+	"github.com/pkg/errors"
+	"github.com/v3io/v3io-go-http"
 )
 
 type ItemsCursor interface {
@@ -34,19 +34,19 @@ type ItemsCursor interface {
 }
 
 type AsyncItemsCursor struct {
-	currentItem     v3io.Item
-	currentError    error
-	itemIndex       int
-	items           []v3io.Item
-	input           *v3io.GetItemsInput
-	container       *v3io.Container
-	logger          logger.Logger
+	currentItem  v3io.Item
+	currentError error
+	itemIndex    int
+	items        []v3io.Item
+	input        *v3io.GetItemsInput
+	container    *v3io.Container
+	logger       logger.Logger
 
-	responseChan    chan *v3io.Response
-	workers         int
-	totalSegments   int
-	lastShards      int
-	Cnt             int
+	responseChan  chan *v3io.Response
+	workers       int
+	totalSegments int
+	lastShards    int
+	Cnt           int
 }
 
 func NewAsyncItemsCursor(container *v3io.Container, input *v3io.GetItemsInput, workers int) (*AsyncItemsCursor, error) {
@@ -57,18 +57,18 @@ func NewAsyncItemsCursor(container *v3io.Container, input *v3io.GetItemsInput, w
 	}
 
 	newAsyncItemsCursor := &AsyncItemsCursor{
-		container: container,
-		input:     input,
+		container:    container,
+		input:        input,
 		responseChan: make(chan *v3io.Response, 1000),
-		workers: workers,
+		workers:      workers,
 	}
 
 	if input.ShardingKey != "" {
 		newAsyncItemsCursor.workers = 1
 		input := v3io.GetItemsInput{
 			Path: input.Path, AttributeNames: input.AttributeNames, Filter: input.Filter,
-			ShardingKey:input.ShardingKey}
-		_ , err := container.GetItems(&input, 0, newAsyncItemsCursor.responseChan)
+			ShardingKey: input.ShardingKey}
+		_, err := container.GetItems(&input, 0, newAsyncItemsCursor.responseChan)
 
 		if err != nil {
 			return nil, err
@@ -77,12 +77,12 @@ func NewAsyncItemsCursor(container *v3io.Container, input *v3io.GetItemsInput, w
 		return newAsyncItemsCursor, nil
 	}
 
-	for i:=0; i < newAsyncItemsCursor.workers; i++ {
+	for i := 0; i < newAsyncItemsCursor.workers; i++ {
 		newAsyncItemsCursor.totalSegments = workers
 		input := v3io.GetItemsInput{
 			Path: input.Path, AttributeNames: input.AttributeNames, Filter: input.Filter,
 			TotalSegments: newAsyncItemsCursor.totalSegments, Segment: i}
-		_ , err := container.GetItems(&input, i, newAsyncItemsCursor.responseChan)
+		_, err := container.GetItems(&input, i, newAsyncItemsCursor.responseChan)
 
 		if err != nil {
 			// TODO: proper exit, release requests which passed
@@ -97,7 +97,6 @@ func NewAsyncItemsCursor(container *v3io.Container, input *v3io.GetItemsInput, w
 func (ic *AsyncItemsCursor) Err() error {
 	return ic.currentError
 }
-
 
 // Release releases a cursor and its underlying resources
 func (ic *AsyncItemsCursor) Release() {
@@ -115,8 +114,6 @@ func (ic *AsyncItemsCursor) Next() bool {
 
 	return true
 }
-
-
 
 // NextItem gets the next matching item. this may potentially block as this lazy loads items from the collection
 func (ic *AsyncItemsCursor) NextItem() (v3io.Item, error) {
@@ -138,7 +135,6 @@ func (ic *AsyncItemsCursor) NextItem() (v3io.Item, error) {
 		ic.currentError = nil
 		return nil, nil
 	}
-
 
 	// Read response from channel
 	resp := <-ic.responseChan
@@ -191,7 +187,6 @@ func (ic *AsyncItemsCursor) All() ([]v3io.Item, error) {
 
 	return items, nil
 }
-
 
 func (ic *AsyncItemsCursor) GetField(name string) interface{} {
 	return ic.currentItem[name]

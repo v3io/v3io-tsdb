@@ -40,8 +40,8 @@ type CountAggregator struct {
 }
 
 func (a *CountAggregator) Aggregate(t int64, v float64) { a.count++ }
-func (a *CountAggregator) Clear()              { a.count = 0 }
-func (a *CountAggregator) GetAttr() string     { return "count" }
+func (a *CountAggregator) Clear()                       { a.count = 0 }
+func (a *CountAggregator) GetAttr() string              { return "count" }
 
 func (a *CountAggregator) UpdateExpr(col string, bucket int) string {
 	return fmt.Sprintf("_%s_count[%d]=_%s_count[%d]+%d;", col, bucket, col, bucket, a.count)
@@ -123,15 +123,15 @@ func (a *MaxAggregator) UpdateExpr(col string, bucket int) string {
 }
 
 // Last value Aggregator
-type LastAggregator struct{
+type LastAggregator struct {
 	FloatAggregator
-	lastT            int64
+	lastT int64
 }
 
 func (a *LastAggregator) Clear() { a.val = math.NaN() }
 
 func (a *LastAggregator) Aggregate(t int64, v float64) {
-	if t > a.lastT  {
+	if t > a.lastT {
 		a.val = v
 		a.lastT = t
 	}
