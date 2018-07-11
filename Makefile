@@ -1,5 +1,6 @@
 .PHONY: test
 test:
+	go get -v -t ./...
 	go test -short ./...
 
 .PHONY: lint
