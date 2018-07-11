@@ -48,7 +48,7 @@ type MetricState struct {
 }
 
 const MAX_WRITE_RETRY = 2
-const CHAN_SIZE = 1024
+const CHAN_SIZE = 4096
 
 func (m *MetricState) Err() error {
 	m.RLock()

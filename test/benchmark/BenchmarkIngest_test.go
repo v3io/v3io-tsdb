@@ -133,7 +133,7 @@ func runTest(
 }
 
 func makeSamplesModel(namesCount, namesDiversity, labelsCount, labelDiversity, labelValueCount,
-	labelValueDiversity int) map[string]map[string][]string {
+labelValueDiversity int) map[string]map[string][]string {
 	names, err := makeNamesRange("Name", namesCount, 1, namesDiversity)
 	if err != nil {
 		panic(err)
@@ -255,8 +255,8 @@ func appendAll(appender tsdb.Appender, testCtx *testing.B, sampleTemplates []str
 				}
 				count++
 
-				if verbose {
-					testCtx.Logf("\rTotal samples count: %d [%d %%]\tTime: %s",
+				if verbose || dataPointIndex%10 == 0 {
+					fmt.Printf("\rTotal samples count: %d [%d %%]\tTime: %s",
 						count,
 						dataPointIndex*100/timeSerieSize,
 						time.Unix(int64(timeStamps[dataPointIndex])/1000, 0).Format(time.RFC3339))
