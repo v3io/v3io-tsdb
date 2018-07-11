@@ -5,7 +5,7 @@ test:
 
 .PHONY: lint
 lint:
-ifeq ($(shell gofmt -l .),)
+ifeq ($(shell gofmt -l . | grep ^vendor),)
 	# lint OK
 else
 	$(error Please run `go fmt ./...` to format the code)
