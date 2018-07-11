@@ -21,12 +21,12 @@ such restriction.
 package tsdbctl
 
 import (
-	"github.com/spf13/cobra"
-	"github.com/pkg/errors"
-	"github.com/v3io/v3io-go-http"
 	"fmt"
-	"github.com/v3io/v3io-tsdb/pkg/utils"
+	"github.com/pkg/errors"
+	"github.com/spf13/cobra"
+	"github.com/v3io/v3io-go-http"
 	"github.com/v3io/v3io-tsdb/pkg/chunkenc"
+	"github.com/v3io/v3io-tsdb/pkg/utils"
 	"time"
 )
 
@@ -44,8 +44,8 @@ func newCheckCommandeer(rootCommandeer *RootCommandeer) *checkCommandeer {
 	}
 
 	cmd := &cobra.Command{
-		Use:   "check",
-		Short: "check TSDB metric object",
+		Use:    "check",
+		Short:  "check TSDB metric object",
 		Hidden: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 
@@ -65,7 +65,6 @@ func newCheckCommandeer(rootCommandeer *RootCommandeer) *checkCommandeer {
 	}
 
 	cmd.Flags().StringSliceVarP(&commandeer.attrs, "attrs", "a", []string{}, "attribute")
-
 
 	commandeer.cmd = cmd
 
@@ -93,8 +92,8 @@ func (cc *checkCommandeer) check() error {
 	// get metric data and metadata
 	allAtters := append(cc.attrs, "__name", "_name", "_lset", "_maxtime")
 	container, path := cc.rootCommandeer.adapter.GetContainer()
-	objPath := fmt.Sprintf("%s/0/%s.%016x", path , cc.name, lset.Hash())
-	input := v3io.GetItemInput{ Path: objPath, AttributeNames: allAtters}
+	objPath := fmt.Sprintf("%s/0/%s.%016x", path, cc.name, lset.Hash())
+	input := v3io.GetItemInput{Path: objPath, AttributeNames: allAtters}
 	resp, err := container.Sync.GetItem(&input)
 	if err != nil {
 		return errors.Wrap(err, "GetItems err")

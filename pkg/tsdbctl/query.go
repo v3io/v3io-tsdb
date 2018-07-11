@@ -24,12 +24,12 @@ import (
 	"fmt"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
+	"github.com/v3io/v3io-tsdb/pkg/formatter"
 	"github.com/v3io/v3io-tsdb/pkg/querier"
+	"github.com/v3io/v3io-tsdb/pkg/utils"
 	"strconv"
 	"strings"
 	"time"
-	"github.com/v3io/v3io-tsdb/pkg/formatter"
-	"github.com/v3io/v3io-tsdb/pkg/utils"
 )
 
 type queryCommandeer struct {
@@ -39,11 +39,11 @@ type queryCommandeer struct {
 	filter         string
 	to             string
 	from           string
-	last      string
-	windows   string
-	functions string
-	step      string
-	output    string
+	last           string
+	windows        string
+	functions      string
+	step           string
+	output         string
 }
 
 func newQueryCommandeer(rootCommandeer *RootCommandeer) *queryCommandeer {
@@ -163,11 +163,10 @@ func (qc *queryCommandeer) query() error {
 
 	f, err := formatter.NewFormatter(qc.output, nil)
 	if err != nil {
-		return errors.Wrap(err, "failed to start formatter " + qc.output)
+		return errors.Wrap(err, "failed to start formatter "+qc.output)
 	}
 
 	return f.Write(qc.cmd.OutOrStdout(), set)
-
 
 	//return qc.printSet(set)
 }
@@ -197,4 +196,3 @@ func (qc *queryCommandeer) printSet(set querier.SeriesSet) error {
 
 	return nil
 }
-
