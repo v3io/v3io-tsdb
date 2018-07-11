@@ -38,7 +38,7 @@ const (
 
 	// derived aggregators
 	aggrTypeAvg    AggrType = aggrTypeCount | aggrTypeSum
-	aggrTypeRate   AggrType = aggrTypeLast  | 0x8000
+	aggrTypeRate   AggrType = aggrTypeLast | 0x8000
 	aggrTypeStddev AggrType = aggrTypeCount | aggrTypeSum | aggrTypeSqr
 	aggrTypeStdvar AggrType = aggrTypeCount | aggrTypeSum | aggrTypeSqr | 0x8000
 	aggrTypeAll    AggrType = 0xffff
