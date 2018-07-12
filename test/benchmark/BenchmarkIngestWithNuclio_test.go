@@ -61,12 +61,43 @@ func BenchmarkIngestWithNuclio(b *testing.B) {
 		b.Fatal("Unable to resolve start time. Check configuration.")
 	}
 	testStartTimeMs := testStartTimeNano/int64(time.Millisecond) - relativeTimeOffsetMs
+	sampleTemplates := common.MakeSampleTemplates(
+		common.MakeSamplesModel(
+			testConfig.NamesCount,
+			testConfig.NamesDiversity,
+			testConfig.LabelsCount,
+			testConfig.LabelsDiversity,
+			testConfig.LabelValuesCount,
+			testConfig.LabelsValueDiversity))
+	sampleTemplatesLength := len(sampleTemplates)
 
 	for i := 0; i < b.N; i++ {
-		count += runNuclioTest(i, tc, b, testConfig, testStartTimeMs)
+		index := i % sampleTemplatesLength
+		timeStamp := testStartTimeMs + int64(index*testConfig.SampleStepSize)
+		count += runNuclioTest(tc, b, sampleTemplates[index], timeStamp)
 	}
 
 	tc.Logger.Warn("Test complete. Count: %d", count)
+}
+
+func runNuclioTest(tc *nutest.TestContext, b *testing.B, sampleTemplateJson string, timeStamp int64) int {
+	count := 0
+	// Add first & get reference
+	sampleJson := fmt.Sprintf(sampleTemplateJson, timeStamp, common.MakeRandomFloat64())
+	tc.Logger.Debug("Sample data: %s", sampleJson)
+
+	testEvent := nutest.TestEvent{
+		Body: []byte(sampleJson),
+	}
+
+	resp, err := tc.Invoke(&testEvent)
+
+	if err != nil {
+		b.Fatalf("Request has failed!\nError: %s\nResponse: %s\n", err, resp)
+	}
+	count++
+
+	return count
 }
 
 // InitContext runs only once when the function runtime starts
@@ -88,38 +119,6 @@ func initContext(context *nuclio.Context) error {
 	}
 	context.UserData = appender
 	return nil
-}
-
-func runNuclioTest(i int, tc *nutest.TestContext, b *testing.B, testConfig *common.BenchmarkIngestConfig, testStartTimeMs int64) int {
-	initialTimeStamp := testStartTimeMs + int64(i*testConfig.SampleStepSize)
-	sampleTemplates := common.MakeSampleTemplates(
-		common.MakeSamplesModel(
-			testConfig.NamesCount,
-			testConfig.NamesDiversity,
-			testConfig.LabelsCount,
-			testConfig.LabelsDiversity,
-			testConfig.LabelValuesCount,
-			testConfig.LabelsValueDiversity))
-
-	count := 0
-	for _, sampleTemplateJson := range sampleTemplates {
-		// Add first & get reference
-		sampleJson := fmt.Sprintf(sampleTemplateJson, initialTimeStamp, common.MakeRandomFloat64())
-		tc.Logger.Debug("Sample data: %s", sampleJson)
-
-		testEvent := nutest.TestEvent{
-			Body: []byte(sampleJson),
-		}
-
-		resp, err := tc.Invoke(&testEvent)
-
-		if err != nil {
-			b.Fatalf("Request has failed!\nError: %s\nResponse: %s\n", err, resp)
-		}
-		count++
-	}
-
-	return count
 }
 
 func handler(context *nuclio.Context, event nuclio.Event) (interface{}, error) {

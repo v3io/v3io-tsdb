@@ -110,8 +110,8 @@ Use the following script as a reference:
     
     cd $HOME/go/src/github.com/v3io/v3io-tsdb/cmd/tsdbctl
     
-    # Note, you can select either "-bench=Ingest" or "-bench=IngestWithNuclio" test
-    time V3IO_TSDBCFG_PATH="$HOME/go/bin/v3io-custom.yaml" TSDB_BENCH_INGEST_CONFIG="$HOME/go/bin/tsdb-bench-test-config.yaml" go test -benchtime $BENCH_TIME -run=DO_NOT_RUN_TESTS -bench=Ingest ../../test/benchmark
+    # Note, you can select either "-bench=^BenchmarkIngest$" or "-bench=^BenchmarkIngestWithNuclio$" test
+    time V3IO_TSDBCFG_PATH="$HOME/go/bin/v3io-custom.yaml" TSDB_BENCH_INGEST_CONFIG="$HOME/go/bin/tsdb-bench-test-config.yaml" go test -benchtime $BENCH_TIME -run=DO_NOT_RUN_TESTS -bench=^BenchmarkIngest$ ../../test/benchmark
     
     echo Done
 ```
