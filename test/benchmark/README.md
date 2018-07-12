@@ -49,41 +49,51 @@ Use the following shell script for reference:
 ### Create test configuration file `tsdb-bench-test-config.yaml` 
    Use the following example for reference:
 ```yaml
-    # Relative start time, i.e. now() - startTimeOffset
-    StartTimeOffset: "24h"
-    
-    # Interval in milliseconds between samples, i.e. 1 second
-    SampleStepSize: 1000
-    
-    # should be in range [1..26], i.e [A..Z]
-    NamesCount: 26
-    
-    # Pattern: Name_[A..Z][_[1..200]]
-    NamesDiversity: 20
-    
-    # should be in range [1..26]
-    LabelsCount: 10
-    
-    # Pattern: Label_[A..Z][_[1..10]]
-    LabelsDiversity: 10
-    
-    # should be in range [1..26], i.e [A..Z]
-    LabelValuesCount: 10
-    
-    # Pattern: [A..Z][_[1..10]]
-    LabelsValueDiversity: 10
+# File: tsdb-bench-test-config.yaml
+
+# Control Nuclio test verbosity
+Verbose: true
+
+# Relative time, i.e. now() - startTimeOffset
+StartTimeOffset: "48h"
+
+# Interval in milliseconds between samples
+SampleStepSize: 5000
+
+# should be in range [1..26], i.e [A..Z]
+NamesCount: 2
+
+# Pattern: Name_[A..Z][_[1..200]]
+NamesDiversity: 1
+
+# should be in range [1..26]
+LabelsCount: 1
+
+# Pattern: Label_[A..Z][_[1..10]]
+LabelsDiversity: 3
+
+# should be in range [1..26], i.e [A..Z]
+LabelValuesCount: 1
+
+# Pattern: [A..Z][_[1..10]]
+LabelsValueDiversity: 10
+
+# Flush frequency - flush metrics after every N steps
+FlushFrequency: 10
+
+# Select how benchmark test will produce the data. If "AppendOneByOne=true" test will produce one sample per test cycle
+AppendOneByOne: true
 ``` 
 ### Define following environment variables.
 > Note: you can also define variables locally in a script
-```bash
-    V3IO_URL="<Application Node Address>:8081" 
+```bash 
     V3IO_TSDBCFG_PATH="$HOME/go/bin/v3io-custom.yaml"
-    TSDB_BENCH_RANDOM_INGEST_CONFIG"$HOME/go/bin/tsdb-bench-test-config.yaml"
+    TSDB_BENCH_INGEST_CONFIG="$HOME/go/bin/tsdb-bench-test-config.yaml"
 ```
-### Run RundomIngest benchmark test for desired time period to populate the TSDB.
+### Run ingestion benchmark test for desired time interval to populate the TSDB.
 Use the following script as a reference:
 > Note: you can pass test duration to the script.
-<br>For example: `./ingest 5m` will run 5 minutes.
+<br>For example: `./ingest.sh 5m` will run 5 minutes.
 <br>By default it will run one minute.
 ```bash
     #!/bin/bash
@@ -96,10 +106,12 @@ Use the following script as a reference:
       BENCH_TIME="$1"
     fi
     
-    echo "Ingesting random samples (Bench Time: $BENCH_TIME) ..."
+    echo "Ingesting samples (Bench Time: $BENCH_TIME) ..."
     
     cd $HOME/go/src/github.com/v3io/v3io-tsdb/cmd/tsdbctl
-    time V3IO_URL="localhost:8081" V3IO_TSDBCFG_PATH="$HOME/go/bin/v3io-custom.yaml" TSDB_BENCH_RANDOM_INGEST_CONFIG"$HOME/go/bin/tsdb-bench-test-config.yaml" go test -benchtime $BENCH_TIME -run=DO_NOT_RUN_TESTS -bench=RandomIngest ../../nuclio/benchmark
+    
+    # Note, you can select either "-bench=Ingest" or "-bench=IngestWithNuclio" test
+    time V3IO_TSDBCFG_PATH="$HOME/go/bin/v3io-custom.yaml" TSDB_BENCH_INGEST_CONFIG="$HOME/go/bin/tsdb-bench-test-config.yaml" go test -benchtime $BENCH_TIME -run=DO_NOT_RUN_TESTS -bench=Ingest ../../test/benchmark
     
     echo Done
 ```
