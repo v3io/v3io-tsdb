@@ -10,12 +10,12 @@ import (
 	"github.com/v3io/v3io-tsdb/config"
 	"github.com/v3io/v3io-tsdb/pkg/tsdb"
 	"github.com/v3io/v3io-tsdb/pkg/utils"
+	"github.com/v3io/v3io-tsdb/test/benchmark/common"
 	"io/ioutil"
 	"log"
 	"os"
 	"testing"
 	"time"
-	"github.com/v3io/v3io-tsdb/test/benchmark/common"
 )
 
 const defaultDbName = "db0"

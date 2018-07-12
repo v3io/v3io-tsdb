@@ -1,12 +1,12 @@
 package common
 
 import (
+	"fmt"
 	"github.com/ghodss/yaml"
+	"github.com/pkg/errors"
 	"io/ioutil"
 	"log"
 	"os"
-	"fmt"
-	"github.com/pkg/errors"
 )
 
 const TsdbBenchIngestConfig = "TSDB_BENCH_INGEST_CONFIG"

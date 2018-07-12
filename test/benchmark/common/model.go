@@ -2,16 +2,16 @@ package common
 
 import (
 	"bytes"
-	"fmt"
-	"math/rand"
-	"time"
-	"testing"
 	"encoding/json"
+	"fmt"
 	"github.com/v3io/v3io-tsdb/pkg/utils"
+	"math/rand"
+	"testing"
+	"time"
 )
 
 func MakeSamplesModel(namesCount, namesDiversity, labelsCount, labelDiversity, labelValueCount,
-labelValueDiversity int) map[string]map[string][]string {
+	labelValueDiversity int) map[string]map[string][]string {
 	names, err := MakeNamesRange("Name", namesCount, 1, namesDiversity)
 	if err != nil {
 		panic(err)
