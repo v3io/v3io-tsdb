@@ -28,4 +28,4 @@ LabelValuesCount: 1
 LabelsValueDiversity: 10
 
 # Flush frequency - flush metrics after every N steps
-FlushFrequency: 10
+FlushFrequency: -1 # -1 for no flush during the ingestion
