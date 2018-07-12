@@ -55,7 +55,6 @@ func BenchmarkIngest(b *testing.B) {
 		timeStamps[i] = testStartTimeMs + int64(i*testConfig.SampleStepSize)
 	}
 
-	//refMap := map[uint64]bool{}
 	sampleTemplates := common.MakeSampleTemplates(
 		common.MakeSamplesModel(
 			testConfig.NamesCount,
@@ -65,78 +64,121 @@ func BenchmarkIngest(b *testing.B) {
 			testConfig.LabelValuesCount,
 			testConfig.LabelsValueDiversity))
 
+	samplesCount := len(sampleTemplates)
+	refsMap := make(map[uint64]bool, samplesCount)
+	refsArray := make([]uint64, samplesCount)
+
 	for i := 0; i < b.N; i++ {
-		count += runTest(appender, b, timeStamps, sampleTemplates, testConfig.FlushFrequency, testConfig.Verbose)
+		rowsAdded := runTest(i, appender, b, timeStamps, sampleTemplates, testConfig.FlushFrequency, refsMap, refsArray,
+			testConfig.AppendOneByOne, testConfig.Verbose)
+		if rowsAdded == 0 {
+			break // stop the test (target has been achieved)
+		}
+		count += rowsAdded
 	}
 
 	b.Logf("\nTest complete. Count: %d\n", count)
 }
 
 func runTest(
+	index int,
 	appender tsdb.Appender,
-	b *testing.B,
+	testCtx *testing.B,
 	timeStamps []int64,
 	sampleTemplates []string,
 	flushFrequency int,
+	refsMap map[uint64]bool,
+	refsArray []uint64,
+	appendOneByOne bool,
 	verbose bool) int {
-	rowsAdded := appendAll(appender, b, sampleTemplates, timeStamps, flushFrequency, verbose)
-
-	return rowsAdded
-}
-
-func appendAll(appender tsdb.Appender, testCtx *testing.B, sampleTemplates []string, timeStamps []int64,
-	flushFrequency int, verbose bool) int {
-	count := 0
 
 	samplesCount := len(sampleTemplates)
 	tsCount := len(timeStamps)
 
 	if samplesCount > 0 && tsCount > 0 {
-		refsMap := map[uint64]bool{}
-		refsArray := make([]uint64, len(sampleTemplates))
-		// First pass - populate references for add fast
-		initialTimeStamp := timeStamps[0]
-		for i, sampleTemplateJson := range sampleTemplates {
-			// Add first & get reference
-			sample := common.JsonTemplate2Sample(sampleTemplateJson, testCtx, initialTimeStamp, common.MakeRandomFloat64())
-			ref, err := appender.Add(sample.Lset, initialTimeStamp, sample.Value)
-			if err != nil {
-				testCtx.Fatalf("Add request has failed!\nError: %s", err)
-			}
-			refsArray[i] = ref
-			refsMap[ref] = true
-			count++
+		if appendOneByOne {
+			return appendSingle(index%samplesCount, index/samplesCount, appender, testCtx, sampleTemplates[index%samplesCount],
+				timeStamps[index/samplesCount], refsMap, refsArray)
+		} else {
+			return appendAll(appender, testCtx, sampleTemplates, timeStamps, flushFrequency, refsMap, refsArray, verbose)
 		}
-
-		timeSerieSize := len(timeStamps)
-		for dataPointIndex := 1; dataPointIndex < timeSerieSize; dataPointIndex++ {
-			for refIndex, sampleTemplateJson := range sampleTemplates {
-				sample := common.JsonTemplate2Sample(sampleTemplateJson, testCtx, timeStamps[dataPointIndex], common.MakeRandomFloat64())
-				err := appender.AddFast(sample.Lset, refsArray[refIndex], timeStamps[dataPointIndex], sample.Value)
-				if err != nil {
-					testCtx.Fatalf("AddFast request has failed!\nSample:%v\nError: %s", sample, err)
-				}
-				count++
-
-				if verbose || dataPointIndex%10 == 0 {
-					fmt.Printf("\rTotal samples count: %d [%d %%]\tTime: %s",
-						count,
-						dataPointIndex*100/timeSerieSize,
-						time.Unix(int64(timeStamps[dataPointIndex])/1000, 0).Format(time.RFC3339))
-				}
-			}
-
-			if flushFrequency > 0 && dataPointIndex%flushFrequency == 0 {
-				// block and flush all metrics every flush interval
-				waitForWrites(appender, &refsMap, testCtx)
-			}
-		}
+		// Wait for all responses
 		waitForWrites(appender, &refsMap, testCtx)
 	} else {
 		testCtx.Fatalf("Insufficient input. "+
 			"Samples count: [%d] and timestamps count [%d] should be positive numbers", samplesCount, tsCount)
 	}
+	return 0
+}
 
+func appendSingle(refIndex, cycleId int, appender tsdb.Appender, testCtx *testing.B, sampleTemplateJson string,
+	timeStamp int64, refsMap map[uint64]bool, refsArray []uint64) int {
+	count := 0
+	sample := common.JsonTemplate2Sample(sampleTemplateJson, testCtx, timeStamp, common.MakeRandomFloat64())
+
+	if cycleId == 0 {
+		// initialize refIds
+		// Add first & get reference
+		ref, err := appender.Add(sample.Lset, timeStamp, sample.Value)
+		if err != nil {
+			testCtx.Fatalf("Add request has failed!\nError: %s", err)
+		}
+		refsArray[refIndex] = ref
+		refsMap[ref] = true
+		count++
+	} else {
+		// use refIds and AddFast
+		err := appender.AddFast(sample.Lset, refsArray[refIndex], timeStamp, sample.Value)
+		if err != nil {
+			testCtx.Fatalf("AddFast request has failed!\nSample:%v\nError: %s", sample, err)
+		}
+		count++
+	}
+
+	return count
+}
+
+func appendAll(appender tsdb.Appender, testCtx *testing.B, sampleTemplates []string, timeStamps []int64,
+	flushFrequency int, refsMap map[uint64]bool, refsArray []uint64, verbose bool) int {
+	count := 0
+
+	// First pass - populate references for add fast
+	initialTimeStamp := timeStamps[0]
+	for i, sampleTemplateJson := range sampleTemplates {
+		// Add first & get reference
+		sample := common.JsonTemplate2Sample(sampleTemplateJson, testCtx, initialTimeStamp, common.MakeRandomFloat64())
+		ref, err := appender.Add(sample.Lset, initialTimeStamp, sample.Value)
+		if err != nil {
+			testCtx.Fatalf("Add request has failed!\nError: %s", err)
+		}
+		refsArray[i] = ref
+		refsMap[ref] = true
+		count++
+	}
+
+	timeSerieSize := len(timeStamps)
+	for dataPointIndex := 1; dataPointIndex < timeSerieSize; dataPointIndex++ {
+		for refIndex, sampleTemplateJson := range sampleTemplates {
+			sample := common.JsonTemplate2Sample(sampleTemplateJson, testCtx, timeStamps[dataPointIndex], common.MakeRandomFloat64())
+			err := appender.AddFast(sample.Lset, refsArray[refIndex], timeStamps[dataPointIndex], sample.Value)
+			if err != nil {
+				testCtx.Fatalf("AddFast request has failed!\nSample:%v\nError: %s", sample, err)
+			}
+			count++
+
+			if verbose || dataPointIndex%10 == 0 {
+				fmt.Printf("\rTotal samples count: %d [%d %%]\tTime: %s",
+					count,
+					dataPointIndex*100/timeSerieSize,
+					time.Unix(int64(timeStamps[dataPointIndex])/1000, 0).Format(time.RFC3339))
+			}
+		}
+
+		if flushFrequency > 0 && dataPointIndex%flushFrequency == 0 {
+			// block and flush all metrics every flush interval
+			waitForWrites(appender, &refsMap, testCtx)
+		}
+	}
 	return count
 }
 

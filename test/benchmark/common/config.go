@@ -23,6 +23,7 @@ type BenchmarkIngestConfig struct {
 	LabelValuesCount     int    `json:"LabelValuesCount,omitempty" yaml:"LabelValuesCount"`
 	LabelsValueDiversity int    `json:"LabelsValueDiversity,omitempty" yaml:"LabelsValueDiversity"`
 	FlushFrequency       int    `json:"FlushFrequency,omitempty" yaml:"FlushFrequency"`
+	AppendOneByOne       bool   `json:"AppendOneByOne,omitempty" yaml:"AppendOneByOne"`
 }
 
 func LoadBenchmarkIngestConfigFromData() (*BenchmarkIngestConfig, error) {
