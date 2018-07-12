@@ -3,13 +3,11 @@ package benchmark
 import (
 	"fmt"
 	"github.com/pkg/errors"
-	"github.com/v3io/v3io-tsdb/config"
 	"github.com/v3io/v3io-tsdb/pkg/tsdb"
 	"github.com/v3io/v3io-tsdb/pkg/utils"
 	"github.com/v3io/v3io-tsdb/test/benchmark/common"
 	"io/ioutil"
 	"log"
-	"os"
 	"testing"
 	"time"
 )
@@ -21,15 +19,9 @@ func BenchmarkIngest(b *testing.B) {
 
 	var count = 0 // count real number of samples to compare with query result
 
-	testConfig, err := common.LoadBenchmarkIngestConfigFromData()
+	testConfig, v3ioConfig, err := common.LoadBenchmarkIngestConfigs()
 	if err != nil {
-		panic(err)
-	}
-
-	v3ioConfigFile := os.Getenv(common.TsdbV3ioConfig)
-	v3ioConfig, err := config.LoadConfig(v3ioConfigFile)
-	if err != nil {
-		panic(errors.Wrap(err, fmt.Sprintf("Failed to load config from file %s", v3ioConfigFile)))
+		panic(errors.Wrap(err, "Unable to load configuration"))
 	}
 
 	adapter, err := tsdb.NewV3ioAdapter(v3ioConfig, nil, nil)

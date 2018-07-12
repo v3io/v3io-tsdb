@@ -13,7 +13,6 @@ import (
 	"github.com/v3io/v3io-tsdb/test/benchmark/common"
 	"io/ioutil"
 	"log"
-	"os"
 	"testing"
 	"time"
 )
@@ -27,16 +26,11 @@ func BenchmarkIngestWithNuclio(b *testing.B) {
 
 	var count = 0 // count real number of samples to compare with query result
 
-	testConfig, err := common.LoadBenchmarkIngestConfigFromData()
+	testConfig, v3ioConfig, err := common.LoadBenchmarkIngestConfigs()
 	if err != nil {
-		panic(err)
+		panic(errors.Wrap(err, "Unable to load configuration"))
 	}
 
-	v3ioConfigFile := os.Getenv("V3IO_TSDBCFG_PATH")
-	v3ioConfig, err := config.LoadConfig(v3ioConfigFile)
-	if err != nil {
-		panic(errors.Wrap(err, fmt.Sprintf("Failed to load config from file %s", v3ioConfigFile)))
-	}
 	data := nutest.DataBind{
 		Name:      defaultDbName,
 		Url:       v3ioConfig.V3ioUrl,
