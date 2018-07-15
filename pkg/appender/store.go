@@ -31,6 +31,7 @@ import (
 )
 
 const MAX_LATE_WRITE = 59 * 3600 * 1000 // max late arrival of 59min
+const MaxSamplesInWrite = 64
 
 // create a chunk store with two chunks (current, previous)
 func NewChunkStore() *chunkStore {
@@ -59,10 +60,11 @@ type storeState uint8
 
 const (
 	storeStateInit   storeState = 0
-	storeStateGet    storeState = 1 // Getting old state from storage
-	storeStateReady  storeState = 2 // Ready to update
-	storeStateUpdate storeState = 3 // Update/write in progress
-	storeStateSort   storeState = 3 // TBD sort chunk(s) in case of late arrivals
+	storeStatePreGet storeState = 1 // Getting old state from storage
+	storeStateGet    storeState = 2 // Getting old state from storage
+	storeStateReady  storeState = 3 // Ready to update
+	storeStateUpdate storeState = 4 // Update/write in progress
+	storeStateSort   storeState = 5 // TBD sort chunk(s) in case of late arrivals
 )
 
 // chunk appender object, state used for appending t/v to a chunk
@@ -126,6 +128,10 @@ func (cs *chunkStore) GetState() storeState {
 	return cs.state
 }
 
+func (cs *chunkStore) SetState(state storeState) {
+	cs.state = state
+}
+
 // return the DB path for storing the metric
 func (cs *chunkStore) GetMetricPath(metric *MetricState, tablePath string) string {
 	return fmt.Sprintf("%s%s.%016x", tablePath, metric.name, metric.hash) // TODO: use TableID
@@ -151,8 +157,9 @@ func (cs *chunkStore) GetChunksState(mc *MetricsCache, metric *MetricState, t in
 		mc.logger.ErrorWith("GetItem Failed", "metric", metric.key, "err", err)
 		return err
 	}
+	mc.getsInFlight++
 
-	mc.logger.DebugWith("GetItems", "name", metric.name, "key", metric.key, "reqid", request.ID)
+	mc.logger.DebugWith("Get Metric State", "name", metric.name, "key", metric.key, "reqid", request.ID)
 
 	cs.state = storeStateGet
 	return nil
@@ -262,7 +269,16 @@ func (cs *chunkStore) chunkByTime(t int64) *attrAppender {
 // write all pending samples to DB chunks and aggregators
 func (cs *chunkStore) WriteChunks(mc *MetricsCache, metric *MetricState) error {
 
+	// return if there are no pending updates
 	if len(cs.pending) == 0 {
+		return nil
+	}
+
+	fmt.Println("Write", mc.updatesInFlight)
+	// If we have too many metrics with update in progress queue it (to avoid chan deadlocks)
+	if mc.updatesInFlight > CHAN_SIZE {
+		cs.state = storeStateUpdate
+		mc.extraQueue.Push(metric)
 		return nil
 	}
 
@@ -287,7 +303,7 @@ func (cs *chunkStore) WriteChunks(mc *MetricsCache, metric *MetricState) error {
 	var i int
 
 	// loop over pending samples, add to chunks & aggregates (create required update expressions)
-	for i < len(cs.pending) && partition.InRange(cs.pending[i].t) {
+	for i < len(cs.pending) && i < MaxSamplesInWrite && partition.InRange(cs.pending[i].t) {
 
 		t := cs.pending[i].t
 
@@ -320,6 +336,7 @@ func (cs *chunkStore) WriteChunks(mc *MetricsCache, metric *MetricState) error {
 		if (i == len(cs.pending)-1) || !partition.InRange(cs.pending[i+1].t) {
 			expr = expr + cs.aggrList.SetOrUpdateExpr("v", bucket, isNewBucket)
 			expr = expr + cs.appendExpression(activeChunk)
+			i++
 			break
 		}
 
@@ -343,7 +360,13 @@ func (cs *chunkStore) WriteChunks(mc *MetricsCache, metric *MetricState) error {
 	}
 
 	cs.aggrList.Clear()
-	cs.pending = cs.pending[:0] // TODO: leave pending from newer partitions if any, use [i:] !
+	fmt.Println("PENDING", i, len(cs.pending), expr)
+	if i == len(cs.pending) {
+		cs.pending = cs.pending[:0]
+	} else {
+		// leave pending not processed or from newer partitions
+		cs.pending = cs.pending[i:]
+	}
 
 	if expr == "" {
 		return nil
@@ -365,8 +388,10 @@ func (cs *chunkStore) WriteChunks(mc *MetricsCache, metric *MetricState) error {
 	// Call V3IO async Update Item method
 	expr += fmt.Sprintf("_maxtime=%d;", cs.maxTime)       // TODO: use max() expr
 	path := cs.GetMetricPath(metric, partition.GetPath()) // TODO: use TableID for multi-partition
+	fmt.Printf("BEF")
 	request, err := mc.container.UpdateItem(
 		&v3io.UpdateItemInput{Path: path, Expression: &expr}, metric, mc.responseChan)
+	fmt.Println("-TER", err, expr, path)
 	if err != nil {
 		mc.logger.ErrorWith("UpdateItem Failed", "err", err)
 		return err
