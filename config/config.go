@@ -48,6 +48,15 @@ type V3ioConfig struct {
 	MaxBehind int `json:"maxBehind"`
 	// Override last chunk (by default on restart it will append from the last point if possible)
 	OverrideOld bool `json:"overrideOld"`
+	// Metrics reporter configuration
+	MetricsReporter MetricsReporterConfig `json:"metrics,omitempty"`
+}
+
+type MetricsReporterConfig struct {
+	ReportOnShutdown   bool   `json:"reportOnShutdown,omitempty"`
+	Output             string `json:output` // stdout, syslog, etc.
+	ReportPeriodically bool   `json:reportPeriodically,omitempty`
+	RepotInterval      int    `json:"reportInterval"` // Duration
 }
 
 type DBPartConfig struct {
