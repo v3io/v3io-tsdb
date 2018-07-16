@@ -188,7 +188,10 @@ func (ac *addCommandeer) add() error {
 	fmt.Println("\nDone!")
 
 	// make sure all writes are committed
-	return ac.waitForWrites(append, &refMap)
+	ret := append.WaitForCompletion(0, 0)
+	fmt.Println("ret:", ret)
+	return nil
+	//return ac.waitForWrites(append, &refMap)
 }
 
 func (ac *addCommandeer) waitForWrites(append tsdb.Appender, refMap *map[uint64]bool) error {

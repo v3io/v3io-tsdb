@@ -152,12 +152,12 @@ func (cs *chunkStore) GetChunksState(mc *MetricsCache, metric *MetricState, t in
 	getInput := v3io.GetItemInput{
 		Path: path, AttributeNames: []string{"_maxtime"}}
 
-	request, err := mc.container.GetItem(&getInput, metric, mc.getRespChan)
+	request, err := mc.container.GetItem(&getInput, metric, mc.responseChan)
 	if err != nil {
 		mc.logger.ErrorWith("GetItem Failed", "metric", metric.key, "err", err)
 		return err
 	}
-	mc.getsInFlight++
+	mc.updatesInFlight++
 
 	mc.logger.DebugWith("Get Metric State", "name", metric.name, "key", metric.key, "reqid", request.ID)
 
@@ -274,7 +274,6 @@ func (cs *chunkStore) WriteChunks(mc *MetricsCache, metric *MetricState) error {
 		return nil
 	}
 
-	fmt.Println("Write", mc.updatesInFlight)
 	// If we have too many metrics with update in progress queue it (to avoid chan deadlocks)
 	if mc.updatesInFlight > CHAN_SIZE {
 		cs.state = storeStateUpdate
@@ -360,7 +359,7 @@ func (cs *chunkStore) WriteChunks(mc *MetricsCache, metric *MetricState) error {
 	}
 
 	cs.aggrList.Clear()
-	fmt.Println("PENDING", i, len(cs.pending), expr)
+	fmt.Println("PENDING", i, len(cs.pending))
 	if i == len(cs.pending) {
 		cs.pending = cs.pending[:0]
 	} else {
@@ -369,6 +368,7 @@ func (cs *chunkStore) WriteChunks(mc *MetricsCache, metric *MetricState) error {
 	}
 
 	if expr == "" {
+		fmt.Println("Nothing to update!")
 		return nil
 	}
 
@@ -388,10 +388,8 @@ func (cs *chunkStore) WriteChunks(mc *MetricsCache, metric *MetricState) error {
 	// Call V3IO async Update Item method
 	expr += fmt.Sprintf("_maxtime=%d;", cs.maxTime)       // TODO: use max() expr
 	path := cs.GetMetricPath(metric, partition.GetPath()) // TODO: use TableID for multi-partition
-	fmt.Printf("BEF")
 	request, err := mc.container.UpdateItem(
 		&v3io.UpdateItemInput{Path: path, Expression: &expr}, metric, mc.responseChan)
-	fmt.Println("-TER", err, expr, path)
 	if err != nil {
 		mc.logger.ErrorWith("UpdateItem Failed", "err", err)
 		return err
