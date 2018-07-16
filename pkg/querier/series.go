@@ -46,8 +46,18 @@ func (s *V3ioSeries) Iterator() SeriesIterator { return s.iter }
 
 // initialize the label set from _lset & name attributes
 func initLabels(set *V3ioSeriesSet) utils.Labels {
-	name := set.iter.GetField("_name").(string)
-	lsetAttr := set.iter.GetField("_lset").(string)
+	name, nok := set.iter.GetField("_name").(string)
+	if !nok {
+		name = "UNKNOWN"
+	}
+	lsetAttr, lok := set.iter.GetField("_lset").(string)
+	if !lok {
+		lsetAttr = "UNKNOWN"
+	}
+	if !lok || !nok {
+		set.logger.Error("Error in initLabels, bad field values")
+	}
+
 	lset := utils.Labels{utils.Label{Name: "__name__", Value: name}}
 
 	splitLset := strings.Split(lsetAttr, ",")
