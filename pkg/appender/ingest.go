@@ -69,6 +69,7 @@ type MetricsCache struct {
 	getRespChan     chan *v3io.Response
 	nameUpdateChan  chan *v3io.Response
 	asyncAppendChan chan *asyncAppend
+	updatesInFlight int
 
 	lastMetric     uint64
 	cacheMetricMap map[uint64]*MetricState // TODO: maybe use hash as key & combine w ref
@@ -121,6 +122,7 @@ func (mc *MetricsCache) start() error {
 			case resp := <-mc.responseChan:
 				// Handle V3io update expression responses
 
+				mc.updatesInFlight--
 				metric, ok := resp.Context.(*MetricState)
 				respErr := resp.Error
 
