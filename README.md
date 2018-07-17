@@ -1,30 +1,30 @@
 [![Build Status](https://travis-ci.org/v3io/v3io-tsdb.svg?branch=master)](https://travis-ci.org/v3io/v3io-tsdb)
 
 # V3IO-TSDB
-iguazio API lib for time-series DB access and Prometheus TSDB storage driver. 
+Iguazio API lib for time-series DB access and Prometheus TSDB storage driver. 
 
 > Note: This project is still under development, it requires the latest 1.7 release of iguazio DB (with Blob functions)
 
 ## Overview
-iguazio provides a real-time flexible document database engine which accelerates popular BigData and open-source 
+Iguazio provides a real-time flexible document database engine which accelerates popular BigData and open-source 
 frameworks such as Spark and Presto, as well as provide AWS compatible data APIs (DynamoDB, Kinesis, S3). 
 
-iguazio DB engine runs at the speed of in-memory databases, but uses lower cost and higher density (NVMe) Flash, it has 
+Iguazio DB engine runs at the speed of in-memory databases, but uses lower cost and higher density (NVMe) Flash, it has 
 a unique low-level design with highly parallel processing and OS bypass which treats Flash as async memory pages. 
 
-iguazio DB low-level APIs (v3io) has rich API semantics and multiple indexing types, those allow it to run multiple
+Iguazio DB low-level APIs (v3io) has rich API semantics and multiple indexing types, those allow it to run multiple
 workloads and processing engines on exactly the same data, and consistently read/write the data in different tools.
 
 This project uses v3io semantics (row & col layouts, arrays, random & sequential indexes, etc.) to provide extremely 
 fast and scalable Time Series database engine which can be accessed simultaneously by multiple engines and APIs, such as:
 - [Prometheus](https://prometheus.io/) Time Series DB (for metrics scraping & queries)
 - [nuclio](https://github.com/nuclio/nuclio) serverless functions (for real-time ingestion, stream processing or queries) 
-- iguazio DynamoDB API (with extensions) 
+- Iguazio DynamoDB API (with extensions) 
 - Apache Presto & Spark (future item, for SQL & AI)
 - Built-in CLI (tsdbctl) for DB creation, ingestion, and queries 
 
 [nuclio](https://github.com/nuclio/nuclio) supports HTTP and a large variety of streaming/triggering options (Kafka, Kinesis
-, Azure event-hub, RabbitMQ, NATS, iguazio streams, MQTT, Cron tasks), it provides automatic deployment and auto-scaling 
+, Azure event-hub, RabbitMQ, NATS, Iguazio streams, MQTT, Cron tasks), it provides automatic deployment and auto-scaling 
 enabling ingestion from variety of sources at endless scalability. using nuclio functions can be customized to pre-process 
 incoming data e.g. examine metric data, alert, convert formats, etc.  
 
@@ -51,7 +51,7 @@ this is currently not possible via the standard Prometheus TSDB API.
 The data can be partitioned to multiple tables (e.g. one per week) or use a cyclic table (goes back to the first chunk after
  it reached the end), multiple tables are stored in a hierarchy under the specified path. 
  
-Metric names and labels are stored in search optimized keys and string attributes. iguazio DB engine can run full 
+Metric names and labels are stored in search optimized keys and string attributes. Iguazio DB engine can run full 
 dimension scan (searches) in the rate of millions of metrics per second, or use selective range based queries to access 
 a specific metric family. 
 
@@ -64,8 +64,8 @@ link latency.
 
 ## How To Use  
 
-the code is separated to Prometheus compliant adapter in [/promtsdb](promtsdb) and more generic/advanced adapter in 
-[/pkg/tsdb](pkg/tsdb), you should use the later for custom functions and code. see a full usage example in 
+The code is separated to Prometheus compliant adapter in [/promtsdb](promtsdb) and more generic/advanced adapter in 
+[/pkg/tsdb](pkg/tsdb), you should use the latter for custom functions and code. See a full usage example in 
 [v3iotsdb_test.go](/pkg/tsdb/v3iotsdb_test.go), both have similar semantics.
 
 For Prometheus you would need to use the fork found in `https://github.com/v3io/prometheus`, it already loads this
@@ -94,13 +94,13 @@ it has built-in help, see the following add/query examples:
 	tsdbctl add cpu os=win,node=xyz123 -d 73.2
 ```
 
-For use with nuclio function you can see function example under [\nuclio](nuclio)
+For use with nuclio function you can see function example under [\nuclio](examples/nuclio)
 
 ## API Walkthrough 
 
 ### Creating and Configuring a TSDB Adapter 
 
-the first step is to create a TSDB, this is done only once per TSDB and generates the required metadata and configuration
+The first step is to create a TSDB, this is done only once per TSDB and generates the required metadata and configuration
 such as partitioning strategy, retention, aggregators, etc. this can be done via the CLI or a function call.
 
 ```go
@@ -118,17 +118,17 @@ such as partitioning strategy, retention, aggregators, etc. this can be done via
 	return tsdb.CreateTSDB(v3iocfg, &dbcfg)
 ```
 
-> if you plan on using pre-aggregation to speed aggregate queries you should specify the `Rollups` (function list) and 
+> If you plan on using pre-aggregation to speed aggregate queries you should specify the `Rollups` (function list) and 
 `RollupMin` (bucket time in minutes) parameters, the supported aggregation functions are: count, sum, avg, min, max, 
 stddev, stdvar.
 
 In order to use the TSDB we need to create an adapter, the `NewV3ioAdapter` function accepts 3
-parameters: the configuration structure, v3io data container object and logger object. the last 2 are optional, in case
+parameters: the configuration structure, v3io data container object and logger object. The last 2 are optional, in case
 you already have container and logger (when using nuclio data bindings).
 
 Configuration is specified in a YAML or JSON format, and can be read from a file using `config.LoadConfig(path string)` 
-or can be loaded from a local buffer using `config.LoadFromData(data []byte)`. you can see details on the configuration
-options in [config](config/config.go), a minimal configuration looks like: 
+or can be loaded from a local buffer using `config.LoadFromData(data []byte)`. You can see details on the configuration
+options in [config](internal/pkg/config/config.go), a minimal configuration looks like: 
 
 ```yaml
 v3ioUrl: "v3io address:port"
@@ -205,7 +205,7 @@ using `functions` and `step` is optional, use it only when you are interested in
 the sampling interval (and preferably equal or greater than the partition RollupMin interval). when using aggregates it will
 return one series per aggregate function, the `Aggregator` label will be added to that series with the function name.
 
-in some cases we would like to retrieve overlapping aggregates instead of fixed interval ones, e.g. stats for last 1hr, 6hr, 24hr
+In some cases we would like to retrieve overlapping aggregates instead of fixed interval ones, e.g. stats for last 1hr, 6hr, 24hr
 the `SelectOverlap()` call adds the `win` integer array ([]int) which allow specifying the requested windows. the windows are 
 multiplied by the step value and start from the querier maxt value e.g. for 1hr, 6hr, and 24hr windows use `Step=3600 * 1000` 
 (1hr), `win=[1,6,24]`, and `maxt` should be the current time. The result set (series iterator) in this case will only contain 3 
@@ -237,7 +237,7 @@ Using SelectOverlap (overlapping windows):
 	set, err := qry.SelectOverlap("http_req", "count,avg,sum", 1000*3600, []int{24,6,1}, "method=='post'")
 ```
 
-once we obtain a set using one of the methods above we can iterate over the set and the individual series in the following way:
+Once we obtain a set using one of the methods above we can iterate over the set and the individual series in the following way:
 
 ```go
 	for set.Next() {

@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"github.com/nuclio/nuclio-sdk-go"
 	"github.com/v3io/v3io-go-http"
-	"github.com/v3io/v3io-tsdb/config"
+	"github.com/v3io/v3io-tsdb/internal/pkg/config"
 	"github.com/v3io/v3io-tsdb/pkg/tsdb"
 	"github.com/v3io/v3io-tsdb/pkg/utils"
 	"sync"

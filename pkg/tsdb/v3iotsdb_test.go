@@ -22,7 +22,7 @@ package tsdb
 
 import (
 	"fmt"
-	"github.com/v3io/v3io-tsdb/config"
+	"github.com/v3io/v3io-tsdb/internal/pkg/config"
 	"github.com/v3io/v3io-tsdb/pkg/partmgr"
 	"github.com/v3io/v3io-tsdb/pkg/utils"
 	"math/rand"
