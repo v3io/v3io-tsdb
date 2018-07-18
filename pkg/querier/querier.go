@@ -23,8 +23,8 @@ package querier
 import (
 	"github.com/nuclio/logger"
 	"github.com/v3io/v3io-go-http"
-	"github.com/v3io/v3io-tsdb/internal/pkg/config"
 	"github.com/v3io/v3io-tsdb/pkg/aggregate"
+	"github.com/v3io/v3io-tsdb/pkg/config"
 	"github.com/v3io/v3io-tsdb/pkg/partmgr"
 	"github.com/v3io/v3io-tsdb/pkg/utils"
 	"sort"
