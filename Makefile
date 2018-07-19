@@ -6,7 +6,7 @@ TOPLEVEL_DIRS_GOFMT_SYNTAX=`ls -d ./*/. | grep -v '^./vendor/.$$'`
 
 test:
 	go get -v -t $(TOPLEVEL_DIRS)
-	go test -short $(TOPLEVEL_DIRS)
+	go test -v -short $(TOPLEVEL_DIRS)
 
 .PHONY: lint
 lint:
