@@ -32,8 +32,6 @@ const (
 	InstanceName = "instance"
 )
 
-var hash = xxhash.New()
-
 // Label is a key/value pair of strings.
 type Label struct {
 	Name, Value string
@@ -130,9 +128,8 @@ func (ls Labels) Hash() uint64 {
 		b = append(b, sep)
 	}
 
-	hash.Reset()
+	hash := xxhash.New()
 	hash.Write(b)
-
 	return hash.Sum64()
 }
 
