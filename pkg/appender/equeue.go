@@ -1,6 +1,8 @@
 package appender
 
-import "sync"
+import (
+	"sync"
+)
 
 const ListSize = 256
 
@@ -32,6 +34,10 @@ func (eq *ElasticQueue) Length() int {
 	eq.mtx.Lock()
 	defer eq.mtx.Unlock()
 
+	return eq.length()
+}
+
+func (eq *ElasticQueue) length() int {
 	if eq.head >= eq.tail {
 		return eq.head - eq.tail
 	}
@@ -39,14 +45,18 @@ func (eq *ElasticQueue) Length() int {
 	return eq.head + (len(eq.data) * ListSize) - eq.tail
 }
 
-// Push a value to the queue
-func (eq *ElasticQueue) Push(val *MetricState) bool {
+func (eq *ElasticQueue) Push(val *MetricState) int {
 	eq.mtx.Lock()
 	defer eq.mtx.Unlock()
 
+	return eq.push(val)
+}
+
+// Push a value to the queue
+func (eq *ElasticQueue) push(val *MetricState) int {
 	headBlock, headOffset := eq.head/ListSize, eq.head%ListSize
 	tailBlock := eq.tail / ListSize
-	wasEmpty := eq.head == eq.tail
+	//wasEmpty := eq.head == eq.tail
 
 	if headBlock == tailBlock-1 && headOffset == ListSize-1 {
 		eq.data = append(eq.data, &list{})
@@ -65,7 +75,7 @@ func (eq *ElasticQueue) Push(val *MetricState) bool {
 
 	eq.head = (eq.head + 1) % (len(eq.data) * ListSize)
 	eq.data[headBlock][headOffset] = val
-	return wasEmpty
+	return eq.length()
 }
 
 func (eq *ElasticQueue) Pop() *MetricState {
@@ -73,6 +83,23 @@ func (eq *ElasticQueue) Pop() *MetricState {
 	defer eq.mtx.Unlock()
 
 	return eq.pop()
+}
+
+func (eq *ElasticQueue) PopN(length int) []*MetricState {
+	eq.mtx.Lock()
+	defer eq.mtx.Unlock()
+	var list []*MetricState
+
+	for i := 0; i < length; i++ {
+		metric := eq.pop()
+		if metric != nil {
+			list = append(list, metric)
+		} else {
+			break
+		}
+	}
+
+	return list
 }
 
 // return the oldest value in the queue
@@ -85,5 +112,17 @@ func (eq *ElasticQueue) pop() *MetricState {
 	eq.tail = (eq.tail + 1) % (len(eq.data) * ListSize)
 
 	return eq.data[tailBlock][tailOffset]
+}
 
+// Atomic rotate, push a value to the tail and pop one from the head
+func (eq *ElasticQueue) Rotate(val *MetricState) (*MetricState, int) {
+	eq.mtx.Lock()
+	defer eq.mtx.Unlock()
+
+	if eq.head == eq.tail {
+		return val, 0
+	}
+
+	length := eq.push(val)
+	return eq.pop(), length
 }

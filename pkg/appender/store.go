@@ -59,12 +59,14 @@ type chunkStore struct {
 type storeState uint8
 
 const (
-	storeStateInit   storeState = 0
-	storeStatePreGet storeState = 1 // Getting old state from storage
-	storeStateGet    storeState = 2 // Getting old state from storage
-	storeStateReady  storeState = 3 // Ready to update
-	storeStateUpdate storeState = 4 // Update/write in progress
-	storeStateSort   storeState = 5 // TBD sort chunk(s) in case of late arrivals
+	storeStateInit    storeState = 0
+	storeStatePreGet  storeState = 1 // Need to get state
+	storeStateGet     storeState = 2 // Getting old state from storage
+	storeStateReady   storeState = 3 // Ready to update
+	storeStatePending storeState = 4 // New data for metric
+	storeStateUpdate  storeState = 5 // Update/write in progress
+	storeStateSort    storeState = 6 // TBD sort chunk(s) in case of late arrivals
+	storeStateError   storeState = 7 // Metric in error state
 )
 
 // chunk appender object, state used for appending t/v to a chunk
@@ -332,7 +334,7 @@ func (cs *chunkStore) WriteChunks(mc *MetricsCache, metric *MetricState) error {
 		activeChunk.appendAttr(t, cs.pending[i].v.(float64))
 
 		// if the last item or last item in the same partition add expressions and break
-		if (i == len(cs.pending)-1) || !partition.InRange(cs.pending[i+1].t) {
+		if (i == len(cs.pending)-1) || i == MaxSamplesInWrite-1 || !partition.InRange(cs.pending[i+1].t) {
 			expr = expr + cs.aggrList.SetOrUpdateExpr("v", bucket, isNewBucket)
 			expr = expr + cs.appendExpression(activeChunk)
 			i++
@@ -359,7 +361,6 @@ func (cs *chunkStore) WriteChunks(mc *MetricsCache, metric *MetricState) error {
 	}
 
 	cs.aggrList.Clear()
-	fmt.Println("PENDING", i, len(cs.pending))
 	if i == len(cs.pending) {
 		cs.pending = cs.pending[:0]
 	} else {
@@ -368,7 +369,6 @@ func (cs *chunkStore) WriteChunks(mc *MetricsCache, metric *MetricState) error {
 	}
 
 	if expr == "" {
-		fmt.Println("Nothing to update!")
 		return nil
 	}
 
