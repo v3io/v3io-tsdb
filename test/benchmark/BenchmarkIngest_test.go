@@ -21,7 +21,7 @@ func BenchmarkIngest(b *testing.B) {
 
 	testConfig, v3ioConfig, err := common.LoadBenchmarkIngestConfigs()
 	if err != nil {
-		panic(errors.Wrap(err, "Unable to load configuration"))
+		panic(errors.Wrap(err, "unable to load configuration"))
 	}
 
 	adapter, err := tsdb.NewV3ioAdapter(v3ioConfig, nil, nil)
@@ -37,14 +37,14 @@ func BenchmarkIngest(b *testing.B) {
 	// run the runTest function b.N times
 	relativeTimeOffsetMs, err := utils.Str2duration(testConfig.StartTimeOffset)
 	if err != nil {
-		b.Fatal("Unable to resolve start time. Check configuration.")
+		b.Fatal("unable to resolve start time. Check configuration.")
 	}
 	testStartTimeMs := testStartTimeNano/int64(time.Millisecond) - relativeTimeOffsetMs
 	timeStampsCount := (testStartTimeNano/int64(time.Millisecond) - testStartTimeMs) / int64(testConfig.SampleStepSize)
-	timeStamps := make([]int64, timeStampsCount)
+	timestamps := make([]int64, timeStampsCount)
 
-	for i := range timeStamps {
-		timeStamps[i] = testStartTimeMs + int64(i*testConfig.SampleStepSize)
+	for i := range timestamps {
+		timestamps[i] = testStartTimeMs + int64(i*testConfig.SampleStepSize)
 	}
 
 	sampleTemplates := common.MakeSampleTemplates(
@@ -58,11 +58,16 @@ func BenchmarkIngest(b *testing.B) {
 
 	samplesCount := len(sampleTemplates)
 	refsMap := make(map[uint64]bool, samplesCount)
-	refsArray := make([]uint64, samplesCount)
+	refs := make([]uint64, samplesCount)
 
 	for i := 0; i < b.N; i++ {
-		rowsAdded := runTest(i, appender, b, timeStamps, sampleTemplates, testConfig.FlushFrequency, refsMap, refsArray,
+		rowsAdded, err := runTest(i, appender, timestamps, sampleTemplates, testConfig.FlushFrequency, refsMap, refs,
 			testConfig.AppendOneByOne, testConfig.Verbose)
+
+		if err != nil {
+			b.Fatal(err)
+		}
+
 		if rowsAdded == 0 {
 			break // stop the test (target has been achieved)
 		}
@@ -75,110 +80,118 @@ func BenchmarkIngest(b *testing.B) {
 func runTest(
 	index int,
 	appender tsdb.Appender,
-	testCtx *testing.B,
 	timeStamps []int64,
 	sampleTemplates []string,
 	flushFrequency int,
 	refsMap map[uint64]bool,
-	refsArray []uint64,
+	refs []uint64,
 	appendOneByOne bool,
-	verbose bool) int {
+	verbose bool) (int, error) {
 
 	samplesCount := len(sampleTemplates)
 	tsCount := len(timeStamps)
 
+	count := 0
+	var err error
 	if samplesCount > 0 && tsCount > 0 {
 		if appendOneByOne {
-			return appendSingle(index%samplesCount, index/samplesCount, appender, testCtx, sampleTemplates[index%samplesCount],
-				timeStamps[index/samplesCount], refsMap, refsArray)
+			count, err = appendSingle(index%samplesCount, index/samplesCount, appender, sampleTemplates[index%samplesCount],
+				timeStamps[index/samplesCount], refsMap, refs)
 		} else {
-			return appendAll(appender, testCtx, sampleTemplates, timeStamps, flushFrequency, refsMap, refsArray, verbose)
+			count, err = appendAll(appender, sampleTemplates, timeStamps, flushFrequency, refsMap, refs, verbose)
 		}
 		// Wait for all responses
-		waitForWrites(appender, &refsMap, testCtx)
+		err = waitForWrites(appender, &refsMap)
 	} else {
-		testCtx.Fatalf("Insufficient input. "+
+		err = errors.Errorf("insufficient input. "+
 			"Samples count: [%d] and timestamps count [%d] should be positive numbers", samplesCount, tsCount)
 	}
-	return 0
+	return count, err
 }
 
-func appendSingle(refIndex, cycleId int, appender tsdb.Appender, testCtx *testing.B, sampleTemplateJson string,
-	timeStamp int64, refsMap map[uint64]bool, refsArray []uint64) int {
+func appendSingle(refIndex, cycleId int, appender tsdb.Appender, sampleTemplateJson string,
+	timeStamp int64, refsMap map[uint64]bool, refs []uint64) (int, error) {
 	count := 0
-	sample := common.JsonTemplate2Sample(sampleTemplateJson, testCtx, timeStamp, common.MakeRandomFloat64())
+	sample, err := common.JsonTemplate2Sample(sampleTemplateJson, timeStamp, common.MakeRandomFloat64())
 
 	if cycleId == 0 {
 		// initialize refIds
 		// Add first & get reference
 		ref, err := appender.Add(sample.Lset, timeStamp, sample.Value)
 		if err != nil {
-			testCtx.Fatalf("Add request has failed!\nError: %s", err)
+			err = errors.Wrap(err, "Add request has failed!")
 		}
-		refsArray[refIndex] = ref
+		refs[refIndex] = ref
 		refsMap[ref] = true
 		count++
 	} else {
-		// use refIds and AddFast
-		err := appender.AddFast(sample.Lset, refsArray[refIndex], timeStamp, sample.Value)
+		err := appender.AddFast(sample.Lset, refs[refIndex], timeStamp, sample.Value)
 		if err != nil {
-			testCtx.Fatalf("AddFast request has failed!\nSample:%v\nError: %s", sample, err)
+			err = errors.Wrap(err, fmt.Sprintf("AddFast request has failed!\nSample:%v", sample))
 		}
 		count++
 	}
 
-	return count
+	return count, err
 }
 
-func appendAll(appender tsdb.Appender, testCtx *testing.B, sampleTemplates []string, timeStamps []int64,
-	flushFrequency int, refsMap map[uint64]bool, refsArray []uint64, verbose bool) int {
+func appendAll(appender tsdb.Appender, sampleTemplates []string, timeStamps []int64,
+	flushFrequency int, refsMap map[uint64]bool, refs []uint64, verbose bool) (int, error) {
 	count := 0
 
 	// First pass - populate references for add fast
 	initialTimeStamp := timeStamps[0]
 	for i, sampleTemplateJson := range sampleTemplates {
 		// Add first & get reference
-		sample := common.JsonTemplate2Sample(sampleTemplateJson, testCtx, initialTimeStamp, common.MakeRandomFloat64())
+		sample, err := common.JsonTemplate2Sample(sampleTemplateJson, initialTimeStamp, common.MakeRandomFloat64())
+		if err != nil {
+			return count, errors.Wrap(err, "unable to marshall json to sample")
+		}
 		ref, err := appender.Add(sample.Lset, initialTimeStamp, sample.Value)
 		if err != nil {
-			testCtx.Fatalf("Add request has failed!\nError: %s", err)
+			return count, errors.Wrap(err, "Add request has failed!")
 		}
-		refsArray[i] = ref
+		refs[i] = ref
 		refsMap[ref] = true
 		count++
 	}
 
-	timeSerieSize := len(timeStamps)
-	for dataPointIndex := 1; dataPointIndex < timeSerieSize; dataPointIndex++ {
+	timeSeriesSize := len(timeStamps)
+	for dataPointIndex := 1; dataPointIndex < timeSeriesSize; dataPointIndex++ {
 		for refIndex, sampleTemplateJson := range sampleTemplates {
-			sample := common.JsonTemplate2Sample(sampleTemplateJson, testCtx, timeStamps[dataPointIndex], common.MakeRandomFloat64())
-			err := appender.AddFast(sample.Lset, refsArray[refIndex], timeStamps[dataPointIndex], sample.Value)
+			sample, err := common.JsonTemplate2Sample(sampleTemplateJson, timeStamps[dataPointIndex], common.MakeRandomFloat64())
 			if err != nil {
-				testCtx.Fatalf("AddFast request has failed!\nSample:%v\nError: %s", sample, err)
+				return count, err
+			}
+			err = appender.AddFast(sample.Lset, refs[refIndex], timeStamps[dataPointIndex], sample.Value)
+			if err != nil {
+				return count, errors.Wrap(err, fmt.Sprintf("AddFast request has failed! Sample:%v", sample))
 			}
 			count++
 
 			if verbose || dataPointIndex%10 == 0 {
 				fmt.Printf("\rTotal samples count: %d [%d %%]\tTime: %s",
 					count,
-					dataPointIndex*100/timeSerieSize,
+					dataPointIndex*100/timeSeriesSize,
 					time.Unix(int64(timeStamps[dataPointIndex])/1000, 0).Format(time.RFC3339))
 			}
 		}
 
 		if flushFrequency > 0 && dataPointIndex%flushFrequency == 0 {
 			// block and flush all metrics every flush interval
-			waitForWrites(appender, &refsMap, testCtx)
+			waitForWrites(appender, &refsMap)
 		}
 	}
-	return count
+	return count, nil
 }
 
-func waitForWrites(append tsdb.Appender, refMap *map[uint64]bool, testCtx *testing.B) {
+func waitForWrites(append tsdb.Appender, refMap *map[uint64]bool) error {
 	for ref := range *refMap {
 		err := append.WaitForReady(ref)
 		if err != nil {
-			testCtx.Fatalf("waitForWrites has failed!\nError: %s", err)
+			errors.Wrap(err, "waitForWrites has failed!")
 		}
 	}
+
+	return nil
 }

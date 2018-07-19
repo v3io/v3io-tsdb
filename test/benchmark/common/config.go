@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"github.com/ghodss/yaml"
 	"github.com/pkg/errors"
-	"github.com/v3io/v3io-tsdb/config"
+	"github.com/v3io/v3io-tsdb/pkg/config"
 	"io/ioutil"
 	"os"
 )

@@ -4,9 +4,9 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"github.com/pkg/errors"
 	"github.com/v3io/v3io-tsdb/pkg/utils"
 	"math/rand"
-	"testing"
 	"time"
 )
 
@@ -43,21 +43,21 @@ func MakeSamplesModel(namesCount, namesDiversity, labelsCount, labelDiversity, l
 func MakeSampleTemplates(model map[string]map[string][]string) []string {
 	var result = make([]string, 0)
 	for name, labels := range model {
-		valSetLenght := 0
+		valSetLength := 0
 		// TODO: find better way to get size of the label values array
 		for _, labelValues := range labels {
-			valSetLenght = len(labelValues)
+			valSetLength = len(labelValues)
 			break
 		}
-		for index := 0; index < valSetLenght; index++ {
+		for index := 0; index < valSetLength; index++ {
 			var buffer bytes.Buffer
-			buffer.WriteString(fmt.Sprintf("{\"Lset\": { \"__name__\":\"%s\"", name))
+			buffer.WriteString(fmt.Sprintf(`{"Lset": { "__name__":"%s"`, name))
 			for label, labelValues := range labels {
-				buffer.WriteString(", \"")
+				buffer.WriteString(`, "`)
 				buffer.WriteString(label)
-				buffer.WriteString(fmt.Sprintf("\" : \"%s\"", labelValues[index]))
+				buffer.WriteString(fmt.Sprintf(`" : "%s"`, labelValues[index]))
 			}
-			buffer.WriteString("}, \"Time\" : \"%d\", \"Value\" : %.2f}")
+			buffer.WriteString(`}, "Time" : "%d", "Value" : %.2f}`)
 			result = append(result, buffer.String())
 		}
 	}
@@ -87,16 +87,16 @@ func MakeNamesRange(prefix string, count, minIndex, maxIndex int) ([]string, err
 	} else {
 		size = count * limit
 	}
-	array := make([]string, size)
+	slice := make([]string, size)
 
-	for i := range array {
+	for i := range slice {
 		if limit > 1 {
-			array[i] = fmt.Sprintf("%s%s_%d", normalizedPrefix, string(65+(i/limit)%count), minIndex+i%limit)
+			slice[i] = fmt.Sprintf("%s%s_%d", normalizedPrefix, string(65+(i/limit)%count), minIndex+i%limit)
 		} else {
-			array[i] = fmt.Sprintf("%s%s", normalizedPrefix, string(65+(i/limit)%count))
+			slice[i] = fmt.Sprintf("%s%s", normalizedPrefix, string(65+(i/limit)%count))
 		}
 	}
-	return array, nil
+	return slice, nil
 }
 
 func MakeRandomFloat64() float64 {
@@ -104,14 +104,14 @@ func MakeRandomFloat64() float64 {
 	return rand.Float64() * 100
 }
 
-func JsonTemplate2Sample(sampleJsonTemplate string, testCtx *testing.B, time int64, value float64) *Sample {
+func JsonTemplate2Sample(sampleJsonTemplate string, time int64, value float64) (*Sample, error) {
 	sampleJson := fmt.Sprintf(sampleJsonTemplate, time, value)
 	sample, err := unmarshallSample(sampleJson)
 	if err != nil {
-		testCtx.Fatalf("Failed to unmarshall sample: %s\nError: %s", sampleJson, err)
+		return nil, errors.Wrap(err, fmt.Sprintf("Failed to unmarshall sample: %s", sampleJson))
 	}
 
-	return sample
+	return sample, nil
 }
 
 func unmarshallSample(sampleJsonString string) (*Sample, error) {

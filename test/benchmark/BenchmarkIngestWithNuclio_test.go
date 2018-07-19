@@ -7,7 +7,7 @@ import (
 	"github.com/nuclio/nuclio-test-go"
 	"github.com/pkg/errors"
 	"github.com/v3io/v3io-go-http"
-	"github.com/v3io/v3io-tsdb/config"
+	"github.com/v3io/v3io-tsdb/pkg/config"
 	"github.com/v3io/v3io-tsdb/pkg/tsdb"
 	"github.com/v3io/v3io-tsdb/pkg/utils"
 	"github.com/v3io/v3io-tsdb/test/benchmark/common"
@@ -28,7 +28,7 @@ func BenchmarkIngestWithNuclio(b *testing.B) {
 
 	testConfig, v3ioConfig, err := common.LoadBenchmarkIngestConfigs()
 	if err != nil {
-		panic(errors.Wrap(err, "Unable to load configuration"))
+		panic(errors.Wrap(err, "unable to load configuration"))
 	}
 
 	data := nutest.DataBind{
@@ -52,7 +52,7 @@ func BenchmarkIngestWithNuclio(b *testing.B) {
 	// run the runTest function b.N times
 	relativeTimeOffsetMs, err := utils.Str2duration(testConfig.StartTimeOffset)
 	if err != nil {
-		b.Fatal("Unable to resolve start time. Check configuration.")
+		b.Fatal("unable to resolve start time. Check configuration.")
 	}
 	testStartTimeMs := testStartTimeNano/int64(time.Millisecond) - relativeTimeOffsetMs
 	sampleTemplates := common.MakeSampleTemplates(
@@ -68,13 +68,17 @@ func BenchmarkIngestWithNuclio(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		index := i % sampleTemplatesLength
 		timeStamp := testStartTimeMs + int64(index*testConfig.SampleStepSize)
-		count += runNuclioTest(tc, b, sampleTemplates[index], timeStamp)
+		newEntries, err := runNuclioTest(tc, sampleTemplates[index], timeStamp)
+		if err != nil {
+			b.Fatal(err)
+		}
+		count += newEntries
 	}
 
-	tc.Logger.Warn("Test complete. Count: %d", count)
+	tc.Logger.Warn("\nTest complete. Count: %d", count)
 }
 
-func runNuclioTest(tc *nutest.TestContext, b *testing.B, sampleTemplateJson string, timeStamp int64) int {
+func runNuclioTest(tc *nutest.TestContext, sampleTemplateJson string, timeStamp int64) (int, error) {
 	count := 0
 	// Add first & get reference
 	sampleJson := fmt.Sprintf(sampleTemplateJson, timeStamp, common.MakeRandomFloat64())
@@ -87,11 +91,11 @@ func runNuclioTest(tc *nutest.TestContext, b *testing.B, sampleTemplateJson stri
 	resp, err := tc.Invoke(&testEvent)
 
 	if err != nil {
-		b.Fatalf("Request has failed!\nError: %s\nResponse: %s\n", err, resp)
+		errors.Wrap(err, fmt.Sprintf("request has failed. Response: %s\n", resp))
 	}
 	count++
 
-	return count
+	return count, err
 }
 
 // InitContext runs only once when the function runtime starts

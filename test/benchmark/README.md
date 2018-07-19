@@ -131,7 +131,7 @@ Use the following script as a reference:
     
     for x in {A..Z}
     do
-      for ((i =0; i < 10; i++))
+      for ((i = 0; i < 10; i++))
       do
         echo Querying Name_${x}_${i} ...
         $GOBIN/tsdbctl query Name_${x}_${i} -a count -l $LOOK_BACK_INTERVAL -i $TSDB_ROLLUP_INTERVAL  -c $V3IO_CONFIG_PATH
