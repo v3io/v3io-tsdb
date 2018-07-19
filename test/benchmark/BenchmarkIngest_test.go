@@ -21,9 +21,8 @@ func BenchmarkIngest(b *testing.B) {
 
 	testConfig, v3ioConfig, err := common.LoadBenchmarkIngestConfigs()
 	if err != nil {
-		panic(errors.Wrap(err, "unable to load configuration"))
+		b.Fatal(errors.Wrap(err, "unable to load configuration"))
 	}
-	b.Logf("Test configuration:\n%v", testConfig)
 
 	adapter, err := tsdb.NewV3ioAdapter(v3ioConfig, nil, nil)
 	if err != nil {
@@ -101,8 +100,6 @@ func runTest(
 		} else {
 			count, err = appendAll(appender, sampleTemplates, timeStamps, flushFrequency, refsMap, refs, verbose)
 		}
-		// Wait for all responses
-		err = waitForWrites(appender, &refsMap)
 	} else {
 		err = errors.Errorf("insufficient input. "+
 			"Samples count: [%d] and timestamps count [%d] should be positive numbers", samplesCount, tsCount)
@@ -186,7 +183,11 @@ func appendAll(appender tsdb.Appender, sampleTemplates []string, timeStamps []in
 			}
 		}
 	}
-	return count, nil
+
+	// Wait for all responses
+	err := waitForWrites(appender, &refsMap)
+
+	return count, err
 }
 
 func waitForWrites(append tsdb.Appender, refMap *map[uint64]bool) error {

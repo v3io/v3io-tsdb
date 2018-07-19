@@ -28,7 +28,7 @@ func BenchmarkIngestWithNuclio(b *testing.B) {
 
 	testConfig, v3ioConfig, err := common.LoadBenchmarkIngestConfigs()
 	if err != nil {
-		panic(errors.Wrap(err, "unable to load configuration"))
+		b.Fatal(errors.Wrap(err, "unable to load configuration"))
 	}
 
 	data := nutest.DataBind{
