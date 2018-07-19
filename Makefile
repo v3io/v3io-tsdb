@@ -1,12 +1,18 @@
-.PHONY: test
-
 # All top-level dirs except for vendor/.
 TOPLEVEL_DIRS=`ls -d ./*/. | grep -v '^./vendor/.$$' | sed 's/\.$$/.../'`
 TOPLEVEL_DIRS_GOFMT_SYNTAX=`ls -d ./*/. | grep -v '^./vendor/.$$'`
 
-test:
+.PHONY: get
+get:
 	go get -v -t $(TOPLEVEL_DIRS)
+
+.PHONY: test
+test: get
 	go test -v -short $(TOPLEVEL_DIRS)
+
+.PHONY: install
+install: get
+	go install -v ./cmd/...
 
 .PHONY: lint
 lint:
