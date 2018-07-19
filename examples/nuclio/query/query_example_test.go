@@ -14,7 +14,7 @@ func TestQueryIntegration(t *testing.T) {
 	}
 
 	data := nutest.DataBind{
-		Name: "db0", Url: os.Getenv("V3IO_URL"), Container: "1", User: "<TDB>", Password: "<TBD>"}
+		Name: "db0", Url: os.Getenv("V3IO_SERVICE_URL"), Container: "1", User: "<TDB>", Password: "<TBD>"}
 	tc, err := nutest.NewTestContext(Handler, false, &data)
 	if err != nil {
 		t.Fatal(err)
