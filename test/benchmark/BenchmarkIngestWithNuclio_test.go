@@ -67,8 +67,8 @@ func BenchmarkIngestWithNuclio(b *testing.B) {
 
 	for i := 0; i < b.N; i++ {
 		index := i % sampleTemplatesLength
-		timeStamp := testStartTimeMs + int64(index*testConfig.SampleStepSize)
-		newEntries, err := runNuclioTest(tc, sampleTemplates[index], timeStamp)
+		timestamp := testStartTimeMs + int64(index*testConfig.SampleStepSize)
+		newEntries, err := runNuclioTest(tc, sampleTemplates[index], timestamp)
 		if err != nil {
 			b.Fatal(err)
 		}
@@ -78,10 +78,10 @@ func BenchmarkIngestWithNuclio(b *testing.B) {
 	tc.Logger.Warn("\nTest complete. Count: %d", count)
 }
 
-func runNuclioTest(tc *nutest.TestContext, sampleTemplateJson string, timeStamp int64) (int, error) {
+func runNuclioTest(tc *nutest.TestContext, sampleTemplateJson string, timestamp int64) (int, error) {
 	count := 0
 	// Add first & get reference
-	sampleJson := fmt.Sprintf(sampleTemplateJson, timeStamp, common.MakeRandomFloat64())
+	sampleJson := fmt.Sprintf(sampleTemplateJson, timestamp, common.MakeRandomFloat64())
 	tc.Logger.Debug("Sample data: %s", sampleJson)
 
 	testEvent := nutest.TestEvent{
