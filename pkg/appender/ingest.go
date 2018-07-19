@@ -136,7 +136,8 @@ func (mc *MetricsCache) metricFeed(index int) {
 
 	go func() {
 		inFlight := 0
-		waitForInFlight := 0
+		gotData := false
+		gotCompletion := false
 		var completeChan chan int
 
 		for {
@@ -147,8 +148,13 @@ func (mc *MetricsCache) metricFeed(index int) {
 				length := mc.extraQueue.Length()
 				mc.logger.Debug("Complete Update cycle - inflight %d len %d\n", inFlight, length)
 
-				if completeChan != nil && (inFlight+length) <= waitForInFlight {
-					completeChan <- inFlight + length
+				if length == 0 && gotData {
+					gotCompletion = true
+				}
+
+				if completeChan != nil && length == 0 && gotData {
+					completeChan <- 0
+					gotData = false
 				}
 
 			case app := <-mc.asyncAppendChan:
@@ -159,11 +165,18 @@ func (mc *MetricsCache) metricFeed(index int) {
 
 					if app.metric == nil {
 						// handle Completion Notification requests (metric == nil)
-						waitForInFlight = int(app.t)
 						completeChan = app.resp
+
+						length := mc.extraQueue.Length()
+						if gotCompletion && length == 0 {
+							completeChan <- 0
+							gotCompletion = false
+							gotData = false
+						}
 
 					} else {
 						// Handle append requests (Add / AddFast)
+						gotData = true
 						metric := app.metric
 						metric.Lock()
 
@@ -214,34 +227,96 @@ func (mc *MetricsCache) metricFeed(index int) {
 	}()
 }
 
-func (mc *MetricsCache) postMetricUpdates(metric *MetricState) bool {
+func (mc *MetricsCache) postMetricUpdates(metric *MetricState) {
 
 	metric.Lock()
+	defer metric.Unlock()
+	sent := false
+	var err error
 	//fmt.Println("NEW Post ", metric.Lset, mc.updatesInFlight, len(metric.store.pending), metric.store.GetState())
 
 	if metric.store.GetState() == storeStatePreGet {
-		err := metric.store.GetChunksState(mc, metric, metric.store.pending[0].t)
+		sent, err = metric.store.GetChunksState(mc, metric, metric.store.pending[0].t)
 		if err != nil {
 			metric.err = err
 		}
 
 	} else {
-		err := metric.store.WriteChunks(mc, metric)
+		sent, err = metric.store.WriteChunks(mc, metric)
 		if err != nil {
 			mc.logger.ErrorWith("Submit failed", "metric", metric.Lset, "err", err)
 			metric.err = errors.Wrap(err, "chunk write submit failed")
 			metric.store.SetState(storeStateError)
 		}
-
 	}
-	metric.Unlock()
 
-	return mc.updatesInFlight < mc.cfg.Workers*2
+	if sent {
+		mc.updatesInFlight++
+	}
+}
+
+func (mc *MetricsCache) handleResponse(metric *MetricState, resp *v3io.Response, canWrite bool, counter int) bool {
+	metric.Lock()
+	defer metric.Unlock()
+
+	if resp.Error != nil && metric.store.GetState() != storeStateGet {
+		mc.logger.ErrorWith("failed IO", "id", resp.ID, "err", resp.Error, "key", metric.key)
+	} else {
+		mc.logger.DebugWith("IO resp", "id", resp.ID, "err", resp.Error, "key", metric.key)
+	}
+
+	if metric.store.GetState() == storeStateGet {
+		// Handle Get response, sync metric state with the DB
+		metric.store.ProcessGetResp(mc, metric, resp)
+
+	} else {
+		// Handle Update Expression responses
+		if resp.Error == nil {
+			// Set fields so next write will not include redundant info (bytes, lables, init_array)
+			metric.store.ProcessWriteResp()
+			metric.retryCount = 0
+		} else {
+			// Metrics with too many update errors go into Error state
+			metric.retryCount++
+			if metric.retryCount == MAX_WRITE_RETRY {
+				metric.err = errors.Wrap(resp.Error, "chunk update failed after few retries")
+				metric.store.SetState(storeStateError)
+			}
+		}
+	}
+
+	resp.Release()
+
+	//length := mc.extraQueue.Length()
+	if counter%200 == 0 {
+		fmt.Println("RESP ", metric.Lset, mc.updatesInFlight, len(metric.store.pending), canWrite)
+	}
+	var sent bool
+	var err error
+
+	if canWrite {
+		sent, err = metric.store.WriteChunks(mc, metric)
+		if err != nil {
+			mc.logger.ErrorWith("Submit failed", "metric", metric.Lset, "err", err)
+			metric.err = errors.Wrap(err, "chunk write submit failed")
+			metric.store.SetState(storeStateError)
+		}
+		if sent {
+			mc.updatesInFlight++
+		}
+
+	} else if len(metric.store.pending) > 0 {
+		metric.store.state = storeStateUpdate
+		mc.extraQueue.Push(metric)
+	}
+
+	return sent
 }
 
 func (mc *MetricsCache) metricsUpdateLoop(index int) {
 
 	go func() {
+		counter := 0
 
 		for {
 
@@ -264,54 +339,10 @@ func (mc *MetricsCache) metricsUpdateLoop(index int) {
 				// Handle V3io async responses
 
 				mc.updatesInFlight--
-				metric := resp.Context.(*MetricState)
-				metric.Lock()
-
-				if resp.Error != nil && metric.store.GetState() != storeStateGet {
-					mc.logger.ErrorWith("failed IO", "id", resp.ID, "err", resp.Error,
-						"key", metric.key, "state", metric.store.GetState())
-				} else {
-					mc.logger.DebugWith("IOe resp", "id", resp.ID, "err", resp.Error,
-						"key", metric.key, "state", metric.store.GetState())
-				}
-
-				if metric.store.GetState() == storeStateGet {
-					// Handle Get response, sync metric state with the DB
-					metric.store.ProcessGetResp(mc, metric, resp)
-
-				} else {
-					// Handle Update Expression responses
-					if resp.Error == nil {
-						// Set fields so next write will not include redundant info (bytes, lables, init_array)
-						metric.store.ProcessWriteResp()
-						metric.retryCount = 0
-					} else {
-						// Metrics with too many update errors go into Error state
-						metric.retryCount++
-						if metric.retryCount == MAX_WRITE_RETRY {
-							metric.err = errors.Wrap(resp.Error, "chunk update failed after few retries")
-							metric.store.SetState(storeStateError)
-						}
-					}
-				}
-
-				resp.Release()
-
 				length := mc.extraQueue.Length()
-				//fmt.Println("RESP ", metric.Lset, mc.updatesInFlight, len(metric.store.pending), length)
-				if length == 0 {
-					err := metric.store.WriteChunks(mc, metric)
-					if err != nil {
-						mc.logger.ErrorWith("Submit failed", "metric", metric.Lset, "err", err)
-						metric.err = errors.Wrap(err, "chunk write submit failed")
-						metric.store.SetState(storeStateError)
-					}
-				} else if len(metric.store.pending) > 0 {
-					metric.store.state = storeStateUpdate
-					mc.extraQueue.Push(metric)
-				}
-
-				metric.Unlock()
+				counter++
+				metric := resp.Context.(*MetricState)
+				mc.handleResponse(metric, resp, length == 0, counter)
 
 				// If we have queued metrics and the channel has room for more updates we send them
 				if length > 0 {

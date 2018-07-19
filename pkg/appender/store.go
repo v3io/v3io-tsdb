@@ -140,7 +140,7 @@ func (cs *chunkStore) GetMetricPath(metric *MetricState, tablePath string) strin
 }
 
 // Read (Async) the current chunk state and data from the storage, used in the first chunk access
-func (cs *chunkStore) GetChunksState(mc *MetricsCache, metric *MetricState, t int64) error {
+func (cs *chunkStore) GetChunksState(mc *MetricsCache, metric *MetricState, t int64) (bool, error) {
 
 	// init chunk and create aggregation list object based on partition policy
 	part := mc.partitionMngr.TimeToPart(t)
@@ -157,14 +157,13 @@ func (cs *chunkStore) GetChunksState(mc *MetricsCache, metric *MetricState, t in
 	request, err := mc.container.GetItem(&getInput, metric, mc.responseChan)
 	if err != nil {
 		mc.logger.ErrorWith("GetItem Failed", "metric", metric.key, "err", err)
-		return err
+		return false, err
 	}
-	mc.updatesInFlight++
 
 	mc.logger.DebugWith("Get Metric State", "name", metric.name, "key", metric.key, "reqid", request.ID)
 
 	cs.state = storeStateGet
-	return nil
+	return true, nil
 
 }
 
@@ -269,18 +268,18 @@ func (cs *chunkStore) chunkByTime(t int64) *attrAppender {
 }
 
 // write all pending samples to DB chunks and aggregators
-func (cs *chunkStore) WriteChunks(mc *MetricsCache, metric *MetricState) error {
+func (cs *chunkStore) WriteChunks(mc *MetricsCache, metric *MetricState) (bool, error) {
 
 	// return if there are no pending updates
 	if len(cs.pending) == 0 {
-		return nil
+		return false, nil
 	}
 
 	// If we have too many metrics with update in progress queue it (to avoid chan deadlocks)
 	if mc.updatesInFlight > CHAN_SIZE {
 		cs.state = storeStateUpdate
 		mc.extraQueue.Push(metric)
-		return nil
+		return false, nil
 	}
 
 	expr := ""
@@ -369,7 +368,7 @@ func (cs *chunkStore) WriteChunks(mc *MetricsCache, metric *MetricState) error {
 	}
 
 	if expr == "" {
-		return nil
+		return false, nil
 	}
 
 	cs.state = storeStateUpdate
@@ -392,16 +391,13 @@ func (cs *chunkStore) WriteChunks(mc *MetricsCache, metric *MetricState) error {
 		&v3io.UpdateItemInput{Path: path, Expression: &expr}, metric, mc.responseChan)
 	if err != nil {
 		mc.logger.ErrorWith("UpdateItem Failed", "err", err)
-		return err
+		return false, err
 	}
-
-	// increase the number of in flight updates, track IO congestion
-	mc.updatesInFlight++
 
 	// add async request ID to the requests map (can be avoided if V3IO will add user data in request)
 	mc.logger.DebugWith("updateMetric expression", "name", metric.name, "key", metric.key, "expr", expr, "reqid", request.ID)
 
-	return nil
+	return true, nil
 }
 
 // Process the (async) response for the chunk update request
