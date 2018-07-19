@@ -372,6 +372,9 @@ func (cs *chunkStore) WriteChunks(mc *MetricsCache, metric *MetricState) error {
 		return err
 	}
 
+	// increase the number of in flight updates, track IO congestion
+	mc.updatesInFlight++
+
 	// add async request ID to the requests map (can be avoided if V3IO will add user data in request)
 	mc.logger.DebugWith("updateMetric expression", "name", metric.name, "key", metric.key, "expr", expr, "reqid", request.ID)
 

@@ -25,7 +25,7 @@ import (
 	"github.com/nuclio/logger"
 	"github.com/pkg/errors"
 	"github.com/v3io/v3io-go-http"
-	"github.com/v3io/v3io-tsdb/config"
+	"github.com/v3io/v3io-tsdb/pkg/config"
 	"github.com/v3io/v3io-tsdb/pkg/partmgr"
 	"github.com/v3io/v3io-tsdb/pkg/utils"
 	"sync"
@@ -69,6 +69,7 @@ type MetricsCache struct {
 	getRespChan     chan *v3io.Response
 	nameUpdateChan  chan *v3io.Response
 	asyncAppendChan chan *asyncAppend
+	updatesInFlight int
 
 	lastMetric     uint64
 	cacheMetricMap map[uint64]*MetricState // TODO: maybe use hash as key & combine w ref
@@ -121,6 +122,7 @@ func (mc *MetricsCache) start() error {
 			case resp := <-mc.responseChan:
 				// Handle V3io update expression responses
 
+				mc.updatesInFlight--
 				metric, ok := resp.Context.(*MetricState)
 				respErr := resp.Error
 
