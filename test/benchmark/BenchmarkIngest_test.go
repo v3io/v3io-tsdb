@@ -23,6 +23,7 @@ func BenchmarkIngest(b *testing.B) {
 	if err != nil {
 		panic(errors.Wrap(err, "unable to load configuration"))
 	}
+	b.Logf("Test configuration:\n%v", testConfig)
 
 	adapter, err := tsdb.NewV3ioAdapter(v3ioConfig, nil, nil)
 	if err != nil {
@@ -111,28 +112,28 @@ func runTest(
 
 func appendSingle(refIndex, cycleId int, appender tsdb.Appender, sampleTemplateJson string,
 	timeStamp int64, refsMap map[uint64]bool, refs []uint64) (int, error) {
-	count := 0
 	sample, err := common.JsonTemplate2Sample(sampleTemplateJson, timeStamp, common.MakeRandomFloat64())
+	if err != nil {
+		return 0, errors.Wrap(err, fmt.Sprintf("unable to unmarshall sample: %s", sampleTemplateJson))
+	}
 
 	if cycleId == 0 {
 		// initialize refIds
 		// Add first & get reference
 		ref, err := appender.Add(sample.Lset, timeStamp, sample.Value)
 		if err != nil {
-			err = errors.Wrap(err, "Add request has failed!")
+			return 0, errors.Wrap(err, "Add request has failed!")
 		}
 		refs[refIndex] = ref
 		refsMap[ref] = true
-		count++
 	} else {
 		err := appender.AddFast(sample.Lset, refs[refIndex], timeStamp, sample.Value)
 		if err != nil {
-			err = errors.Wrap(err, fmt.Sprintf("AddFast request has failed!\nSample:%v", sample))
+			return 0, errors.Wrap(err, fmt.Sprintf("AddFast request has failed!\nSample:%v", sample))
 		}
-		count++
 	}
 
-	return count, err
+	return 1, nil
 }
 
 func appendAll(appender tsdb.Appender, sampleTemplates []string, timeStamps []int64,
@@ -145,7 +146,7 @@ func appendAll(appender tsdb.Appender, sampleTemplates []string, timeStamps []in
 		// Add first & get reference
 		sample, err := common.JsonTemplate2Sample(sampleTemplateJson, initialTimeStamp, common.MakeRandomFloat64())
 		if err != nil {
-			return count, errors.Wrap(err, "unable to marshall json to sample")
+			return count, errors.Wrap(err, fmt.Sprintf("unable to unmarshall sample: %s", sampleTemplateJson))
 		}
 		ref, err := appender.Add(sample.Lset, initialTimeStamp, sample.Value)
 		if err != nil {
@@ -179,7 +180,10 @@ func appendAll(appender tsdb.Appender, sampleTemplates []string, timeStamps []in
 
 		if flushFrequency > 0 && dataPointIndex%flushFrequency == 0 {
 			// block and flush all metrics every flush interval
-			waitForWrites(appender, &refsMap)
+			err := waitForWrites(appender, &refsMap)
+			if err != nil {
+				return count, err
+			}
 		}
 	}
 	return count, nil
@@ -189,7 +193,7 @@ func waitForWrites(append tsdb.Appender, refMap *map[uint64]bool) error {
 	for ref := range *refMap {
 		err := append.WaitForReady(ref)
 		if err != nil {
-			errors.Wrap(err, "waitForWrites has failed!")
+			return errors.Wrap(err, "waitForWrites has failed!")
 		}
 	}
 
