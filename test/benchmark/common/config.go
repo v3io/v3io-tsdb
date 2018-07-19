@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"github.com/ghodss/yaml"
 	"github.com/pkg/errors"
+	"github.com/v3io/v3io-tsdb/config"
 	"io/ioutil"
 	"os"
-	"github.com/v3io/v3io-tsdb/config"
 )
 
 const TsdbBenchIngestConfig = "TSDB_BENCH_INGEST_CONFIG"
