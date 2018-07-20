@@ -22,104 +22,10 @@ package appender
 
 import (
 	"fmt"
-	"github.com/nuclio/logger"
 	"github.com/pkg/errors"
 	"github.com/v3io/v3io-go-http"
-	"github.com/v3io/v3io-tsdb/config"
-	"github.com/v3io/v3io-tsdb/pkg/partmgr"
-	"github.com/v3io/v3io-tsdb/pkg/utils"
-	"sync"
 	"time"
 )
-
-// to add, rollups policy (cnt, sum, min/max, sum^2) + interval , or policy in per name lable
-type MetricState struct {
-	sync.RWMutex
-	Lset  utils.LabelsIfc
-	key   string
-	name  string
-	hash  uint64
-	refId uint64
-
-	store      *chunkStore
-	err        error
-	retryCount uint8
-	newName    bool
-}
-
-const MAX_WRITE_RETRY = 3
-const CHAN_SIZE = 2048
-
-func (m *MetricState) Err() error {
-	m.RLock()
-	defer m.RUnlock()
-	return m.err
-}
-
-// store the state and metadata for all the metrics
-type MetricsCache struct {
-	cfg           *config.V3ioConfig
-	partitionMngr *partmgr.PartitionManager
-	mtx           sync.RWMutex
-	container     *v3io.Container
-	logger        logger.Logger
-	started       bool
-
-	responseChan    chan *v3io.Response
-	nameUpdateChan  chan *v3io.Response
-	asyncAppendChan chan *asyncAppend
-	updatesInFlight int
-
-	getsInFlight    int
-	extraQueue      *ElasticQueue
-	updatesComplete chan int
-	newUpdates      chan int
-
-	lastMetric     uint64
-	cacheMetricMap map[uint64]*MetricState // TODO: maybe use hash as key & combine w ref
-	cacheRefMap    map[uint64]*MetricState // TODO: maybe turn to list + free list, periodically delete old matrics
-
-	NameLabelMap map[string]bool // temp store all lable names
-}
-
-func NewMetricsCache(container *v3io.Container, logger logger.Logger, cfg *config.V3ioConfig,
-	partMngr *partmgr.PartitionManager) *MetricsCache {
-	newCache := MetricsCache{container: container, logger: logger, cfg: cfg, partitionMngr: partMngr}
-	newCache.cacheMetricMap = map[uint64]*MetricState{}
-	newCache.cacheRefMap = map[uint64]*MetricState{}
-
-	newCache.responseChan = make(chan *v3io.Response, CHAN_SIZE)
-	newCache.nameUpdateChan = make(chan *v3io.Response, CHAN_SIZE)
-	newCache.asyncAppendChan = make(chan *asyncAppend, CHAN_SIZE)
-
-	newCache.extraQueue = NewElasticQueue()
-	newCache.updatesComplete = make(chan int, 10)
-	newCache.newUpdates = make(chan int, 100)
-
-	newCache.NameLabelMap = map[string]bool{}
-	return &newCache
-}
-
-type asyncAppend struct {
-	metric *MetricState
-	t      int64
-	v      interface{}
-	resp   chan int
-}
-
-func (mc *MetricsCache) StartIfNeeded() error {
-	if !mc.started {
-		err := mc.start()
-		if err != nil {
-			return errors.Wrap(err, "Failed to start Appender loop")
-		}
-		mc.started = true
-	}
-
-	return nil
-}
-
-const maxSampleLoop = 64
 
 // start event loops for handling metric updates (appends and Get/Update DB responses)
 // TODO: we can use multiple Go routines and spread the metrics across based on Hash LSB
@@ -132,6 +38,7 @@ func (mc *MetricsCache) start() error {
 	return nil
 }
 
+// Reads data from append queue, push into per metric queues, and manage ingestion states
 func (mc *MetricsCache) metricFeed(index int) {
 
 	go func() {
@@ -227,6 +134,55 @@ func (mc *MetricsCache) metricFeed(index int) {
 	}()
 }
 
+// async loop which accept new metric updates or responses from previous updates and make new storage requests
+func (mc *MetricsCache) metricsUpdateLoop(index int) {
+
+	go func() {
+		counter := 0
+
+		for {
+
+			select {
+
+			case length := <-mc.newUpdates:
+				// Handle new metric notifications (from metricFeed)
+				if length+mc.updatesInFlight > mc.cfg.Workers*2 {
+					length = mc.cfg.Workers*2 - mc.updatesInFlight
+					if length < 0 {
+						length = 0
+					}
+				}
+
+				for _, metric := range mc.extraQueue.PopN(length) {
+					mc.postMetricUpdates(metric)
+				}
+
+			case resp := <-mc.responseChan:
+				// Handle V3io async responses
+
+				mc.updatesInFlight--
+				length := mc.extraQueue.Length()
+				counter++
+				metric := resp.Context.(*MetricState)
+				mc.handleResponse(metric, resp, length == 0, counter)
+
+				// If we have queued metrics and the channel has room for more updates we send them
+				if length > 0 {
+					if metric := mc.extraQueue.Pop(); metric != nil {
+						mc.postMetricUpdates(metric)
+					}
+				}
+
+				// Notify the metric feeder that all in-flight tasks are done
+				if mc.updatesInFlight == 0 {
+					mc.updatesComplete <- 0
+				}
+			}
+		}
+	}()
+
+}
+
 func (mc *MetricsCache) postMetricUpdates(metric *MetricState) {
 
 	metric.Lock()
@@ -313,54 +269,6 @@ func (mc *MetricsCache) handleResponse(metric *MetricState, resp *v3io.Response,
 	return sent
 }
 
-func (mc *MetricsCache) metricsUpdateLoop(index int) {
-
-	go func() {
-		counter := 0
-
-		for {
-
-			select {
-
-			case length := <-mc.newUpdates:
-				// Handle new metric notifications (from metricFeed)
-				if length+mc.updatesInFlight > mc.cfg.Workers*2 {
-					length = mc.cfg.Workers*2 - mc.updatesInFlight
-					if length < 0 {
-						length = 0
-					}
-				}
-
-				for _, metric := range mc.extraQueue.PopN(length) {
-					mc.postMetricUpdates(metric)
-				}
-
-			case resp := <-mc.responseChan:
-				// Handle V3io async responses
-
-				mc.updatesInFlight--
-				length := mc.extraQueue.Length()
-				counter++
-				metric := resp.Context.(*MetricState)
-				mc.handleResponse(metric, resp, length == 0, counter)
-
-				// If we have queued metrics and the channel has room for more updates we send them
-				if length > 0 {
-					if metric := mc.extraQueue.Pop(); metric != nil {
-						mc.postMetricUpdates(metric)
-					}
-				}
-
-				// Notify the metric feeder that all in-flight tasks are done
-				if mc.updatesInFlight == 0 {
-					mc.updatesComplete <- 0
-				}
-			}
-		}
-	}()
-
-}
-
 func (mc *MetricsCache) nameUpdateRespLoop() {
 
 	go func() {
@@ -382,118 +290,4 @@ func (mc *MetricsCache) nameUpdateRespLoop() {
 			resp.Release()
 		}
 	}()
-}
-
-// return metric struct by key
-func (mc *MetricsCache) getMetric(hash uint64) (*MetricState, bool) {
-	mc.mtx.RLock()
-	defer mc.mtx.RUnlock()
-
-	metric, ok := mc.cacheMetricMap[hash]
-	return metric, ok
-}
-
-// create a new metric and save in the map
-func (mc *MetricsCache) addMetric(hash uint64, name string, metric *MetricState) {
-	mc.mtx.Lock()
-	defer mc.mtx.Unlock()
-
-	mc.lastMetric++
-	metric.refId = mc.lastMetric
-	mc.cacheRefMap[mc.lastMetric] = metric
-	mc.cacheMetricMap[hash] = metric
-	if _, ok := mc.NameLabelMap[name]; !ok {
-		metric.newName = true
-		mc.NameLabelMap[name] = true
-	}
-}
-
-// return metric struct by refID
-func (mc *MetricsCache) getMetricByRef(ref uint64) (*MetricState, bool) {
-	mc.mtx.RLock()
-	defer mc.mtx.RUnlock()
-
-	metric, ok := mc.cacheRefMap[ref]
-	return metric, ok
-}
-
-// Push append to async channel
-func (mc *MetricsCache) appendTV(metric *MetricState, t int64, v interface{}) {
-	mc.asyncAppendChan <- &asyncAppend{metric: metric, t: t, v: v}
-}
-
-// First time add time & value to metric (by label set)
-func (mc *MetricsCache) Add(lset utils.LabelsIfc, t int64, v interface{}) (uint64, error) {
-
-	name, key, hash := lset.GetKey()
-	//hash := lset.Hash()
-	metric, ok := mc.getMetric(hash)
-
-	if ok {
-		err := metric.Err()
-		if err != nil {
-			return 0, err
-		}
-		mc.appendTV(metric, t, v)
-		return metric.refId, nil
-	}
-
-	metric = &MetricState{Lset: lset, key: key, name: name, hash: hash}
-	metric.store = NewChunkStore()
-	mc.addMetric(hash, name, metric)
-
-	// push new/next update
-	mc.appendTV(metric, t, v)
-	return metric.refId, nil
-}
-
-// fast Add to metric (by refId)
-func (mc *MetricsCache) AddFast(ref uint64, t int64, v interface{}) error {
-
-	metric, ok := mc.getMetricByRef(ref)
-	if !ok {
-		mc.logger.ErrorWith("Ref not found", "ref", ref)
-		return fmt.Errorf("ref not found")
-	}
-
-	err := metric.Err()
-	if err != nil {
-		return err
-	}
-	mc.appendTV(metric, t, v)
-	return nil
-
-}
-
-func (mc *MetricsCache) WaitForReady(ref uint64) error {
-	metric, ok := mc.getMetricByRef(ref)
-	if !ok {
-		mc.logger.ErrorWith("Ref not found", "ref", ref)
-		return fmt.Errorf("ref not found")
-	}
-
-	for i := 0; i < 1000; i++ {
-		metric.RLock()
-		err := metric.err
-		ready := metric.store.IsReady()
-		metric.RUnlock()
-
-		if err != nil {
-			return errors.Wrap(err, "metric error")
-		}
-
-		if ready {
-			return nil
-		}
-
-		time.Sleep(time.Millisecond * 5)
-	}
-
-	return fmt.Errorf("Timeout waiting for metric to be ready")
-}
-
-func (mc *MetricsCache) WaitForCompletion(inFlight int64, timeout int) int {
-	waitChan := make(chan int, 2)
-	mc.asyncAppendChan <- &asyncAppend{metric: nil, t: inFlight, v: 0, resp: waitChan}
-	return <-waitChan
 }
