@@ -21,7 +21,6 @@ such restriction.
 package appender
 
 import (
-	"fmt"
 	"github.com/pkg/errors"
 	"github.com/v3io/v3io-go-http"
 	"time"
@@ -139,8 +138,6 @@ func (mc *MetricsCache) metricFeed(index int) {
 func (mc *MetricsCache) metricsUpdateLoop(index int) {
 
 	go func() {
-		counter := 0
-
 		for {
 
 			select {
@@ -164,9 +161,8 @@ func (mc *MetricsCache) metricsUpdateLoop(index int) {
 				for i := 0; i < maxSampleLoop; i++ {
 
 					mc.updatesInFlight--
-					counter++
 					metric := resp.Context.(*MetricState)
-					mc.handleResponse(metric, resp, nonQueued, counter)
+					mc.handleResponse(metric, resp, nonQueued)
 
 					// poll if we have more responses (accelerate the outer select)
 					select {
@@ -224,7 +220,7 @@ func (mc *MetricsCache) postMetricUpdates(metric *MetricState) {
 }
 
 // handle DB responses, if the backlog queue is empty and have data to send write more chunks to DB
-func (mc *MetricsCache) handleResponse(metric *MetricState, resp *v3io.Response, canWrite bool, counter int) bool {
+func (mc *MetricsCache) handleResponse(metric *MetricState, resp *v3io.Response, canWrite bool) bool {
 	metric.Lock()
 	defer metric.Unlock()
 
@@ -257,10 +253,6 @@ func (mc *MetricsCache) handleResponse(metric *MetricState, resp *v3io.Response,
 	resp.Release()
 	metric.SetState(storeStateReady)
 
-	//length := mc.extraQueue.Length()
-	if counter%200 == 0 {
-		fmt.Println("RESP ", metric.Lset, mc.updatesInFlight, metric.store.NumQueuedSamples(), canWrite)
-	}
 	var sent bool
 	var err error
 

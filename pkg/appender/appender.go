@@ -57,14 +57,13 @@ type MetricState struct {
 type storeState uint8
 
 const (
-	storeStateInit    storeState = 0
-	storeStatePreGet  storeState = 1 // Need to get state
-	storeStateGet     storeState = 2 // Getting old state from storage
-	storeStateReady   storeState = 3 // Ready to update
-	storeStatePending storeState = 4 // New data for metric
-	storeStateUpdate  storeState = 5 // Update/write in progress
-	storeStateSort    storeState = 6 // TBD sort chunk(s) in case of late arrivals
-	storeStateError   storeState = 7 // Metric in error state
+	storeStateInit   storeState = 0
+	storeStatePreGet storeState = 1 // Need to get state
+	storeStateGet    storeState = 2 // Getting old state from storage
+	storeStateReady  storeState = 3 // Ready to update
+	storeStateUpdate storeState = 4 // Update/write in progress
+	storeStateError  storeState = 5 // Metric in error state
+	storeStateSort   storeState = 6 // TBD sort chunk(s) in case of late arrivals
 )
 
 // store is ready to update samples into the DB
