@@ -223,6 +223,7 @@ type aggrSeriesIterator struct {
 // advance iterator to time t
 func (s *aggrSeriesIterator) Seek(t int64) bool {
 	if t <= s.set.baseTime {
+		s.index = 0
 		return true
 	}
 
@@ -246,7 +247,7 @@ func (s *aggrSeriesIterator) Next() bool {
 
 // return the time & value at the current bucket
 func (s *aggrSeriesIterator) At() (t int64, v float64) {
-	val := s.set.aggrSet.GetCellValue(s.aggrType, s.index)
+	val, _ := s.set.aggrSet.GetCellValue(s.aggrType, s.index)
 	return s.set.aggrSet.GetCellTime(s.set.baseTime, s.index), val
 }
 
