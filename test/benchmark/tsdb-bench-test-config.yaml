@@ -1,0 +1,34 @@
+# File: tsdb-bench-test-config.yaml
+
+# Control Nuclio test verbosity
+Verbose: false
+
+# Relative time, i.e. now() - startTimeOffset
+StartTimeOffset: "48h"
+
+# Interval in milliseconds between samples
+SampleStepSize: 5000
+
+# should be in range [1..26], i.e [A..Z]
+NamesCount: 26
+
+# Pattern: Name_[A..Z][_[1..200]]
+NamesDiversity: 10
+
+# should be in range [1..26]
+LabelsCount: 1
+
+# Pattern: Label_[A..Z][_[1..10]]
+LabelsDiversity: 3
+
+# should be in range [1..26], i.e [A..Z]
+LabelValuesCount: 1
+
+# Pattern: [A..Z][_[1..10]]
+LabelsValueDiversity: 10
+
+# Flush frequency - flush metrics after every N steps
+FlushFrequency: -1 # -1 for no flush during the ingestion
+
+# Select how benchmark test will produce the data. If "AppendOneByOne=true" test will produce one sample per test cycle
+AppendOneByOne: true

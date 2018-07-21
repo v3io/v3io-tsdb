@@ -26,7 +26,7 @@ import (
 	"os"
 )
 
-const DEFAULT_CFG_FILE_NAME = "v3io.yaml"
+const DefaultConfigurationFileName = "v3io.yaml"
 
 type V3ioConfig struct {
 	// V3IO Connection details: Url, Data container, relative path for this dataset, credentials
@@ -63,7 +63,7 @@ type DBPartConfig struct {
 	// Indicating this is a valid Partition file, Signature == 'TSDB'
 	Signature string `json:"signature"`
 	// Version of the config
-	Version string `json:version`
+	Version string `json:"version"`
 	// Description of this TSDB
 	Description string `json:"description,omitempty"`
 	// Partition Key, __name__ by default
@@ -115,7 +115,7 @@ func LoadConfig(path string) (*V3ioConfig, error) {
 	}
 
 	if path == "" {
-		path = DEFAULT_CFG_FILE_NAME
+		path = DefaultConfigurationFileName
 	}
 
 	data, err := ioutil.ReadFile(path)

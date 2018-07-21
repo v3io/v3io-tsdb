@@ -25,7 +25,7 @@ import (
 	"github.com/nuclio/logger"
 	"github.com/pkg/errors"
 	"github.com/v3io/v3io-go-http"
-	"github.com/v3io/v3io-tsdb/config"
+	"github.com/v3io/v3io-tsdb/pkg/config"
 	"github.com/v3io/v3io-tsdb/pkg/partmgr"
 	"github.com/v3io/v3io-tsdb/pkg/utils"
 	"sync"
@@ -48,7 +48,7 @@ type MetricState struct {
 }
 
 const MAX_WRITE_RETRY = 2
-const CHAN_SIZE = 1024
+const CHAN_SIZE = 4096
 
 func (m *MetricState) Err() error {
 	m.RLock()

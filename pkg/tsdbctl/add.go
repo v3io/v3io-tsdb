@@ -36,7 +36,7 @@ import (
 	"time"
 )
 
-const ARRAY_SEPARATOR = ";"
+const ArraySeparator = ","
 
 type addCommandeer struct {
 	cmd            *cobra.Command
@@ -55,7 +55,7 @@ func newAddCommandeer(rootCommandeer *RootCommandeer) *addCommandeer {
 	}
 
 	cmd := &cobra.Command{
-		Use:     "add metric [labels] [flags]",
+		Use:     "add <metric> [labels] [flags]",
 		Aliases: []string{"append"},
 		Short:   "add samples to metric. e.g. add http_req method=get -d 99.9",
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -245,8 +245,8 @@ func strToLabels(name, lbls string) (utils.Labels, error) {
 
 func strToTV(tarr, varr string) ([]int64, []float64, error) {
 
-	tlist := strings.Split(tarr, ARRAY_SEPARATOR)
-	vlist := strings.Split(varr, ARRAY_SEPARATOR)
+	tlist := strings.Split(tarr, ArraySeparator)
+	vlist := strings.Split(varr, ArraySeparator)
 
 	if tarr == "" && len(vlist) > 1 {
 		return nil, nil, errors.New("time array must be provided when using a value array")

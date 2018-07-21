@@ -127,7 +127,10 @@ func (ls Labels) Hash() uint64 {
 		b = append(b, v.Value...)
 		b = append(b, sep)
 	}
-	return xxhash.Sum64(b)
+
+	hash := xxhash.New()
+	hash.Write(b)
+	return hash.Sum64()
 }
 
 // Copy returns a copy of the labels.
