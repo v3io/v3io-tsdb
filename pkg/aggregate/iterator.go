@@ -272,9 +272,12 @@ func (as *AggregateSet) GetCellValue(aggr AggrType, cell int) (float64, bool) {
 	}
 
 	// if no samples in this bucket the result is undefined
-	cnt := as.dataArrays[aggrTypeCount][cell]
-	if cnt == 0 && (aggr == aggrTypeAvg || aggr == aggrTypeStddev || aggr == aggrTypeStdvar) {
-		return math.NaN(), false
+	var cnt float64
+	if aggr == aggrTypeAvg || aggr == aggrTypeStddev || aggr == aggrTypeStdvar {
+		cnt = as.dataArrays[aggrTypeCount][cell]
+		if cnt == 0 {
+			return math.NaN(), false
+		}
 	}
 
 	switch aggr {
