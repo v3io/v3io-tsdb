@@ -56,18 +56,19 @@ func (mc *MetricsCache) metricFeed(index int) {
 				length := mc.extraQueue.Length()
 				mc.logger.Debug("Complete Update cycle - inflight %d len %d\n", inFlight, length)
 
+				// if data was sent and the queue is empty mark as completion
 				if length == 0 && gotData {
 					gotCompletion = true
-				}
-
-				if completeChan != nil && length == 0 && gotData {
-					completeChan <- 0
-					gotData = false
+					if completeChan != nil {
+						completeChan <- 0
+						gotData = false
+					}
 				}
 
 			case app := <-mc.asyncAppendChan:
 				newMetrics := 0
-				maxPending := 0
+				queuedEnough := false
+
 			inLoop:
 				for i := 0; i < maxSampleLoop; i++ {
 
@@ -88,12 +89,10 @@ func (mc *MetricsCache) metricFeed(index int) {
 						metric := app.metric
 						metric.Lock()
 
-						if metric.GetState() != storeStateError {
+						if !metric.HasError() {
 
 							metric.store.Append(app.t, app.v)
-							if metric.store.QueuedSamples() > maxPending {
-								maxPending = metric.store.QueuedSamples()
-							}
+							queuedEnough = queuedEnough || metric.store.QueuedEnough()
 
 							// if there are no in flight requests, add the metric to the queue and update state
 							if metric.IsReady() || metric.GetState() == storeStateInit {
@@ -102,11 +101,11 @@ func (mc *MetricsCache) metricFeed(index int) {
 									metric.SetState(storeStatePreGet)
 								}
 								if metric.IsReady() {
-									metric.SetState(storeStatePending)
+									metric.SetState(storeStateUpdate)
 								}
 
 								length := mc.extraQueue.Push(metric)
-								if length < 2*mc.cfg.Workers { // && waiting
+								if length < 2*mc.cfg.Workers {
 									newMetrics++
 								}
 							}
@@ -122,13 +121,14 @@ func (mc *MetricsCache) metricFeed(index int) {
 						break inLoop
 					}
 				}
+				// notify update loop there are new metrics to process
 				if newMetrics > 0 {
 					mc.newUpdates <- newMetrics
 				}
 
-				// If we have too much work, stall the queue
-				if maxPending > 3*MaxSamplesInWrite {
-					time.Sleep(10 * time.Millisecond)
+				// If we have too much work, stall the queue for some time
+				if queuedEnough {
+					time.Sleep(queueStallTime)
 				}
 			}
 		}
@@ -145,42 +145,50 @@ func (mc *MetricsCache) metricsUpdateLoop(index int) {
 
 			select {
 
-			case length := <-mc.newUpdates:
+			case newMetrics := <-mc.newUpdates:
 				// Handle new metric notifications (from metricFeed)
 				freeSlots := mc.cfg.Workers*2 - mc.updatesInFlight
-				if length > freeSlots {
-					length = freeSlots
+				if newMetrics > freeSlots {
+					newMetrics = freeSlots
 				}
 
-				for _, metric := range mc.extraQueue.PopN(length) {
+				for _, metric := range mc.extraQueue.PopN(newMetrics) {
 					mc.postMetricUpdates(metric)
 				}
 
 			case resp := <-mc.responseChan:
 				// Handle V3io async responses
+				nonQueued := mc.extraQueue.IsEmpty()
 
-				mc.updatesInFlight--
-				// TODO: if in loop must verify enought free slots to post
-				length := mc.extraQueue.Length()
-				counter++
-				metric := resp.Context.(*MetricState)
-				mc.handleResponse(metric, resp, length == 0, counter)
+			inLoop:
+				for i := 0; i < maxSampleLoop; i++ {
 
-				// If we have queued metrics and the channel has room for more updates we send them
-				if length > 0 {
-					if metric := mc.extraQueue.Pop(); metric != nil {
-						mc.postMetricUpdates(metric)
+					mc.updatesInFlight--
+					counter++
+					metric := resp.Context.(*MetricState)
+					mc.handleResponse(metric, resp, nonQueued, counter)
+
+					// poll if we have more responses (accelerate the outer select)
+					select {
+					case resp = <-mc.responseChan:
+					default:
+						break inLoop
 					}
 				}
 
-				// Notify the metric feeder that all in-flight tasks are done
+				// Post updates if we have queued metrics and the channel has room for more
+				freeSlots := mc.cfg.Workers*2 - mc.updatesInFlight
+				for _, metric := range mc.extraQueue.PopN(freeSlots) {
+					mc.postMetricUpdates(metric)
+				}
+
+				// Notify the metric feeder when all in-flight tasks are done
 				if mc.updatesInFlight == 0 {
 					mc.updatesComplete <- 0
 				}
 			}
 		}
 	}()
-
 }
 
 // send request with chunk data to the DB, if in initial state read metric metadata from DB
@@ -251,7 +259,7 @@ func (mc *MetricsCache) handleResponse(metric *MetricState, resp *v3io.Response,
 
 	//length := mc.extraQueue.Length()
 	if counter%200 == 0 {
-		fmt.Println("RESP ", metric.Lset, mc.updatesInFlight, metric.store.QueuedSamples(), canWrite)
+		fmt.Println("RESP ", metric.Lset, mc.updatesInFlight, metric.store.NumQueuedSamples(), canWrite)
 	}
 	var sent bool
 	var err error
@@ -266,7 +274,7 @@ func (mc *MetricsCache) handleResponse(metric *MetricState, resp *v3io.Response,
 			mc.updatesInFlight++
 		}
 
-	} else if metric.store.QueuedSamples() > 0 {
+	} else if metric.store.NumQueuedSamples() > 0 {
 		mc.extraQueue.Push(metric)
 		metric.SetState(storeStateUpdate)
 	}

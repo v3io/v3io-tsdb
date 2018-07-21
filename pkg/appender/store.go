@@ -51,11 +51,15 @@ type chunkStore struct {
 	pending       pendingList
 	maxTime       int64
 	initMaxTime   int64 // max time read from DB metric before first append
-	DelRawSamples bool  // TODO: for metrics w aggregates only
+	delRawSamples bool  // TODO: for metrics w aggregates only
 }
 
-func (cs *chunkStore) QueuedSamples() int {
+func (cs *chunkStore) NumQueuedSamples() int {
 	return len(cs.pending)
+}
+
+func (cs *chunkStore) QueuedEnough() bool {
+	return len(cs.pending) > 3*MaxSamplesInWrite
 }
 
 // chunk appender object, state used for appending t/v to a chunk
@@ -377,7 +381,6 @@ func (cs *chunkStore) ProcessWriteResp() {
 			chunk.appender.Chunk().Clear()
 		}
 	}
-
 }
 
 // return the chunk update expression

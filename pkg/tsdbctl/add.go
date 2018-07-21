@@ -183,10 +183,10 @@ func (ac *addCommandeer) add() error {
 		}
 
 	}
-	fmt.Println("\nDone!")
 
 	// make sure all writes are committed
 	append.WaitForCompletion(0, 0)
+	fmt.Println("\nDone!")
 	return nil
 }
 

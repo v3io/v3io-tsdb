@@ -29,11 +29,13 @@ import (
 	"github.com/v3io/v3io-tsdb/pkg/partmgr"
 	"github.com/v3io/v3io-tsdb/pkg/utils"
 	"sync"
+	"time"
 )
 
 const MAX_WRITE_RETRY = 3
 const CHAN_SIZE = 2048
-const maxSampleLoop = 64
+const maxSampleLoop = 16
+const queueStallTime = 10 * time.Millisecond
 
 // to add, rollups policy (cnt, sum, min/max, sum^2) + interval , or policy in per name lable
 type MetricState struct {
