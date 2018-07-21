@@ -145,14 +145,21 @@ func (a *V3ioAdapter) connect() error {
 	msg := "Starting V3IO TSDB client, server is at : " + fullpath
 	a.logger.Info(msg)
 
-	a.MetricsCache = appender.NewMetricsCache(a.container, a.logger, a.cfg, a.partitionMngr)
+	return nil
+}
+
+func (a *V3ioAdapter) InitAppenderCache() error {
+	if a.MetricsCache == nil {
+		a.MetricsCache = appender.NewMetricsCache(a.container, a.logger, a.cfg, a.partitionMngr)
+		return a.MetricsCache.Start()
+	}
 
 	return nil
 }
 
 // Create an appender interface, for writing metrics
 func (a *V3ioAdapter) Appender() (Appender, error) {
-	err := a.MetricsCache.StartIfNeeded()
+	err := a.InitAppenderCache()
 	if err != nil {
 		return nil, err
 	}

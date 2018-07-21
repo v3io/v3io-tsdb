@@ -53,7 +53,7 @@ type MetricState struct {
 	newName    bool
 }
 
-// Store states
+// Metric store states
 type storeState uint8
 
 const (
@@ -108,8 +108,7 @@ type MetricsCache struct {
 	asyncAppendChan chan *asyncAppend
 	updatesInFlight int
 
-	getsInFlight    int
-	extraQueue      *ElasticQueue
+	metricQueue     *ElasticQueue
 	updatesComplete chan int
 	newUpdates      chan int
 
@@ -122,6 +121,7 @@ type MetricsCache struct {
 
 func NewMetricsCache(container *v3io.Container, logger logger.Logger, cfg *config.V3ioConfig,
 	partMngr *partmgr.PartitionManager) *MetricsCache {
+
 	newCache := MetricsCache{container: container, logger: logger, cfg: cfg, partitionMngr: partMngr}
 	newCache.cacheMetricMap = map[uint64]*MetricState{}
 	newCache.cacheRefMap = map[uint64]*MetricState{}
@@ -130,7 +130,7 @@ func NewMetricsCache(container *v3io.Container, logger logger.Logger, cfg *confi
 	newCache.nameUpdateChan = make(chan *v3io.Response, CHAN_SIZE)
 	newCache.asyncAppendChan = make(chan *asyncAppend, CHAN_SIZE)
 
-	newCache.extraQueue = NewElasticQueue()
+	newCache.metricQueue = NewElasticQueue()
 	newCache.updatesComplete = make(chan int, 10)
 	newCache.newUpdates = make(chan int, 100)
 
@@ -145,13 +145,10 @@ type asyncAppend struct {
 	resp   chan int
 }
 
-func (mc *MetricsCache) StartIfNeeded() error {
-	if !mc.started {
-		err := mc.start()
-		if err != nil {
-			return errors.Wrap(err, "Failed to start Appender loop")
-		}
-		mc.started = true
+func (mc *MetricsCache) Start() error {
+	err := mc.start()
+	if err != nil {
+		return errors.Wrap(err, "Failed to start Appender loop")
 	}
 
 	return nil

@@ -52,7 +52,7 @@ func (mc *MetricsCache) metricFeed(index int) {
 
 			case inFlight = <-mc.updatesComplete:
 				// handle completion notifications from update loop
-				length := mc.extraQueue.Length()
+				length := mc.metricQueue.Length()
 				mc.logger.Debug("Complete Update cycle - inflight %d len %d\n", inFlight, length)
 
 				// if data was sent and the queue is empty mark as completion
@@ -75,7 +75,7 @@ func (mc *MetricsCache) metricFeed(index int) {
 						// handle Completion update requests (metric == nil)
 						completeChan = app.resp
 
-						length := mc.extraQueue.Length()
+						length := mc.metricQueue.Length()
 						if gotCompletion && length == 0 {
 							completeChan <- 0
 							gotCompletion = false
@@ -103,7 +103,7 @@ func (mc *MetricsCache) metricFeed(index int) {
 									metric.SetState(storeStateUpdate)
 								}
 
-								length := mc.extraQueue.Push(metric)
+								length := mc.metricQueue.Push(metric)
 								if length < 2*mc.cfg.Workers {
 									newMetrics++
 								}
@@ -149,13 +149,13 @@ func (mc *MetricsCache) metricsUpdateLoop(index int) {
 					newMetrics = freeSlots
 				}
 
-				for _, metric := range mc.extraQueue.PopN(newMetrics) {
+				for _, metric := range mc.metricQueue.PopN(newMetrics) {
 					mc.postMetricUpdates(metric)
 				}
 
 			case resp := <-mc.responseChan:
 				// Handle V3io async responses
-				nonQueued := mc.extraQueue.IsEmpty()
+				nonQueued := mc.metricQueue.IsEmpty()
 
 			inLoop:
 				for i := 0; i < maxSampleLoop; i++ {
@@ -174,7 +174,7 @@ func (mc *MetricsCache) metricsUpdateLoop(index int) {
 
 				// Post updates if we have queued metrics and the channel has room for more
 				freeSlots := mc.cfg.Workers*2 - mc.updatesInFlight
-				for _, metric := range mc.extraQueue.PopN(freeSlots) {
+				for _, metric := range mc.metricQueue.PopN(freeSlots) {
 					mc.postMetricUpdates(metric)
 				}
 
@@ -267,7 +267,7 @@ func (mc *MetricsCache) handleResponse(metric *MetricState, resp *v3io.Response,
 		}
 
 	} else if metric.store.NumQueuedSamples() > 0 {
-		mc.extraQueue.Push(metric)
+		mc.metricQueue.Push(metric)
 		metric.SetState(storeStateUpdate)
 	}
 
