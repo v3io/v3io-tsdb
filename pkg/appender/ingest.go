@@ -52,6 +52,7 @@ func (mc *MetricsCache) metricFeed(index int) {
 			select {
 
 			case inFlight = <-mc.updatesComplete:
+				// handle completion notifications from update loop
 				length := mc.extraQueue.Length()
 				mc.logger.Debug("Complete Update cycle - inflight %d len %d\n", inFlight, length)
 
@@ -71,7 +72,7 @@ func (mc *MetricsCache) metricFeed(index int) {
 				for i := 0; i < maxSampleLoop; i++ {
 
 					if app.metric == nil {
-						// handle Completion Notification requests (metric == nil)
+						// handle Completion update requests (metric == nil)
 						completeChan = app.resp
 
 						length := mc.extraQueue.Length()
@@ -87,21 +88,21 @@ func (mc *MetricsCache) metricFeed(index int) {
 						metric := app.metric
 						metric.Lock()
 
-						if metric.store.GetState() != storeStateError {
+						if metric.GetState() != storeStateError {
 
 							metric.store.Append(app.t, app.v)
-							if len(metric.store.pending) > maxPending {
-								maxPending = len(metric.store.pending)
+							if metric.store.QueuedSamples() > maxPending {
+								maxPending = metric.store.QueuedSamples()
 							}
 
 							// if there are no in flight requests, add the metric to the queue and update state
-							if metric.store.IsReady() || metric.store.GetState() == storeStateInit {
+							if metric.IsReady() || metric.GetState() == storeStateInit {
 
-								if metric.store.GetState() == storeStateInit {
-									metric.store.SetState(storeStatePreGet)
+								if metric.GetState() == storeStateInit {
+									metric.SetState(storeStatePreGet)
 								}
-								if metric.store.IsReady() {
-									metric.store.SetState(storeStatePending)
+								if metric.IsReady() {
+									metric.SetState(storeStatePending)
 								}
 
 								length := mc.extraQueue.Push(metric)
@@ -146,11 +147,9 @@ func (mc *MetricsCache) metricsUpdateLoop(index int) {
 
 			case length := <-mc.newUpdates:
 				// Handle new metric notifications (from metricFeed)
-				if length+mc.updatesInFlight > mc.cfg.Workers*2 {
-					length = mc.cfg.Workers*2 - mc.updatesInFlight
-					if length < 0 {
-						length = 0
-					}
+				freeSlots := mc.cfg.Workers*2 - mc.updatesInFlight
+				if length > freeSlots {
+					length = freeSlots
 				}
 
 				for _, metric := range mc.extraQueue.PopN(length) {
@@ -161,6 +160,7 @@ func (mc *MetricsCache) metricsUpdateLoop(index int) {
 				// Handle V3io async responses
 
 				mc.updatesInFlight--
+				// TODO: if in loop must verify enought free slots to post
 				length := mc.extraQueue.Length()
 				counter++
 				metric := resp.Context.(*MetricState)
@@ -183,26 +183,30 @@ func (mc *MetricsCache) metricsUpdateLoop(index int) {
 
 }
 
+// send request with chunk data to the DB, if in initial state read metric metadata from DB
 func (mc *MetricsCache) postMetricUpdates(metric *MetricState) {
 
 	metric.Lock()
 	defer metric.Unlock()
 	sent := false
 	var err error
-	//fmt.Println("NEW Post ", metric.Lset, mc.updatesInFlight, len(metric.store.pending), metric.store.GetState())
+	//fmt.Println("NEW Post ", metric.Lset, mc.updatesInFlight, metric.store.QueuedSamples(), metric.store.GetState())
 
-	if metric.store.GetState() == storeStatePreGet {
-		sent, err = metric.store.GetChunksState(mc, metric, metric.store.pending[0].t)
+	if metric.GetState() == storeStatePreGet {
+		sent, err = metric.store.GetChunksState(mc, metric)
 		if err != nil {
-			metric.err = err
+			metric.SetError(err)
+		} else {
+			metric.SetState(storeStateGet)
 		}
 
 	} else {
 		sent, err = metric.store.WriteChunks(mc, metric)
 		if err != nil {
 			mc.logger.ErrorWith("Submit failed", "metric", metric.Lset, "err", err)
-			metric.err = errors.Wrap(err, "chunk write submit failed")
-			metric.store.SetState(storeStateError)
+			metric.SetError(errors.Wrap(err, "chunk write submit failed"))
+		} else if sent {
+			metric.SetState(storeStateUpdate)
 		}
 	}
 
@@ -211,17 +215,18 @@ func (mc *MetricsCache) postMetricUpdates(metric *MetricState) {
 	}
 }
 
+// handle DB responses, if the backlog queue is empty and have data to send write more chunks to DB
 func (mc *MetricsCache) handleResponse(metric *MetricState, resp *v3io.Response, canWrite bool, counter int) bool {
 	metric.Lock()
 	defer metric.Unlock()
 
-	if resp.Error != nil && metric.store.GetState() != storeStateGet {
+	if resp.Error != nil && metric.GetState() != storeStateGet {
 		mc.logger.ErrorWith("failed IO", "id", resp.ID, "err", resp.Error, "key", metric.key)
 	} else {
 		mc.logger.DebugWith("IO resp", "id", resp.ID, "err", resp.Error, "key", metric.key)
 	}
 
-	if metric.store.GetState() == storeStateGet {
+	if metric.GetState() == storeStateGet {
 		// Handle Get response, sync metric state with the DB
 		metric.store.ProcessGetResp(mc, metric, resp)
 
@@ -235,17 +240,18 @@ func (mc *MetricsCache) handleResponse(metric *MetricState, resp *v3io.Response,
 			// Metrics with too many update errors go into Error state
 			metric.retryCount++
 			if metric.retryCount == MAX_WRITE_RETRY {
-				metric.err = errors.Wrap(resp.Error, "chunk update failed after few retries")
-				metric.store.SetState(storeStateError)
+				metric.SetError(errors.Wrap(resp.Error, "chunk update failed after few retries"))
+				return false
 			}
 		}
 	}
 
 	resp.Release()
+	metric.SetState(storeStateReady)
 
 	//length := mc.extraQueue.Length()
 	if counter%200 == 0 {
-		fmt.Println("RESP ", metric.Lset, mc.updatesInFlight, len(metric.store.pending), canWrite)
+		fmt.Println("RESP ", metric.Lset, mc.updatesInFlight, metric.store.QueuedSamples(), canWrite)
 	}
 	var sent bool
 	var err error
@@ -254,21 +260,21 @@ func (mc *MetricsCache) handleResponse(metric *MetricState, resp *v3io.Response,
 		sent, err = metric.store.WriteChunks(mc, metric)
 		if err != nil {
 			mc.logger.ErrorWith("Submit failed", "metric", metric.Lset, "err", err)
-			metric.err = errors.Wrap(err, "chunk write submit failed")
-			metric.store.SetState(storeStateError)
-		}
-		if sent {
+			metric.SetError(errors.Wrap(err, "chunk write submit failed"))
+		} else if sent {
+			metric.SetState(storeStateUpdate)
 			mc.updatesInFlight++
 		}
 
-	} else if len(metric.store.pending) > 0 {
-		metric.store.state = storeStateUpdate
+	} else if metric.store.QueuedSamples() > 0 {
 		mc.extraQueue.Push(metric)
+		metric.SetState(storeStateUpdate)
 	}
 
 	return sent
 }
 
+// handle responses for names table updates
 func (mc *MetricsCache) nameUpdateRespLoop() {
 
 	go func() {

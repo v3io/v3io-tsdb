@@ -31,9 +31,14 @@ import (
 	"sync"
 )
 
+const MAX_WRITE_RETRY = 3
+const CHAN_SIZE = 2048
+const maxSampleLoop = 64
+
 // to add, rollups policy (cnt, sum, min/max, sum^2) + interval , or policy in per name lable
 type MetricState struct {
 	sync.RWMutex
+	state storeState
 	Lset  utils.LabelsIfc
 	key   string
 	name  string
@@ -46,9 +51,41 @@ type MetricState struct {
 	newName    bool
 }
 
-const MAX_WRITE_RETRY = 3
-const CHAN_SIZE = 2048
-const maxSampleLoop = 64
+// Store states
+type storeState uint8
+
+const (
+	storeStateInit    storeState = 0
+	storeStatePreGet  storeState = 1 // Need to get state
+	storeStateGet     storeState = 2 // Getting old state from storage
+	storeStateReady   storeState = 3 // Ready to update
+	storeStatePending storeState = 4 // New data for metric
+	storeStateUpdate  storeState = 5 // Update/write in progress
+	storeStateSort    storeState = 6 // TBD sort chunk(s) in case of late arrivals
+	storeStateError   storeState = 7 // Metric in error state
+)
+
+// store is ready to update samples into the DB
+func (m *MetricState) IsReady() bool {
+	return m.state == storeStateReady
+}
+
+func (m *MetricState) HasError() bool {
+	return m.state == storeStateError
+}
+
+func (m *MetricState) GetState() storeState {
+	return m.state
+}
+
+func (m *MetricState) SetState(state storeState) {
+	m.state = state
+}
+
+func (m *MetricState) SetError(err error) {
+	m.SetState(storeStateError)
+	m.err = err
+}
 
 func (m *MetricState) Err() error {
 	m.RLock()

@@ -31,7 +31,7 @@ import (
 )
 
 const MAX_LATE_WRITE = 59 * 3600 * 1000 // max late arrival of 59min
-const MaxSamplesInWrite = 64
+const MaxSamplesInWrite = 128
 
 // create a chunk store with two chunks (current, previous)
 func NewChunkStore() *chunkStore {
@@ -43,7 +43,6 @@ func NewChunkStore() *chunkStore {
 
 // chunkStore store state & latest + previous chunk appenders
 type chunkStore struct {
-	state    storeState
 	curChunk int
 	lastTid  int
 	chunks   [2]*attrAppender
@@ -55,19 +54,9 @@ type chunkStore struct {
 	DelRawSamples bool  // TODO: for metrics w aggregates only
 }
 
-// Store states
-type storeState uint8
-
-const (
-	storeStateInit    storeState = 0
-	storeStatePreGet  storeState = 1 // Need to get state
-	storeStateGet     storeState = 2 // Getting old state from storage
-	storeStateReady   storeState = 3 // Ready to update
-	storeStatePending storeState = 4 // New data for metric
-	storeStateUpdate  storeState = 5 // Update/write in progress
-	storeStateSort    storeState = 6 // TBD sort chunk(s) in case of late arrivals
-	storeStateError   storeState = 7 // Metric in error state
-)
+func (cs *chunkStore) QueuedSamples() int {
+	return len(cs.pending)
+}
 
 // chunk appender object, state used for appending t/v to a chunk
 type attrAppender struct {
@@ -121,28 +110,16 @@ func (l pendingList) Len() int           { return len(l) }
 func (l pendingList) Less(i, j int) bool { return l[i].t < l[j].t }
 func (l pendingList) Swap(i, j int)      { l[i], l[j] = l[j], l[i] }
 
-// store is ready to update samples into the DB
-func (cs *chunkStore) IsReady() bool {
-	return cs.state == storeStateReady
-}
-
-func (cs *chunkStore) GetState() storeState {
-	return cs.state
-}
-
-func (cs *chunkStore) SetState(state storeState) {
-	cs.state = state
-}
-
 // return the DB path for storing the metric
 func (cs *chunkStore) GetMetricPath(metric *MetricState, tablePath string) string {
 	return fmt.Sprintf("%s%s.%016x", tablePath, metric.name, metric.hash) // TODO: use TableID
 }
 
 // Read (Async) the current chunk state and data from the storage, used in the first chunk access
-func (cs *chunkStore) GetChunksState(mc *MetricsCache, metric *MetricState, t int64) (bool, error) {
+func (cs *chunkStore) GetChunksState(mc *MetricsCache, metric *MetricState) (bool, error) {
 
 	// init chunk and create aggregation list object based on partition policy
+	t := cs.pending[0].t
 	part := mc.partitionMngr.TimeToPart(t)
 	cs.chunks[0].initialize(part, t)
 	cs.aggrList = aggregate.NewAggregatorList(part.AggrType())
@@ -156,15 +133,12 @@ func (cs *chunkStore) GetChunksState(mc *MetricsCache, metric *MetricState, t in
 
 	request, err := mc.container.GetItem(&getInput, metric, mc.responseChan)
 	if err != nil {
-		mc.logger.ErrorWith("GetItem Failed", "metric", metric.key, "err", err)
+		mc.logger.ErrorWith("Failed to send GetItem request", "metric", metric.key, "err", err)
 		return false, err
 	}
 
 	mc.logger.DebugWith("Get Metric State", "name", metric.name, "key", metric.key, "reqid", request.ID)
-
-	cs.state = storeStateGet
 	return true, nil
-
 }
 
 // Process the GetItem response from the DB and initialize or restore the current chunk
@@ -175,8 +149,6 @@ func (cs *chunkStore) ProcessGetResp(mc *MetricsCache, metric *MetricState, resp
 	app, _ := chunk.Appender()
 	cs.chunks[0].appender = app
 	cs.chunks[0].state |= chunkStateFirst
-
-	cs.state = storeStateReady
 
 	if resp.Error != nil {
 		// assume the item not found   TODO: check error code
@@ -223,6 +195,10 @@ func (cs *chunkStore) ProcessGetResp(mc *MetricsCache, metric *MetricState, resp
 func (cs *chunkStore) Append(t int64, v interface{}) {
 
 	cs.pending = append(cs.pending, pendingData{t: t, v: v})
+	// if the new time is older than previous times, sort the list
+	if len(cs.pending) > 1 && cs.pending[len(cs.pending)-2].t < t {
+		sort.Sort(cs.pending)
+	}
 
 }
 
@@ -275,16 +251,8 @@ func (cs *chunkStore) WriteChunks(mc *MetricsCache, metric *MetricState) (bool, 
 		return false, nil
 	}
 
-	// If we have too many metrics with update in progress queue it (to avoid chan deadlocks)
-	if mc.updatesInFlight > CHAN_SIZE {
-		cs.state = storeStateUpdate
-		mc.extraQueue.Push(metric)
-		return false, nil
-	}
-
 	expr := ""
 	notInitialized := false
-	sort.Sort(cs.pending)
 
 	// init partition info and find if we need to init the metric headers (labels, ..) in case of new partition
 	t0 := cs.pending[0].t
@@ -371,8 +339,6 @@ func (cs *chunkStore) WriteChunks(mc *MetricsCache, metric *MetricState) (bool, 
 		return false, nil
 	}
 
-	cs.state = storeStateUpdate
-
 	// if the table object wasnt initialized, insert init expression
 	if notInitialized {
 		// init labels (dimension) attributes
@@ -411,8 +377,6 @@ func (cs *chunkStore) ProcessWriteResp() {
 			chunk.appender.Chunk().Clear()
 		}
 	}
-
-	cs.state = storeStateReady
 
 }
 
