@@ -184,9 +184,9 @@ func (a *V3ioAdapter) Querier(_ context.Context, mint, maxt int64) (*querier.V3i
 
 func (a *V3ioAdapter) DeleteDB(config bool, force bool) error {
 
-	path := a.partitionMngr.GetHead().GetPath()
+	path, filter := a.partitionMngr.GetHead().GetTablePath()
 	a.logger.Info("Delete partition %s", path)
-	err := utils.DeleteTable(a.container, path, "", a.cfg.QryWorkers)
+	err := utils.DeleteTable(a.container, path, filter, a.cfg.QryWorkers)
 	if err != nil && !force {
 		return err
 	}
@@ -218,7 +218,8 @@ func (a *V3ioAdapter) DeleteDB(config bool, force bool) error {
 // return number of objects in a table
 func (a *V3ioAdapter) CountMetrics(part string) (int, error) {
 
-	input := v3io.GetItemsInput{Path: a.partitionMngr.GetHead().GetPath(), AttributeNames: []string{"__size"}}
+	path, filter := a.partitionMngr.GetHead().GetTablePath()
+	input := v3io.GetItemsInput{Path: path, Filter: filter, AttributeNames: []string{"__size"}}
 	iter, err := utils.NewAsyncItemsCursor(a.container, &input, a.cfg.QryWorkers)
 	if err != nil {
 		return 0, err

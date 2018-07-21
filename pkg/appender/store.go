@@ -114,11 +114,6 @@ func (l pendingList) Len() int           { return len(l) }
 func (l pendingList) Less(i, j int) bool { return l[i].t < l[j].t }
 func (l pendingList) Swap(i, j int)      { l[i], l[j] = l[j], l[i] }
 
-// return the DB path for storing the metric
-func (cs *chunkStore) GetMetricPath(metric *MetricState, tablePath string) string {
-	return fmt.Sprintf("%s%s.%016x", tablePath, metric.name, metric.hash) // TODO: use TableID
-}
-
 // Read (Async) the current chunk state and data from the storage, used in the first chunk access
 func (cs *chunkStore) GetChunksState(mc *MetricsCache, metric *MetricState) (bool, error) {
 
@@ -131,7 +126,7 @@ func (cs *chunkStore) GetChunksState(mc *MetricsCache, metric *MetricState) (boo
 	// TODO: if policy to merge w old chunks need to get prev chunk, vs restart appender
 
 	// issue DB GetItem command to load last state of metric
-	path := cs.GetMetricPath(metric, part.GetPath())
+	path := part.GetMetricPath(metric.name, metric.hash)
 	getInput := v3io.GetItemInput{
 		Path: path, AttributeNames: []string{"_maxtime"}}
 
@@ -355,8 +350,8 @@ func (cs *chunkStore) WriteChunks(mc *MetricsCache, metric *MetricState) (bool, 
 	}
 
 	// Call V3IO async Update Item method
-	expr += fmt.Sprintf("_maxtime=%d;", cs.maxTime)       // TODO: use max() expr
-	path := cs.GetMetricPath(metric, partition.GetPath()) // TODO: use TableID for multi-partition
+	expr += fmt.Sprintf("_maxtime=%d;", cs.maxTime) // TODO: use max() expr
+	path := partition.GetMetricPath(metric.name, metric.hash)
 	request, err := mc.container.UpdateItem(
 		&v3io.UpdateItemInput{Path: path, Expression: &expr}, metric, mc.responseChan)
 	if err != nil {
