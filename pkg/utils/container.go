@@ -127,17 +127,19 @@ func respWaitLoop(comm chan int, responseChan chan *v3io.Response, timeout time.
 	done := make(chan bool)
 
 	go func() {
+		active := false
 		for {
 			select {
 
 			case resp := <-responseChan:
 				responses++
+				active = true
+
 				if resp.Error != nil {
 					fmt.Println(resp.Error, "failed Delete response")
 				}
 
 				if requests == responses {
-					fmt.Println()
 					done <- true
 					return
 				}
@@ -149,9 +151,13 @@ func respWaitLoop(comm chan int, responseChan chan *v3io.Response, timeout time.
 				}
 
 			case <-time.After(timeout):
-				fmt.Println("\nResp loop timed out! ", requests, responses)
-				done <- true
-				return
+				if !active {
+					fmt.Println("\nResp loop timed out! ", requests, responses)
+					done <- true
+					return
+				} else {
+					active = false
+				}
 			}
 		}
 	}()
