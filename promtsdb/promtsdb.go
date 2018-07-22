@@ -26,7 +26,7 @@ func NewV3ioProm(cfg *config.V3ioConfig, container *v3io.Container, logger logge
 }
 
 func (a *V3ioPromAdapter) Appender() (storage.Appender, error) {
-	err := a.db.MetricsCache.StartIfNeeded()
+	err := a.db.InitAppenderCache()
 	if err != nil {
 		return nil, err
 	}
