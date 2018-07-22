@@ -49,14 +49,14 @@ type V3ioConfig struct {
 	// Override last chunk (by default on restart it will append from the last point if possible)
 	OverrideOld bool `json:"overrideOld"`
 	// Metrics reporter configuration
-	MetricsReporter MetricsReporterConfig `json:"metrics,omitempty"`
+	MetricsReporter MetricsReporterConfig `json:"performance,omitempty"`
 }
 
 type MetricsReporterConfig struct {
 	ReportOnShutdown   bool   `json:"reportOnShutdown,omitempty"`
 	Output             string `json:output` // stdout, syslog, etc.
 	ReportPeriodically bool   `json:reportPeriodically,omitempty`
-	RepotInterval      int    `json:"reportInterval"` // Duration
+	RepotInterval      int    `json:"reportInterval"` // interval between consequence reports (in Seconds)
 }
 
 type DBPartConfig struct {

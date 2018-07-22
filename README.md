@@ -133,7 +133,7 @@ options in [config](internal/pkg/config/config.go), a minimal configuration look
 ```yaml
 v3ioUrl: "v3io address:port"
 container: "tsdb"
-path: "metrics"
+path: performance
 username: "<username>"
 password: "<password>"
 ```

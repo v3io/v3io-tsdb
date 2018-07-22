@@ -31,6 +31,7 @@ import (
 	"github.com/v3io/v3io-tsdb/pkg/config"
 	"github.com/v3io/v3io-tsdb/pkg/tsdb"
 	"strings"
+	"github.com/v3io/v3io-tsdb/internal/pkg/performance"
 )
 
 type RootCommandeer struct {
@@ -42,6 +43,7 @@ type RootCommandeer struct {
 	dbPath      string
 	cfgFilePath string
 	verbose     string
+	reporter    *performance.MetricReporter
 }
 
 func NewRootCommandeer() *RootCommandeer {
@@ -102,6 +104,10 @@ func (rc *RootCommandeer) initialize() error {
 		cfg = &config.V3ioConfig{} // initialize struct, will try and set it from individual flags
 		config.InitDefaults(cfg)
 	}
+
+	// Initialize performance monitoring
+	// TODO: support custom report writers (file, syslog, tsdb, etc.)
+	rc.reporter = performance.NewMetricReporterFromConfiguration(os.Stderr, cfg)
 
 	if rc.v3ioPath != "" {
 

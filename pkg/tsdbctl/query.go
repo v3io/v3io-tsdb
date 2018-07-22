@@ -54,7 +54,7 @@ func newQueryCommandeer(rootCommandeer *RootCommandeer) *queryCommandeer {
 	cmd := &cobra.Command{
 		Use:     "query name [flags]",
 		Aliases: []string{"get"},
-		Short:   "query time series metrics",
+		Short:   "query time series performance",
 		RunE: func(cmd *cobra.Command, args []string) error {
 
 			// if we got positional arguments

@@ -150,7 +150,7 @@ func (a *V3ioAdapter) connect() error {
 	return nil
 }
 
-// Create an appender interface, for writing metrics
+// Create an appender interface, for writing performance
 func (a *V3ioAdapter) Appender() (Appender, error) {
 	err := a.MetricsCache.StartIfNeeded()
 	if err != nil {

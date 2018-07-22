@@ -56,7 +56,7 @@ func (m *MetricState) Err() error {
 	return m.err
 }
 
-// store the state and metadata for all the metrics
+// store the state and metadata for all the performance
 type MetricsCache struct {
 	cfg           *config.V3ioConfig
 	partitionMngr *partmgr.PartitionManager
@@ -112,7 +112,7 @@ func (mc *MetricsCache) StartIfNeeded() error {
 }
 
 // loop for handling metric events (appends and Get/Update DB responses)
-// TODO: we can use multiple Go routines and spread the metrics across based on Hash LSB
+// TODO: we can use multiple Go routines and spread the performance across based on Hash LSB
 func (mc *MetricsCache) start() error {
 
 	go func() {

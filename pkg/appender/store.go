@@ -51,7 +51,7 @@ type chunkStore struct {
 	pending       pendingList
 	maxTime       int64
 	initMaxTime   int64 // max time read from DB metric before first append
-	DelRawSamples bool  // TODO: for metrics w aggregates only
+	DelRawSamples bool  // TODO: for performance w aggregates only
 }
 
 // Store states

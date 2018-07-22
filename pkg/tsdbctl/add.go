@@ -102,6 +102,11 @@ func (ac *addCommandeer) add() error {
 		return err
 	}
 
+	appender, err := ac.rootCommandeer.adapter.Appender()
+	if err != nil {
+		return errors.Wrap(err, "failed to create Appender")
+	}
+
 	if ac.inFile == "" {
 		// process direct CLI input
 		if lset, err = strToLabels(ac.name, ac.lset); err != nil {
@@ -117,17 +122,18 @@ func (ac *addCommandeer) add() error {
 			return err
 		}
 
-		append, err := ac.rootCommandeer.adapter.Appender()
+		timer, err := ac.rootCommandeer.reporter.NewTimer("AppendTimer")
+
 		if err != nil {
-			return errors.Wrap(err, "failed to create Appender")
+			timer.Time(func() {
+				ref, err := ac.appendMetric(appender, lset, tarray, varray, true)
+				if err == nil {
+					err = appender.WaitForReady(ref)
+				}
+			})
 		}
 
-		ref, err := ac.appendMetric(append, lset, tarray, varray, true)
-		if err != nil {
-			return err
-		}
-
-		return append.WaitForReady(ref)
+		return err
 	}
 
 	// process a CSV file input
@@ -141,11 +147,6 @@ func (ac *addCommandeer) add() error {
 	records, err := r.ReadAll()
 	if err != nil {
 		errors.Wrap(err, "cant read/process CSV input")
-	}
-
-	append, err := ac.rootCommandeer.adapter.Appender()
-	if err != nil {
-		return errors.Wrap(err, "failed to create Appender")
 	}
 
 	refMap := map[uint64]bool{}
@@ -178,7 +179,7 @@ func (ac *addCommandeer) add() error {
 			return err
 		}
 
-		ref, err := ac.appendMetric(append, lset, tarray, varray, false)
+		ref, err := ac.appendMetric(appender, lset, tarray, varray, false)
 		if err != nil {
 			return err
 		}
@@ -188,12 +189,12 @@ func (ac *addCommandeer) add() error {
 	fmt.Println("\nDone!")
 
 	// make sure all writes are committed
-	return ac.waitForWrites(append, &refMap)
+	return ac.waitForWrites(appender, &refMap)
 }
 
 func (ac *addCommandeer) waitForWrites(append tsdb.Appender, refMap *map[uint64]bool) error {
 
-	for ref, _ := range *refMap {
+	for ref := range *refMap {
 		err := append.WaitForReady(ref)
 		if err != nil {
 			return err
@@ -203,23 +204,32 @@ func (ac *addCommandeer) waitForWrites(append tsdb.Appender, refMap *map[uint64]
 }
 
 func (ac *addCommandeer) appendMetric(
-	append tsdb.Appender, lset utils.Labels, tarray []int64, varray []float64, print bool) (uint64, error) {
+	appender tsdb.Appender, lset utils.Labels, tarray []int64, varray []float64, print bool) (uint64, error) {
 
-	ac.rootCommandeer.logger.DebugWith("adding value to metric", "lset", lset, "t", tarray, "v", varray)
+	timer, err := ac.rootCommandeer.reporter.NewTimer("AppendMetricTimer")
+	var ref uint64
 
-	if print {
-		fmt.Println("add:", lset, tarray, varray)
-	}
-	ref, err := append.Add(lset, tarray[0], varray[0])
 	if err != nil {
-		return 0, errors.Wrap(err, "failed to Add")
-	}
+		timer.Time(func() {
+			ac.rootCommandeer.logger.DebugWith("adding value to metric", "lset", lset, "t", tarray, "v", varray)
 
-	for i := 1; i < len(varray); i++ {
-		err := append.AddFast(lset, ref, tarray[i], varray[i])
-		if err != nil {
-			return 0, errors.Wrap(err, "failed to AddFast")
-		}
+			if print {
+				fmt.Println("add:", lset, tarray, varray)
+			}
+			ref, err := appender.Add(lset, tarray[0], varray[0])
+			if err != nil {
+				ref, err = 0, errors.Wrap(err, "failed to Add")
+				return
+			}
+
+			for i := 1; i < len(varray); i++ {
+				err := appender.AddFast(lset, ref, tarray[i], varray[i])
+				if err != nil {
+					ref, err = 0, errors.Wrap(err, "failed to AddFast")
+					return
+				}
+			}
+		})
 	}
 
 	return ref, nil
@@ -256,8 +266,8 @@ func strToTV(tarr, varr string) ([]int64, []float64, error) {
 		return nil, nil, errors.New("time and value arrays must have the same number of elements")
 	}
 
-	tarray := []int64{}
-	varray := []float64{}
+	var tarray []int64
+	var varray []float64
 
 	for i := 0; i < len(vlist); i++ {
 

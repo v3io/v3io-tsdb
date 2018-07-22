@@ -27,7 +27,7 @@ LabelValuesCount: 1
 # Pattern: [A..Z][_[1..10]]
 LabelsValueDiversity: 10
 
-# Flush frequency - flush metrics after every N steps
+# Flush frequency - flush performance after every N steps
 FlushFrequency: -1 # -1 for no flush during the ingestion
 
 # Select how benchmark test will produce the data. If "AppendOneByOne=true" test will produce one sample per test cycle

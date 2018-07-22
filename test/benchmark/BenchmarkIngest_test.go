@@ -176,7 +176,7 @@ func appendAll(appender tsdb.Appender, sampleTemplates []string, timestamps []in
 		}
 
 		if flushFrequency > 0 && dataPointIndex%flushFrequency == 0 {
-			// block and flush all metrics every flush interval
+			// block and flush all performance every flush interval
 			err := waitForWrites(appender, &refsMap)
 			if err != nil {
 				return count, err
