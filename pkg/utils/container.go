@@ -42,7 +42,7 @@ func NewLogger(verbose string) (logger.Logger, error) {
 	case "error":
 		logLevel = nucliozap.ErrorLevel
 	default:
-		logLevel = nucliozap.InfoLevel
+		logLevel = nucliozap.WarnLevel
 	}
 
 	log, err := nucliozap.NewNuclioZapCmd("v3io-prom", logLevel)

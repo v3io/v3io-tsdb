@@ -53,7 +53,7 @@ func (mc *MetricsCache) metricFeed(index int) {
 			case inFlight = <-mc.updatesComplete:
 				// handle completion notifications from update loop
 				length := mc.metricQueue.Length()
-				mc.logger.Debug("Complete Update cycle - inflight %d len %d\n", inFlight, length)
+				mc.logger.Info("Complete Update cycle - inflight %d len %d\n", inFlight, length)
 
 				// if data was sent and the queue is empty mark as completion
 				if length == 0 && gotData {
@@ -69,7 +69,7 @@ func (mc *MetricsCache) metricFeed(index int) {
 				queuedEnough := false
 
 			inLoop:
-				for i := 0; i < maxSampleLoop; i++ {
+				for i := 0; i <= maxSampleLoop; i++ {
 
 					if app.metric == nil {
 						// handle Completion update requests (metric == nil)
@@ -114,10 +114,12 @@ func (mc *MetricsCache) metricFeed(index int) {
 					}
 
 					// poll if we have more updates (accelerate the outer select)
-					select {
-					case app = <-mc.asyncAppendChan:
-					default:
-						break inLoop
+					if i < maxSampleLoop {
+						select {
+						case app = <-mc.asyncAppendChan:
+						default:
+							break inLoop
+						}
 					}
 				}
 				// notify update loop there are new metrics to process
@@ -138,6 +140,7 @@ func (mc *MetricsCache) metricFeed(index int) {
 func (mc *MetricsCache) metricsUpdateLoop(index int) {
 
 	go func() {
+		counter := 0
 		for {
 
 			select {
@@ -158,17 +161,23 @@ func (mc *MetricsCache) metricsUpdateLoop(index int) {
 				nonQueued := mc.metricQueue.IsEmpty()
 
 			inLoop:
-				for i := 0; i < maxSampleLoop; i++ {
+				for i := 0; i <= maxSampleLoop; i++ {
 
 					mc.updatesInFlight--
+					counter++
+					if counter%1000 == 0 {
+						mc.logger.Info("Handle resp: inFly %d, Q %d", mc.updatesInFlight, mc.metricQueue.Length())
+					}
 					metric := resp.Context.(*MetricState)
 					mc.handleResponse(metric, resp, nonQueued)
 
 					// poll if we have more responses (accelerate the outer select)
-					select {
-					case resp = <-mc.responseChan:
-					default:
-						break inLoop
+					if i < maxSampleLoop {
+						select {
+						case resp = <-mc.responseChan:
+						default:
+							break inLoop
+						}
 					}
 				}
 
@@ -225,7 +234,8 @@ func (mc *MetricsCache) handleResponse(metric *MetricState, resp *v3io.Response,
 	defer metric.Unlock()
 
 	if resp.Error != nil && metric.GetState() != storeStateGet {
-		mc.logger.ErrorWith("failed IO", "id", resp.ID, "err", resp.Error, "key", metric.key)
+		mc.logger.ErrorWith("failed IO", "id", resp.ID, "err", resp.Error, "key", metric.key,
+			"inflight", mc.updatesInFlight, "mqueue", mc.metricQueue.Length(), "numsamples", metric.store.NumQueuedSamples())
 	} else {
 		mc.logger.DebugWith("IO resp", "id", resp.ID, "err", resp.Error, "key", metric.key)
 	}

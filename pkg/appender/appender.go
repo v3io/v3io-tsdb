@@ -235,8 +235,8 @@ func (mc *MetricsCache) AddFast(ref uint64, t int64, v interface{}) error {
 
 }
 
-func (mc *MetricsCache) WaitForCompletion(inFlight int64, timeout int) int {
+func (mc *MetricsCache) WaitForCompletion(timeout int) int {
 	waitChan := make(chan int, 2)
-	mc.asyncAppendChan <- &asyncAppend{metric: nil, t: inFlight, v: 0, resp: waitChan}
+	mc.asyncAppendChan <- &asyncAppend{metric: nil, t: 0, v: 0, resp: waitChan}
 	return <-waitChan
 }

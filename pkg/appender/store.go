@@ -31,7 +31,7 @@ import (
 )
 
 const MAX_LATE_WRITE = 59 * 3600 * 1000 // max late arrival of 59min
-const MaxSamplesInWrite = 128
+const MaxSamplesInWrite = 64
 
 // create a chunk store with two chunks (current, previous)
 func NewChunkStore() *chunkStore {
@@ -59,7 +59,7 @@ func (cs *chunkStore) NumQueuedSamples() int {
 }
 
 func (cs *chunkStore) QueuedEnough() bool {
-	return len(cs.pending) > 3*MaxSamplesInWrite
+	return len(cs.pending) > 2*MaxSamplesInWrite
 }
 
 // chunk appender object, state used for appending t/v to a chunk

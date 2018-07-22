@@ -251,8 +251,8 @@ func (a v3ioAppender) AddFast(lset utils.Labels, ref uint64, t int64, v float64)
 }
 
 // wait for completion of all updates
-func (a v3ioAppender) WaitForCompletion(inFlight int64, timeout int) int {
-	return a.metricsCache.WaitForCompletion(inFlight, timeout)
+func (a v3ioAppender) WaitForCompletion(timeout int) int {
+	return a.metricsCache.WaitForCompletion(timeout)
 }
 
 // in V3IO all ops a committed (no client cache)
@@ -263,7 +263,7 @@ func (a v3ioAppender) Rollback() error { return nil }
 type Appender interface {
 	Add(l utils.Labels, t int64, v float64) (uint64, error)
 	AddFast(l utils.Labels, ref uint64, t int64, v float64) error
-	WaitForCompletion(inFlight int64, timeout int) int
+	WaitForCompletion(timeout int) int
 	Commit() error
 	Rollback() error
 }
