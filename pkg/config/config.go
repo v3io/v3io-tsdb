@@ -48,6 +48,8 @@ type V3ioConfig struct {
 	MaxBehind int `json:"maxBehind"`
 	// Override last chunk (by default on restart it will append from the last point if possible)
 	OverrideOld bool `json:"overrideOld"`
+	// Default timeout duration in Seconds (if not set, 1 Hour timeout will be used )
+	DefaultTimeout int `json:"timeout,omitempty"`
 }
 
 type DBPartConfig struct {

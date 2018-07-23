@@ -235,8 +235,22 @@ func (mc *MetricsCache) AddFast(ref uint64, t int64, v interface{}) error {
 
 }
 
-func (mc *MetricsCache) WaitForCompletion(timeout int) int {
+func (mc *MetricsCache) WaitForCompletion(timeout time.Duration) (int, error) {
 	waitChan := make(chan int, 2)
 	mc.asyncAppendChan <- &asyncAppend{metric: nil, t: 0, v: 0, resp: waitChan}
-	return <-waitChan
+
+	var maxWaitTime time.Duration
+
+	if timeout > 0 {
+		maxWaitTime = timeout
+	} else {
+		maxWaitTime = time.Duration(mc.cfg.DefaultTimeout) * time.Second
+	}
+
+	select {
+	case res := <-waitChan:
+		return res, nil
+	case <-time.After(maxWaitTime):
+		return 0, errors.Errorf("the operation was timed out after %d seconds", maxWaitTime.Seconds())
+	}
 }

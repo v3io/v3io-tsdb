@@ -158,8 +158,6 @@ func (it *v3ioSeriesIterator) Seek(t int64) bool {
 			it.iter = it.chunks[it.chunkIndex].Iterator()
 		}
 	}
-
-	return false
 }
 
 // move to the next iterator item

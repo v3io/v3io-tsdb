@@ -127,7 +127,7 @@ func (ac *addCommandeer) add() error {
 			return err
 		}
 
-		append.WaitForCompletion(0)
+		append.WaitForCompletion(-1)
 		return nil
 	}
 
@@ -185,7 +185,7 @@ func (ac *addCommandeer) add() error {
 	}
 
 	// make sure all writes are committed
-	append.WaitForCompletion(0)
+	append.WaitForCompletion(-1)
 	fmt.Println("\nDone!")
 	return nil
 }

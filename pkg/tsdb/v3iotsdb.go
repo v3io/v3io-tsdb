@@ -251,7 +251,7 @@ func (a v3ioAppender) AddFast(lset utils.Labels, ref uint64, t int64, v float64)
 }
 
 // wait for completion of all updates
-func (a v3ioAppender) WaitForCompletion(timeout int) int {
+func (a v3ioAppender) WaitForCompletion(timeout time.Duration) (int, error) {
 	return a.metricsCache.WaitForCompletion(timeout)
 }
 
@@ -263,7 +263,7 @@ func (a v3ioAppender) Rollback() error { return nil }
 type Appender interface {
 	Add(l utils.Labels, t int64, v float64) (uint64, error)
 	AddFast(l utils.Labels, ref uint64, t int64, v float64) error
-	WaitForCompletion(timeout int) int
+	WaitForCompletion(timeout time.Duration) (int, error)
 	Commit() error
 	Rollback() error
 }
