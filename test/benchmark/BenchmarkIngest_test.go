@@ -73,6 +73,9 @@ func BenchmarkIngest(b *testing.B) {
 		count += rowsAdded
 	}
 
+	// Wait for all responses
+	appender.WaitForCompletion(0)
+
 	b.Logf("\nTest complete. Count: %d\n", count)
 }
 

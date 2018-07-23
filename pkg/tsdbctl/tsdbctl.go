@@ -48,8 +48,9 @@ func NewRootCommandeer() *RootCommandeer {
 	commandeer := &RootCommandeer{}
 
 	cmd := &cobra.Command{
-		Use:   "tsdbctl [command]",
-		Short: "V3IO TSDB command-line interface",
+		Use:          "tsdbctl [command]",
+		Short:        "V3IO TSDB command-line interface",
+		SilenceUsage: true,
 	}
 
 	defaultV3ioServer := os.Getenv("V3IO_SERVICE_URL")
