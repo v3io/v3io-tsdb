@@ -59,6 +59,7 @@ func BenchmarkIngest(b *testing.B) {
 	samplesCount := len(sampleTemplates)
 	refs := make([]uint64, samplesCount)
 
+	fmt.Printf("\n********** About to run test %d times *********\n", b.N)
 	for i := 0; i < b.N; i++ {
 		rowsAdded, err := runTest(i, appender, timestamps, sampleTemplates, refs,
 			testConfig.AppendOneByOne, testConfig.Verbose)

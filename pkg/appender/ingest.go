@@ -156,6 +156,10 @@ func (mc *MetricsCache) metricsUpdateLoop(index int) {
 					mc.postMetricUpdates(metric)
 				}
 
+				if mc.updatesInFlight == 0 && mc.metricQueue.IsEmpty() {
+					mc.updatesComplete <- 0
+				}
+
 			case resp := <-mc.responseChan:
 				// Handle V3io async responses
 				nonQueued := mc.metricQueue.IsEmpty()
@@ -182,9 +186,14 @@ func (mc *MetricsCache) metricsUpdateLoop(index int) {
 				}
 
 				// Post updates if we have queued metrics and the channel has room for more
-				freeSlots := mc.cfg.Workers*2 - mc.updatesInFlight
-				for _, metric := range mc.metricQueue.PopN(freeSlots) {
-					mc.postMetricUpdates(metric)
+				for freeSlots := mc.cfg.Workers*2 - mc.updatesInFlight; freeSlots > 0; {
+					metrics := mc.metricQueue.PopN(freeSlots)
+					if len(metrics) == 0 {
+						break
+					}
+					for _, metric := range metrics {
+						mc.postMetricUpdates(metric)
+					}
 				}
 
 				// Notify the metric feeder when all in-flight tasks are done
@@ -208,6 +217,7 @@ func (mc *MetricsCache) postMetricUpdates(metric *MetricState) {
 	if metric.GetState() == storeStatePreGet {
 		sent, err = metric.store.GetChunksState(mc, metric)
 		if err != nil {
+			mc.logger.ErrorWith("Get item request failed", "metric", metric.Lset, "err", err)
 			metric.SetError(err)
 		} else {
 			metric.SetState(storeStateGet)

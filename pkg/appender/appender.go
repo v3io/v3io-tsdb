@@ -239,13 +239,15 @@ func (mc *MetricsCache) WaitForCompletion(timeout time.Duration) (int, error) {
 	waitChan := make(chan int, 2)
 	mc.asyncAppendChan <- &asyncAppend{metric: nil, t: 0, v: 0, resp: waitChan}
 
-	var maxWaitTime time.Duration
+	var maxWaitTime time.Duration = 0
 
 	if timeout > 0 {
 		maxWaitTime = timeout
 	} else {
 		maxWaitTime = time.Duration(mc.cfg.DefaultTimeout) * time.Second
 	}
+
+	//fmt.Printf("\nmaxWaitTime=%d\n", maxWaitTime)
 
 	select {
 	case res := <-waitChan:

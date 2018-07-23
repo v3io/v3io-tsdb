@@ -275,6 +275,7 @@ func (cs *chunkStore) WriteChunks(mc *MetricsCache, metric *MetricState) (bool, 
 		t := cs.pending[i].t
 
 		if t <= cs.initMaxTime && !mc.cfg.OverrideOld {
+			mc.logger.InfoWith("Time is less than init max time", "T", t, "InitMaxTime", cs.initMaxTime)
 			i++
 			continue
 		}
@@ -335,6 +336,7 @@ func (cs *chunkStore) WriteChunks(mc *MetricsCache, metric *MetricState) (bool, 
 	}
 
 	if expr == "" {
+		mc.logger.WarnWith("Empty expression!", "name", metric.name, "key", metric.key, "expr", expr)
 		return false, nil
 	}
 
