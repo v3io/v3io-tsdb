@@ -127,8 +127,8 @@ func (ac *addCommandeer) add() error {
 			return err
 		}
 
-		append.WaitForCompletion(-1)
-		return nil
+		_, err = append.WaitForCompletion(-1)
+		return err
 	}
 
 	// process a CSV file input
@@ -185,9 +185,15 @@ func (ac *addCommandeer) add() error {
 	}
 
 	// make sure all writes are committed
-	append.WaitForCompletion(-1)
-	fmt.Println("\nDone!")
-	return nil
+	_, err = append.WaitForCompletion(-1)
+
+	if err == nil {
+		fmt.Println("\nDone!")
+	} else {
+		fmt.Printf("operation timed out. Error: %v", err)
+	}
+
+	return err
 }
 
 func (ac *addCommandeer) appendMetric(

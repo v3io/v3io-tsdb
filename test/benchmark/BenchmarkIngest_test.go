@@ -74,7 +74,11 @@ func BenchmarkIngest(b *testing.B) {
 	}
 
 	// Wait for all responses
-	appender.WaitForCompletion(-1)
+	_, err = appender.WaitForCompletion(-1)
+
+	if err != nil {
+		b.Fatalf("Test timed out. Error: %v", err)
+	}
 
 	b.Logf("\nTest complete. Count: %d\n", count)
 }
@@ -175,7 +179,7 @@ func appendAll(appender tsdb.Appender, sampleTemplates []string, timestamps []in
 	}
 
 	// Wait for all responses
-	appender.WaitForCompletion(-1)
+	_, err := appender.WaitForCompletion(-1)
 
-	return count, nil
+	return count, err
 }
