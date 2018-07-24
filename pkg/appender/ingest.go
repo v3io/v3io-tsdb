@@ -66,7 +66,8 @@ func (mc *MetricsCache) metricFeed(index int) {
 
 			case app := <-mc.asyncAppendChan:
 				newMetrics := 0
-				queuedEnough := false
+				dataQueued := 0
+				numPushed := 0
 
 			inLoop:
 				for i := 0; i <= maxSampleLoop; i++ {
@@ -88,10 +89,11 @@ func (mc *MetricsCache) metricFeed(index int) {
 						metric := app.metric
 						metric.Lock()
 
-						if !metric.HasError() {
+						if !metric.HasError() && !metric.InvalidTime(app.t) {
 
 							metric.store.Append(app.t, app.v)
-							queuedEnough = queuedEnough || metric.store.QueuedEnough()
+							numPushed++
+							dataQueued += metric.store.NumQueuedSamples()
 
 							// if there are no in flight requests, add the metric to the queue and update state
 							if metric.IsReady() || metric.GetState() == storeStateInit {
@@ -128,8 +130,16 @@ func (mc *MetricsCache) metricFeed(index int) {
 				}
 
 				// If we have too much work, stall the queue for some time
-				if queuedEnough {
-					time.Sleep(queueStallTime)
+				if numPushed > maxSampleLoop/2 && dataQueued/numPushed > 64 {
+					//fmt.Printf("-S %d %d %d %d \n",mc.metricQueue.Length(), numPushed, dataQueued/numPushed, newMetrics)
+					switch {
+					case dataQueued/numPushed <= 96:
+						time.Sleep(queueStallTime)
+					case dataQueued/numPushed > 96 && dataQueued/numPushed < 200:
+						time.Sleep(4 * queueStallTime)
+					default:
+						time.Sleep(10 * queueStallTime)
+					}
 				}
 			}
 		}
@@ -145,18 +155,22 @@ func (mc *MetricsCache) metricsUpdateLoop(index int) {
 
 			select {
 
-			case newMetrics := <-mc.newUpdates:
+			case _ = <-mc.newUpdates:
 				// Handle new metric notifications (from metricFeed)
-				freeSlots := mc.cfg.Workers*2 - mc.updatesInFlight
-				if newMetrics > freeSlots {
-					newMetrics = freeSlots
+
+				for mc.updatesInFlight < mc.cfg.Workers*2 { //&& newMetrics > 0{
+					freeSlots := mc.cfg.Workers*2 - mc.updatesInFlight
+					metrics := mc.metricQueue.PopN(freeSlots)
+					for _, metric := range metrics {
+						mc.postMetricUpdates(metric)
+					}
+					if len(metrics) < freeSlots {
+						break
+					}
 				}
 
-				for _, metric := range mc.metricQueue.PopN(newMetrics) {
-					mc.postMetricUpdates(metric)
-				}
-
-				if mc.updatesInFlight == 0 && mc.metricQueue.IsEmpty() {
+				if mc.updatesInFlight == 0 {
+					mc.logger.Info("Complete New Update cycle - inflight %d\n", mc.updatesInFlight)
 					mc.updatesComplete <- 0
 				}
 
@@ -169,7 +183,7 @@ func (mc *MetricsCache) metricsUpdateLoop(index int) {
 
 					mc.updatesInFlight--
 					counter++
-					if counter%1000 == 0 {
+					if counter%3000 == 0 {
 						mc.logger.Info("Handle resp: inFly %d, Q %d", mc.updatesInFlight, mc.metricQueue.Length())
 					}
 					metric := resp.Context.(*MetricState)
@@ -186,7 +200,8 @@ func (mc *MetricsCache) metricsUpdateLoop(index int) {
 				}
 
 				// Post updates if we have queued metrics and the channel has room for more
-				for freeSlots := mc.cfg.Workers*2 - mc.updatesInFlight; freeSlots > 0; {
+				for mc.updatesInFlight < mc.cfg.Workers*2 {
+					freeSlots := mc.cfg.Workers*2 - mc.updatesInFlight
 					metrics := mc.metricQueue.PopN(freeSlots)
 					if len(metrics) == 0 {
 						break
@@ -198,6 +213,7 @@ func (mc *MetricsCache) metricsUpdateLoop(index int) {
 
 				// Notify the metric feeder when all in-flight tasks are done
 				if mc.updatesInFlight == 0 {
+					mc.logger.Info("return to feed: Q %d ", mc.metricQueue.Length())
 					mc.updatesComplete <- 0
 				}
 			}
@@ -230,6 +246,9 @@ func (mc *MetricsCache) postMetricUpdates(metric *MetricState) {
 			metric.SetError(errors.Wrap(err, "chunk write submit failed"))
 		} else if sent {
 			metric.SetState(storeStateUpdate)
+		}
+		if !sent && metric.store.NumQueuedSamples() == 0 {
+			metric.SetState(storeStateReady)
 		}
 	}
 
@@ -264,6 +283,7 @@ func (mc *MetricsCache) handleResponse(metric *MetricState, resp *v3io.Response,
 			// Metrics with too many update errors go into Error state
 			metric.retryCount++
 			if metric.retryCount == MAX_WRITE_RETRY {
+				mc.logger.ErrorWith("Metric error, exceeded retry", "metric", metric.Lset)
 				metric.SetError(errors.Wrap(resp.Error, "chunk update failed after few retries"))
 				return false
 			}

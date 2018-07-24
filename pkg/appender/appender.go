@@ -33,9 +33,9 @@ import (
 )
 
 const MAX_WRITE_RETRY = 3
-const CHAN_SIZE = 2048
+const CHAN_SIZE = 4048
 const maxSampleLoop = 16
-const queueStallTime = 10 * time.Millisecond
+const queueStallTime = time.Millisecond
 
 // to add, rollups policy (cnt, sum, min/max, sum^2) + interval , or policy in per name lable
 type MetricState struct {
@@ -69,6 +69,10 @@ const (
 // store is ready to update samples into the DB
 func (m *MetricState) IsReady() bool {
 	return m.state == storeStateReady
+}
+
+func (m *MetricState) InvalidTime(t int64) bool {
+	return (m.state == storeStateReady || m.state == storeStateUpdate) && t < m.store.maxTime-MAX_LATE_WRITE
 }
 
 func (m *MetricState) HasError() bool {
@@ -131,8 +135,8 @@ func NewMetricsCache(container *v3io.Container, logger logger.Logger, cfg *confi
 	newCache.asyncAppendChan = make(chan *asyncAppend, CHAN_SIZE)
 
 	newCache.metricQueue = NewElasticQueue()
-	newCache.updatesComplete = make(chan int, 10)
-	newCache.newUpdates = make(chan int, 100)
+	newCache.updatesComplete = make(chan int, 5000)
+	newCache.newUpdates = make(chan int, 5000)
 
 	newCache.NameLabelMap = map[string]bool{}
 	return &newCache
