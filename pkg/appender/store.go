@@ -30,8 +30,9 @@ import (
 	"sort"
 )
 
-const MAX_LATE_WRITE = 59 * 3600 * 1000 // max late arrival of 59min
-const MaxSamplesInWrite = 64
+// TODO: make it configurable
+const maxLateArrivalInterval = 59 * 60 * 1000 // max late arrival of 59min
+const maxSamplesInWrite = 64
 
 // create a chunk store with two chunks (current, previous)
 func NewChunkStore() *chunkStore {
@@ -54,12 +55,8 @@ type chunkStore struct {
 	delRawSamples bool  // TODO: for metrics w aggregates only
 }
 
-func (cs *chunkStore) NumQueuedSamples() int {
+func (cs *chunkStore) samplesQueueLength() int {
 	return len(cs.pending)
-}
-
-func (cs *chunkStore) QueuedEnough() bool {
-	return len(cs.pending) > 2*MaxSamplesInWrite
 }
 
 // chunk appender object, state used for appending t/v to a chunk
@@ -235,7 +232,7 @@ func (cs *chunkStore) chunkByTime(t int64) *attrAppender {
 
 	prev := cs.chunks[cs.curChunk^1]
 	// delayed Appends only allowed to previous chunk or within allowed window
-	if prev.partition != nil && prev.inRange(t) && t > cs.maxTime-MAX_LATE_WRITE {
+	if prev.partition != nil && prev.inRange(t) && t > cs.maxTime-maxLateArrivalInterval {
 		return prev
 	}
 
@@ -267,48 +264,51 @@ func (cs *chunkStore) WriteChunks(mc *MetricsCache, metric *MetricState) (bool, 
 	isNewBucket := bucket > partition.Time2Bucket(cs.maxTime)
 
 	var activeChunk *attrAppender
-	var i int
+	var pendingSampleIndex int
+	var pendingSamplesCount int
 
 	// loop over pending samples, add to chunks & aggregates (create required update expressions)
-	for i < len(cs.pending) && i < MaxSamplesInWrite && partition.InRange(cs.pending[i].t) {
+	for pendingSampleIndex < len(cs.pending) && pendingSamplesCount < maxSamplesInWrite && partition.InRange(cs.pending[pendingSampleIndex].t) {
+		sampleTime := cs.pending[pendingSampleIndex].t
 
-		t := cs.pending[i].t
-
-		if t <= cs.initMaxTime && !mc.cfg.OverrideOld {
-			i++
+		if sampleTime <= cs.initMaxTime && !mc.cfg.OverrideOld {
+			mc.logger.DebugWith("Time is less than init max time", "T", sampleTime, "InitMaxTime", cs.initMaxTime)
+			pendingSampleIndex++
 			continue
 		}
 
 		// init activeChunk if nil (when samples are too old), if still too old skip to next sample
 		if activeChunk == nil {
-			activeChunk = cs.chunkByTime(t)
+			activeChunk = cs.chunkByTime(sampleTime)
 			if activeChunk == nil {
-				i++
+				pendingSampleIndex++
+				mc.logger.DebugWith("nil active chunk", "T", sampleTime)
 				continue
 			}
 		}
 
 		// advance maximum time processed in metric
-		if t > cs.maxTime {
-			cs.maxTime = t
+		if sampleTime > cs.maxTime {
+			cs.maxTime = sampleTime
 		}
 
 		// add value to aggregators
-		cs.aggrList.Aggregate(t, cs.pending[i].v)
+		cs.aggrList.Aggregate(sampleTime, cs.pending[pendingSampleIndex].v)
 
 		// add value to compressed raw value chunk
-		activeChunk.appendAttr(t, cs.pending[i].v.(float64))
+		activeChunk.appendAttr(sampleTime, cs.pending[pendingSampleIndex].v.(float64))
 
 		// if the last item or last item in the same partition add expressions and break
-		if (i == len(cs.pending)-1) || i == MaxSamplesInWrite-1 || !partition.InRange(cs.pending[i+1].t) {
+		if (pendingSampleIndex == len(cs.pending)-1) || pendingSamplesCount == maxSamplesInWrite-1 || !partition.InRange(cs.pending[pendingSampleIndex+1].t) {
 			expr = expr + cs.aggrList.SetOrUpdateExpr("v", bucket, isNewBucket)
 			expr = expr + cs.appendExpression(activeChunk)
-			i++
+			pendingSampleIndex++
+			pendingSamplesCount++
 			break
 		}
 
 		// if the next item is in new Aggregate bucket, gen expression and init new bucket
-		nextT := cs.pending[i+1].t
+		nextT := cs.pending[pendingSampleIndex+1].t
 		nextBucket := partition.Time2Bucket(nextT)
 		if nextBucket != bucket {
 			expr = expr + cs.aggrList.SetOrUpdateExpr("v", bucket, isNewBucket)
@@ -323,18 +323,22 @@ func (cs *chunkStore) WriteChunks(mc *MetricsCache, metric *MetricState) (bool, 
 			activeChunk = cs.chunkByTime(nextT)
 		}
 
-		i++
+		pendingSampleIndex++
+		pendingSamplesCount++
 	}
 
 	cs.aggrList.Clear()
-	if i == len(cs.pending) {
+	if pendingSampleIndex == len(cs.pending) {
 		cs.pending = cs.pending[:0]
 	} else {
 		// leave pending not processed or from newer partitions
-		cs.pending = cs.pending[i:]
+		cs.pending = cs.pending[pendingSampleIndex:]
 	}
 
-	if expr == "" {
+	if pendingSamplesCount == 0 || expr == "" {
+		if len(cs.pending) > 0 {
+			mc.metricQueue.Push(metric)
+		}
 		return false, nil
 	}
 

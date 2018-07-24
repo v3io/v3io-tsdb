@@ -15,6 +15,6 @@ func CreateTSDB(v3ioConfig *config.V3ioConfig, newTsdbPath string) error {
 	return tsdb.CreateTSDB(v3ioConfig, &dbcfg)
 }
 
-func DeleteTSDB(adapter *tsdb.V3ioAdapter, deleteConf bool, force bool)  {
+func DeleteTSDB(adapter *tsdb.V3ioAdapter, deleteConf bool, force bool) {
 	adapter.DeleteDB(deleteConf, force)
 }

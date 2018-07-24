@@ -32,12 +32,13 @@ import (
 	"time"
 )
 
-const MAX_WRITE_RETRY = 3
-const CHAN_SIZE = 2048
-const maxSampleLoop = 16
-const queueStallTime = 10 * time.Millisecond
+// TODO: make configurable
+const maxRetriesOnWrite = 3
+const channelSize = 4048
+const maxSamplesBatchSize = 16
+const queueStallTime = 1 * time.Millisecond
 
-// to add, rollups policy (cnt, sum, min/max, sum^2) + interval , or policy in per name lable
+// to add, rollups policy (cnt, sum, min/max, sum^2) + interval , or policy in per name label
 type MetricState struct {
 	sync.RWMutex
 	state storeState
@@ -67,28 +68,32 @@ const (
 )
 
 // store is ready to update samples into the DB
-func (m *MetricState) IsReady() bool {
+func (m *MetricState) isReady() bool {
 	return m.state == storeStateReady
 }
 
-func (m *MetricState) HasError() bool {
+func (m *MetricState) isTimeInvalid(t int64) bool {
+	return !((m.state == storeStateReady || m.state == storeStateUpdate) && t < m.store.maxTime-maxLateArrivalInterval)
+}
+
+func (m *MetricState) hasError() bool {
 	return m.state == storeStateError
 }
 
-func (m *MetricState) GetState() storeState {
+func (m *MetricState) getState() storeState {
 	return m.state
 }
 
-func (m *MetricState) SetState(state storeState) {
+func (m *MetricState) setState(state storeState) {
 	m.state = state
 }
 
-func (m *MetricState) SetError(err error) {
-	m.SetState(storeStateError)
+func (m *MetricState) setError(err error) {
+	m.setState(storeStateError)
 	m.err = err
 }
 
-func (m *MetricState) Err() error {
+func (m *MetricState) error() error {
 	m.RLock()
 	defer m.RUnlock()
 	return m.err
@@ -126,13 +131,13 @@ func NewMetricsCache(container *v3io.Container, logger logger.Logger, cfg *confi
 	newCache.cacheMetricMap = map[uint64]*MetricState{}
 	newCache.cacheRefMap = map[uint64]*MetricState{}
 
-	newCache.responseChan = make(chan *v3io.Response, CHAN_SIZE)
-	newCache.nameUpdateChan = make(chan *v3io.Response, CHAN_SIZE)
-	newCache.asyncAppendChan = make(chan *asyncAppend, CHAN_SIZE)
+	newCache.responseChan = make(chan *v3io.Response, channelSize)
+	newCache.nameUpdateChan = make(chan *v3io.Response, channelSize)
+	newCache.asyncAppendChan = make(chan *asyncAppend, channelSize)
 
 	newCache.metricQueue = NewElasticQueue()
-	newCache.updatesComplete = make(chan int, 10)
-	newCache.newUpdates = make(chan int, 100)
+	newCache.updatesComplete = make(chan int, 100)
+	newCache.newUpdates = make(chan int, 1000)
 
 	newCache.NameLabelMap = map[string]bool{}
 	return &newCache
@@ -200,7 +205,7 @@ func (mc *MetricsCache) Add(lset utils.LabelsIfc, t int64, v interface{}) (uint6
 	metric, ok := mc.getMetric(hash)
 
 	if ok {
-		err := metric.Err()
+		err := metric.error()
 		if err != nil {
 			return 0, err
 		}
@@ -226,7 +231,7 @@ func (mc *MetricsCache) AddFast(ref uint64, t int64, v interface{}) error {
 		return fmt.Errorf("ref not found")
 	}
 
-	err := metric.Err()
+	err := metric.error()
 	if err != nil {
 		return err
 	}
@@ -239,7 +244,7 @@ func (mc *MetricsCache) WaitForCompletion(timeout time.Duration) (int, error) {
 	waitChan := make(chan int, 2)
 	mc.asyncAppendChan <- &asyncAppend{metric: nil, t: 0, v: 0, resp: waitChan}
 
-	var maxWaitTime time.Duration
+	var maxWaitTime time.Duration = 0
 
 	if timeout == 0 {
 		maxWaitTime = 24 * time.Hour // almost infinite time
@@ -248,6 +253,8 @@ func (mc *MetricsCache) WaitForCompletion(timeout time.Duration) (int, error) {
 	} else {
 		maxWaitTime = time.Duration(mc.cfg.DefaultTimeout) * time.Second
 	}
+
+	//fmt.Printf("\nmaxWaitTime=%d\n", maxWaitTime)
 
 	select {
 	case res := <-waitChan:

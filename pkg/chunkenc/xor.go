@@ -106,7 +106,7 @@ func (c *XORChunk) aAppender() (Appender, error) {
 	// We iterate through the end and populate via the iterator's state.
 	for it.Next() {
 	}
-	if err := it.Err(); err != nil {
+	if err := it.error(); err != nil {
 		return nil, err
 	}
 

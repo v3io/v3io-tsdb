@@ -282,7 +282,7 @@ func (s *V3ioSeriesSet) chunks2IntervalAggregates() {
 			t, v := iter.At()
 			s.aggrSet.AppendAllCells(int((t-s.baseTime)/s.interval), v)
 			if !iter.Next() {
-				// s.err = iter.Err()  // if the internal iterator has error we dont need to err the aggregator
+				// s.err = iter.error()  // if the internal iterator has error we dont need to err the aggregator
 				break
 			}
 		}
