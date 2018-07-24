@@ -31,9 +31,14 @@ func BenchmarkIngest(b *testing.B) {
 	v3ioConfig.Path = tsdbPath
 	common.CreateTSDB(v3ioConfig, tsdbPath)
 
+
 	adapter, err := tsdb.NewV3ioAdapter(v3ioConfig, nil, nil)
 	if err != nil {
 		b.Fatal(err)
+	}
+
+	if testConfig.CleanupAfterTest {
+		defer adapter.DeleteDB(true, true)
 	}
 
 	appender, err := adapter.Appender()

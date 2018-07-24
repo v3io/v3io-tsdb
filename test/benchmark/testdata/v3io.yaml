@@ -1,0 +1,25 @@
+# File: v3io.yaml
+
+# NGINX server address:PORT
+v3ioUrl: "192.168.206.17:8081"
+
+# V3IO container ID or Name
+container: "bigdata"
+
+# Path in the container (default, should be override by test)
+path: "tsdb-test-1"
+
+# Logging level. Valid values: debug,info,warn,error (Default: info)
+verbose: "info"
+
+# Default timeout 10 seconds
+timeout: 30
+
+username: "iguazio@Default"
+password: "datal@ke!"
+
+performance:
+  reportOnShutdown: true
+  output: "stdout"
+  reportPeriodically: true
+  reportInterval: 30
