@@ -135,8 +135,8 @@ func NewMetricsCache(container *v3io.Container, logger logger.Logger, cfg *confi
 	newCache.asyncAppendChan = make(chan *asyncAppend, CHAN_SIZE)
 
 	newCache.metricQueue = NewElasticQueue()
-	newCache.updatesComplete = make(chan int, 5000)
-	newCache.newUpdates = make(chan int, 5000)
+	newCache.updatesComplete = make(chan int, 100)
+	newCache.newUpdates = make(chan int, 1000)
 
 	newCache.NameLabelMap = map[string]bool{}
 	return &newCache
