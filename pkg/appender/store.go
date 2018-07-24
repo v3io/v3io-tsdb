@@ -268,14 +268,15 @@ func (cs *chunkStore) WriteChunks(mc *MetricsCache, metric *MetricState) (bool, 
 
 	var activeChunk *attrAppender
 	var i int
+	var toWrite int
 
 	// loop over pending samples, add to chunks & aggregates (create required update expressions)
-	for i < len(cs.pending) && i < MaxSamplesInWrite && partition.InRange(cs.pending[i].t) {
+	for i < len(cs.pending) && toWrite < MaxSamplesInWrite && partition.InRange(cs.pending[i].t) {
 
 		t := cs.pending[i].t
 
 		if t <= cs.initMaxTime && !mc.cfg.OverrideOld {
-			mc.logger.InfoWith("Time is less than init max time", "T", t, "InitMaxTime", cs.initMaxTime)
+			mc.logger.DebugWith("Time is less than init max time", "T", t, "InitMaxTime", cs.initMaxTime)
 			i++
 			continue
 		}
@@ -285,6 +286,7 @@ func (cs *chunkStore) WriteChunks(mc *MetricsCache, metric *MetricState) (bool, 
 			activeChunk = cs.chunkByTime(t)
 			if activeChunk == nil {
 				i++
+				mc.logger.DebugWith("nil active chunk", "T", t)
 				continue
 			}
 		}
@@ -301,10 +303,11 @@ func (cs *chunkStore) WriteChunks(mc *MetricsCache, metric *MetricState) (bool, 
 		activeChunk.appendAttr(t, cs.pending[i].v.(float64))
 
 		// if the last item or last item in the same partition add expressions and break
-		if (i == len(cs.pending)-1) || i == MaxSamplesInWrite-1 || !partition.InRange(cs.pending[i+1].t) {
+		if (i == len(cs.pending)-1) || toWrite == MaxSamplesInWrite-1 || !partition.InRange(cs.pending[i+1].t) {
 			expr = expr + cs.aggrList.SetOrUpdateExpr("v", bucket, isNewBucket)
 			expr = expr + cs.appendExpression(activeChunk)
 			i++
+			toWrite++
 			break
 		}
 
@@ -325,6 +328,7 @@ func (cs *chunkStore) WriteChunks(mc *MetricsCache, metric *MetricState) (bool, 
 		}
 
 		i++
+		toWrite++
 	}
 
 	cs.aggrList.Clear()
@@ -335,8 +339,11 @@ func (cs *chunkStore) WriteChunks(mc *MetricsCache, metric *MetricState) (bool, 
 		cs.pending = cs.pending[i:]
 	}
 
-	if expr == "" {
-		mc.logger.WarnWith("Empty expression!", "name", metric.name, "key", metric.key, "expr", expr)
+	if toWrite == 0 || expr == "" {
+		//mc.logger.InfoWith("No Chunk to write!", "name", metric.name, "lset", metric.Lset, "i", i, "pd", len(cs.pending))
+		if len(cs.pending) > 0 {
+			mc.metricQueue.Push(metric)
+		}
 		return false, nil
 	}
 
