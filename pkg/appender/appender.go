@@ -241,7 +241,9 @@ func (mc *MetricsCache) WaitForCompletion(timeout time.Duration) (int, error) {
 
 	var maxWaitTime time.Duration
 
-	if timeout > 0 {
+	if timeout == 0 {
+		maxWaitTime = 24 * time.Hour // almost infinite time
+	} else if timeout > 0 {
 		maxWaitTime = timeout
 	} else {
 		maxWaitTime = time.Duration(mc.cfg.DefaultTimeout) * time.Second
@@ -251,6 +253,6 @@ func (mc *MetricsCache) WaitForCompletion(timeout time.Duration) (int, error) {
 	case res := <-waitChan:
 		return res, nil
 	case <-time.After(maxWaitTime):
-		return 0, errors.Errorf("the operation was timed out after %d seconds", maxWaitTime.Seconds())
+		return 0, errors.Errorf("the operation was timed out after %.2f seconds", maxWaitTime.Seconds())
 	}
 }

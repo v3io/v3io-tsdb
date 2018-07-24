@@ -13,6 +13,7 @@ import (
 )
 
 func BenchmarkIngest(b *testing.B) {
+	b.StopTimer()
 	log.SetFlags(0)
 	log.SetOutput(ioutil.Discard)
 	testStartTimeNano := time.Now().UnixNano()
@@ -23,6 +24,12 @@ func BenchmarkIngest(b *testing.B) {
 	if err != nil {
 		b.Fatal(errors.Wrap(err, "unable to load configuration"))
 	}
+
+	// Create test path (tsdb instance)
+	tsdbPath := fmt.Sprintf("tsdb-%s-%d-%s", b.Name(), b.N, time.Now().Format(time.RFC3339))
+	// Update TSDB instance path for this test
+	v3ioConfig.Path = tsdbPath
+	common.CreateTSDB(v3ioConfig, tsdbPath)
 
 	adapter, err := tsdb.NewV3ioAdapter(v3ioConfig, nil, nil)
 	if err != nil {
@@ -59,6 +66,7 @@ func BenchmarkIngest(b *testing.B) {
 	samplesCount := len(sampleTemplates)
 	refs := make([]uint64, samplesCount)
 
+	b.StartTimer()
 	for i := 0; i < b.N; i++ {
 		rowsAdded, err := runTest(i, appender, timestamps, sampleTemplates, refs,
 			testConfig.AppendOneByOne, testConfig.Verbose)
@@ -73,7 +81,7 @@ func BenchmarkIngest(b *testing.B) {
 		count += rowsAdded
 	}
 
-	// Wait for all responses
+	// Wait for all responses, use default timeout from configuration or unlimited if not set
 	_, err = appender.WaitForCompletion(-1)
 
 	if err != nil {
@@ -178,7 +186,7 @@ func appendAll(appender tsdb.Appender, sampleTemplates []string, timestamps []in
 		}
 	}
 
-	// Wait for all responses
+	// Wait for all responses, use default timeout from configuration or unlimited if not set
 	_, err := appender.WaitForCompletion(-1)
 
 	return count, err
