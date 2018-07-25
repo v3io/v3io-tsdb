@@ -25,7 +25,6 @@ import (
 	"github.com/v3io/v3io-tsdb/pkg/config"
 	"github.com/v3io/v3io-tsdb/pkg/partmgr"
 	"github.com/v3io/v3io-tsdb/pkg/utils"
-	"math/rand"
 	"testing"
 	"time"
 )
@@ -114,27 +113,30 @@ func TestTsdbIntegration(t *testing.T) {
 }
 
 func DoAppend(lset utils.Labels, app Appender, num, interval int) error {
+	// TODO: Implement this test
 	return nil
-	//time.Sleep(time.Second * 1)
-	curTime := int64(basetime)
+	/*
+		//time.Sleep(time.Second * 1)
+		curTime := int64(basetime)
 
-	ref, err := app.Add(lset, curTime, 2)
-	if err != nil {
-		return err
-	}
-
-	for i := 0; i <= num; i++ {
-		time.Sleep(time.Millisecond * 80)
-		curTime += int64(interval * 1000)
-		t := curTime + int64(rand.Intn(100)) - 50
-		_, h := partmgr.TimeToDHM(t)
-		v := rand.Float64()*10 + float64(h*100)
-		fmt.Printf("t-%d,v%3.2f ", t, v)
-		err = app.AddFast(lset, ref, t, v)
+		ref, err := app.Add(lset, curTime, 2)
 		if err != nil {
 			return err
 		}
-	}
 
-	return nil
+		for i := 0; i <= num; i++ {
+			time.Sleep(time.Millisecond * 80)
+			curTime += int64(interval * 1000)
+			t := curTime + int64(rand.Intn(100)) - 50
+			_, h := partmgr.TimeToDHM(t)
+			v := rand.Float64()*10 + float64(h*100)
+			fmt.Printf("t-%d,v%3.2f ", t, v)
+			err = app.AddFast(lset, ref, t, v)
+			if err != nil {
+				return err
+			}
+		}
+
+		return nil
+	*/
 }

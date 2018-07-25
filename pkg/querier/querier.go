@@ -91,7 +91,11 @@ func (q *V3ioQuerier) selectQry(name, functions string, step int64, win []int, f
 			newSet.overlapWin = q.overlapWin
 		}
 
-		err = newSet.getItems(partition.GetPath(), name, filter, q.container, q.cfg.QryWorkers)
+		path, partFilter := partition.GetTablePath()
+		if partFilter != "" && filter != "" {
+			partFilter += " AND "
+		}
+		err = newSet.getItems(path, name, partFilter+filter, q.container, q.cfg.QryWorkers)
 		if err != nil {
 			return nil, err
 		}
@@ -177,9 +181,7 @@ func (s *V3ioSeriesSet) getItems(path, name, filter string, container *v3io.Cont
 
 	s.logger.DebugWith("Select - GetItems", "path", path, "attr", attrs, "filter", filter, "name", name)
 	input := v3io.GetItemsInput{Path: path, AttributeNames: attrs, Filter: filter, ShardingKey: name}
-	//iter, err := container.Sync.GetItemsCursor(&input)
 	iter, err := utils.NewAsyncItemsCursor(container, &input, workers)
-	//iter, err := utils.NewItemsCursor(container, &input)
 	if err != nil {
 		return err
 	}
@@ -280,7 +282,7 @@ func (s *V3ioSeriesSet) chunks2IntervalAggregates() {
 			t, v := iter.At()
 			s.aggrSet.AppendAllCells(int((t-s.baseTime)/s.interval), v)
 			if !iter.Next() {
-				// s.err = iter.Err()  // if the internal iterator has error we dont need to err the aggregator
+				// s.err = iter.error()  // if the internal iterator has error we dont need to err the aggregator
 				break
 			}
 		}

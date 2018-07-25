@@ -126,8 +126,15 @@ func (p *DBPartition) GetId() int {
 	return p.partID
 }
 
-func (p *DBPartition) GetPath() string {
-	return p.path
+// return path to metrics table and filter expression for selected partition
+func (p *DBPartition) GetTablePath() (string, string) {
+	return p.path, ""
+}
+
+// return metric object full path
+func (p *DBPartition) GetMetricPath(name string, hash uint64) string {
+
+	return fmt.Sprintf("%s%s.%016x", p.path, name, hash)
 }
 
 func (p *DBPartition) AggrType() aggregate.AggrType {
@@ -166,8 +173,11 @@ func (p *DBPartition) IsAheadOfChunk(mint, t int64) bool {
 }
 
 // Get ID of the Chunk covering time t
-func (p *DBPartition) TimeToChunkId(t int64) int {
-	d, h := TimeToDHM(t - p.startTime)
+func (p *DBPartition) TimeToChunkId(tmilli int64) int {
+
+	t := int(tmilli - p.startTime/1000)
+	h := (t / 3600) % 24
+	d := t / 3600 / 24
 
 	if p.days <= 1 {
 		return h

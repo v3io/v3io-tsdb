@@ -77,7 +77,7 @@ func Str2unixTime(tstr string) (int64, error) {
 
 	tint, err := strconv.Atoi(tstr)
 	if err == nil {
-		return int64(tint) * 1000, nil
+		return int64(tint), nil
 	}
 
 	t, err := time.Parse(time.RFC3339, tstr)

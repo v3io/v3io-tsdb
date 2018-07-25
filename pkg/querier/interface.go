@@ -57,6 +57,6 @@ type SeriesIterator interface {
 	At() (t int64, v float64)
 	// Next advances the iterator by one.
 	Next() bool
-	// Err returns the current error.
+	// error returns the current error.
 	Err() error
 }
