@@ -137,5 +137,9 @@ func (a *LastAggregator) Aggregate(t int64, v float64) {
 	}
 }
 func (a *LastAggregator) UpdateExpr(col string, bucket int) string {
+	if math.IsNaN(a.val) {
+		// TODO: replace with NaN when engine will support that syntax
+		return fmt.Sprintf("_%s_%s[%d]=%f;", col, a.attr, bucket, -math.MaxFloat64)
+	}
 	return fmt.Sprintf("_%s_%s[%d]=%f;", col, a.attr, bucket, a.val)
 }
