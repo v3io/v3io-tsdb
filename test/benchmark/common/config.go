@@ -23,8 +23,8 @@ type BenchmarkIngestConfig struct {
 	LabelsDiversity      int    `json:"LabelsDiversity,omitempty" yaml:"LabelsDiversity"`
 	LabelValuesCount     int    `json:"LabelValuesCount,omitempty" yaml:"LabelValuesCount"`
 	LabelsValueDiversity int    `json:"LabelsValueDiversity,omitempty" yaml:"LabelsValueDiversity"`
-	FlushFrequency       int    `json:"FlushFrequency,omitempty" yaml:"FlushFrequency"`
 	AppendOneByOne       bool   `json:"AppendOneByOne,omitempty" yaml:"AppendOneByOne"`
+	BatchSize            int    `json:"BatchSize,omitempty" yaml:"BatchSize"`
 	CleanupAfterTest     bool   `json:"CleanupAfterTest,omitempty" yaml:"CleanupAfterTest"`
 }
 
@@ -73,5 +73,9 @@ func loadBenchmarkIngestConfigFromFile(benchConfigFile string) (*BenchmarkIngest
 func initDefaults(cfg *BenchmarkIngestConfig) {
 	if cfg.StartTimeOffset == "" {
 		cfg.StartTimeOffset = "48h"
+	}
+
+	if cfg.BatchSize == 0 {
+		cfg.BatchSize = 64
 	}
 }

@@ -51,7 +51,7 @@ func (mc *MetricsCache) metricFeed(index int) {
 			case inFlight = <-mc.updatesComplete:
 				// handle completion notifications from update loop
 				length := mc.metricQueue.Length()
-				mc.logger.Info("Complete Update cycle - inflight %d len %d\n", inFlight, length)
+				mc.logger.Debug(`Complete Update cycle - "inflight requests"=%d; "metric queue length""=%d\n`, inFlight, length)
 
 				// if data was sent and the queue is empty mark as completion
 				if length == 0 && gotData {
@@ -200,7 +200,7 @@ func (mc *MetricsCache) metricsUpdateLoop(index int) {
 
 				// Notify the metric feeder when all in-flight tasks are done
 				if mc.updatesInFlight == 0 {
-					mc.logger.Info("return to feed: Q %d ", mc.metricQueue.Length())
+					mc.logger.Debug("return to feed. Metric queue length: %d ", mc.metricQueue.Length())
 					mc.updatesComplete <- 0
 				}
 			}
@@ -249,8 +249,11 @@ func (mc *MetricsCache) handleResponse(metric *MetricState, resp *v3io.Response,
 	defer metric.Unlock()
 
 	if resp.Error != nil && metric.getState() != storeStateGet {
+		reqInput := resp.Request().Input.(*v3io.UpdateItemInput)
+
 		mc.logger.ErrorWith("failed IO", "id", resp.ID, "err", resp.Error, "key", metric.key,
-			"inflight", mc.updatesInFlight, "mqueue", mc.metricQueue.Length(), "numsamples", metric.store.samplesQueueLength())
+			"inflight", mc.updatesInFlight, "mqueue", mc.metricQueue.Length(),
+			"numsamples", metric.store.samplesQueueLength(), "update expression", reqInput.Expression)
 	} else {
 		mc.logger.DebugWith("IO resp", "id", resp.ID, "err", resp.Error, "key", metric.key)
 	}

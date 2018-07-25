@@ -73,7 +73,7 @@ func BenchmarkIngest(b *testing.B) {
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
 		rowsAdded, err := runTest(i, appender, timestamps, sampleTemplates, refs,
-			testConfig.AppendOneByOne, testConfig.Verbose)
+			testConfig.AppendOneByOne, testConfig.BatchSize, testConfig.Verbose)
 
 		if err != nil {
 			b.Fatal(err)
@@ -92,7 +92,7 @@ func BenchmarkIngest(b *testing.B) {
 		b.Fatalf("Test timed out. Error: %v", err)
 	}
 
-	b.Logf("\nTest complete. Count: %d\n", count)
+	b.Logf("\nTest complete. %d samples added to %s\n", count, tsdbPath)
 }
 
 func runTest(
@@ -102,6 +102,7 @@ func runTest(
 	sampleTemplates []string,
 	refs []uint64,
 	appendOneByOne bool,
+	batchSize int,
 	verbose bool) (int, error) {
 
 	samplesCount := len(sampleTemplates)
@@ -111,10 +112,12 @@ func runTest(
 	var err error
 	if samplesCount > 0 && tsCount > 0 {
 		if appendOneByOne {
+			startFromIndex := index * batchSize / samplesCount
+			batchOfTimestamps := timestamps[startFromIndex : startFromIndex+batchSize]
 			count, err = appendSingle(index%samplesCount, index/samplesCount, appender, sampleTemplates[index%samplesCount],
-				timestamps[index/samplesCount], refs)
+				batchOfTimestamps, refs)
 		} else {
-			count, err = appendAll(appender, sampleTemplates, timestamps, refs, verbose)
+			count, err = appendAll(appender, sampleTemplates, timestamps, refs, batchSize, verbose)
 		}
 	} else {
 		err = errors.Errorf("insufficient input. "+
@@ -123,33 +126,44 @@ func runTest(
 	return count, err
 }
 
+func min(left, right int) int {
+	if left <= right {
+		return left
+	}
+	return right
+}
+
 func appendSingle(refIndex, cycleId int, appender tsdb.Appender, sampleTemplateJson string,
-	timestamp int64, refs []uint64) (int, error) {
-	sample, err := common.JsonTemplate2Sample(sampleTemplateJson, timestamp, common.MakeRandomFloat64())
+	timestamps []int64, refs []uint64) (int, error) {
+
+	timestampIndex := 0
+	sample, err := common.JsonTemplate2Sample(sampleTemplateJson, timestamps[timestampIndex], common.MakeRandomFloat64())
 	if err != nil {
 		return 0, errors.Wrap(err, fmt.Sprintf("unable to unmarshall sample: %s", sampleTemplateJson))
 	}
 
-	if cycleId == 0 {
-		// initialize refIds
-		// Add first & get reference
-		ref, err := appender.Add(sample.Lset, timestamp, sample.Value)
-		if err != nil {
-			return 0, errors.Wrap(err, "Add request has failed!")
-		}
-		refs[refIndex] = ref
-	} else {
-		err := appender.AddFast(sample.Lset, refs[refIndex], timestamp, sample.Value)
-		if err != nil {
-			return 0, errors.Wrap(err, fmt.Sprintf("AddFast request has failed!\nSample:%v", sample))
+	for timestamp := timestamps[timestampIndex]; timestampIndex < len(timestamps); timestampIndex++ {
+		if cycleId == 0 && timestampIndex == 0 {
+			// initialize refIds
+			// Add first & get reference
+			ref, err := appender.Add(sample.Lset, timestamp, sample.Value)
+			if err != nil {
+				return 0, errors.Wrap(err, "Add request has failed!")
+			}
+			refs[refIndex] = ref
+		} else {
+			err := appender.AddFast(sample.Lset, refs[refIndex], timestamp, sample.Value)
+			if err != nil {
+				return 0, errors.Wrap(err, fmt.Sprintf("AddFast request has failed!\nSample:%v", sample))
+			}
 		}
 	}
 
-	return 1, nil
+	return timestampIndex, nil
 }
 
 func appendAll(appender tsdb.Appender, sampleTemplates []string, timestamps []int64,
-	refs []uint64, verbose bool) (int, error) {
+	refs []uint64, batchSize int, verbose bool) (int, error) {
 	count := 0
 
 	// First pass - populate references for add fast
@@ -169,25 +183,32 @@ func appendAll(appender tsdb.Appender, sampleTemplates []string, timestamps []in
 	}
 
 	timeSeriesSize := len(timestamps)
-	for dataPointIndex := 1; dataPointIndex < timeSeriesSize; dataPointIndex++ {
-		for refIndex, sampleTemplateJson := range sampleTemplates {
-			sample, err := common.JsonTemplate2Sample(sampleTemplateJson, timestamps[dataPointIndex], common.MakeRandomFloat64())
-			if err != nil {
-				return count, err
-			}
-			err = appender.AddFast(sample.Lset, refs[refIndex], timestamps[dataPointIndex], sample.Value)
-			if err != nil {
-				return count, errors.Wrap(err, fmt.Sprintf("AddFast request has failed! Sample:%v", sample))
-			}
-			count++
+	for dataPointStartIndex := 1; dataPointStartIndex < timeSeriesSize; {
+		// calculate batch boundaries
+		remaining := timeSeriesSize - dataPointStartIndex
+		actualBatchSize := min(remaining, batchSize)
 
-			if verbose || dataPointIndex%10 == 0 {
-				fmt.Printf("\rTotal samples count: %d [%d %%]\tTime: %s",
-					count,
-					dataPointIndex*100/timeSeriesSize,
-					time.Unix(int64(timestamps[dataPointIndex])/1000, 0).Format(time.RFC3339))
+		for refIndex, sampleTemplateJson := range sampleTemplates {
+			for i := 0; i < actualBatchSize; i++ {
+				sample, err := common.JsonTemplate2Sample(sampleTemplateJson, timestamps[dataPointStartIndex+i], common.MakeRandomFloat64())
+				if err != nil {
+					return count, err
+				}
+				err = appender.AddFast(sample.Lset, refs[refIndex], timestamps[dataPointStartIndex], sample.Value)
+				if err != nil {
+					return count, errors.Wrap(err, fmt.Sprintf("AddFast request has failed! Sample:%v", sample))
+				}
+				count++
+
+				if verbose || dataPointStartIndex%10 == 0 {
+					fmt.Printf("\rTotal samples count: %d [%d %%]\tTime: %s",
+						count,
+						dataPointStartIndex*100/timeSeriesSize,
+						time.Unix(int64(timestamps[dataPointStartIndex])/1000, 0).Format(time.RFC3339))
+				}
 			}
 		}
+		dataPointStartIndex += actualBatchSize
 	}
 
 	// Wait for all responses, use default timeout from configuration or unlimited if not set
