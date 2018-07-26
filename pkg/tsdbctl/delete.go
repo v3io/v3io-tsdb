@@ -21,6 +21,7 @@ such restriction.
 package tsdbctl
 
 import (
+	"fmt"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 )
@@ -69,6 +70,7 @@ func (ic *delCommandeer) delete() error {
 	if err != nil {
 		return errors.Wrap(err, "Failed to delete DB")
 	}
+	fmt.Printf("Deleted table %s succsesfuly\n", ic.rootCommandeer.v3iocfg.Path)
 
 	return nil
 }

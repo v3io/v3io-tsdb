@@ -93,7 +93,7 @@ func NewAsyncItemsCursor(container *v3io.Container, input *v3io.GetItemsInput, w
 	return newAsyncItemsCursor, nil
 }
 
-// Err returns the last error
+// error returns the last error
 func (ic *AsyncItemsCursor) Err() error {
 	return ic.currentError
 }

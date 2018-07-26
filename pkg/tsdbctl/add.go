@@ -122,12 +122,13 @@ func (ac *addCommandeer) add() error {
 			return errors.Wrap(err, "failed to create Appender")
 		}
 
-		ref, err := ac.appendMetric(append, lset, tarray, varray, true)
+		_, err = ac.appendMetric(append, lset, tarray, varray, true)
 		if err != nil {
 			return err
 		}
 
-		return append.WaitForReady(ref)
+		_, err = append.WaitForCompletion(0)
+		return err
 	}
 
 	// process a CSV file input
@@ -147,8 +148,6 @@ func (ac *addCommandeer) add() error {
 	if err != nil {
 		return errors.Wrap(err, "failed to create Appender")
 	}
-
-	refMap := map[uint64]bool{}
 
 	for num, line := range records {
 
@@ -178,28 +177,23 @@ func (ac *addCommandeer) add() error {
 			return err
 		}
 
-		ref, err := ac.appendMetric(append, lset, tarray, varray, false)
+		_, err = ac.appendMetric(append, lset, tarray, varray, false)
 		if err != nil {
 			return err
 		}
 
-		refMap[ref] = true
 	}
-	fmt.Println("\nDone!")
 
 	// make sure all writes are committed
-	return ac.waitForWrites(append, &refMap)
-}
+	_, err = append.WaitForCompletion(0)
 
-func (ac *addCommandeer) waitForWrites(append tsdb.Appender, refMap *map[uint64]bool) error {
-
-	for ref, _ := range *refMap {
-		err := append.WaitForReady(ref)
-		if err != nil {
-			return err
-		}
+	if err == nil {
+		fmt.Println("\nDone!")
+	} else {
+		fmt.Printf("operation timed out. Error: %v", err)
 	}
-	return nil
+
+	return err
 }
 
 func (ac *addCommandeer) appendMetric(

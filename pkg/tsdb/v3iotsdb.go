@@ -145,14 +145,21 @@ func (a *V3ioAdapter) connect() error {
 	msg := "Starting V3IO TSDB client, server is at : " + fullpath
 	a.logger.Info(msg)
 
-	a.MetricsCache = appender.NewMetricsCache(a.container, a.logger, a.cfg, a.partitionMngr)
+	return nil
+}
+
+func (a *V3ioAdapter) InitAppenderCache() error {
+	if a.MetricsCache == nil {
+		a.MetricsCache = appender.NewMetricsCache(a.container, a.logger, a.cfg, a.partitionMngr)
+		return a.MetricsCache.Start()
+	}
 
 	return nil
 }
 
 // Create an appender interface, for writing metrics
 func (a *V3ioAdapter) Appender() (Appender, error) {
-	err := a.MetricsCache.StartIfNeeded()
+	err := a.InitAppenderCache()
 	if err != nil {
 		return nil, err
 	}
@@ -177,9 +184,9 @@ func (a *V3ioAdapter) Querier(_ context.Context, mint, maxt int64) (*querier.V3i
 
 func (a *V3ioAdapter) DeleteDB(config bool, force bool) error {
 
-	path := a.partitionMngr.GetHead().GetPath()
+	path, filter := a.partitionMngr.GetHead().GetTablePath()
 	a.logger.Info("Delete partition %s", path)
-	err := utils.DeleteTable(a.container, path, "", a.cfg.QryWorkers)
+	err := utils.DeleteTable(a.container, path, filter, a.cfg.QryWorkers)
 	if err != nil && !force {
 		return err
 	}
@@ -211,7 +218,8 @@ func (a *V3ioAdapter) DeleteDB(config bool, force bool) error {
 // return number of objects in a table
 func (a *V3ioAdapter) CountMetrics(part string) (int, error) {
 
-	input := v3io.GetItemsInput{Path: a.partitionMngr.GetHead().GetPath(), AttributeNames: []string{"__size"}}
+	path, filter := a.partitionMngr.GetHead().GetTablePath()
+	input := v3io.GetItemsInput{Path: path, Filter: filter, AttributeNames: []string{"__size"}}
 	iter, err := utils.NewAsyncItemsCursor(a.container, &input, a.cfg.QryWorkers)
 	if err != nil {
 		return 0, err
@@ -242,9 +250,9 @@ func (a v3ioAppender) AddFast(lset utils.Labels, ref uint64, t int64, v float64)
 	return a.metricsCache.AddFast(ref, t, v)
 }
 
-// faster Add using refID obtained from Add (avoid some hash/lookup overhead)
-func (a v3ioAppender) WaitForReady(ref uint64) error {
-	return a.metricsCache.WaitForReady(ref)
+// wait for completion of all updates
+func (a v3ioAppender) WaitForCompletion(timeout time.Duration) (int, error) {
+	return a.metricsCache.WaitForCompletion(timeout)
 }
 
 // in V3IO all ops a committed (no client cache)
@@ -255,7 +263,7 @@ func (a v3ioAppender) Rollback() error { return nil }
 type Appender interface {
 	Add(l utils.Labels, t int64, v float64) (uint64, error)
 	AddFast(l utils.Labels, ref uint64, t int64, v float64) error
-	WaitForReady(ref uint64) error
+	WaitForCompletion(timeout time.Duration) (int, error)
 	Commit() error
 	Rollback() error
 }
