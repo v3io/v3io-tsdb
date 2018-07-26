@@ -49,7 +49,9 @@ type AsyncItemsCursor struct {
 	Cnt           int
 }
 
-func NewAsyncItemsCursor(container *v3io.Container, input *v3io.GetItemsInput, workers int) (*AsyncItemsCursor, error) {
+func NewAsyncItemsCursor(
+	container *v3io.Container, input *v3io.GetItemsInput,
+	workers int, shardingKeys []string) (*AsyncItemsCursor, error) {
 
 	// TODO: use workers from Context.numWorkers (if no ShardingKey)
 	if workers == 0 || input.ShardingKey != "" {

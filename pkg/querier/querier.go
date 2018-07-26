@@ -91,11 +91,7 @@ func (q *V3ioQuerier) selectQry(name, functions string, step int64, win []int, f
 			newSet.overlapWin = q.overlapWin
 		}
 
-		path, partFilter := partition.GetTablePath()
-		if partFilter != "" && filter != "" {
-			partFilter += " AND "
-		}
-		err = newSet.getItems(path, name, partFilter+filter, q.container, q.cfg.QryWorkers)
+		err = newSet.getItems(partition, name, filter, q.container, q.cfg.QryWorkers)
 		if err != nil {
 			return nil, err
 		}
@@ -120,7 +116,7 @@ func (q *V3ioQuerier) LabelValues(name string) ([]string, error) {
 
 	input := v3io.GetItemsInput{Path: q.cfg.Path + "/names/", AttributeNames: []string{"__name"}, Filter: ""}
 	//iter, err := q.container.Sync.GetItemsCursor(&input)
-	iter, err := utils.NewAsyncItemsCursor(q.container, &input, q.cfg.QryWorkers)
+	iter, err := utils.NewAsyncItemsCursor(q.container, &input, q.cfg.QryWorkers, []string{})
 	q.logger.DebugWith("GetItems to read names", "input", input, "err", err)
 	if err != nil {
 		return list, err
@@ -168,8 +164,9 @@ type V3ioSeriesSet struct {
 
 // Get relevant items & attributes from the DB, and create an iterator
 // TODO: get items per partition + merge, per partition calc attrs
-func (s *V3ioSeriesSet) getItems(path, name, filter string, container *v3io.Container, workers int) error {
+func (s *V3ioSeriesSet) getItems(partition *partmgr.DBPartition, name, filter string, container *v3io.Container, workers int) error {
 
+	path, shardingKeys := partition.GetTablePathWithKeys(name)
 	attrs := []string{"_lset", "_meta", "_name", "_maxtime"}
 
 	if s.aggrSeries != nil && s.aggrSeries.CanAggregate(s.partition.AggrType()) && s.maxt-s.mint >= s.interval {
@@ -181,7 +178,7 @@ func (s *V3ioSeriesSet) getItems(path, name, filter string, container *v3io.Cont
 
 	s.logger.DebugWith("Select - GetItems", "path", path, "attr", attrs, "filter", filter, "name", name)
 	input := v3io.GetItemsInput{Path: path, AttributeNames: attrs, Filter: filter, ShardingKey: name}
-	iter, err := utils.NewAsyncItemsCursor(container, &input, workers)
+	iter, err := utils.NewAsyncItemsCursor(container, &input, workers, shardingKeys)
 	if err != nil {
 		return err
 	}

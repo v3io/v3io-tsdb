@@ -81,7 +81,7 @@ func (s *V3ioSeries) initSeriesIter() {
 	}
 
 	newIterator := v3ioSeriesIterator{
-		mint: s.set.mint, maxt: maxt, chunkTime: s.set.partition.HoursInChunk() * 3600 * 1000,
+		mint: s.set.mint, maxt: maxt, chunkTime: s.set.partition.TimePerChunk(),
 		isCyclic: s.set.partition.IsCyclic()}
 	newIterator.chunks = []chunkenc.Chunk{}
 

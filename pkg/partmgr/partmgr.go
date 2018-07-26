@@ -114,8 +114,9 @@ func (p *DBPartition) IsCyclic() bool {
 	return p.manager.cyclic
 }
 
-func (p *DBPartition) HoursInChunk() int {
-	return p.hoursInChunk
+// Time covered by a single chunk
+func (p *DBPartition) TimePerChunk() int {
+	return p.hoursInChunk * 3600 * 1000
 }
 
 func (p *DBPartition) NextPart(t int64) *DBPartition {
@@ -126,9 +127,14 @@ func (p *DBPartition) GetId() int {
 	return p.partID
 }
 
-// return path to metrics table and filter expression for selected partition
-func (p *DBPartition) GetTablePath() (string, string) {
-	return p.path, ""
+// return path to metrics table
+func (p *DBPartition) GetTablePath() string {
+	return p.path
+}
+
+// return path to metrics table and optionally list of Sharding Keys matching the name
+func (p *DBPartition) GetTablePathWithKeys(name string) (string, []string) {
+	return p.path, []string{}
 }
 
 // return metric object full path
