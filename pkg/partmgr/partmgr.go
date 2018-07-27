@@ -132,9 +132,9 @@ func (p *DBPartition) GetTablePath() string {
 	return p.path
 }
 
-// return path to metrics table and optionally list of Sharding Keys matching the name
-func (p *DBPartition) GetTablePathWithKeys(name string) (string, []string) {
-	return p.path, []string{}
+// return list of Sharding Keys matching the name
+func (p *DBPartition) GetShardingKeys(name string) []string {
+	return []string{name}
 }
 
 // return metric object full path
@@ -202,12 +202,21 @@ func (p *DBPartition) InRange(t int64) bool {
 	return (t >= p.startTime) && (t < p.startTime+int64(p.days)*24*3600*1000)
 }
 
+// return the mint and maxt for this partition, may need maxt for cyclic partition
+// TODO: add non cyclic partitions
+func (p *DBPartition) GetPartitionRange(maxt int64) (int64, int64) {
+
+	maxSec := maxt / 1000
+
+	// start p.days ago, rounded to next hour
+	newMin := (maxSec/3600 - int64(p.days*24) + 1) * 3600 * 1000
+	return newMin, maxt
+}
+
 // return the valid minimum time in a cyclic partition based on max time
 func (p *DBPartition) CyclicMinTime(mint, maxt int64) int64 {
 	maxSec := maxt / 1000
-	//if !p.manager.ignoreWrap {
-	//	maxSec = time.Now().Unix()
-	//}
+
 	// start p.days ago, rounded to next hour
 	newMin := (maxSec/3600 - int64(p.days*24) + 1) * 3600 * 1000
 	if mint > newMin {

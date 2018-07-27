@@ -39,9 +39,19 @@ type V3ioSeries struct {
 	set  *V3ioSeriesSet
 	lset utils.Labels
 	iter SeriesIterator
+	hash uint64
 }
 
-func (s *V3ioSeries) Labels() utils.Labels     { return s.lset }
+func (s *V3ioSeries) Labels() utils.Labels { return s.lset }
+
+// get the unique series key for sorting
+func (s *V3ioSeries) GetKey() uint64 {
+	if s.hash == 0 {
+		s.hash = s.lset.Hash()
+	}
+	return s.hash
+}
+
 func (s *V3ioSeries) Iterator() SeriesIterator { return s.iter }
 
 // initialize the label set from _lset & name attributes
