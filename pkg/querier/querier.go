@@ -82,13 +82,19 @@ func (q *V3ioQuerier) selectQry(name, functions string, step int64, win []int, f
 		if err != nil {
 			return nullSeriesSet{}, err
 		}
-		if name == "" {
-			set, err = NewSetSorter(set)
+		sets[i] = set
+	}
+
+	// sort each partition when not using range scan
+	if name == "" {
+		for i := 0; i < len(sets); i++ {
+			// TODO make it a Go routine per part
+			set, err := NewSetSorter(sets[i])
 			if err != nil {
 				return nullSeriesSet{}, err
 			}
+			sets[i] = set
 		}
-		sets[i] = set
 	}
 
 	return newIterSortMerger(sets)

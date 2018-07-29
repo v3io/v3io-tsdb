@@ -62,7 +62,7 @@ func (s *V3ioSeriesSet) getItems(partition *partmgr.DBPartition, name, filter st
 	if name != "" {
 		shardingKeys = partition.GetShardingKeys(name)
 	}
-	attrs := []string{"_lset", "_meta", "_name", "_maxtime"}
+	attrs := []string{"_lset", "_ooo", "_name", "_maxtime"}
 
 	if s.aggrSeries != nil && s.aggrSeries.CanAggregate(s.partition.AggrType()) && s.maxt-s.mint >= s.interval {
 		s.attrs = s.aggrSeries.GetAttrNames()
@@ -96,7 +96,9 @@ func (s *V3ioSeriesSet) Next() bool {
 	}
 
 	// create multiple aggregation series (one per aggregation function)
+	// the index is initialized as numfunc-1 (so the first +1 and modulo will be eq 0)
 	if s.aggrIdx == s.aggrSeries.NumFunctions()-1 {
+		// if no more items (from GetItems cursor), return with EOF
 		if !s.iter.Next() {
 			return false
 		}

@@ -205,20 +205,15 @@ func (p *DBPartition) InRange(t int64) bool {
 // return the mint and maxt for this partition, may need maxt for cyclic partition
 // TODO: add non cyclic partitions
 func (p *DBPartition) GetPartitionRange(maxt int64) (int64, int64) {
-
-	maxSec := maxt / 1000
-
 	// start p.days ago, rounded to next hour
-	newMin := (maxSec/3600 - int64(p.days*24) + 1) * 3600 * 1000
+	newMin := (maxt/1000/3600 - int64(p.days*24) + 1) * 3600 * 1000
 	return newMin, maxt
 }
 
 // return the valid minimum time in a cyclic partition based on max time
 func (p *DBPartition) CyclicMinTime(mint, maxt int64) int64 {
-	maxSec := maxt / 1000
-
 	// start p.days ago, rounded to next hour
-	newMin := (maxSec/3600 - int64(p.days*24) + 1) * 3600 * 1000
+	newMin := (maxt/1000/3600 - int64(p.days*24) + 1) * 3600 * 1000
 	if mint > newMin {
 		return mint
 	}
