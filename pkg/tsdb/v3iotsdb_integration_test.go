@@ -101,6 +101,12 @@ func TestIngestData(t *testing.T) {
 			data: []testDataPoint{{t: 1532940510, v: 314.3},
 				{t: 1532940510 + 5, v: 300.3},
 				{t: 1532940510 - 10, v: 3234.6}}},
+
+		{desc: "Should ingest record with '-' in the metric name (IG-8585)", metricName: "cool-cpu",
+			labels: utils.FromStrings("os", "linux", "iguaz", "yesplease"),
+			data: []testDataPoint{{t: 1532940510, v: 314.3},
+				{t: 1532940510 + 5, v: 300.3},
+				{t: 1532940510 - 10, v: 3234.6}}},
 	}
 
 	for _, test := range testCases {
@@ -204,6 +210,13 @@ func TestQueryData(t *testing.T) {
 			filter: "os=='linux'",
 			from:   0, to: 1532940510 + 1,
 			expected: []testDataPoint{{t: 1532940510, v: 31.3}}},
+
+		{desc: "Should ingest and query data with '-' in the metric name (IG-8585)", metricName: "cool-cpu",
+			labels: utils.FromStrings("testLabel", "balbala"),
+			data:   []testDataPoint{{t: 1532940510, v: 314.3}},
+			from:   0, to: 1532940510 + 1,
+			expected: []testDataPoint{{t: 1532940510, v: 314.3}}},
+
 	}
 
 	for _, test := range testCases {
