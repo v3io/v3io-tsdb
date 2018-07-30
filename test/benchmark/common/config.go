@@ -38,6 +38,11 @@ func LoadBenchmarkIngestConfigs() (*BenchmarkIngestConfig, *config.V3ioConfig, e
 		return nil, nil, errors.Wrap(err, "Failed to load test configuration.")
 	}
 
+	if testConfig.BatchSize == 0 && v3ioConfig.BatchSize > 0 {
+		// Use batch size from V3IO config
+		testConfig.BatchSize = v3ioConfig.BatchSize
+	}
+
 	return testConfig, v3ioConfig, nil
 }
 
@@ -73,9 +78,5 @@ func loadBenchmarkIngestConfigFromFile(benchConfigFile string) (*BenchmarkIngest
 func initDefaults(cfg *BenchmarkIngestConfig) {
 	if cfg.StartTimeOffset == "" {
 		cfg.StartTimeOffset = "48h"
-	}
-
-	if cfg.BatchSize == 0 {
-		cfg.BatchSize = 64
 	}
 }

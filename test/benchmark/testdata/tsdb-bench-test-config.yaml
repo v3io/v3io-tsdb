@@ -34,4 +34,4 @@ AppendOneByOne: true
 BatchSize: 64
 
 # Cleanup the data after each test
-CleanupAfterTest: true
+CleanupAfterTest: false

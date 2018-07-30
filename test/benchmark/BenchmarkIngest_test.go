@@ -8,6 +8,8 @@ import (
 	"github.com/v3io/v3io-tsdb/test/benchmark/common"
 	"io/ioutil"
 	"log"
+	"regexp"
+	"strings"
 	"testing"
 	"time"
 )
@@ -26,7 +28,8 @@ func BenchmarkIngest(b *testing.B) {
 	}
 
 	// Create test path (tsdb instance)
-	tsdbPath := fmt.Sprintf("tsdb-%s-%d-%s", b.Name(), b.N, time.Now().Format(time.RFC3339))
+	tsdbPath := formatPath(fmt.Sprintf("tsdb-%s-%d-%s", b.Name(), b.N, time.Now().Format(time.RFC3339)))
+
 	// Update TSDB instance path for this test
 	v3ioConfig.Path = tsdbPath
 	common.CreateTSDB(v3ioConfig, tsdbPath)
@@ -54,6 +57,15 @@ func BenchmarkIngest(b *testing.B) {
 	timestampsCount := (testStartTimeNano/int64(time.Millisecond) - testStartTimeMs) / int64(testConfig.SampleStepSize)
 	timestamps := make([]int64, timestampsCount)
 
+	testStartTime := time.Unix(int64(testStartTimeMs/1000), 0).Format(time.RFC3339)
+	testEndTimeMs := testStartTimeMs + timestampsCount*int64(testConfig.SampleStepSize)
+	testEndTime := time.Unix(int64(testEndTimeMs/1000), 0).Format(time.RFC3339)
+	fmt.Printf("\nAbout to run %d ingestion cycles from %s [%d] to %s [%d]. Total samples count: %d\n",
+		b.N,
+		testStartTime, testStartTimeMs,
+		testEndTime, testEndTimeMs,
+		timestampsCount)
+
 	for i := range timestamps {
 		timestamps[i] = testStartTimeMs + int64(i*testConfig.SampleStepSize)
 	}
@@ -69,6 +81,8 @@ func BenchmarkIngest(b *testing.B) {
 
 	samplesCount := len(sampleTemplates)
 	refs := make([]uint64, samplesCount)
+	timestampCount := len(timestamps)
+	testLimit := samplesCount * timestampCount
 
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
@@ -79,20 +93,25 @@ func BenchmarkIngest(b *testing.B) {
 			b.Fatal(err)
 		}
 
-		if rowsAdded == 0 {
+		count += rowsAdded
+
+		if rowsAdded == 0 || rowsAdded >= testLimit {
+			defer b.Skipf("\nTest have reached the target (limit=%d)", testLimit)
 			break // stop the test (target has been achieved)
 		}
-		count += rowsAdded
 	}
 
 	// Wait for all responses, use default timeout from configuration or unlimited if not set
 	_, err = appender.WaitForCompletion(-1)
+	b.StopTimer()
 
 	if err != nil {
 		b.Fatalf("Test timed out. Error: %v", err)
 	}
 
 	b.Logf("\nTest complete. %d samples added to %s\n", count, tsdbPath)
+
+	// TODO: Make sure all samples have been ingested properly, i.e. execute `count` for all metrics and compare with expected
 }
 
 func runTest(
@@ -112,10 +131,17 @@ func runTest(
 	var err error
 	if samplesCount > 0 && tsCount > 0 {
 		if appendOneByOne {
-			startFromIndex := index * batchSize / samplesCount
-			batchOfTimestamps := timestamps[startFromIndex : startFromIndex+batchSize]
-			count, err = appendSingle(index%samplesCount, index/samplesCount, appender, sampleTemplates[index%samplesCount],
-				batchOfTimestamps, refs)
+			startFromIndex := (index / samplesCount) * batchSize
+			endIndex := min(startFromIndex+batchSize, tsCount)
+			if startFromIndex < tsCount {
+				batchOfTimestamps := timestamps[startFromIndex:endIndex]
+				count, err = appendSingle(index%samplesCount, index/samplesCount, appender, sampleTemplates[index%samplesCount],
+					batchOfTimestamps, refs)
+			} else {
+				// Test complete - filled the given time interval with samples
+				fmt.Printf("Breaking the loop with %d enties in range [%d:%d]", endIndex-startFromIndex, startFromIndex, endIndex)
+				return count, nil
+			}
 		} else {
 			count, err = appendAll(appender, sampleTemplates, timestamps, refs, batchSize, verbose)
 		}
@@ -124,6 +150,13 @@ func runTest(
 			"Samples count: [%d] and timestamps count [%d] should be positive numbers", samplesCount, tsCount)
 	}
 	return count, err
+}
+
+func formatPath(path string) string {
+	chars := []string{":", "+"}
+	r := strings.Join(chars, "")
+	re := regexp.MustCompile("[" + r + "]+")
+	return re.ReplaceAllString(path, "_")
 }
 
 func min(left, right int) int {
