@@ -5,9 +5,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/pkg/errors"
+	"github.com/v3io/v3io-tsdb/test/utils"
 	"math/rand"
 	"time"
-	"github.com/v3io/v3io-tsdb/test/utils"
 )
 
 func MakeSamplesModel(namesCount, namesDiversity, labelsCount, labelDiversity, labelValueCount,

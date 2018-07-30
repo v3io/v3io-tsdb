@@ -5,11 +5,11 @@ package ingest
 import (
 	"fmt"
 	"github.com/nuclio/nuclio-test-go"
+	"github.com/v3io/v3io-tsdb/pkg/config"
 	"os"
+	"path/filepath"
 	"testing"
 	"time"
-	"github.com/v3io/v3io-tsdb/pkg/config"
-	"path/filepath"
 )
 
 func TestIngestIntegration(t *testing.T) {

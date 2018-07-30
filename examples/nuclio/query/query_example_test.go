@@ -5,10 +5,10 @@ package query
 import (
 	"fmt"
 	"github.com/nuclio/nuclio-test-go"
-	"os"
-	"testing"
 	"github.com/v3io/v3io-tsdb/pkg/config"
+	"os"
 	"path/filepath"
+	"testing"
 )
 
 func TestQueryIntegration(t *testing.T) {
