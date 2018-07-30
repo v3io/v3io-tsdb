@@ -29,7 +29,7 @@ func TestAggregators(t *testing.T) {
 			fmt.Sprintf("_v_sqr[1]=_v_sqr[1]+%f;", 4.0),
 			fmt.Sprintf("_v_sqr[1]=%f;", 4.0), false},
 
-			// todo: enable when bug is fixed
+			// todo: enable when bug is fixed - IG-8675
 		//{"Should aggregate data with Min & Max aggregators", "min,max", map[int64]float64{1: 7.5, 2: 2.5}, "v", 1,
 		//	fmt.Sprintf("_v_min[1]=min(_v_min[1],%f);_v_max[1]=max(_v_max[1],%f);", 2.5, 7.5),
 		//	fmt.Sprintf("_v_min[1]=%f;_v_max[1]=%f;", 2.5, 7.5), false},
@@ -38,7 +38,7 @@ func TestAggregators(t *testing.T) {
 			fmt.Sprintf("_v_count[1]=_v_count[1]+2;_v_sum[1]=_v_sum[1]+%f;_v_sqr[1]=_v_sqr[1]+%f;_v_last[1]=%f;", 10.0, 62.5, 2.5),
 			fmt.Sprintf("_v_count[1]=2;_v_sum[1]=%f;_v_sqr[1]=%f;_v_last[1]=%f;", 10.0, 62.5, 2.5), false},
 
-		// todo: enable when bug is fixed
+		// todo: enable when bug is fixed - IG-8675
 		//{"Should aggregate data with Wildcard aggregators", "*", map[int64]float64{1: 7.5, 2: 2.5}, "v", 1,
 		//	fmt.Sprintf("_v_count[1]=_v_count[1]+2;_v_sum[1]=_v_sum[1]+%f;"+
 		//		"_v_sqr[1]=_v_sqr[1]+%f;_v_min[1]=min(_v_min[1],%f);_v_max[1]=max(_v_max[1],%f);"+
