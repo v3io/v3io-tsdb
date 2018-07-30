@@ -24,12 +24,12 @@ package tsdb
 
 import (
 	"fmt"
+	"github.com/v3io/v3io-go-http"
 	"github.com/v3io/v3io-tsdb/pkg/config"
 	"github.com/v3io/v3io-tsdb/pkg/utils"
-	"testing"
 	"path/filepath"
-	"github.com/v3io/v3io-go-http"
 	"reflect"
+	"testing"
 )
 
 func deleteTSDB(t *testing.T, v3ioConfig *config.V3ioConfig) {
@@ -177,8 +177,8 @@ func TestQueryData(t *testing.T) {
 	}{
 		{desc: "Should ingest and query one data point", metricName: "cpu",
 			labels: utils.FromStrings("testLabel", "balbala"),
-			data: []testDataPoint{{t: 1532940510, v: 314.3}},
-			from: 0, to: 1532940510 + 1,
+			data:   []testDataPoint{{t: 1532940510, v: 314.3}},
+			from:   0, to: 1532940510 + 1,
 			expected: []testDataPoint{{t: 1532940510, v: 314.3}}},
 
 		{desc: "Should ingest and query multiple data points", metricName: "cpu",
@@ -193,16 +193,16 @@ func TestQueryData(t *testing.T) {
 
 		{desc: "Should query with filter on metric name", metricName: "cpu",
 			labels: utils.FromStrings("os", "linux", "iguaz", "yesplease"),
-			data: []testDataPoint{{t: 1532940510, v: 33.3}},
+			data:   []testDataPoint{{t: 1532940510, v: 33.3}},
 			filter: "_name=='cpu'",
-			from: 0, to: 1532940510 + 1,
+			from:   0, to: 1532940510 + 1,
 			expected: []testDataPoint{{t: 1532940510, v: 33.3}}},
 
 		{desc: "Should query with filter on label name", metricName: "cpu",
 			labels: utils.FromStrings("os", "linux", "iguaz", "yesplease"),
-			data: []testDataPoint{{t: 1532940510, v: 31.3}},
+			data:   []testDataPoint{{t: 1532940510, v: 31.3}},
 			filter: "os=='linux'",
-			from: 0, to: 1532940510 + 1,
+			from:   0, to: 1532940510 + 1,
 			expected: []testDataPoint{{t: 1532940510, v: 31.3}}},
 	}
 
