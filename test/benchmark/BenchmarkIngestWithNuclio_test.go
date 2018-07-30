@@ -15,6 +15,7 @@ import (
 	"log"
 	"testing"
 	"time"
+	testUtils "github.com/v3io/v3io-tsdb/test/utils"
 )
 
 const defaultDbName = "db0"
@@ -121,7 +122,7 @@ func initContext(context *nuclio.Context) error {
 
 func handler(context *nuclio.Context, event nuclio.Event) (interface{}, error) {
 
-	sample := common.Sample{}
+	sample := testUtils.Sample{}
 	err := json.Unmarshal(event.GetBody(), &sample)
 	if err != nil {
 		return nil, err

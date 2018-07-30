@@ -30,6 +30,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"testing"
+	testUtils "github.com/v3io/v3io-tsdb/test/utils"
 )
 
 func deleteTSDB(t *testing.T, v3ioConfig *config.V3ioConfig) {
@@ -70,43 +71,40 @@ func setUpWithDBConfig(t *testing.T, v3ioConfig *config.V3ioConfig, dbConfig con
 	}
 }
 
-type testDataPoint struct {
-	t int64
-	v float64
-}
-
 func TestIngestData(t *testing.T) {
 	v3ioConfig, err := config.LoadConfig(filepath.Join("../../", config.DefaultConfigurationFileName))
 	if err != nil {
 		t.Fatalf("Failed to load test configuration. reason: %s", err)
 	}
 
+	fmt.Printf("som %v", testUtils.DataPoint{Time: 123134, Value: 123.43})
+
 	testCases := []struct {
 		desc       string
 		metricName string
 		labels     []utils.Label
-		data       []testDataPoint
+		data       []testUtils.DataPoint
 	}{
 		{desc: "Should ingest one data point", metricName: "cpu", labels: utils.FromStrings("testLabel", "balbala"),
-			data: []testDataPoint{{t: 1532940510, v: 314.3}}},
+			data: []testUtils.DataPoint{{Time: 1532940510, Value: 314.3}}},
 
 		{desc: "Should ingest multiple data points", metricName: "cpu",
 			labels: utils.FromStrings("os", "linux", "iguaz", "yesplease"),
-			data: []testDataPoint{{t: 1532940510, v: 314.3},
-				{t: 1532940510 + 5, v: 300.3},
-				{t: 1532940510 + 10, v: 3234.6}}},
+			data: []testUtils.DataPoint{{Time: 1532940510, Value: 314.3},
+				{Time: 1532940510 + 5, Value: 300.3},
+				{Time: 1532940510 + 10, Value: 3234.6}}},
 
 		{desc: "Should ingest record with late arrival", metricName: "cpu",
 			labels: utils.FromStrings("os", "linux", "iguaz", "yesplease"),
-			data: []testDataPoint{{t: 1532940510, v: 314.3},
-				{t: 1532940510 + 5, v: 300.3},
-				{t: 1532940510 - 10, v: 3234.6}}},
+			data: []testUtils.DataPoint{{Time: 1532940510, Value: 314.3},
+				{Time: 1532940510 + 5, Value: 300.3},
+				{Time: 1532940510 - 10, Value: 3234.6}}},
 
 		{desc: "Should ingest record with '-' in the metric name (IG-8585)", metricName: "cool-cpu",
 			labels: utils.FromStrings("os", "linux", "iguaz", "yesplease"),
-			data: []testDataPoint{{t: 1532940510, v: 314.3},
-				{t: 1532940510 + 5, v: 300.3},
-				{t: 1532940510 - 10, v: 3234.6}}},
+			data: []testUtils.DataPoint{{Time: 1532940510, Value: 314.3},
+				{Time: 1532940510 + 5, Value: 300.3},
+				{Time: 1532940510 - 10, Value: 3234.6}}},
 	}
 
 	for _, test := range testCases {
@@ -116,7 +114,7 @@ func TestIngestData(t *testing.T) {
 }
 
 func testIngestDataCase(t *testing.T, v3ioConfig *config.V3ioConfig, testDescription string,
-	metricsName string, userLabels []utils.Label, data []testDataPoint) {
+	metricsName string, userLabels []utils.Label, data []testUtils.DataPoint) {
 	defer setUp(t, v3ioConfig)()
 
 	adapter, err := NewV3ioAdapter(v3ioConfig, nil, nil)
@@ -133,12 +131,12 @@ func testIngestDataCase(t *testing.T, v3ioConfig *config.V3ioConfig, testDescrip
 	labels = append(labels, userLabels...)
 
 	fmt.Printf("the labeles are: %v\n", labels)
-	ref, err := appender.Add(labels, data[0].t, data[0].v)
+	ref, err := appender.Add(labels, data[0].Time, data[0].Value)
 	if err != nil {
 		t.Fatalf("test %s - Failed to add data to appender. reason: %s", testDescription, err)
 	}
 	for i := 1; i < len(data); i++ {
-		appender.AddFast(labels, ref, data[i].t, data[i].v)
+		appender.AddFast(labels, ref, data[i].Time, data[i].Value)
 	}
 
 	if _, err := appender.WaitForCompletion(0); err != nil {
@@ -175,47 +173,47 @@ func TestQueryData(t *testing.T) {
 		desc       string
 		metricName string
 		labels     []utils.Label
-		data       []testDataPoint
+		data       []testUtils.DataPoint
 		filter     string
 		from       int64
 		to         int64
-		expected   []testDataPoint
+		expected   []testUtils.DataPoint
 	}{
 		{desc: "Should ingest and query one data point", metricName: "cpu",
 			labels: utils.FromStrings("testLabel", "balbala"),
-			data: []testDataPoint{{t: 1532940510, v: 314.3}},
+			data: []testUtils.DataPoint{{Time: 1532940510, Value: 314.3}},
 			from: 0, to: 1532940510 + 1,
-			expected: []testDataPoint{{t: 1532940510, v: 314.3}}},
+			expected: []testUtils.DataPoint{{Time: 1532940510, Value: 314.3}}},
 
 		{desc: "Should ingest and query multiple data points", metricName: "cpu",
 			labels: utils.FromStrings("os", "linux", "iguaz", "yesplease"),
-			data: []testDataPoint{{t: 1532940510 - 10, v: 314.3},
-				{t: 1532940510 - 5, v: 300.3},
-				{t: 1532940510, v: 3234.6}},
+			data: []testUtils.DataPoint{{Time: 1532940510 - 10, Value: 314.3},
+				{Time: 1532940510 - 5, Value: 300.3},
+				{Time: 1532940510, Value: 3234.6}},
 			from: 0, to: 1532940510 + 1,
-			expected: []testDataPoint{{t: 1532940510 - 10, v: 314.3},
-				{t: 1532940510 - 5, v: 300.3},
-				{t: 1532940510, v: 3234.6}}},
+			expected: []testUtils.DataPoint{{Time: 1532940510 - 10, Value: 314.3},
+				{Time: 1532940510 - 5, Value: 300.3},
+				{Time: 1532940510, Value: 3234.6}}},
 
 		{desc: "Should query with filter on metric name", metricName: "cpu",
 			labels: utils.FromStrings("os", "linux", "iguaz", "yesplease"),
-			data: []testDataPoint{{t: 1532940510, v: 33.3}},
+			data: []testUtils.DataPoint{{Time: 1532940510, Value: 33.3}},
 			filter: "_name=='cpu'",
 			from: 0, to: 1532940510 + 1,
-			expected: []testDataPoint{{t: 1532940510, v: 33.3}}},
+			expected: []testUtils.DataPoint{{Time: 1532940510, Value: 33.3}}},
 
 		{desc: "Should query with filter on label name", metricName: "cpu",
 			labels: utils.FromStrings("os", "linux", "iguaz", "yesplease"),
-			data: []testDataPoint{{t: 1532940510, v: 31.3}},
+			data: []testUtils.DataPoint{{Time: 1532940510, Value: 31.3}},
 			filter: "os=='linux'",
 			from: 0, to: 1532940510 + 1,
-			expected: []testDataPoint{{t: 1532940510, v: 31.3}}},
+			expected: []testUtils.DataPoint{{Time: 1532940510, Value: 31.3}}},
 
 		{desc: "Should ingest and query data with '-' in the metric name (IG-8585)", metricName: "cool-cpu",
 			labels: utils.FromStrings("testLabel", "balbala"),
-			data: []testDataPoint{{t: 1532940510, v: 314.3}},
+			data: []testUtils.DataPoint{{Time: 1532940510, Value: 314.3}},
 			from: 0, to: 1532940510 + 1,
-			expected: []testDataPoint{{t: 1532940510, v: 314.3}}},
+			expected: []testUtils.DataPoint{{Time: 1532940510, Value: 314.3}}},
 	}
 
 	for _, test := range testCases {
@@ -226,8 +224,8 @@ func TestQueryData(t *testing.T) {
 }
 
 func testQueryDataCase(test *testing.T, v3ioConfig *config.V3ioConfig, testDescription string,
-	metricsName string, userLabels []utils.Label, data []testDataPoint, filter string,
-	from int64, to int64, expected []testDataPoint) {
+	metricsName string, userLabels []utils.Label, data []testUtils.DataPoint, filter string,
+	from int64, to int64, expected []testUtils.DataPoint) {
 	defer setUp(test, v3ioConfig)()
 
 	adapter, err := NewV3ioAdapter(v3ioConfig, nil, nil)
@@ -243,12 +241,12 @@ func testQueryDataCase(test *testing.T, v3ioConfig *config.V3ioConfig, testDescr
 	labels := utils.Labels{utils.Label{Name: "__name__", Value: metricsName}}
 	labels = append(labels, userLabels...)
 
-	ref, err := appender.Add(labels, data[0].t, data[0].v)
+	ref, err := appender.Add(labels, data[0].Time, data[0].Value)
 	if err != nil {
 		test.Fatalf("test %s - Failed to add data to appender. reason: %s", testDescription, err)
 	}
 	for i := 1; i < len(data); i++ {
-		appender.AddFast(labels, ref, data[i].t, data[i].v)
+		appender.AddFast(labels, ref, data[i].Time, data[i].Value)
 	}
 
 	if _, err := appender.WaitForCompletion(0); err != nil {
@@ -285,9 +283,9 @@ func testQueryDataCase(test *testing.T, v3ioConfig *config.V3ioConfig, testDescr
 			t, v := iter.At()
 
 			fmt.Printf("(%v, %v)\n", t, v)
-			if t != expected.t || v != expected.v {
+			if t != expected.Time || v != expected.Value {
 				test.Fatalf("actual: (t=%v, v=%v) is not equal to expected:(t=%v, v=%v)   === %f",
-					t, v, expected.t, expected.v, v-expected.v)
+					t, v, expected.Time, expected.Value, v-expected.Value)
 			}
 
 			counter++

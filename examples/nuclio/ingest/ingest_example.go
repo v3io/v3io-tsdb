@@ -7,6 +7,7 @@ import (
 	"github.com/v3io/v3io-tsdb/pkg/config"
 	"github.com/v3io/v3io-tsdb/pkg/tsdb"
 	"github.com/v3io/v3io-tsdb/pkg/utils"
+	testUtils "github.com/v3io/v3io-tsdb/test/utils"
 	"sync"
 )
 
@@ -26,18 +27,12 @@ const pushEvent = `
 }
 `
 
-type Sample struct {
-	Lset  utils.Labels
-	Time  string
-	Value float64
-}
-
 var adapter *tsdb.V3ioAdapter
 var adapterMtx sync.RWMutex
 
 func Handler(context *nuclio.Context, event nuclio.Event) (interface{}, error) {
 
-	sample := Sample{}
+	sample := testUtils.Sample{}
 	err := json.Unmarshal(event.GetBody(), &sample)
 	if err != nil {
 		return nil, err
