@@ -88,16 +88,16 @@ func TestIngestData(t *testing.T) {
 		labels     []utils.Label
 		data       []testDataPoint
 	}{
-		{desc: "one data point", metricName: "cpu", labels: utils.FromStrings("testLabel", "balbala"),
+		{desc: "Should ingest one data point", metricName: "cpu", labels: utils.FromStrings("testLabel", "balbala"),
 			data: []testDataPoint{{t: time.Now().Unix(), v: 314.3}}},
 
-		{desc: "multiple data points", metricName: "cpu",
+		{desc: "Should ingest multiple data points", metricName: "cpu",
 			labels: utils.FromStrings("os", "linux", "iguaz", "yesplease"),
 			data: []testDataPoint{{t: time.Now().Unix(), v: 314.3},
 				{t: time.Now().Unix() + 5, v: 300.3},
 				{t: time.Now().Unix() + 10, v: 3234.6}}},
 
-		{desc: "late arrival", metricName: "cpu",
+		{desc: "Should ingest record with late arrival", metricName: "cpu",
 			labels: utils.FromStrings("os", "linux", "iguaz", "yesplease"),
 			data: []testDataPoint{{t: time.Now().Unix(), v: 314.3},
 				{t: time.Now().Unix() + 5, v: 300.3},
@@ -176,13 +176,13 @@ func TestQueryData(t *testing.T) {
 		to         int64
 		expected   []testDataPoint
 	}{
-		{desc: "one data point", metricName: "cpu",
+		{desc: "Should ingest and query one data point", metricName: "cpu",
 			labels: utils.FromStrings("testLabel", "balbala"),
 			data: []testDataPoint{{t: 1532940510, v: 314.3}},
 			from: 0, to: time.Now().Unix() + 1,
 			expected: []testDataPoint{{t: 1532940510, v: 314.3}}},
 
-		{desc: "multiple data points", metricName: "cpu",
+		{desc: "Should ingest and query multiple data points", metricName: "cpu",
 			labels: utils.FromStrings("os", "linux", "iguaz", "yesplease"),
 			data: []testDataPoint{{t: 1532940510 - 10, v: 314.3},
 				{t: 1532940510 - 5, v: 300.3},
@@ -192,14 +192,14 @@ func TestQueryData(t *testing.T) {
 				{t: 1532940510 - 5, v: 300.3},
 				{t: 1532940510, v: 3234.6}}},
 
-		{desc: "filter on metric name", metricName: "cpu",
+		{desc: "Should query with filter on metric name", metricName: "cpu",
 			labels: utils.FromStrings("os", "linux", "iguaz", "yesplease"),
 			data: []testDataPoint{{t: 1532940510, v: 33.3}},
 			filter: "_name=='cpu'",
 			from: 0, to: time.Now().Unix() + 1,
 			expected: []testDataPoint{{t: 1532940510, v: 33.3}}},
 
-		{desc: "filter on label name", metricName: "cpu",
+		{desc: "Should query with filter on label name", metricName: "cpu",
 			labels: utils.FromStrings("os", "linux", "iguaz", "yesplease"),
 			data: []testDataPoint{{t: 1532940510, v: 31.3}},
 			filter: "os=='linux'",
@@ -298,7 +298,7 @@ func TestCreateTSDB(t *testing.T) {
 		desc string
 		conf config.DBPartConfig
 	}{
-		{"standard configuration", config.DBPartConfig{
+		{"Should create TSDB with standard configuration", config.DBPartConfig{
 			Signature:      "TSDB",
 			Version:        "1.0",
 			DaysPerObj:     1,
@@ -307,7 +307,7 @@ func TestCreateTSDB(t *testing.T) {
 			RollupMin:      10,
 		}},
 
-		{"asterix aggregations", config.DBPartConfig{
+		{"Should create TSDB with wildcard aggregations", config.DBPartConfig{
 			Signature:      "TSDB",
 			Version:        "1.0",
 			DaysPerObj:     1,

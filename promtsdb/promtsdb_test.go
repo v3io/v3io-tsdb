@@ -14,10 +14,7 @@ import (
 const basetime = 15222481971234
 
 func TestTsdbIntegration(t *testing.T) {
-
-	if testing.Short() {
-		t.Skip("Skipping integration test.")
-	}
+	t.SkipNow()
 
 	d, h := partmgr.TimeToDHM(basetime)
 	fmt.Println("base=", d, h)
