@@ -27,7 +27,6 @@ import (
 	"github.com/v3io/v3io-tsdb/pkg/config"
 	"github.com/v3io/v3io-tsdb/pkg/utils"
 	"testing"
-	"time"
 	"path/filepath"
 	"github.com/v3io/v3io-go-http"
 	"reflect"
@@ -89,19 +88,19 @@ func TestIngestData(t *testing.T) {
 		data       []testDataPoint
 	}{
 		{desc: "Should ingest one data point", metricName: "cpu", labels: utils.FromStrings("testLabel", "balbala"),
-			data: []testDataPoint{{t: time.Now().Unix(), v: 314.3}}},
+			data: []testDataPoint{{t: 1532940510, v: 314.3}}},
 
 		{desc: "Should ingest multiple data points", metricName: "cpu",
 			labels: utils.FromStrings("os", "linux", "iguaz", "yesplease"),
-			data: []testDataPoint{{t: time.Now().Unix(), v: 314.3},
-				{t: time.Now().Unix() + 5, v: 300.3},
-				{t: time.Now().Unix() + 10, v: 3234.6}}},
+			data: []testDataPoint{{t: 1532940510, v: 314.3},
+				{t: 1532940510 + 5, v: 300.3},
+				{t: 1532940510 + 10, v: 3234.6}}},
 
 		{desc: "Should ingest record with late arrival", metricName: "cpu",
 			labels: utils.FromStrings("os", "linux", "iguaz", "yesplease"),
-			data: []testDataPoint{{t: time.Now().Unix(), v: 314.3},
-				{t: time.Now().Unix() + 5, v: 300.3},
-				{t: time.Now().Unix() - 10, v: 3234.6}}},
+			data: []testDataPoint{{t: 1532940510, v: 314.3},
+				{t: 1532940510 + 5, v: 300.3},
+				{t: 1532940510 - 10, v: 3234.6}}},
 	}
 
 	for _, test := range testCases {
@@ -179,7 +178,7 @@ func TestQueryData(t *testing.T) {
 		{desc: "Should ingest and query one data point", metricName: "cpu",
 			labels: utils.FromStrings("testLabel", "balbala"),
 			data: []testDataPoint{{t: 1532940510, v: 314.3}},
-			from: 0, to: time.Now().Unix() + 1,
+			from: 0, to: 1532940510 + 1,
 			expected: []testDataPoint{{t: 1532940510, v: 314.3}}},
 
 		{desc: "Should ingest and query multiple data points", metricName: "cpu",
@@ -187,7 +186,7 @@ func TestQueryData(t *testing.T) {
 			data: []testDataPoint{{t: 1532940510 - 10, v: 314.3},
 				{t: 1532940510 - 5, v: 300.3},
 				{t: 1532940510, v: 3234.6}},
-			from: 0, to: time.Now().Unix() + 1,
+			from: 0, to: 1532940510 + 1,
 			expected: []testDataPoint{{t: 1532940510 - 10, v: 314.3},
 				{t: 1532940510 - 5, v: 300.3},
 				{t: 1532940510, v: 3234.6}}},
@@ -196,14 +195,14 @@ func TestQueryData(t *testing.T) {
 			labels: utils.FromStrings("os", "linux", "iguaz", "yesplease"),
 			data: []testDataPoint{{t: 1532940510, v: 33.3}},
 			filter: "_name=='cpu'",
-			from: 0, to: time.Now().Unix() + 1,
+			from: 0, to: 1532940510 + 1,
 			expected: []testDataPoint{{t: 1532940510, v: 33.3}}},
 
 		{desc: "Should query with filter on label name", metricName: "cpu",
 			labels: utils.FromStrings("os", "linux", "iguaz", "yesplease"),
 			data: []testDataPoint{{t: 1532940510, v: 31.3}},
 			filter: "os=='linux'",
-			from: 0, to: time.Now().Unix() + 1,
+			from: 0, to: 1532940510 + 1,
 			expected: []testDataPoint{{t: 1532940510, v: 31.3}}},
 	}
 

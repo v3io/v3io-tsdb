@@ -19,7 +19,11 @@ get:
 
 .PHONY: test
 test: get
-	go test -v -short $(TOPLEVEL_DIRS)
+	go test -v -short -tags unit $(TOPLEVEL_DIRS)
+
+.PHONY: integration
+integration: get
+	go test -v -tags integration $(TOPLEVEL_DIRS)
 
 .PHONY: build
 build: get
