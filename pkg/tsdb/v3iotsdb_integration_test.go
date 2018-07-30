@@ -108,23 +108,24 @@ func TestIngestData(t *testing.T) {
 	}
 
 	for _, test := range testCases {
-		t.Logf("%s\n", test.desc)
-		testIngestDataCase(t, v3ioConfig, test.desc, test.metricName, test.labels, test.data)
+		t.Run(test.desc, func(t *testing.T) {
+			testIngestDataCase(t, v3ioConfig, test.metricName, test.labels, test.data)
+		})
 	}
 }
 
-func testIngestDataCase(t *testing.T, v3ioConfig *config.V3ioConfig, testDescription string,
+func testIngestDataCase(t *testing.T, v3ioConfig *config.V3ioConfig,
 	metricsName string, userLabels []utils.Label, data []testUtils.DataPoint) {
 	defer setUp(t, v3ioConfig)()
 
 	adapter, err := NewV3ioAdapter(v3ioConfig, nil, nil)
 	if err != nil {
-		t.Fatalf("test %s - Failed to create v3io adapter. reason: %s", testDescription, err)
+		t.Fatalf("Failed to create v3io adapter. reason: %s", err)
 	}
 
 	appender, err := adapter.Appender()
 	if err != nil {
-		t.Fatalf("test %s - Failed to get appender. reason: %s", testDescription, err)
+		t.Fatalf("Failed to get appender. reason: %s", err)
 	}
 
 	labels := utils.Labels{utils.Label{Name: "__name__", Value: metricsName}}
@@ -133,14 +134,14 @@ func testIngestDataCase(t *testing.T, v3ioConfig *config.V3ioConfig, testDescrip
 	fmt.Printf("the labeles are: %v\n", labels)
 	ref, err := appender.Add(labels, data[0].Time, data[0].Value)
 	if err != nil {
-		t.Fatalf("test %s - Failed to add data to appender. reason: %s", testDescription, err)
+		t.Fatalf("Failed to add data to appender. reason: %s", err)
 	}
 	for i := 1; i < len(data); i++ {
 		appender.AddFast(labels, ref, data[i].Time, data[i].Value)
 	}
 
 	if _, err := appender.WaitForCompletion(0); err != nil {
-		t.Fatalf("test %s - Failed to wait for appender completion. reason: %s", testDescription, err)
+		t.Fatalf("Failed to wait for appender completion. reason: %s", err)
 	}
 
 	responseChan := make(chan *v3io.Response)
@@ -156,8 +157,8 @@ func testIngestDataCase(t *testing.T, v3ioConfig *config.V3ioConfig, testDescrip
 		for _, label := range userLabels {
 			actual := item.GetField(label.Name)
 			if actual != label.Value {
-				t.Fatalf("test %s - Records were not saved correctly. for label %s, actual: %v, expected: %v",
-					testDescription, label.Name, actual, label.Value)
+				t.Fatalf("Records were not saved correctly. for label %s, actual: %v, expected: %v",
+					label.Name, actual, label.Value)
 			}
 		}
 	}
@@ -217,25 +218,26 @@ func TestQueryData(t *testing.T) {
 	}
 
 	for _, test := range testCases {
-		t.Logf("%s\n", test.desc)
-		testQueryDataCase(t, v3ioConfig, test.desc, test.metricName, test.labels,
-			test.data, test.filter, test.from, test.to, test.expected)
+		t.Run(test.desc, func(t *testing.T) {
+			testQueryDataCase(t, v3ioConfig, test.metricName, test.labels,
+				test.data, test.filter, test.from, test.to, test.expected)
+		})
 	}
 }
 
-func testQueryDataCase(test *testing.T, v3ioConfig *config.V3ioConfig, testDescription string,
+func testQueryDataCase(test *testing.T, v3ioConfig *config.V3ioConfig,
 	metricsName string, userLabels []utils.Label, data []testUtils.DataPoint, filter string,
 	from int64, to int64, expected []testUtils.DataPoint) {
 	defer setUp(test, v3ioConfig)()
 
 	adapter, err := NewV3ioAdapter(v3ioConfig, nil, nil)
 	if err != nil {
-		test.Fatalf("test %s - Failed to create v3io adapter. reason: %s", testDescription, err)
+		test.Fatalf("Failed to create v3io adapter. reason: %s", err)
 	}
 
 	appender, err := adapter.Appender()
 	if err != nil {
-		test.Fatalf("test %s - Failed to get appender. reason: %s", testDescription, err)
+		test.Fatalf("Failed to get appender. reason: %s", err)
 	}
 
 	labels := utils.Labels{utils.Label{Name: "__name__", Value: metricsName}}
@@ -243,42 +245,40 @@ func testQueryDataCase(test *testing.T, v3ioConfig *config.V3ioConfig, testDescr
 
 	ref, err := appender.Add(labels, data[0].Time, data[0].Value)
 	if err != nil {
-		test.Fatalf("test %s - Failed to add data to appender. reason: %s", testDescription, err)
+		test.Fatalf("Failed to add data to appender. reason: %s", err)
 	}
 	for i := 1; i < len(data); i++ {
 		appender.AddFast(labels, ref, data[i].Time, data[i].Value)
 	}
 
 	if _, err := appender.WaitForCompletion(0); err != nil {
-		test.Fatalf("test %s - Failed to wait for appender completion. reason: %s", testDescription, err)
+		test.Fatalf("Failed to wait for appender completion. reason: %s", err)
 	}
 
 	qry, err := adapter.Querier(nil, from, to)
 	if err != nil {
-		test.Fatalf("test %s - Failed to create Querier. reason: %v", testDescription, err)
+		test.Fatalf("Failed to create Querier. reason: %v", err)
 	}
 
 	set, err := qry.Select(metricsName, "", 1000, filter)
-	//set, err := qry.Select("count,avg,sum", 1000*3600, "_name=='http_req'")
-	//set, err := qry.SelectOverlap("count,avg,sum,max", 1000*3600, []int{4, 2, 1}, "_name=='http_req'")
 	if err != nil {
-		test.Fatalf("test %s - Failed to run Select. reason: %v", testDescription, err)
+		test.Fatalf("Failed to run Select. reason: %v", err)
 	}
 
 	counter := 0
 	for set.Next() {
 		if set.Err() != nil {
-			test.Fatalf("test %s - Failed to query metric. reason: %v", testDescription, set.Err())
+			test.Fatalf("Failed to query metric. reason: %v", set.Err())
 		}
 
 		series := set.At()
 		iter := series.Iterator()
 		if iter.Err() != nil {
-			test.Fatalf("test %s - Failed to query data series. reason: %v", testDescription, iter.Err())
+			test.Fatalf("Failed to query data series. reason: %v", iter.Err())
 		}
 		for _, expected := range expected {
 			if !iter.Next() {
-				test.Fatalf("test %s - Number of actual data points (%d) is less the expected (%d)", testDescription, counter, len(data))
+				test.Fatalf("Number of actual data points (%d) is less the expected (%d)", counter, len(data))
 			}
 			t, v := iter.At()
 
@@ -293,7 +293,7 @@ func testQueryDataCase(test *testing.T, v3ioConfig *config.V3ioConfig, testDescr
 	}
 
 	if counter == 0 {
-		test.Fatalf("test %s - No data was recieved", testDescription)
+		test.Fatalf("No data was recieved")
 	}
 }
 
@@ -327,23 +327,24 @@ func TestCreateTSDB(t *testing.T) {
 	}
 
 	for _, test := range testCases {
-		t.Logf("%s\n", test.desc)
-		testCreateTSDBcase(t, v3ioConfig, test.desc, test.conf)
+		t.Run(test.desc, func(t *testing.T) {
+			testCreateTSDBcase(t, v3ioConfig, test.conf)
+		})
 	}
 
 }
 
-func testCreateTSDBcase(t *testing.T, v3ioConfig *config.V3ioConfig, testDescription string, dbConfig config.DBPartConfig) {
+func testCreateTSDBcase(t *testing.T, v3ioConfig *config.V3ioConfig, dbConfig config.DBPartConfig) {
 	defer setUpWithDBConfig(t, v3ioConfig, dbConfig)()
 
 	adapter, err := NewV3ioAdapter(v3ioConfig, nil, nil)
 	if err != nil {
-		t.Fatalf("test %s - Failed to create adapter. reason: %s", testDescription, err)
+		t.Fatalf("Failed to create adapter. reason: %s", err)
 	}
 
 	actualDbConfig := *adapter.GetDBConfig()
 
 	if !reflect.DeepEqual(actualDbConfig, dbConfig) {
-		t.Fatalf("test %s - actual: %v is not equal to expected: %v", testDescription, actualDbConfig, dbConfig)
+		t.Fatalf("actual: %v is not equal to expected: %v", actualDbConfig, dbConfig)
 	}
 }
