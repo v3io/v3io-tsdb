@@ -162,7 +162,7 @@ func GenSamples(num, interval int, start, step float64) []sample {
 	for i := 0; i <= num; i++ {
 		curTime += int64(interval * 1000)
 		t := curTime + int64(rand.Intn(100)) - 50
-		v += float64(rand.Intn(100)-50) / 100 * step
+		v += float64(rand.Intn(50)) / 100 * step
 		//fmt.Printf("t-%d,v%.2f ", t, v)
 		samples = append(samples, sample{t: t, v: v})
 	}
