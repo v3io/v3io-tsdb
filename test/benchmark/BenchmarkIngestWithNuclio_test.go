@@ -127,9 +127,9 @@ func runNuclioTest(tc *nutest.TestContext, sampleTemplateJson string, timestamp 
 
 // InitContext runs only once when the function runtime starts
 func initContext(context *nuclio.Context) error {
-	v3ioConfig, err := config.LoadConfig("")
+	v3ioConfig, err := config.LoadConfig(common.GetV3ioConfigPath())
 	if err != nil {
-		return err
+		return errors.Wrap(err, "failed to load configuration")
 	}
 
 	// Hack - update path to TSDB
@@ -138,7 +138,7 @@ func initContext(context *nuclio.Context) error {
 	data := context.DataBinding[defaultDbName].(*v3io.Container)
 	adapter, err := tsdb.NewV3ioAdapter(v3ioConfig, data, context.Logger)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "failed to create V3IO Adapter")
 	}
 
 	// Store adapter in user cache

@@ -28,12 +28,16 @@ type BenchmarkIngestConfig struct {
 	CleanupAfterTest     bool   `json:"CleanupAfterTest,omitempty" yaml:"CleanupAfterTest"`
 }
 
+func GetV3ioConfigPath() string {
+	return filepath.Join(TsdbDefaultTestConfigPath, config.DefaultConfigurationFileName)
+}
+
 func LoadBenchmarkIngestConfigs() (*BenchmarkIngestConfig, *config.V3ioConfig, error) {
 	testConfig, err := loadBenchmarkIngestConfigFromFile("")
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "Failed to load test configuration.")
 	}
-	v3ioConfig, err := config.LoadConfig(filepath.Join(TsdbDefaultTestConfigPath, config.DefaultConfigurationFileName))
+	v3ioConfig, err := config.LoadConfig(GetV3ioConfigPath())
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "Failed to load test configuration.")
 	}
