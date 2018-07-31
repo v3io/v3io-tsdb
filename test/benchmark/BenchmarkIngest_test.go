@@ -8,8 +8,6 @@ import (
 	"github.com/v3io/v3io-tsdb/test/benchmark/common"
 	"io/ioutil"
 	"log"
-	"regexp"
-	"strings"
 	"testing"
 	"time"
 )
@@ -28,7 +26,7 @@ func BenchmarkIngest(b *testing.B) {
 	}
 
 	// Create test path (tsdb instance)
-	tsdbPath := formatPath(fmt.Sprintf("tsdb-%s-%d-%s", b.Name(), b.N, time.Now().Format(time.RFC3339)))
+	tsdbPath := common.NormalizePath(fmt.Sprintf("tsdb-%s-%d-%s", b.Name(), b.N, time.Now().Format(time.RFC3339)))
 
 	// Update TSDB instance path for this test
 	v3ioConfig.Path = tsdbPath
@@ -111,48 +109,9 @@ func BenchmarkIngest(b *testing.B) {
 
 	b.Logf("\nTest complete. %d samples added to %s\n", count, tsdbPath)
 
-	// TODO: Make sure all samples have been ingested properly, i.e. execute `count` for all metrics and compare with expected
-	if err := validateCountOfSamples(adapter, count, testStartTimeMs, testEndTimeMs); err != nil {
+	if err := common.ValidateCountOfSamples(adapter, count, testStartTimeMs, testEndTimeMs); err != nil {
 		b.Error(err)
 	}
-}
-
-func validateCountOfSamples(adapter *tsdb.V3ioAdapter, expected int, startTimeMs, endTimeMs int64) error {
-	qry, err := adapter.Querier(nil, startTimeMs, endTimeMs)
-	if err != nil {
-		return errors.Wrap(err, "failed to create Querier instance.")
-	}
-	stepSize, err := utils.Str2duration("1h")
-	if err != nil {
-		return errors.Wrap(err, "failed to create step")
-	}
-	set, err := qry.SelectOverlap("", "count", stepSize, []int{24, 12, 1}, "starts(__name__, 'Name_')")
-
-	var actual int
-	for set.Next() {
-		if set.Err() != nil {
-			return errors.Wrap(set.Err(), "failed to get next element from result set")
-		}
-
-		series := set.At()
-		iter := series.Iterator()
-		for iter.Next() {
-			if iter.Err() != nil {
-				return errors.Wrap(set.Err(), "failed to get next time-value pair from iterator")
-			}
-
-			_, v := iter.At()
-			actual += int(v)
-		}
-	}
-
-	if expected != actual {
-		return errors.Errorf("Check failed: actual result is not as expected (%d != %d)", expected, actual)
-	} else {
-		fmt.Printf("Result is verified. Actual samples count is equal to expected. [%d==%d]\n", expected, actual)
-	}
-
-	return nil
 }
 
 func runTest(
@@ -191,13 +150,6 @@ func runTest(
 			"Samples count: [%d] and timestamps count [%d] should be positive numbers", samplesCount, tsCount)
 	}
 	return count, err
-}
-
-func formatPath(path string) string {
-	chars := []string{":", "+"}
-	r := strings.Join(chars, "")
-	re := regexp.MustCompile("[" + r + "]+")
-	return re.ReplaceAllString(path, "_")
 }
 
 func min(left, right int) int {
