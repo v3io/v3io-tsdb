@@ -17,65 +17,99 @@ func TestAggregators(t *testing.T) {
 		expectedUpdateExpr string
 		expectedSetExpr    string
 		expectFail         bool
+		ignoreReason       string
 	}{
-		{"Should aggregate data with Count aggregator", "count", map[int64]float64{1: 7.5, 2: 2.5}, "v", 1,
-			"_v_count[1]=_v_count[1]+2;", "_v_count[1]=2;", false},
+		{desc: "Should aggregate data with Count aggregator",
+			aggString: "count",
+			data:      map[int64]float64{1: 7.5, 2: 2.5},
+			exprCol:   "v", bucket: 1,
+			expectedUpdateExpr: "_v_count[1]=_v_count[1]+2;", expectedSetExpr: "_v_count[1]=2;"},
 
-		{"Should aggregate data with Sum aggregator", "sum", map[int64]float64{1: 7.5, 2: 2.5}, "v", 1,
-			fmt.Sprintf("_v_sum[1]=_v_sum[1]+%f;", 10.0),
-			fmt.Sprintf("_v_sum[1]=%f;", 10.0), false},
+		{desc: "Should aggregate data with Sum aggregator",
+			aggString: "sum",
+			data:      map[int64]float64{1: 7.5, 2: 2.5},
+			exprCol:   "v", bucket: 1,
+			expectedUpdateExpr: fmt.Sprintf("_v_sum[1]=_v_sum[1]+%f;", 10.0),
+			expectedSetExpr:    fmt.Sprintf("_v_sum[1]=%f;", 10.0)},
 
-		{"Should aggregate data with Sqr aggregator", "sqr", map[int64]float64{1: 2.0}, "v", 1,
-			fmt.Sprintf("_v_sqr[1]=_v_sqr[1]+%f;", 4.0),
-			fmt.Sprintf("_v_sqr[1]=%f;", 4.0), false},
+		{desc: "Should aggregate data with Sqr aggregator",
+			aggString: "sqr",
+			data:      map[int64]float64{1: 2.0},
+			exprCol:   "v", bucket: 1,
+			expectedUpdateExpr: fmt.Sprintf("_v_sqr[1]=_v_sqr[1]+%f;", 4.0),
+			expectedSetExpr:    fmt.Sprintf("_v_sqr[1]=%f;", 4.0)},
 
-		// todo: enable when bug is fixed - IG-8675
-		//{"Should aggregate data with Min & Max aggregators", "min,max", map[int64]float64{1: 7.5, 2: 2.5}, "v", 1,
-		//	fmt.Sprintf("_v_min[1]=min(_v_min[1],%f);_v_max[1]=max(_v_max[1],%f);", 2.5, 7.5),
-		//	fmt.Sprintf("_v_min[1]=%f;_v_max[1]=%f;", 2.5, 7.5), false},
+		{desc: "Should aggregate data with Min & Max aggregators",
+			aggString: "min,max",
+			data:      map[int64]float64{1: 7.5, 2: 2.5},
+			exprCol:   "v", bucket: 1,
+			expectedUpdateExpr: fmt.Sprintf("_v_min[1]=min(_v_min[1],%f);_v_max[1]=max(_v_max[1],%f);", 2.5, 7.5),
+			expectedSetExpr:    fmt.Sprintf("_v_min[1]=%f;_v_max[1]=%f;", 2.5, 7.5),
+			ignoreReason:       "enable when bug is fixed - IG-8675"},
 
-		{"Should aggregate data with Count,Sum,Sqr,Last aggregators", "count,sum,sqr,last", map[int64]float64{1: 7.5, 2: 2.5}, "v", 1,
-			fmt.Sprintf("_v_count[1]=_v_count[1]+2;_v_sum[1]=_v_sum[1]+%f;_v_sqr[1]=_v_sqr[1]+%f;_v_last[1]=%f;", 10.0, 62.5, 2.5),
-			fmt.Sprintf("_v_count[1]=2;_v_sum[1]=%f;_v_sqr[1]=%f;_v_last[1]=%f;", 10.0, 62.5, 2.5), false},
+		{desc: "Should aggregate data with Count,Sum,Sqr,Last aggregators",
+			aggString: "count,sum,sqr,last",
+			data:      map[int64]float64{1: 7.5, 2: 2.5},
+			exprCol:   "v", bucket: 1,
+			expectedUpdateExpr: fmt.Sprintf("_v_count[1]=_v_count[1]+2;_v_sum[1]=_v_sum[1]+%f;_v_sqr[1]=_v_sqr[1]+%f;_v_last[1]=%f;", 10.0, 62.5, 2.5),
+			expectedSetExpr:    fmt.Sprintf("_v_count[1]=2;_v_sum[1]=%f;_v_sqr[1]=%f;_v_last[1]=%f;", 10.0, 62.5, 2.5)},
 
-		// todo: enable when bug is fixed - IG-8675
-		//{"Should aggregate data with Wildcard aggregators", "*", map[int64]float64{1: 7.5, 2: 2.5}, "v", 1,
-		//	fmt.Sprintf("_v_count[1]=_v_count[1]+2;_v_sum[1]=_v_sum[1]+%f;"+
-		//		"_v_sqr[1]=_v_sqr[1]+%f;_v_min[1]=min(_v_min[1],%f);_v_max[1]=max(_v_max[1],%f);"+
-		//		"_v_last[1]=%f;", 10.0, 62.5, 2.5, 7.5, 2.5),
-		//	fmt.Sprintf("_v_count[1]=2;_v_sum[1]=%f;_v_sqr[1]=%f;"+
-		//		"_v_min[1]=%f;_v_max[1]=%f;_v_last[1]=%f;", 10.0, 62.5, 2.5, 7.5, 2.5), false},
-		//
-		//{"Should aggregate data with Bad aggregator", "not-real", map[int64]float64{1: 7.5, 2: 2.5}, "v", 1,
-		//	"_v_count[1]=_v_count[1]+2;", "_v_count[1]=2;", true},
+		{desc: "Should aggregate data with Wildcard aggregators",
+			aggString: "*",
+			data:      map[int64]float64{1: 7.5, 2: 2.5},
+			exprCol:   "v", bucket: 1,
+			expectedUpdateExpr: fmt.Sprintf("_v_count[1]=_v_count[1]+2;_v_sum[1]=_v_sum[1]+%f;"+
+				"_v_sqr[1]=_v_sqr[1]+%f;_v_min[1]=min(_v_min[1],%f);_v_max[1]=max(_v_max[1],%f);"+
+				"_v_last[1]=%f;", 10.0, 62.5, 2.5, 7.5, 2.5),
+			expectedSetExpr: fmt.Sprintf("_v_count[1]=2;_v_sum[1]=%f;_v_sqr[1]=%f;"+
+				"_v_min[1]=%f;_v_max[1]=%f;_v_last[1]=%f;", 10.0, 62.5, 2.5, 7.5, 2.5),
+			ignoreReason: "enable when bug is fixed - IG-8675"},
+
+		{desc: "Should aggregate data with Bad aggregator",
+			aggString: "not-real",
+			data:      map[int64]float64{1: 7.5, 2: 2.5},
+			exprCol:   "v", bucket: 1,
+			expectedUpdateExpr: "_v_count[1]=_v_count[1]+2;", expectedSetExpr: "_v_count[1]=2;", expectFail: true},
 	}
 
 	for _, test := range testCases {
 		t.Logf("%s\n", test.desc)
-		aggregator, err := AggrsFromString(test.aggString)
-		if err != nil {
-			if !test.expectFail {
-				t.Fatal(err)
-			} else {
-				return
+		t.Run(test.desc, func(t *testing.T) {
+			if test.ignoreReason != "" {
+				t.Skip(test.ignoreReason)
 			}
-		}
-		aggregatorList := NewAggregatorList(aggregator)
+			testAggregatorCase(t, test.aggString, test.data, test.exprCol, test.bucket, test.expectedUpdateExpr,
+				test.expectedSetExpr, test.expectFail)
+		})
+	}
+}
 
-		for k, v := range test.data {
-			aggregatorList.Aggregate(k, v)
-		}
+func testAggregatorCase(t *testing.T, aggString string, data map[int64]float64, exprCol string, bucket int,
+	expectedUpdateExpr string, expectedSetExpr string, expectFail bool) {
 
-		actualUpdateExpr := aggregatorList.UpdateExpr(test.exprCol, test.bucket)
-		if actualUpdateExpr != test.expectedUpdateExpr {
-			t.Errorf("test: %s failed. actual update Expresion %s is not equal to expected %s",
-				test.desc, actualUpdateExpr, test.expectedUpdateExpr)
+	aggregator, err := AggrsFromString(aggString)
+	if err != nil {
+		if !expectFail {
+			t.Fatal(err)
+		} else {
+			return
 		}
+	}
+	aggregatorList := NewAggregatorList(aggregator)
 
-		actualSetExpr := aggregatorList.SetExpr(test.exprCol, test.bucket)
-		if actualSetExpr != test.expectedSetExpr {
-			t.Errorf("test: %s failed. actual set Expresion %s is not equal to expected %s",
-				test.desc, actualSetExpr, test.expectedSetExpr)
-		}
+	for k, v := range data {
+		aggregatorList.Aggregate(k, v)
+	}
+
+	actualUpdateExpr := aggregatorList.UpdateExpr(exprCol, bucket)
+	if actualUpdateExpr != expectedUpdateExpr {
+		t.Errorf("Actual update Expresion %s is not equal to expected %s",
+			actualUpdateExpr, expectedUpdateExpr)
+	}
+
+	actualSetExpr := aggregatorList.SetExpr(exprCol, bucket)
+	if actualSetExpr != expectedSetExpr {
+		t.Errorf("Actual set Expresion %s is not equal to expected %s",
+			actualSetExpr, expectedSetExpr)
 	}
 }

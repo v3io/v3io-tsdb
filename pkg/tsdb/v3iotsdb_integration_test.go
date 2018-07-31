@@ -41,10 +41,11 @@ func TestIngestData(t *testing.T) {
 	}
 
 	testCases := []struct {
-		desc       string
-		metricName string
-		labels     []utils.Label
-		data       []tsdbtest.DataPoint
+		desc         string
+		metricName   string
+		labels       []utils.Label
+		data         []tsdbtest.DataPoint
+		ignoreReason string
 	}{
 		{desc: "Should ingest one data point", metricName: "cpu", labels: utils.FromStrings("testLabel", "balbala"),
 			data: []tsdbtest.DataPoint{{Time: 1532940510, Value: 314.3}}},
@@ -70,6 +71,9 @@ func TestIngestData(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.desc, func(t *testing.T) {
+			if test.ignoreReason != "" {
+				t.Skip(test.ignoreReason)
+			}
 			testIngestDataCase(t, v3ioConfig, test.metricName, test.labels, test.data)
 		})
 	}
@@ -132,14 +136,15 @@ func TestQueryData(t *testing.T) {
 	}
 
 	testCases := []struct {
-		desc       string
-		metricName string
-		labels     []utils.Label
-		data       []tsdbtest.DataPoint
-		filter     string
-		from       int64
-		to         int64
-		expected   []tsdbtest.DataPoint
+		desc         string
+		metricName   string
+		labels       []utils.Label
+		data         []tsdbtest.DataPoint
+		filter       string
+		from         int64
+		to           int64
+		expected     []tsdbtest.DataPoint
+		ignoreReason string
 	}{
 		{desc: "Should ingest and query one data point", metricName: "cpu",
 			labels: utils.FromStrings("testLabel", "balbala"),
@@ -180,6 +185,9 @@ func TestQueryData(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.desc, func(t *testing.T) {
+			if test.ignoreReason != "" {
+				t.Skip(test.ignoreReason)
+			}
 			testQueryDataCase(t, v3ioConfig, test.metricName, test.labels,
 				test.data, test.filter, test.from, test.to, test.expected)
 		})
@@ -265,10 +273,11 @@ func TestCreateTSDB(t *testing.T) {
 	}
 
 	testCases := []struct {
-		desc string
-		conf config.DBPartConfig
+		desc         string
+		conf         config.DBPartConfig
+		ignoreReason string
 	}{
-		{"Should create TSDB with standard configuration", config.DBPartConfig{
+		{desc: "Should create TSDB with standard configuration", conf: config.DBPartConfig{
 			Signature:      "TSDB",
 			Version:        "1.0",
 			DaysPerObj:     1,
@@ -277,7 +286,7 @@ func TestCreateTSDB(t *testing.T) {
 			RollupMin:      10,
 		}},
 
-		{"Should create TSDB with wildcard aggregations", config.DBPartConfig{
+		{desc: "Should create TSDB with wildcard aggregations", conf: config.DBPartConfig{
 			Signature:      "TSDB",
 			Version:        "1.0",
 			DaysPerObj:     1,
@@ -289,6 +298,9 @@ func TestCreateTSDB(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.desc, func(t *testing.T) {
+			if test.ignoreReason != "" {
+				t.Skip(test.ignoreReason)
+			}
 			testCreateTSDBcase(t, v3ioConfig, test.conf)
 		})
 	}
