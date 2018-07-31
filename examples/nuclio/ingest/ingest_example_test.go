@@ -1,4 +1,4 @@
-// +build nuclio_integration
+// +build integration
 
 package ingest
 
@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/nuclio/nuclio-test-go"
 	"github.com/v3io/v3io-tsdb/pkg/config"
+	"github.com/v3io/v3io-tsdb/pkg/tsdb/tsdbtest"
 	"os"
 	"path/filepath"
 	"testing"
@@ -13,16 +14,14 @@ import (
 )
 
 func TestIngestIntegration(t *testing.T) {
-
-	if testing.Short() {
-		t.Skip("Skipping integration test.")
-	}
-	v3ioConfig, err := config.LoadConfig(filepath.Join("../../../", config.DefaultConfigurationFileName))
+	v3ioConfig, err := config.LoadConfig(filepath.Join("..", "..", "..", config.DefaultConfigurationFileName))
+	defer tsdbtest.SetUp(t, v3ioConfig)()
 
 	url := os.Getenv("V3IO_SERVICE_URL")
 	if url == "" {
 		url = v3ioConfig.V3ioUrl
 	}
+
 	data := nutest.DataBind{
 		Name: "db0", Url: url, Container: v3ioConfig.Container, User: v3ioConfig.Username, Password: v3ioConfig.Password}
 	tc, err := nutest.NewTestContext(Handler, true, &data)

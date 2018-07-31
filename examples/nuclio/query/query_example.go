@@ -10,13 +10,9 @@ import (
 	"github.com/v3io/v3io-tsdb/pkg/formatter"
 	"github.com/v3io/v3io-tsdb/pkg/tsdb"
 	"github.com/v3io/v3io-tsdb/pkg/utils"
+	"path/filepath"
 	"strings"
 )
-
-// Configuration
-const tsdbConfig = `
-path: "pmetric"
-`
 
 type tsdbQuery struct {
 	Name        string
@@ -80,7 +76,7 @@ func Handler(context *nuclio.Context, event nuclio.Event) (interface{}, error) {
 
 // InitContext runs only once when the function runtime starts
 func InitContext(context *nuclio.Context) error {
-	cfg, _ := config.LoadFromData([]byte(tsdbConfig))
+	cfg, _ := config.LoadConfig(filepath.Join("..", "..", "..", config.DefaultConfigurationFileName))
 	data := context.DataBinding["db0"].(*v3io.Container)
 	adapter, err := tsdb.NewV3ioAdapter(cfg, data, context.Logger)
 	if err != nil {

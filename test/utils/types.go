@@ -1,6 +1,8 @@
 package utils
 
-import "github.com/v3io/v3io-tsdb/pkg/utils"
+import (
+	"github.com/v3io/v3io-tsdb/pkg/utils"
+)
 
 type DataPoint struct {
 	Time  int64

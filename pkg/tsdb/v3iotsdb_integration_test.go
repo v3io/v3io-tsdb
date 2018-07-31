@@ -20,12 +20,14 @@ under the Apache 2.0 license is conditioned upon your compliance with
 such restriction.
 */
 
-package tsdb
+package tsdb_test
 
 import (
 	"fmt"
 	"github.com/v3io/v3io-go-http"
 	"github.com/v3io/v3io-tsdb/pkg/config"
+	. "github.com/v3io/v3io-tsdb/pkg/tsdb"
+	"github.com/v3io/v3io-tsdb/pkg/tsdb/tsdbtest"
 	"github.com/v3io/v3io-tsdb/pkg/utils"
 	testUtils "github.com/v3io/v3io-tsdb/test/utils"
 	"path/filepath"
@@ -33,51 +35,11 @@ import (
 	"testing"
 )
 
-func deleteTSDB(t *testing.T, v3ioConfig *config.V3ioConfig) {
-	adapter, err := NewV3ioAdapter(v3ioConfig, nil, nil)
-	if err != nil {
-		t.Fatalf("Failed to create adapter. reason: %s", err)
-	}
-
-	if err := adapter.DeleteDB(true, true); err != nil {
-		t.Fatalf("Failed to delete DB on teardown. reason: %s", err)
-	}
-}
-
-func setUp(t *testing.T, v3ioConfig *config.V3ioConfig) func() {
-	dbConfig := config.DBPartConfig{
-		DaysPerObj:     1,
-		HrInChunk:      1,
-		DefaultRollups: "sum",
-		RollupMin:      10,
-	}
-
-	if err := CreateTSDB(v3ioConfig, &dbConfig); err != nil {
-		t.Fatalf("Failed to create TSDB. reason: %s", err)
-	}
-
-	return func() {
-		deleteTSDB(t, v3ioConfig)
-	}
-}
-
-func setUpWithDBConfig(t *testing.T, v3ioConfig *config.V3ioConfig, dbConfig config.DBPartConfig) func() {
-	if err := CreateTSDB(v3ioConfig, &dbConfig); err != nil {
-		t.Fatalf("Failed to create TSDB. reason: %s", err)
-	}
-
-	return func() {
-		deleteTSDB(t, v3ioConfig)
-	}
-}
-
 func TestIngestData(t *testing.T) {
 	v3ioConfig, err := config.LoadConfig(filepath.Join("../../", config.DefaultConfigurationFileName))
 	if err != nil {
 		t.Fatalf("Failed to load test configuration. reason: %s", err)
 	}
-
-	fmt.Printf("som %v", testUtils.DataPoint{Time: 123134, Value: 123.43})
 
 	testCases := []struct {
 		desc       string
@@ -116,7 +78,7 @@ func TestIngestData(t *testing.T) {
 
 func testIngestDataCase(t *testing.T, v3ioConfig *config.V3ioConfig,
 	metricsName string, userLabels []utils.Label, data []testUtils.DataPoint) {
-	defer setUp(t, v3ioConfig)()
+	defer tsdbtest.SetUp(t, v3ioConfig)()
 
 	adapter, err := NewV3ioAdapter(v3ioConfig, nil, nil)
 	if err != nil {
@@ -131,13 +93,12 @@ func testIngestDataCase(t *testing.T, v3ioConfig *config.V3ioConfig,
 	labels := utils.Labels{utils.Label{Name: "__name__", Value: metricsName}}
 	labels = append(labels, userLabels...)
 
-	fmt.Printf("the labeles are: %v\n", labels)
 	ref, err := appender.Add(labels, data[0].Time, data[0].Value)
 	if err != nil {
 		t.Fatalf("Failed to add data to appender. reason: %s", err)
 	}
-	for i := 1; i < len(data); i++ {
-		appender.AddFast(labels, ref, data[i].Time, data[i].Value)
+	for _, curr := range data[1:] {
+		appender.AddFast(labels, ref, curr.Time, curr.Value)
 	}
 
 	if _, err := appender.WaitForCompletion(0); err != nil {
@@ -145,8 +106,9 @@ func testIngestDataCase(t *testing.T, v3ioConfig *config.V3ioConfig,
 	}
 
 	responseChan := make(chan *v3io.Response)
-	adapter.container.GetItems(&v3io.GetItemsInput{
-		Path:           "/metrics/0/",
+	container, _ := adapter.GetContainer()
+	container.GetItems(&v3io.GetItemsInput{
+		Path:           fmt.Sprintf("/%s/0/", v3ioConfig.Path),
 		AttributeNames: []string{"*"},
 	}, 30, responseChan)
 
@@ -157,7 +119,7 @@ func testIngestDataCase(t *testing.T, v3ioConfig *config.V3ioConfig,
 		for _, label := range userLabels {
 			actual := item.GetField(label.Name)
 			if actual != label.Value {
-				t.Fatalf("Records were not saved correctly. for label %s, actual: %v, expected: %v",
+				t.Fatalf("Records were not saved correctly for label %s, actual: %v, expected: %v",
 					label.Name, actual, label.Value)
 			}
 		}
@@ -228,7 +190,7 @@ func TestQueryData(t *testing.T) {
 func testQueryDataCase(test *testing.T, v3ioConfig *config.V3ioConfig,
 	metricsName string, userLabels []utils.Label, data []testUtils.DataPoint, filter string,
 	from int64, to int64, expected []testUtils.DataPoint) {
-	defer setUp(test, v3ioConfig)()
+	defer tsdbtest.SetUp(test, v3ioConfig)()
 
 	adapter, err := NewV3ioAdapter(v3ioConfig, nil, nil)
 	if err != nil {
@@ -247,8 +209,8 @@ func testQueryDataCase(test *testing.T, v3ioConfig *config.V3ioConfig,
 	if err != nil {
 		test.Fatalf("Failed to add data to appender. reason: %s", err)
 	}
-	for i := 1; i < len(data); i++ {
-		appender.AddFast(labels, ref, data[i].Time, data[i].Value)
+	for _, curr := range data[1:] {
+		appender.AddFast(labels, ref, curr.Time, curr.Value)
 	}
 
 	if _, err := appender.WaitForCompletion(0); err != nil {
@@ -335,7 +297,7 @@ func TestCreateTSDB(t *testing.T) {
 }
 
 func testCreateTSDBcase(t *testing.T, v3ioConfig *config.V3ioConfig, dbConfig config.DBPartConfig) {
-	defer setUpWithDBConfig(t, v3ioConfig, dbConfig)()
+	defer tsdbtest.SetUpWithDBConfig(t, v3ioConfig, dbConfig)()
 
 	adapter, err := NewV3ioAdapter(v3ioConfig, nil, nil)
 	if err != nil {

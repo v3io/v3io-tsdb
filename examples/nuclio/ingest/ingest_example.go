@@ -8,15 +8,13 @@ import (
 	"github.com/v3io/v3io-tsdb/pkg/tsdb"
 	"github.com/v3io/v3io-tsdb/pkg/utils"
 	testUtils "github.com/v3io/v3io-tsdb/test/utils"
+	"path/filepath"
 	"sync"
 )
 
 // Configuration
 // Note: the TSDB (path) must be first created using the CLI or API
 // the user must also define the v3io data binding in the nuclio function with path, username, password and name it db0
-const tsdbConfig = `
-path: "pmetric"
-`
 
 // example event
 const pushEvent = `
@@ -65,7 +63,7 @@ func InitContext(context *nuclio.Context) error {
 
 	if adapter == nil {
 		// create adapter once for all contexts
-		cfg, _ := config.LoadFromData([]byte(tsdbConfig))
+		cfg, _ := config.LoadConfig(filepath.Join("..", "..", "..", config.DefaultConfigurationFileName))
 		data := context.DataBinding["db0"].(*v3io.Container)
 		adapter, err = tsdb.NewV3ioAdapter(cfg, data, context.Logger)
 		if err != nil {

@@ -1,4 +1,4 @@
-// +build nuclio_integration
+// +build integration
 
 package query
 
@@ -6,17 +6,16 @@ import (
 	"fmt"
 	"github.com/nuclio/nuclio-test-go"
 	"github.com/v3io/v3io-tsdb/pkg/config"
+	"github.com/v3io/v3io-tsdb/pkg/tsdb/tsdbtest"
 	"os"
 	"path/filepath"
 	"testing"
 )
 
 func TestQueryIntegration(t *testing.T) {
-
-	if testing.Short() {
-		t.Skip("Skipping integration test.")
-	}
 	v3ioConfig, err := config.LoadConfig(filepath.Join("../../../", config.DefaultConfigurationFileName))
+
+	defer tsdbtest.SetUp(t, v3ioConfig)()
 
 	url := os.Getenv("V3IO_SERVICE_URL")
 	if url == "" {
