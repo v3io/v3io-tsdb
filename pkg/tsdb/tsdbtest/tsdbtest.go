@@ -3,8 +3,20 @@ package tsdbtest
 import (
 	"github.com/v3io/v3io-tsdb/pkg/config"
 	. "github.com/v3io/v3io-tsdb/pkg/tsdb"
+	"github.com/v3io/v3io-tsdb/pkg/utils"
 	"testing"
 )
+
+type DataPoint struct {
+	Time  int64
+	Value float64
+}
+
+type Sample struct {
+	Lset  utils.Labels
+	Time  string
+	Value float64
+}
 
 func DeleteTSDB(t *testing.T, v3ioConfig *config.V3ioConfig) {
 	adapter, err := NewV3ioAdapter(v3ioConfig, nil, nil)
