@@ -8,7 +8,6 @@ import (
 	"github.com/v3io/v3io-tsdb/pkg/tsdb"
 	"github.com/v3io/v3io-tsdb/pkg/tsdb/tsdbtest"
 	"github.com/v3io/v3io-tsdb/pkg/utils"
-	"path/filepath"
 	"sync"
 )
 
@@ -27,7 +26,10 @@ const pushEvent = `
 
 var adapter *tsdb.V3ioAdapter
 var adapterMtx sync.RWMutex
-var tsdbPath string
+// Configuration
+var tsdbConfig = `
+path: "pmetric"
+`
 
 func Handler(context *nuclio.Context, event nuclio.Event) (interface{}, error) {
 	sample := tsdbtest.Sample{}
@@ -62,8 +64,7 @@ func InitContext(context *nuclio.Context) error {
 
 	if adapter == nil {
 		// create adapter once for all contexts
-		cfg, _ := config.LoadConfig(filepath.Join("..", "..", "..", config.DefaultConfigurationFileName))
-		cfg.Path = tsdbPath
+		cfg, _ := config.LoadFromData([]byte(tsdbConfig))
 		data := context.DataBinding["db0"].(*v3io.Container)
 		adapter, err = tsdb.NewV3ioAdapter(cfg, data, context.Logger)
 		if err != nil {

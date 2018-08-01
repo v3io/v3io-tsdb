@@ -15,7 +15,7 @@ import (
 func TestIngestIntegration(t *testing.T) {
 	v3ioConfig, err := config.LoadConfig(filepath.Join("..", "..", "..", config.DefaultConfigurationFileName))
 	defer tsdbtest.SetUp(t, v3ioConfig)()
-	tsdbPath = v3ioConfig.Path
+	tsdbConfig = fmt.Sprintf(`path: "%v"`, v3ioConfig.Path)
 
 	url := os.Getenv("V3IO_SERVICE_URL")
 	if url == "" {
