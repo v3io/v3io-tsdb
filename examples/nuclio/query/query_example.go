@@ -13,6 +13,11 @@ import (
 	"strings"
 )
 
+// Configuration
+var tsdbConfig = `
+path: "pmetric"
+`
+
 type tsdbQuery struct {
 	Name        string
 	Aggregators []string
@@ -22,11 +27,6 @@ type tsdbQuery struct {
 	To          string
 	Last        string
 }
-
-// Configuration
-var tsdbConfig = `
-path: "pmetric"
-`
 
 // example query event
 const queryEvent = `

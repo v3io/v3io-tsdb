@@ -14,6 +14,9 @@ import (
 // Configuration
 // Note: the TSDB (path) must be first created using the CLI or API
 // the user must also define the v3io data binding in the nuclio function with path, username, password and name it db0
+var tsdbConfig = `
+path: "pmetric"
+`
 
 // example event
 const pushEvent = `
@@ -26,11 +29,6 @@ const pushEvent = `
 
 var adapter *tsdb.V3ioAdapter
 var adapterMtx sync.RWMutex
-
-// Configuration
-var tsdbConfig = `
-path: "pmetric"
-`
 
 func Handler(context *nuclio.Context, event nuclio.Event) (interface{}, error) {
 	sample := tsdbtest.Sample{}
