@@ -41,7 +41,7 @@ func BenchmarkIngestWithNuclio(b *testing.B) {
 
 	// Update TSDB instance path for this test
 	v3ioConfig.Path = tsdbPath
-	common.CreateTSDB(v3ioConfig, tsdbPath)
+	common.CreateTSDB(v3ioConfig)
 
 	data := nutest.DataBind{
 		Name:      defaultDbName,
@@ -66,9 +66,9 @@ func BenchmarkIngestWithNuclio(b *testing.B) {
 	if err != nil {
 		b.Fatal("unable to resolve start time. Check configuration.")
 	}
-	testStartTimeMs := testStartTimeNano/int64(time.Millisecond) - relativeTimeOffsetMs
-	timestampsCount := (testStartTimeNano/int64(time.Millisecond) - testStartTimeMs) / int64(testConfig.SampleStepSize)
-	testEndTimeMs := testStartTimeMs + timestampsCount*int64(testConfig.SampleStepSize)
+	testEndTimeMs := testStartTimeNano / int64(time.Millisecond)
+	testStartTimeMs := testEndTimeMs - relativeTimeOffsetMs
+
 	sampleTemplates := common.MakeSampleTemplates(
 		common.MakeSamplesModel(
 			testConfig.NamesCount,

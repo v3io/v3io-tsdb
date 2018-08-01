@@ -10,7 +10,7 @@ import (
 	"strings"
 )
 
-func CreateTSDB(v3ioConfig *config.V3ioConfig, newTsdbPath string) error {
+func CreateTSDB(v3ioConfig *config.V3ioConfig) error {
 	dbcfg := config.DBPartConfig{
 		DaysPerObj:     7,
 		HrInChunk:      1,
@@ -18,10 +18,6 @@ func CreateTSDB(v3ioConfig *config.V3ioConfig, newTsdbPath string) error {
 		RollupMin:      5,
 	}
 	return tsdb.CreateTSDB(v3ioConfig, &dbcfg)
-}
-
-func DeleteTSDB(adapter *tsdb.V3ioAdapter, deleteConf bool, force bool) {
-	adapter.DeleteDB(deleteConf, force)
 }
 
 func ValidateCountOfSamples(adapter *tsdb.V3ioAdapter, expected int, startTimeMs, endTimeMs int64) error {

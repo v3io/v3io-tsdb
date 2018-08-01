@@ -30,7 +30,7 @@ func BenchmarkIngest(b *testing.B) {
 
 	// Update TSDB instance path for this test
 	v3ioConfig.Path = tsdbPath
-	common.CreateTSDB(v3ioConfig, tsdbPath)
+	common.CreateTSDB(v3ioConfig)
 
 	adapter, err := tsdb.NewV3ioAdapter(v3ioConfig, nil, nil)
 	if err != nil {
@@ -51,14 +51,14 @@ func BenchmarkIngest(b *testing.B) {
 	if err != nil {
 		b.Fatal("unable to resolve start time. Check configuration.")
 	}
-	testStartTimeMs := testStartTimeNano/int64(time.Millisecond) - relativeTimeOffsetMs
-	timestampsCount := (testStartTimeNano/int64(time.Millisecond) - testStartTimeMs) / int64(testConfig.SampleStepSize)
+	testEndTimeMs := testStartTimeNano / int64(time.Millisecond)
+	testStartTimeMs := testEndTimeMs - relativeTimeOffsetMs
+	timestampsCount := (testEndTimeMs - testStartTimeMs) / int64(testConfig.SampleStepSize)
 	timestamps := make([]int64, timestampsCount)
 
 	testStartTime := time.Unix(int64(testStartTimeMs/1000), 0).Format(time.RFC3339)
-	testEndTimeMs := testStartTimeMs + timestampsCount*int64(testConfig.SampleStepSize)
 	testEndTime := time.Unix(int64(testEndTimeMs/1000), 0).Format(time.RFC3339)
-	fmt.Printf("\nAbout to run %d ingestion cycles from %s [%d] to %s [%d]. Total samples count: %d\n",
+	fmt.Printf("\nAbout to run %d ingestion cycles from %s [%d] to %s [%d]. Max samples count: %d\n",
 		b.N,
 		testStartTime, testStartTimeMs,
 		testEndTime, testEndTimeMs,
@@ -79,8 +79,7 @@ func BenchmarkIngest(b *testing.B) {
 
 	samplesCount := len(sampleTemplates)
 	refs := make([]uint64, samplesCount)
-	timestampCount := len(timestamps)
-	testLimit := samplesCount * timestampCount
+	testLimit := samplesCount * int(timestampsCount)
 
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
