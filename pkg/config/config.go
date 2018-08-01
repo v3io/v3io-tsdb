@@ -27,6 +27,7 @@ import (
 )
 
 const DefaultConfigurationFileName = "v3io.yaml"
+const SCHEMA_CONFIG = "/.schema"
 
 type V3ioConfig struct {
 	// V3IO Connection details: Url, Data container, relative path for this dataset, credentials

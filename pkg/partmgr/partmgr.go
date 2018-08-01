@@ -30,7 +30,6 @@ import (
 	"github.com/v3io/v3io-go-http"
 	"encoding/json"
 	"github.com/pkg/errors"
-	"github.com/v3io/v3io-tsdb/pkg/tsdb"
 )
 
 // Create new Partition Manager, for now confined to one Cyclic partition
@@ -138,7 +137,7 @@ func (p *PartitionManager) updatePartitionInSchema(partition *DBPartition) error
 	if err != nil {
 		return errors.Wrap(err, "Failed to update new partition in schema file")
 	}
-	err = p.container.Sync.PutObject(&v3io.PutObjectInput{Path:p.path + tsdb.SCHEMA_CONFIG, Body: data})
+	err = p.container.Sync.PutObject(&v3io.PutObjectInput{Path:p.path + config.SCHEMA_CONFIG, Body: data})
 	return err
 }
 
