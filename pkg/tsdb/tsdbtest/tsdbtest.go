@@ -1,11 +1,11 @@
 package tsdbtest
 
 import (
+	"fmt"
 	"github.com/v3io/v3io-tsdb/pkg/config"
 	. "github.com/v3io/v3io-tsdb/pkg/tsdb"
 	"github.com/v3io/v3io-tsdb/pkg/utils"
 	"testing"
-	"fmt"
 	"time"
 )
 
