@@ -23,6 +23,7 @@ package aggregate
 import (
 	"fmt"
 	"strings"
+	"github.com/v3io/v3io-tsdb/pkg/config"
 )
 
 type AggrType uint16
@@ -57,11 +58,43 @@ var aggrToString = map[AggrType]string{
 	aggrTypeStddev: "stddev", aggrTypeStdvar: "stdvar", aggrTypeAll: "*",
 }
 
+var aggrToSchemaField = map[string]config.SchemaField{
+	"count": {Name: "_v_count", Type: "array", Nullable: true, Items: "double"},
+	"sum": {Name: "_v_sum", Type: "array", Nullable: true, Items: "double"},
+	"sqr":  {Name: "_v_sqr", Type: "array", Nullable: true, Items: "double"},
+	"max":  {Name: "_v_max", Type: "array", Nullable: true, Items: "double"},
+	"min":  {Name: "_v_min", Type: "array", Nullable: true, Items: "double"},
+	"last":  {Name: "_v_last", Type: "array", Nullable: true, Items: "double"},
+	"avg":  {Name: "_v_avg", Type: "array", Nullable: true, Items: "double"},
+	"rate":  {Name: "_v_rate", Type: "array", Nullable: true, Items: "double"},
+	"stddev":  {Name: "_v_stddev", Type: "array", Nullable: true, Items: "double"},
+	"stdvar":  {Name: "_v_stdvar", Type: "array", Nullable: true, Items: "double"},
+}
+
+func SchemaFieldFromString(split []string) ([]config.SchemaField, error) {
+	fieldList := make([]config.SchemaField, 0, len(split))
+	for _, s := range split {
+		if strings.Compare(s, "*") == 0 {
+			fieldList = make([]config.SchemaField, 0, len(aggrToSchemaField))
+			for _, val := range aggrToSchemaField {
+				fieldList = append(fieldList, val)
+			}
+			return fieldList, nil
+		} else {
+			field, ok := aggrToSchemaField[s]
+			if !ok {
+				return fieldList, fmt.Errorf("Invalid aggragator type %s", s)
+			}
+			fieldList = append(fieldList, field)
+		}
+	}
+	return fieldList, nil
+}
+
 func (a AggrType) String() string { return aggrToString[a] }
 
 // convert comma separated string to aggregator mask
-func AggrsFromString(list string) (AggrType, error) {
-	split := strings.Split(list, ",")
+func AggrsFromString(split []string) (AggrType, error) {
 	var aggrList AggrType
 	for _, s := range split {
 		aggr, ok := aggrTypeString[s]

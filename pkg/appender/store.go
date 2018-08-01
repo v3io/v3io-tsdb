@@ -45,7 +45,7 @@ func NewChunkStore() *chunkStore {
 // chunkStore store state & latest + previous chunk appenders
 type chunkStore struct {
 	curChunk int
-	lastTid  int
+	lastTid  int64
 	chunks   [2]*attrAppender
 
 	aggrList      *aggregate.AggregatorList
@@ -116,7 +116,10 @@ func (cs *chunkStore) GetChunksState(mc *MetricsCache, metric *MetricState) (boo
 
 	// init chunk and create aggregation list object based on partition policy
 	t := cs.pending[0].t
-	part := mc.partitionMngr.TimeToPart(t)
+	part, err := mc.partitionMngr.TimeToPart(t)
+	if err != nil {
+		return false, err
+	}
 	cs.chunks[0].initialize(part, t)
 	cs.aggrList = aggregate.NewAggregatorList(part.AggrType())
 
@@ -183,7 +186,7 @@ func (cs *chunkStore) ProcessGetResp(mc *MetricsCache, metric *MetricState, resp
 	}
 
 	// set Last TableId, indicate that there is no need to create metric object
-	cs.lastTid = cs.chunks[0].partition.GetId()
+	cs.lastTid = cs.chunks[0].partition.GetStartTime()
 
 }
 
@@ -218,7 +221,8 @@ func (cs *chunkStore) chunkByTime(t int64) *attrAppender {
 		if err != nil {
 			return nil
 		}
-		cur.initialize(part.NextPart(t), t) // TODO: next part
+		nextPart, _  := part.NextPart(t)
+		cur.initialize(nextPart, t)
 		cur.appender = app
 		cs.curChunk = cs.curChunk ^ 1
 
@@ -252,10 +256,13 @@ func (cs *chunkStore) WriteChunks(mc *MetricsCache, metric *MetricState) (bool, 
 
 	// init partition info and find if we need to init the metric headers (labels, ..) in case of new partition
 	t0 := cs.pending[0].t
-	partition := mc.partitionMngr.TimeToPart(t0)
-	if partition.GetId() > cs.lastTid {
+	partition, err := mc.partitionMngr.TimeToPart(t0)
+	if err != nil {
+		return false, err
+	}
+	if partition.GetStartTime() > cs.lastTid {
 		notInitialized = true
-		cs.lastTid = partition.GetId()
+		cs.lastTid = partition.GetStartTime()
 	}
 
 	// init aggregation buckets info

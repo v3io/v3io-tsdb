@@ -35,8 +35,7 @@ import (
 	"time"
 )
 
-const DB_VERSION = "1.0"
-const DB_CONFIG_PATH = "/dbconfig.json"
+const SCHEMA_CONFIG = "/.schema.json"
 
 type V3ioAdapter struct {
 	startTimeMargin int64
@@ -47,7 +46,7 @@ type V3ioAdapter struct {
 	partitionMngr   *partmgr.PartitionManager
 }
 
-func CreateTSDB(v3iocfg *config.V3ioConfig, dbconfig *config.DBPartConfig) error {
+func CreateTSDB(v3iocfg *config.V3ioConfig, schema *config.Schema) error {
 
 	logger, _ := utils.NewLogger(v3iocfg.Verbose)
 	container, err := utils.CreateContainer(
@@ -56,21 +55,18 @@ func CreateTSDB(v3iocfg *config.V3ioConfig, dbconfig *config.DBPartConfig) error
 		return errors.Wrap(err, "Failed to create data container")
 	}
 
-	dbconfig.Signature = "TSDB"
-	dbconfig.Version = DB_VERSION
-
-	data, err := json.Marshal(dbconfig)
+	data, err := json.Marshal(schema)
 	if err != nil {
-		return errors.Wrap(err, "Failed to Marshal DB config")
+		return errors.Wrap(err, "Failed to Marshal schema file")
 	}
 
 	// check if the config file already exist, abort if it does
-	_, err = container.Sync.GetObject(&v3io.GetObjectInput{Path: v3iocfg.Path + DB_CONFIG_PATH})
+	_, err = container.Sync.GetObject(&v3io.GetObjectInput{Path: v3iocfg.Path + SCHEMA_CONFIG})
 	if err == nil {
 		return fmt.Errorf("TSDB already exist in path: " + v3iocfg.Path)
 	}
 
-	err = container.Sync.PutObject(&v3io.PutObjectInput{Path: v3iocfg.Path + DB_CONFIG_PATH, Body: data})
+	err = container.Sync.PutObject(&v3io.PutObjectInput{Path: v3iocfg.Path + SCHEMA_CONFIG, Body: data})
 
 	return err
 }
@@ -106,7 +102,7 @@ func NewV3ioAdapter(cfg *config.V3ioConfig, container *v3io.Container, logger lo
 	return &newV3ioAdapter, err
 }
 
-func (a *V3ioAdapter) GetDBConfig() *config.DBPartConfig {
+func (a *V3ioAdapter) GetSchema() *config.Schema {
 	return a.partitionMngr.GetConfig()
 }
 
@@ -121,22 +117,18 @@ func (a *V3ioAdapter) GetContainer() (*v3io.Container, string) {
 func (a *V3ioAdapter) connect() error {
 
 	fullpath := a.cfg.V3ioUrl + "/" + a.cfg.Container + "/" + a.cfg.Path
-	resp, err := a.container.Sync.GetObject(&v3io.GetObjectInput{Path: a.cfg.Path + "/dbconfig.json"})
+	resp, err := a.container.Sync.GetObject(&v3io.GetObjectInput{Path: a.cfg.Path + SCHEMA_CONFIG})
 	if err != nil {
-		return errors.Wrap(err, "Failed to read DB config at path: "+fullpath)
+		return errors.Wrap(err, "Failed to read schema at path: "+fullpath)
 	}
 
-	dbcfg := config.DBPartConfig{}
-	err = json.Unmarshal(resp.Body(), &dbcfg)
+	schema := config.Schema{}
+	err = json.Unmarshal(resp.Body(), &schema)
 	if err != nil {
-		return errors.Wrap(err, "Failed to Unmarshal DB config at path: "+fullpath)
+		return errors.Wrap(err, "Failed to Unmarshal schema at path: "+fullpath)
 	}
 
-	if dbcfg.Signature != "TSDB" {
-		return fmt.Errorf("Bad TSDB signature at path %s", fullpath)
-	}
-
-	a.partitionMngr = partmgr.NewPartitionMngr(&dbcfg, a.cfg.Path)
+	a.partitionMngr = partmgr.NewPartitionMngr(&schema, a.cfg.Path, a.container)
 	err = a.partitionMngr.Init()
 	if err != nil {
 		return errors.Wrap(err, "Failed to init DB partition manager at path: "+fullpath)
@@ -203,10 +195,10 @@ func (a *V3ioAdapter) DeleteDB(config bool, force bool) error {
 	a.container.Sync.DeleteObject(&v3io.DeleteObjectInput{Path: path})
 
 	if config {
-		a.logger.Info("Delete TSDB config in path %s", a.cfg.Path+DB_CONFIG_PATH)
-		err = a.container.Sync.DeleteObject(&v3io.DeleteObjectInput{Path: a.cfg.Path + DB_CONFIG_PATH})
+		a.logger.Info("Delete TSDB config in path %s", a.cfg.Path+SCHEMA_CONFIG)
+		err = a.container.Sync.DeleteObject(&v3io.DeleteObjectInput{Path: a.cfg.Path + SCHEMA_CONFIG})
 		if err != nil && !force {
-			return errors.New("Cant delete config or not found in " + a.cfg.Path + DB_CONFIG_PATH)
+			return errors.New("Cant delete config or not found in " + a.cfg.Path + SCHEMA_CONFIG)
 		}
 		// delete the Directory object
 		a.container.Sync.DeleteObject(&v3io.DeleteObjectInput{Path: a.cfg.Path + "/"})

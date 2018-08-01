@@ -27,33 +27,47 @@ import (
 	"github.com/v3io/v3io-tsdb/pkg/aggregate"
 	"github.com/v3io/v3io-tsdb/pkg/config"
 	"sync"
+	"github.com/v3io/v3io-go-http"
+	"encoding/json"
+	"github.com/pkg/errors"
+	"github.com/v3io/v3io-tsdb/pkg/tsdb"
 )
 
 // Create new Partition Manager, for now confined to one Cyclic partition
-func NewPartitionMngr(cfg *config.DBPartConfig, path string) *PartitionManager {
-	newMngr := &PartitionManager{cfg: cfg, path: path, cyclic: true, ignoreWrap: true}
-	newMngr.headPartition = NewDBPartition(newMngr)
+func NewPartitionMngr(cfg *config.Schema, path string, cont *v3io.Container) *PartitionManager {
+	newMngr := &PartitionManager{cfg: cfg, path: path, cyclic: true, ignoreWrap: true, container: cont}
+	for _, part := range cfg.Partitions {
+		path := fmt.Sprintf("%s/%s/", newMngr.path, string(part.StartTime))
+		newPart := NewDBPartition(newMngr, part.StartTime, path)
+		newMngr.partitions = append(newMngr.partitions, newPart)
+		if newMngr.headPartition == nil {
+			newMngr.headPartition = newPart
+		} else {
+			if newMngr.headPartition.startTime < newPart.startTime {
+				newMngr.headPartition = newPart
+			}
+		}
+	}
 	return newMngr
 }
 
 // Create and Init a new Partition
-func NewDBPartition(pmgr *PartitionManager) *DBPartition {
+func NewDBPartition(pmgr *PartitionManager, startTime int64, path string) *DBPartition {
 	newPart := DBPartition{
 		manager:       pmgr,
-		path:          pmgr.path + "/0/", // TODO: format a string based on id & format
-		partID:        1,
-		startTime:     0,
-		days:          pmgr.cfg.DaysPerObj,
-		hoursInChunk:  pmgr.cfg.HrInChunk,
+		path:          path,
+		startTime:     startTime,
+		days:          1,//pmgr.cfg.DaysPerObj, //TODO
+		hoursInChunk:  1,//pmgr.cfg.HrInChunk,
 		prefix:        "",
-		retentionDays: pmgr.cfg.DaysRetention,
-		rollupTime:    int64(pmgr.cfg.RollupMin) * 60 * 1000,
+		retentionDays: pmgr.cfg.PartitionSchemaInfo.SampleRetention,
+		rollupTime:    int64(pmgr.cfg.PartitionSchemaInfo.AggregatorsGranularityInSeconds) * 60 * 1000,
 	}
 
-	aggrType, _ := aggregate.AggrsFromString(pmgr.cfg.DefaultRollups) // TODO: error check & load part data from schema object
+	aggrType, _ := aggregate.AggrsFromString(pmgr.cfg.PartitionSchemaInfo.Aggregators)
 	newPart.defaultRollups = aggrType
-	if pmgr.cfg.RollupMin != 0 {
-		newPart.rollupBuckets = pmgr.cfg.DaysPerObj * 24 * 60 / pmgr.cfg.RollupMin
+	if pmgr.cfg.PartitionSchemaInfo.AggregatorsGranularityInSeconds != 0 {
+		newPart.rollupBuckets = /*pmgr.cfg.DaysPerObj*/ 1 * 24 * 60 / pmgr.cfg.PartitionSchemaInfo.SampleRetention //TODO
 	}
 
 	return &newPart
@@ -62,49 +76,134 @@ func NewDBPartition(pmgr *PartitionManager) *DBPartition {
 type PartitionManager struct {
 	mtx           sync.RWMutex
 	path          string
-	cfg           *config.DBPartConfig
+	cfg           *config.Schema
 	headPartition *DBPartition
+	partitions    []*DBPartition
 	cyclic        bool
 	ignoreWrap    bool
+	container     *v3io.Container
 }
 
 func (p *PartitionManager) IsCyclic() bool {
 	return p.cyclic
 }
 
-func (p *PartitionManager) GetConfig() *config.DBPartConfig {
+func (p *PartitionManager) GetConfig() *config.Schema {
 	return p.cfg
 }
 
 func (p *PartitionManager) Init() error {
-
 	return nil
 }
 
-func (p *PartitionManager) TimeToPart(t int64) *DBPartition {
+func (p *PartitionManager) TimeToPart(t int64) (*DBPartition, error) {
+	if p.headPartition == nil {
+		_, err := p.createNewPartition(p.TimeToPartitionStart(t))
+		return p.headPartition, err
+	} else {
+		tNext := p.TimeToNextPartition(p.headPartition.startTime)
+		if t >= p.headPartition.startTime && t < tNext {
+			return p.headPartition, nil
+		} else if t < p.headPartition.startTime {
+			//iterate backwards, ignore last elem as it's the headPartition
+			for i := len(p.partitions) - 2; i >= 0; i-- {
+				if t > p.partitions[i].startTime {
+					return p.partitions[i], nil
+				}
+			}
+		} else {
+			_, err := p.createNewPartition(tNext)
+			if err != nil {
+				return nil, err
+			}
+			return p.TimeToPart(t)
+		}
+	}
+	return p.headPartition, nil
+}
 
-	return p.headPartition // TODO: find the matching partition, if newer create one
+func (p *PartitionManager) createNewPartition(t int64) (*DBPartition, error) {
+	time := t & 0x7FFFFFFFFFFFFFF0
+	path := fmt.Sprintf("%s/%s/", p.path, string(time))
+	partition := NewDBPartition(p, time, path)
+	p.headPartition = partition
+	p.partitions = append(p.partitions, partition)
+	err := p.updatePartitionInSchema(partition)
+	return partition, err
+}
+
+func (p *PartitionManager) updatePartitionInSchema(partition *DBPartition) error {
+	p.cfg.Partitions = append(p.cfg.Partitions, config.Partition{StartTime:partition.startTime, SchemaInfo: p.cfg.PartitionSchemaInfo})
+	data, err := json.Marshal(p.cfg)
+	if err != nil {
+		return errors.Wrap(err, "Failed to update new partition in schema file")
+	}
+	err = p.container.Sync.PutObject(&v3io.PutObjectInput{Path:p.path + tsdb.SCHEMA_CONFIG, Body: data})
+	return err
 }
 
 func (p *PartitionManager) PartsForRange(mint, maxt int64) []*DBPartition {
-
-	return []*DBPartition{p.headPartition}
+	var parts []*DBPartition
+	for _, part := range p.partitions {
+		if part.startTime >= mint && part.startTime < maxt {
+			parts = append(parts, part)
+		}
+	}
+	return parts
 }
 
 func (p *PartitionManager) GetHead() *DBPartition {
-
+	//TODO check nil
 	return p.headPartition
+}
+
+func (p *PartitionManager) TimeToNextPartition(t int64) int64 {
+	interval := int(p.cfg.PartitionSchemaInfo.PartitionerInterval[0])
+	date := p.cfg.PartitionSchemaInfo.PartitionerInterval[1]
+	switch date {
+	//case 'Y':
+	//case 'M':
+	case 'D':
+		d := t / 3600 / 24 / 1000
+		return (d + int64(interval)) * 24 * 3600 * 1000
+	case 'H':
+		d,h := TimeToDHM(t)
+		return int64((d * 24 + h + interval) * 3600 * 1000)
+	//case 'm':
+	}
+	return 0
+}
+
+func (p *PartitionManager) TimeToPartitionStart(t int64) int64 {
+	date := p.cfg.PartitionSchemaInfo.PartitionerInterval[1]
+	if p.headPartition == nil {
+		//first event
+	} else {
+		//p.headPartition.startTime   -> prev partition start
+	}
+	switch date {
+	case 'Y':
+	case 'M':
+	case 'D':
+		d := t / 3600 / 24 / 1000
+		return d * 24 * 3600 * 1000
+	case 'H':
+		d,h := TimeToDHM(t)
+		return int64((d * 24 + h) * 3600 * 1000)
+	case 'm':
+	//default:
+	}
+	return 0
 }
 
 type DBPartition struct {
 	manager        *PartitionManager
 	path           string             // Full path (in the DB) to the partition
-	partID         int                // PartitionID
 	startTime      int64              // Start from time/date
 	days           int                // Number of days stored in the partition
 	hoursInChunk   int                // number of hours stored in each chunk
 	prefix         string             // Path prefix
-	retentionDays  int                // Keep samples for N days
+	retentionDays  int                // Keep samples for N hours
 	defaultRollups aggregate.AggrType // Default Aggregation functions to apply on sample update
 	rollupTime     int64              // Time range per aggregation bucket
 	rollupBuckets  int                // Total number of buckets per partition
@@ -119,12 +218,12 @@ func (p *DBPartition) TimePerChunk() int {
 	return p.hoursInChunk * 3600 * 1000
 }
 
-func (p *DBPartition) NextPart(t int64) *DBPartition {
-	return p.manager.TimeToPart(t)
+func (p *DBPartition) NextPart(t int64) (*DBPartition, error) {
+	return p.manager.TimeToPart(p.manager.TimeToNextPartition(t))
 }
 
-func (p *DBPartition) GetId() int {
-	return p.partID
+func (p *DBPartition) GetStartTime() int64 {
+	return p.startTime
 }
 
 // return path to metrics table

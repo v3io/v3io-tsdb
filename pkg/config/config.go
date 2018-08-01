@@ -52,42 +52,52 @@ type V3ioConfig struct {
 	DefaultTimeout int `json:"timeout,omitempty"`
 }
 
-type DBPartConfig struct {
-	// Indicating this is a valid Partition file, Signature == 'TSDB'
-	Signature string `json:"signature"`
-	// Version of the config
-	Version string `json:"version"`
-	// Description of this TSDB
-	Description string `json:"description,omitempty"`
-	// Partition Key, __name__ by default
-	ShardingKey string `json:"partitionKey,omitempty"`
-	// Sorting Key, dimensions used for sorting per DB shard
-	SortingKey string `json:"sortingKey,omitempty"`
-	// indicate if it is cyclic (single partition, return to first chunk after the last)
-	IsCyclic bool `json:"isCyclic,omitempty"`
-	// Number of hours per chunk (1hr default)
-	HrInChunk int `json:"hrInChunk,omitempty"`
-	// Days per table/object (in a partition), after N days will use a new table or go to start (Cyclic partition)
-	// this is used only for the Head configuration, per partition we look at StartTime & EndTime
-	DaysPerObj int `json:"daysPerObj,omitempty"`
-	// How many days to save samples
-	DaysRetention int `json:"daysRetention,omitempty"`
-	// Start from time/date in Unix milisec
-	StartTime int64 `json:"startTime,omitempty"`
-	// End by time/date in Unix milisec
-	EndTime int64 `json:"endTime,omitempty"`
-	// Partition name format e.g. 'dd-mm-yy'
-	PartFormat string `json:"partFormat,omitempty"`
+type Rollup struct {
+	Aggregators string `json:"aggregators"`
+	AggregatorsGranularityInSeconds int `json:"aggregatorsGranularityInSeconds"`
+	//["cloud","local"] for the aggregators and sample chucks
+	StorageClass string `json:"storageClass"`
+	//in hours. 0  means no need to save samples
+	SampleRetention int `json:"sampleRetention"`
+	// format : 1M, 7D, 3H . Possible intervals: Y/M/D/H/M
+	LayerRetentionTime string `json:"layerRetentionTime"`
+}
 
-	// Comma seperated list of default aggregation functions e.g. 'count,sum,avg,max'
-	DefaultRollups string `json:"defaultRollups,omitempty"`
-	// Number of minutes per aggregation bucket (aggregation interval)
-	RollupMin int `json:"rollupMin,omitempty"`
-	// If true, dont save raw samples/chunks, only aggregates
-	DelRawSamples bool `json:"delRawSamples,omitempty"`
+type TableSchema struct {
+	Version int `json:"version"`
+	RollupLayers []Rollup `json:"rollupLayers"`
+	ShardingBuckets int `json:"shardingBuckets"`
+	PartitionerInterval string `json:"partitionerInterval"`
+	ChunckerInterval string `json:"chunckerInterval"`
+}
 
-	// Metric specific policy
-	MetricsConfig map[string]MetricConfig `json:"metricsConfig,omitempty"`
+type PartitionSchema struct {
+	Version int `json:"version"`
+	Aggregators []string `json:"aggregators"`
+	AggregatorsGranularityInSeconds int `json:"aggregatorsGranularityInSeconds"`
+	StorageClass string `json:"storageClass"`
+	SampleRetention int `json:"sampleRetention"`
+	PartitionerInterval string `json:"partitionerInterval"`
+	ChunckerInterval string `json:"chunckerInterval"`
+}
+
+type Partition struct {
+	StartTime int64 `json:"startTime"`
+	SchemaInfo PartitionSchema `json:"schemaInfo"`
+}
+
+type SchemaField struct {
+	Name     string `json:"name"`
+	Type     string `json:"type"`
+	Nullable bool   `json:"nullable"`
+	Items    string `json:"items,omitempty"`
+}
+
+type Schema struct {
+	TableSchemaInfo TableSchema `json:"tableSchemaInfo"`
+	PartitionSchemaInfo PartitionSchema `json:"partitionSchemaInfo"`
+	Partitions []Partition `json:"partitions"`
+	Fields []SchemaField `json:"fields"`
 }
 
 type MetricConfig struct {

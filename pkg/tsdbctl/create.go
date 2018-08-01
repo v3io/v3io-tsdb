@@ -24,16 +24,27 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/v3io/v3io-tsdb/pkg/config"
 	"github.com/v3io/v3io-tsdb/pkg/tsdb"
+	"strings"
+	"github.com/pkg/errors"
+	"github.com/v3io/v3io-tsdb/pkg/aggregate"
+	"strconv"
+	"fmt"
 )
+
+const SCHEMA_VERSION = 0
+const DEFAULT_STORAGE_CLASS = "local"
 
 type createCommandeer struct {
 	cmd            *cobra.Command
 	rootCommandeer *RootCommandeer
 	path           string
-	daysPerObj     int
-	hrInChunk      int
+	partitionInterval string
+	storageClass string
+	chunkInterval string
 	defaultRollups string
-	rollupMin      int
+	rollupInterval int
+	shardingBuckets int
+	sampleRetention int
 }
 
 func newCreateCommandeer(rootCommandeer *RootCommandeer) *createCommandeer {
@@ -51,11 +62,13 @@ func newCreateCommandeer(rootCommandeer *RootCommandeer) *createCommandeer {
 		},
 	}
 
-	cmd.Flags().IntVarP(&commandeer.daysPerObj, "days", "d", 1, "number of days covered per partition")
-	cmd.Flags().IntVarP(&commandeer.hrInChunk, "chunk-hours", "t", 1, "number of hours in a single chunk")
+	cmd.Flags().StringVarP(&commandeer.partitionInterval, "partition-interval", "p", "1D", "time covered per partition")
+	cmd.Flags().StringVarP(&commandeer.chunkInterval, "chunk-interval", "t", "1H", "time in a single chunk")
 	cmd.Flags().StringVarP(&commandeer.defaultRollups, "rollups", "r", "",
 		"Default aggregation rollups, comma seperated: count,avg,sum,min,max,stddev")
-	cmd.Flags().IntVarP(&commandeer.rollupMin, "rollup-interval", "i", 60, "aggregation interval in minutes")
+	cmd.Flags().IntVarP(&commandeer.rollupInterval, "rollup-interval", "i", 3600, "aggregation interval in seconds")
+	cmd.Flags().IntVarP(&commandeer.shardingBuckets, "sharding-buckets", "b", 64, "number of buckets to split key")
+	cmd.Flags().IntVarP(&commandeer.shardingBuckets, "sample-retention", "s", 0, "nsample retention in hours")
 
 	commandeer.cmd = cmd
 
@@ -69,13 +82,68 @@ func (cc *createCommandeer) create() error {
 		return err
 	}
 
-	dbcfg := config.DBPartConfig{
-		DaysPerObj:     cc.daysPerObj,
-		HrInChunk:      cc.hrInChunk,
-		DefaultRollups: cc.defaultRollups,
-		RollupMin:      cc.rollupMin,
+	if err := cc.validateFormat(cc.partitionInterval); err != nil {
+		return errors.Wrap(err, "Failed to parse partition interval")
 	}
 
-	return tsdb.CreateTSDB(cc.rootCommandeer.v3iocfg, &dbcfg)
+	if err := cc.validateFormat(cc.chunkInterval); err != nil {
+		return errors.Wrap(err, "Failed to parse chunk interval")
+	}
 
+
+	defaultRollup := config.Rollup {
+		Aggregators: cc.defaultRollups,
+		AggregatorsGranularityInSeconds: cc.rollupInterval,
+		StorageClass: DEFAULT_STORAGE_CLASS,
+		SampleRetention: cc.sampleRetention,
+		LayerRetentionTime: "1Y", //TODO
+	}
+
+	tableSchema := config.TableSchema{
+		Version: SCHEMA_VERSION,
+		RollupLayers: []config.Rollup{defaultRollup},
+		ShardingBuckets: cc.shardingBuckets,
+		PartitionerInterval: cc.partitionInterval,
+		ChunckerInterval: cc.chunkInterval,
+	}
+
+	aggrs := strings.Split(cc.defaultRollups, ",")
+	fields, err := aggregate.SchemaFieldFromString(aggrs)
+	if err != nil {
+		return errors.Wrap(err, "Failed to create aggregators list")
+	}
+	fields = append(fields, config.SchemaField{Name: "_name", Type: "string", Nullable: false, Items: ""})
+	fields = append(fields, config.SchemaField{Name: "partId", Type: "int", Nullable: false, Items: ""})
+
+	partitionSchema := config.PartitionSchema{
+		Version: tableSchema.Version,
+		Aggregators: aggrs,
+		AggregatorsGranularityInSeconds: cc.rollupInterval,
+		StorageClass: DEFAULT_STORAGE_CLASS,
+		SampleRetention: cc.sampleRetention,
+		ChunckerInterval: tableSchema.ChunckerInterval,
+		PartitionerInterval: tableSchema.PartitionerInterval,
+	}
+
+	schema := config.Schema{
+		TableSchemaInfo: tableSchema,
+		PartitionSchemaInfo: partitionSchema,
+		Partitions: []config.Partition{},
+		Fields: fields,
+	}
+
+	return tsdb.CreateTSDB(cc.rootCommandeer.v3iocfg, &schema)
+
+}
+
+func (cc *createCommandeer) validateFormat(format string) error {
+	interval := format[0]
+	if _, err := strconv.Atoi(string(interval)); err != nil {
+		return fmt.Errorf("format is inncorrect, not a number")
+	}
+	date := format[1]
+	if ! (date == 'Y' || date == 'M' || date == 'D' || date == 'H' || date == 'm') {
+		return fmt.Errorf("format is inncorrect, not part of Y/M/D/H/m")
+	}
+	return nil
 }
