@@ -26,6 +26,7 @@ const pushEvent = `
 
 var adapter *tsdb.V3ioAdapter
 var adapterMtx sync.RWMutex
+
 // Configuration
 var tsdbConfig = `
 path: "pmetric"
