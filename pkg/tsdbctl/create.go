@@ -62,13 +62,13 @@ func newCreateCommandeer(rootCommandeer *RootCommandeer) *createCommandeer {
 		},
 	}
 
-	cmd.Flags().StringVarP(&commandeer.partitionInterval, "partition-interval", "p", "1D", "time covered per partition")
+	cmd.Flags().StringVarP(&commandeer.partitionInterval, "partition-interval", "m", "1D", "time covered per partition")
 	cmd.Flags().StringVarP(&commandeer.chunkInterval, "chunk-interval", "t", "1H", "time in a single chunk")
 	cmd.Flags().StringVarP(&commandeer.defaultRollups, "rollups", "r", "",
 		"Default aggregation rollups, comma seperated: count,avg,sum,min,max,stddev")
 	cmd.Flags().IntVarP(&commandeer.rollupInterval, "rollup-interval", "i", 3600, "aggregation interval in seconds")
 	cmd.Flags().IntVarP(&commandeer.shardingBuckets, "sharding-buckets", "b", 64, "number of buckets to split key")
-	cmd.Flags().IntVarP(&commandeer.shardingBuckets, "sample-retention", "s", 0, "nsample retention in hours")
+	cmd.Flags().IntVarP(&commandeer.sampleRetention, "sample-retention", "a", 0, "sample retention in hours")
 
 	commandeer.cmd = cmd
 
@@ -113,7 +113,6 @@ func (cc *createCommandeer) create() error {
 		return errors.Wrap(err, "Failed to create aggregators list")
 	}
 	fields = append(fields, config.SchemaField{Name: "_name", Type: "string", Nullable: false, Items: ""})
-	fields = append(fields, config.SchemaField{Name: "partId", Type: "int", Nullable: false, Items: ""})
 
 	partitionSchema := config.PartitionSchema{
 		Version: tableSchema.Version,
@@ -137,12 +136,12 @@ func (cc *createCommandeer) create() error {
 }
 
 func (cc *createCommandeer) validateFormat(format string) error {
-	interval := format[0]
-	if _, err := strconv.Atoi(string(interval)); err != nil {
+	interval := format[0:len(format) - 1]
+	if _, err := strconv.Atoi(interval); err != nil {
 		return fmt.Errorf("format is inncorrect, not a number")
 	}
-	date := format[1]
-	if ! (date == 'Y' || date == 'M' || date == 'D' || date == 'H' || date == 'm') {
+	unit := string(format[len(format) -1])
+	if ! (unit == "Y" || unit == "M" || unit == "D" || unit == "H" || unit == "m") {
 		return fmt.Errorf("format is inncorrect, not part of Y/M/D/H/m")
 	}
 	return nil

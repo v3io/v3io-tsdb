@@ -128,7 +128,7 @@ type v3ioSeriesIterator struct {
 
 	chunks     []chunkenc.Chunk
 	chunkIndex int
-	chunkTime  int
+	chunkTime  int64
 	iter       chunkenc.Iterator
 }
 
