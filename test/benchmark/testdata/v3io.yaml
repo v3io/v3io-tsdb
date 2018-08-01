@@ -10,7 +10,7 @@ container: "bigdata"
 path: "tsdb-test-1"
 
 # Logging level. Valid values: debug,info,warn,error (Default: info)
-verbose: "info"
+verbose: "warn"
 
 # Default timeout 10 seconds
 timeout: 30
