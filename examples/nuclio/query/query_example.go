@@ -24,6 +24,8 @@ type tsdbQuery struct {
 	Last        string
 }
 
+var tsdbPath string
+
 // example query event
 const queryEvent = `
 {
@@ -77,6 +79,7 @@ func Handler(context *nuclio.Context, event nuclio.Event) (interface{}, error) {
 // InitContext runs only once when the function runtime starts
 func InitContext(context *nuclio.Context) error {
 	cfg, _ := config.LoadConfig(filepath.Join("..", "..", "..", config.DefaultConfigurationFileName))
+	cfg.Path = tsdbPath
 	data := context.DataBinding["db0"].(*v3io.Container)
 	adapter, err := tsdb.NewV3ioAdapter(cfg, data, context.Logger)
 	if err != nil {

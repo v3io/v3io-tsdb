@@ -27,9 +27,9 @@ const pushEvent = `
 
 var adapter *tsdb.V3ioAdapter
 var adapterMtx sync.RWMutex
+var tsdbPath string
 
 func Handler(context *nuclio.Context, event nuclio.Event) (interface{}, error) {
-
 	sample := tsdbtest.Sample{}
 	err := json.Unmarshal(event.GetBody(), &sample)
 	if err != nil {
@@ -50,7 +50,6 @@ func Handler(context *nuclio.Context, event nuclio.Event) (interface{}, error) {
 
 	// Append sample to metric
 	_, err = app.Add(sample.Lset, t, sample.Value)
-
 	return "", err
 }
 
@@ -64,6 +63,7 @@ func InitContext(context *nuclio.Context) error {
 	if adapter == nil {
 		// create adapter once for all contexts
 		cfg, _ := config.LoadConfig(filepath.Join("..", "..", "..", config.DefaultConfigurationFileName))
+		cfg.Path = tsdbPath
 		data := context.DataBinding["db0"].(*v3io.Container)
 		adapter, err = tsdb.NewV3ioAdapter(cfg, data, context.Logger)
 		if err != nil {

@@ -10,12 +10,12 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
-	"time"
 )
 
 func TestIngestIntegration(t *testing.T) {
 	v3ioConfig, err := config.LoadConfig(filepath.Join("..", "..", "..", config.DefaultConfigurationFileName))
 	defer tsdbtest.SetUp(t, v3ioConfig)()
+	tsdbPath = v3ioConfig.Path
 
 	url := os.Getenv("V3IO_SERVICE_URL")
 	if url == "" {
@@ -39,6 +39,4 @@ func TestIngestIntegration(t *testing.T) {
 	resp, err := tc.Invoke(&testEvent)
 	tc.Logger.InfoWith("Run complete", "resp", resp, "err", err)
 	fmt.Println(resp)
-
-	time.Sleep(time.Second * 10)
 }

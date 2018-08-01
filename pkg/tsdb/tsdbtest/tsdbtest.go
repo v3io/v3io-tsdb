@@ -5,6 +5,8 @@ import (
 	. "github.com/v3io/v3io-tsdb/pkg/tsdb"
 	"github.com/v3io/v3io-tsdb/pkg/utils"
 	"testing"
+	"fmt"
+	"time"
 )
 
 type DataPoint struct {
@@ -36,7 +38,7 @@ func SetUp(t *testing.T, v3ioConfig *config.V3ioConfig) func() {
 		DefaultRollups: "sum",
 		RollupMin:      10,
 	}
-
+	v3ioConfig.Path = fmt.Sprintf("%s-%d", v3ioConfig.Path, time.Now().Nanosecond())
 	if err := CreateTSDB(v3ioConfig, &dbConfig); err != nil {
 		t.Fatalf("Failed to create TSDB. reason: %s", err)
 	}

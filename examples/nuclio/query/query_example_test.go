@@ -13,14 +13,15 @@ import (
 )
 
 func TestQueryIntegration(t *testing.T) {
-	v3ioConfig, err := config.LoadConfig(filepath.Join("../../../", config.DefaultConfigurationFileName))
-
+	v3ioConfig, err := config.LoadConfig(filepath.Join("..", "..", "..", config.DefaultConfigurationFileName))
 	defer tsdbtest.SetUp(t, v3ioConfig)()
+	tsdbPath = v3ioConfig.Path
 
 	url := os.Getenv("V3IO_SERVICE_URL")
 	if url == "" {
 		url = v3ioConfig.V3ioUrl
 	}
+
 	data := nutest.DataBind{
 		Name: "db0", Url: url, Container: v3ioConfig.Container, User: v3ioConfig.Username, Password: v3ioConfig.Password}
 	tc, err := nutest.NewTestContext(Handler, false, &data)
