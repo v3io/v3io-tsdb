@@ -251,7 +251,6 @@ func testQueryDataCase(test *testing.T, v3ioConfig *config.V3ioConfig,
 			}
 			t, v := iter.At()
 
-			fmt.Printf("(%v, %v)\n", t, v)
 			if t != expected.Time || v != expected.Value {
 				test.Fatalf("actual: (t=%v, v=%v) is not equal to expected:(t=%v, v=%v)   === %f",
 					t, v, expected.Time, expected.Value, v-expected.Value)
@@ -319,5 +318,44 @@ func testCreateTSDBcase(t *testing.T, v3ioConfig *config.V3ioConfig, dbConfig co
 
 	if !reflect.DeepEqual(actualDbConfig, dbConfig) {
 		t.Fatalf("actual: %v is not equal to expected: %v", actualDbConfig, dbConfig)
+	}
+}
+
+func TestDeleteTSDB(t *testing.T) {
+	v3ioConfig, err := config.LoadConfig(filepath.Join("../../", config.DefaultConfigurationFileName))
+	if err != nil {
+		t.Fatalf("Failed to load test configuration. reason: %s", err)
+	}
+
+	dbConfig := config.DBPartConfig{
+		Signature:      "TSDB",
+		Version:        "1.0",
+		DaysPerObj:     1,
+		HrInChunk:      1,
+		DefaultRollups: "count,sum",
+		RollupMin:      10,
+	}
+	if err := CreateTSDB(v3ioConfig, &dbConfig); err != nil {
+		t.Fatalf("Failed to create TSDB. reason: %s", err)
+	}
+
+	adapter, err := NewV3ioAdapter(v3ioConfig, nil, nil)
+	if err != nil {
+		t.Fatalf("Failed to create v3io adapter. reason: %s", err)
+	}
+	responseChan := make(chan *v3io.Response)
+	container, _ := adapter.GetContainer()
+	container.ListBucket(&v3io.ListBucketInput{Path: v3ioConfig.Path}, 30, responseChan)
+	if res := <-responseChan; res.Error != nil {
+		t.Fatal("Failed to create TSDB")
+	}
+
+	if err := adapter.DeleteDB(true, true); err != nil {
+		t.Fatalf("Failed to delete DB on teardown. reason: %s", err)
+	}
+
+	container.ListBucket(&v3io.ListBucketInput{Path: v3ioConfig.Path}, 30, responseChan)
+	if res := <-responseChan; res.Error == nil {
+		t.Fatal("Did not delete TSDB properly")
 	}
 }
