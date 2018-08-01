@@ -23,7 +23,7 @@ test: get
 
 .PHONY: integration
 integration: get
-	go test -tags integration $(TOPLEVEL_DIRS) -p 1 # Set p=1 to force Go to run pkg tests serially.
+	go test -tags integration $(TOPLEVEL_DIRS) -p 1 # p=1 to force Go to run pkg tests serially.
 
 .PHONY: build
 build: get
