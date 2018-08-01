@@ -28,14 +28,23 @@ type BenchmarkIngestConfig struct {
 	CleanupAfterTest     bool   `json:"CleanupAfterTest,omitempty" yaml:"CleanupAfterTest"`
 }
 
+func GetV3ioConfigPath() string {
+	return filepath.Join(TsdbDefaultTestConfigPath, config.DefaultConfigurationFileName)
+}
+
 func LoadBenchmarkIngestConfigs() (*BenchmarkIngestConfig, *config.V3ioConfig, error) {
 	testConfig, err := loadBenchmarkIngestConfigFromFile("")
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "Failed to load test configuration.")
 	}
-	v3ioConfig, err := config.LoadConfig(filepath.Join(TsdbDefaultTestConfigPath, config.DefaultConfigurationFileName))
+	v3ioConfig, err := config.LoadConfig(GetV3ioConfigPath())
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "Failed to load test configuration.")
+	}
+
+	if testConfig.BatchSize == 0 && v3ioConfig.BatchSize > 0 {
+		// Use batch size from V3IO config
+		testConfig.BatchSize = v3ioConfig.BatchSize
 	}
 
 	return testConfig, v3ioConfig, nil
@@ -73,9 +82,5 @@ func loadBenchmarkIngestConfigFromFile(benchConfigFile string) (*BenchmarkIngest
 func initDefaults(cfg *BenchmarkIngestConfig) {
 	if cfg.StartTimeOffset == "" {
 		cfg.StartTimeOffset = "48h"
-	}
-
-	if cfg.BatchSize == 0 {
-		cfg.BatchSize = 64
 	}
 }

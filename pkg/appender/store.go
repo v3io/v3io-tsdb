@@ -32,7 +32,6 @@ import (
 
 // TODO: make it configurable
 const maxLateArrivalInterval = 59 * 60 * 1000 // max late arrival of 59min
-const maxSamplesInWrite = 64
 
 // create a chunk store with two chunks (current, previous)
 func NewChunkStore() *chunkStore {
@@ -268,7 +267,7 @@ func (cs *chunkStore) WriteChunks(mc *MetricsCache, metric *MetricState) (bool, 
 	var pendingSamplesCount int
 
 	// loop over pending samples, add to chunks & aggregates (create required update expressions)
-	for pendingSampleIndex < len(cs.pending) && pendingSamplesCount < maxSamplesInWrite && partition.InRange(cs.pending[pendingSampleIndex].t) {
+	for pendingSampleIndex < len(cs.pending) && pendingSamplesCount < mc.cfg.BatchSize && partition.InRange(cs.pending[pendingSampleIndex].t) {
 		sampleTime := cs.pending[pendingSampleIndex].t
 
 		if sampleTime <= cs.initMaxTime && !mc.cfg.OverrideOld {
@@ -299,7 +298,7 @@ func (cs *chunkStore) WriteChunks(mc *MetricsCache, metric *MetricState) (bool, 
 		activeChunk.appendAttr(sampleTime, cs.pending[pendingSampleIndex].v.(float64))
 
 		// if the last item or last item in the same partition add expressions and break
-		if (pendingSampleIndex == len(cs.pending)-1) || pendingSamplesCount == maxSamplesInWrite-1 || !partition.InRange(cs.pending[pendingSampleIndex+1].t) {
+		if (pendingSampleIndex == len(cs.pending)-1) || pendingSamplesCount == mc.cfg.BatchSize-1 || !partition.InRange(cs.pending[pendingSampleIndex+1].t) {
 			expr = expr + cs.aggrList.SetOrUpdateExpr("v", bucket, isNewBucket)
 			expr = expr + cs.appendExpression(activeChunk)
 			pendingSampleIndex++

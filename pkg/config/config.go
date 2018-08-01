@@ -50,6 +50,8 @@ type V3ioConfig struct {
 	OverrideOld bool `json:"overrideOld"`
 	// Default timeout duration in Seconds (if not set, 1 Hour timeout will be used )
 	DefaultTimeout int `json:"timeout,omitempty"`
+	// The size of batch to use during ingestion
+	BatchSize int `json:"batchSize,omitempty"`
 }
 
 type DBPartConfig struct {
@@ -141,5 +143,10 @@ func InitDefaults(cfg *V3ioConfig) {
 		} else {
 			cfg.QryWorkers = 8
 		}
+	}
+
+	// init default batch size
+	if cfg.BatchSize <= 0 {
+		cfg.BatchSize = 64
 	}
 }

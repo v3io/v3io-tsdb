@@ -19,7 +19,12 @@ import (
 
 const defaultDbName = "db0"
 
+// Hack: Define GLOBAL variables to get access to private stuff
+var v3ioAdapter *tsdb.V3ioAdapter
+var tsdbPath string
+
 func BenchmarkIngestWithNuclio(b *testing.B) {
+	b.StopTimer()
 	log.SetFlags(0)
 	log.SetOutput(ioutil.Discard)
 	testStartTimeNano := time.Now().UnixNano()
@@ -30,6 +35,13 @@ func BenchmarkIngestWithNuclio(b *testing.B) {
 	if err != nil {
 		b.Fatal(errors.Wrap(err, "unable to load configuration"))
 	}
+
+	// Create test path (tsdb instance)
+	tsdbPath = common.NormalizePath(fmt.Sprintf("tsdb-%s-%d-%s", b.Name(), b.N, time.Now().Format(time.RFC3339)))
+
+	// Update TSDB instance path for this test
+	v3ioConfig.Path = tsdbPath
+	common.CreateTSDB(v3ioConfig)
 
 	data := nutest.DataBind{
 		Name:      defaultDbName,
@@ -54,7 +66,9 @@ func BenchmarkIngestWithNuclio(b *testing.B) {
 	if err != nil {
 		b.Fatal("unable to resolve start time. Check configuration.")
 	}
-	testStartTimeMs := testStartTimeNano/int64(time.Millisecond) - relativeTimeOffsetMs
+	testEndTimeMs := testStartTimeNano / int64(time.Millisecond)
+	testStartTimeMs := testEndTimeMs - relativeTimeOffsetMs
+
 	sampleTemplates := common.MakeSampleTemplates(
 		common.MakeSamplesModel(
 			testConfig.NamesCount,
@@ -65,6 +79,7 @@ func BenchmarkIngestWithNuclio(b *testing.B) {
 			testConfig.LabelsValueDiversity))
 	sampleTemplatesLength := len(sampleTemplates)
 
+	b.StartTimer()
 	for i := 0; i < b.N; i++ {
 		index := i % sampleTemplatesLength
 		timestamp := testStartTimeMs + int64(index*testConfig.SampleStepSize)
@@ -75,7 +90,19 @@ func BenchmarkIngestWithNuclio(b *testing.B) {
 		count += newEntries
 	}
 
+	appender, err := v3ioAdapter.Appender()
+	if err != nil {
+		b.Error(err)
+	}
+	// Wait for all responses, use default timeout from configuration or unlimited if not set
+	_, err = appender.WaitForCompletion(-1)
+	b.StopTimer()
+
 	tc.Logger.Warn("\nTest complete. Count: %d", count)
+
+	if err := common.ValidateCountOfSamples(v3ioAdapter, count, testStartTimeMs, testEndTimeMs); err != nil {
+		b.Error(err)
+	}
 }
 
 func runNuclioTest(tc *nutest.TestContext, sampleTemplateJson string, timestamp int64) (int, error) {
@@ -100,22 +127,25 @@ func runNuclioTest(tc *nutest.TestContext, sampleTemplateJson string, timestamp 
 
 // InitContext runs only once when the function runtime starts
 func initContext(context *nuclio.Context) error {
-	cfg, err := config.LoadConfig("")
+	v3ioConfig, err := config.LoadConfig(common.GetV3ioConfigPath())
 	if err != nil {
-		return err
+		return errors.Wrap(err, "failed to load configuration")
 	}
+
+	// Hack - update path to TSDB
+	v3ioConfig.Path = tsdbPath
 
 	data := context.DataBinding[defaultDbName].(*v3io.Container)
-	adapter, err := tsdb.NewV3ioAdapter(cfg, data, context.Logger)
+	adapter, err := tsdb.NewV3ioAdapter(v3ioConfig, data, context.Logger)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "failed to create V3IO Adapter")
 	}
 
-	appender, err := adapter.Appender()
-	if err != nil {
-		return err
-	}
-	context.UserData = appender
+	// Store adapter in user cache
+	context.UserData = adapter
+
+	v3ioAdapter = adapter
+
 	return nil
 }
 
@@ -126,7 +156,13 @@ func handler(context *nuclio.Context, event nuclio.Event) (interface{}, error) {
 	if err != nil {
 		return nil, err
 	}
-	app := context.UserData.(tsdb.Appender)
+
+	adapter := context.UserData.(*tsdb.V3ioAdapter)
+
+	appender, err := adapter.Appender()
+	if err != nil {
+		return "", err
+	}
 
 	// if time is not specified assume "now"
 	if sample.Time == "" {
@@ -140,7 +176,7 @@ func handler(context *nuclio.Context, event nuclio.Event) (interface{}, error) {
 	}
 
 	// Append sample to metric
-	_, err = app.Add(sample.Lset, t, sample.Value)
+	_, err = appender.Add(sample.Lset, t, sample.Value)
 
 	return "", err
 }
