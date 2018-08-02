@@ -15,7 +15,7 @@ TSDBCTL_BIN_NAME := tsdbctl-$(GIT_REVISION)-$(GOOS)-$(GOARCH)
 
 .PHONY: get
 get:
-	go get -v -t $(TOPLEVEL_DIRS) -tags "unit integration"
+	go get -v -t -tags "unit integration" $(TOPLEVEL_DIRS)
 
 .PHONY: test
 test: get
