@@ -4,6 +4,8 @@ package aggregate
 
 import (
 	"fmt"
+	"github.com/stretchr/testify/assert"
+	"strings"
 	"testing"
 )
 
@@ -101,15 +103,11 @@ func testAggregatorCase(t *testing.T, aggString string, data map[int64]float64, 
 		aggregatorList.Aggregate(k, v)
 	}
 
-	actualUpdateExpr := aggregatorList.UpdateExpr(exprCol, bucket)
-	if actualUpdateExpr != expectedUpdateExpr {
-		t.Errorf("Actual update Expresion %s is not equal to expected %s",
-			actualUpdateExpr, expectedUpdateExpr)
-	}
+	actualUpdateExpr := strings.Split(aggregatorList.UpdateExpr(exprCol, bucket), ";")
+	expectedUpdateExprSet := strings.Split(expectedUpdateExpr, ";")
+	assert.ElementsMatch(t, actualUpdateExpr, expectedUpdateExprSet)
 
-	actualSetExpr := aggregatorList.SetExpr(exprCol, bucket)
-	if actualSetExpr != expectedSetExpr {
-		t.Errorf("Actual set Expresion %s is not equal to expected %s",
-			actualSetExpr, expectedSetExpr)
-	}
+	actualSetExpr := strings.Split(aggregatorList.SetExpr(exprCol, bucket), ";")
+	expectedSetExprSet := strings.Split(expectedSetExpr, ";")
+	assert.ElementsMatch(t, actualSetExpr, expectedSetExprSet)
 }

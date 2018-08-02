@@ -24,13 +24,13 @@ package tsdb_test
 
 import (
 	"fmt"
+	"github.com/stretchr/testify/assert"
 	"github.com/v3io/v3io-go-http"
 	"github.com/v3io/v3io-tsdb/pkg/config"
 	. "github.com/v3io/v3io-tsdb/pkg/tsdb"
 	"github.com/v3io/v3io-tsdb/pkg/tsdb/tsdbtest"
 	"github.com/v3io/v3io-tsdb/pkg/utils"
 	"path/filepath"
-	"reflect"
 	"testing"
 )
 
@@ -245,6 +245,7 @@ func testQueryDataCase(test *testing.T, v3ioConfig *config.V3ioConfig,
 		if iter.Err() != nil {
 			test.Fatalf("Failed to query data series. reason: %v", iter.Err())
 		}
+
 		for _, expected := range expected {
 			if !iter.Next() {
 				test.Fatalf("Number of actual data points (%d) is less the expected (%d)", counter, len(data))
@@ -315,10 +316,7 @@ func testCreateTSDBcase(t *testing.T, v3ioConfig *config.V3ioConfig, dbConfig co
 	}
 
 	actualDbConfig := *adapter.GetDBConfig()
-
-	if !reflect.DeepEqual(actualDbConfig, dbConfig) {
-		t.Fatalf("actual: %v is not equal to expected: %v", actualDbConfig, dbConfig)
-	}
+	assert.Equal(t, actualDbConfig, dbConfig)
 }
 
 func TestDeleteTSDB(t *testing.T) {
