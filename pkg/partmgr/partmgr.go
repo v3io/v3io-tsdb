@@ -98,27 +98,21 @@ func (p *PartitionManager) Init() error {
 
 func (p *PartitionManager) TimeToPart(t int64) (*DBPartition, error) {
 	interval := IntervalInMilli(p.cfg.PartitionSchemaInfo.PartitionerInterval)
-	fmt.Println("TimeToPart interval ",interval," t ",t)
 	if p.headPartition == nil {
-		fmt.Println("TimeToPart1 ")
 		_, err := p.createNewPartition(interval * (t / interval))
 		return p.headPartition, err
 	} else {
 		if t >= p.headPartition.startTime {
-			fmt.Println("TimeToPart2 ")
 			if (t - p.headPartition.startTime) > interval {
-				fmt.Println("TimeToPart3 ")
 				_, err := p.createNewPartition(p.headPartition.startTime + interval)
 				if err != nil {
 					return nil, err
 				}
 				return p.TimeToPart(t)
 			} else {
-				fmt.Println("TimeToPart4 ")
 				return p.headPartition, nil
 			}
 		} else {
-			fmt.Println("TimeToPart5 ")
 			//iterate backwards, ignore last elem as it's the headPartition
 			for i := len(p.partitions) - 2; i >= 0; i-- {
 				if t > p.partitions[i].startTime {
@@ -133,7 +127,6 @@ func (p *PartitionManager) TimeToPart(t int64) (*DBPartition, error) {
 func (p *PartitionManager) createNewPartition(t int64) (*DBPartition, error) {
 	time := t & 0x7FFFFFFFFFFFFFF0
 	path := fmt.Sprintf("%s/%d/", p.path, time)
-	fmt.Println("createNewPartition "+path)
 	partition := NewDBPartition(p, time, path)
 	p.headPartition = partition
 	p.partitions = append(p.partitions, partition)
