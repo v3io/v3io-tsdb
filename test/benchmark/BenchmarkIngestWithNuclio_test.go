@@ -9,6 +9,7 @@ import (
 	"github.com/v3io/v3io-go-http"
 	"github.com/v3io/v3io-tsdb/pkg/config"
 	"github.com/v3io/v3io-tsdb/pkg/tsdb"
+	"github.com/v3io/v3io-tsdb/pkg/tsdb/tsdbtest"
 	"github.com/v3io/v3io-tsdb/pkg/utils"
 	"github.com/v3io/v3io-tsdb/test/benchmark/common"
 	"io/ioutil"
@@ -151,7 +152,7 @@ func initContext(context *nuclio.Context) error {
 
 func handler(context *nuclio.Context, event nuclio.Event) (interface{}, error) {
 
-	sample := common.Sample{}
+	sample := tsdbtest.Sample{}
 	err := json.Unmarshal(event.GetBody(), &sample)
 	if err != nil {
 		return nil, err
