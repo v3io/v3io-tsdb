@@ -54,8 +54,8 @@ type V3ioConfig struct {
 }
 
 type Rollup struct {
-	Aggregators string `json:"aggregators"`
-	AggregatorsGranularityInSeconds int `json:"aggregatorsGranularityInSeconds"`
+	Aggregators                     string `json:"aggregators"`
+	AggregatorsGranularityInSeconds int    `json:"aggregatorsGranularityInSeconds"`
 	//["cloud","local"] for the aggregators and sample chucks
 	StorageClass string `json:"storageClass"`
 	//in hours. 0  means no need to save samples
@@ -65,25 +65,25 @@ type Rollup struct {
 }
 
 type TableSchema struct {
-	Version int `json:"version"`
-	RollupLayers []Rollup `json:"rollupLayers"`
-	ShardingBuckets int `json:"shardingBuckets"`
-	PartitionerInterval string `json:"partitionerInterval"`
-	ChunckerInterval string `json:"chunckerInterval"`
+	Version             int      `json:"version"`
+	RollupLayers        []Rollup `json:"rollupLayers"`
+	ShardingBuckets     int      `json:"shardingBuckets"`
+	PartitionerInterval string   `json:"partitionerInterval"`
+	ChunckerInterval    string   `json:"chunckerInterval"`
 }
 
 type PartitionSchema struct {
-	Version int `json:"version"`
-	Aggregators []string `json:"aggregators"`
-	AggregatorsGranularityInSeconds int `json:"aggregatorsGranularityInSeconds"`
-	StorageClass string `json:"storageClass"`
-	SampleRetention int `json:"sampleRetention"`
-	PartitionerInterval string `json:"partitionerInterval"`
-	ChunckerInterval string `json:"chunckerInterval"`
+	Version                         int      `json:"version"`
+	Aggregators                     []string `json:"aggregators"`
+	AggregatorsGranularityInSeconds int      `json:"aggregatorsGranularityInSeconds"`
+	StorageClass                    string   `json:"storageClass"`
+	SampleRetention                 int      `json:"sampleRetention"`
+	PartitionerInterval             string   `json:"partitionerInterval"`
+	ChunckerInterval                string   `json:"chunckerInterval"`
 }
 
 type Partition struct {
-	StartTime int64 `json:"startTime"`
+	StartTime  int64           `json:"startTime"`
 	SchemaInfo PartitionSchema `json:"schemaInfo"`
 }
 
@@ -95,10 +95,10 @@ type SchemaField struct {
 }
 
 type Schema struct {
-	TableSchemaInfo TableSchema `json:"tableSchemaInfo"`
+	TableSchemaInfo     TableSchema     `json:"tableSchemaInfo"`
 	PartitionSchemaInfo PartitionSchema `json:"partitionSchemaInfo"`
-	Partitions []Partition `json:"partitions"`
-	Fields []SchemaField `json:"fields"`
+	Partitions          []Partition     `json:"partitions"`
+	Fields              []SchemaField   `json:"fields"`
 }
 
 type MetricConfig struct {

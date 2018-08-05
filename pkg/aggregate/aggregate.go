@@ -22,8 +22,8 @@ package aggregate
 
 import (
 	"fmt"
-	"strings"
 	"github.com/v3io/v3io-tsdb/pkg/config"
+	"strings"
 )
 
 type AggrType uint16
@@ -59,16 +59,16 @@ var aggrToString = map[AggrType]string{
 }
 
 var aggrToSchemaField = map[string]config.SchemaField{
-	"count": {Name: "_v_count", Type: "array", Nullable: true, Items: "double"},
-	"sum": {Name: "_v_sum", Type: "array", Nullable: true, Items: "double"},
-	"sqr":  {Name: "_v_sqr", Type: "array", Nullable: true, Items: "double"},
-	"max":  {Name: "_v_max", Type: "array", Nullable: true, Items: "double"},
-	"min":  {Name: "_v_min", Type: "array", Nullable: true, Items: "double"},
-	"last":  {Name: "_v_last", Type: "array", Nullable: true, Items: "double"},
-	"avg":  {Name: "_v_avg", Type: "array", Nullable: true, Items: "double"},
-	"rate":  {Name: "_v_rate", Type: "array", Nullable: true, Items: "double"},
-	"stddev":  {Name: "_v_stddev", Type: "array", Nullable: true, Items: "double"},
-	"stdvar":  {Name: "_v_stdvar", Type: "array", Nullable: true, Items: "double"},
+	"count":  {Name: "_v_count", Type: "array", Nullable: true, Items: "double"},
+	"sum":    {Name: "_v_sum", Type: "array", Nullable: true, Items: "double"},
+	"sqr":    {Name: "_v_sqr", Type: "array", Nullable: true, Items: "double"},
+	"max":    {Name: "_v_max", Type: "array", Nullable: true, Items: "double"},
+	"min":    {Name: "_v_min", Type: "array", Nullable: true, Items: "double"},
+	"last":   {Name: "_v_last", Type: "array", Nullable: true, Items: "double"},
+	"avg":    {Name: "_v_avg", Type: "array", Nullable: true, Items: "double"},
+	"rate":   {Name: "_v_rate", Type: "array", Nullable: true, Items: "double"},
+	"stddev": {Name: "_v_stddev", Type: "array", Nullable: true, Items: "double"},
+	"stdvar": {Name: "_v_stdvar", Type: "array", Nullable: true, Items: "double"},
 }
 
 func SchemaFieldFromString(split []string) ([]config.SchemaField, error) {

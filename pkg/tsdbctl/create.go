@@ -21,30 +21,30 @@ such restriction.
 package tsdbctl
 
 import (
+	"fmt"
+	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
+	"github.com/v3io/v3io-tsdb/pkg/aggregate"
 	"github.com/v3io/v3io-tsdb/pkg/config"
 	"github.com/v3io/v3io-tsdb/pkg/tsdb"
-	"strings"
-	"github.com/pkg/errors"
-	"github.com/v3io/v3io-tsdb/pkg/aggregate"
 	"strconv"
-	"fmt"
+	"strings"
 )
 
 const SCHEMA_VERSION = 0
 const DEFAULT_STORAGE_CLASS = "local"
 
 type createCommandeer struct {
-	cmd            *cobra.Command
-	rootCommandeer *RootCommandeer
-	path           string
+	cmd               *cobra.Command
+	rootCommandeer    *RootCommandeer
+	path              string
 	partitionInterval string
-	storageClass string
-	chunkInterval string
-	defaultRollups string
-	rollupInterval int
-	shardingBuckets int
-	sampleRetention int
+	storageClass      string
+	chunkInterval     string
+	defaultRollups    string
+	rollupInterval    int
+	shardingBuckets   int
+	sampleRetention   int
 }
 
 func newCreateCommandeer(rootCommandeer *RootCommandeer) *createCommandeer {
@@ -90,21 +90,20 @@ func (cc *createCommandeer) create() error {
 		return errors.Wrap(err, "Failed to parse chunk interval")
 	}
 
-
-	defaultRollup := config.Rollup {
-		Aggregators: cc.defaultRollups,
+	defaultRollup := config.Rollup{
+		Aggregators:                     cc.defaultRollups,
 		AggregatorsGranularityInSeconds: cc.rollupInterval,
-		StorageClass: DEFAULT_STORAGE_CLASS,
-		SampleRetention: cc.sampleRetention,
-		LayerRetentionTime: "1Y", //TODO
+		StorageClass:                    DEFAULT_STORAGE_CLASS,
+		SampleRetention:                 cc.sampleRetention,
+		LayerRetentionTime:              "1Y", //TODO
 	}
 
 	tableSchema := config.TableSchema{
-		Version: SCHEMA_VERSION,
-		RollupLayers: []config.Rollup{defaultRollup},
-		ShardingBuckets: cc.shardingBuckets,
+		Version:             SCHEMA_VERSION,
+		RollupLayers:        []config.Rollup{defaultRollup},
+		ShardingBuckets:     cc.shardingBuckets,
 		PartitionerInterval: cc.partitionInterval,
-		ChunckerInterval: cc.chunkInterval,
+		ChunckerInterval:    cc.chunkInterval,
 	}
 
 	aggrs := strings.Split(cc.defaultRollups, ",")
@@ -115,20 +114,20 @@ func (cc *createCommandeer) create() error {
 	fields = append(fields, config.SchemaField{Name: "_name", Type: "string", Nullable: false, Items: ""})
 
 	partitionSchema := config.PartitionSchema{
-		Version: tableSchema.Version,
-		Aggregators: aggrs,
+		Version:                         tableSchema.Version,
+		Aggregators:                     aggrs,
 		AggregatorsGranularityInSeconds: cc.rollupInterval,
-		StorageClass: DEFAULT_STORAGE_CLASS,
-		SampleRetention: cc.sampleRetention,
-		ChunckerInterval: tableSchema.ChunckerInterval,
-		PartitionerInterval: tableSchema.PartitionerInterval,
+		StorageClass:                    DEFAULT_STORAGE_CLASS,
+		SampleRetention:                 cc.sampleRetention,
+		ChunckerInterval:                tableSchema.ChunckerInterval,
+		PartitionerInterval:             tableSchema.PartitionerInterval,
 	}
 
 	schema := config.Schema{
-		TableSchemaInfo: tableSchema,
+		TableSchemaInfo:     tableSchema,
 		PartitionSchemaInfo: partitionSchema,
-		Partitions: []config.Partition{},
-		Fields: fields,
+		Partitions:          []config.Partition{},
+		Fields:              fields,
 	}
 
 	return tsdb.CreateTSDB(cc.rootCommandeer.v3iocfg, &schema)
@@ -136,12 +135,12 @@ func (cc *createCommandeer) create() error {
 }
 
 func (cc *createCommandeer) validateFormat(format string) error {
-	interval := format[0:len(format) - 1]
+	interval := format[0 : len(format)-1]
 	if _, err := strconv.Atoi(interval); err != nil {
 		return fmt.Errorf("format is inncorrect, not a number")
 	}
-	unit := string(format[len(format) -1])
-	if ! (unit == "Y" || unit == "M" || unit == "D" || unit == "H" || unit == "m") {
+	unit := string(format[len(format)-1])
+	if !(unit == "Y" || unit == "M" || unit == "D" || unit == "H" || unit == "m") {
 		return fmt.Errorf("format is inncorrect, not part of Y/M/D/H/m")
 	}
 	return nil

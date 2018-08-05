@@ -221,7 +221,7 @@ func (cs *chunkStore) chunkByTime(t int64) *attrAppender {
 		if err != nil {
 			return nil
 		}
-		nextPart, _  := part.NextPart(t)
+		nextPart, _ := part.NextPart(t)
 		cur.initialize(nextPart, t)
 		cur.appender = app
 		cs.curChunk = cs.curChunk ^ 1

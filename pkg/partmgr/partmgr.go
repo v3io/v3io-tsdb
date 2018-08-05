@@ -23,14 +23,14 @@ such restriction.
 package partmgr
 
 import (
+	"encoding/json"
 	"fmt"
+	"github.com/pkg/errors"
+	"github.com/v3io/v3io-go-http"
 	"github.com/v3io/v3io-tsdb/pkg/aggregate"
 	"github.com/v3io/v3io-tsdb/pkg/config"
-	"sync"
-	"github.com/v3io/v3io-go-http"
-	"encoding/json"
-	"github.com/pkg/errors"
 	"strconv"
+	"sync"
 )
 
 // Create new Partition Manager
@@ -54,14 +54,14 @@ func NewPartitionMngr(cfg *config.Schema, path string, cont *v3io.Container) *Pa
 // Create and Init a new Partition
 func NewDBPartition(pmgr *PartitionManager, startTime int64, path string) *DBPartition {
 	newPart := DBPartition{
-		manager:       pmgr,
-		path:          path,
-		startTime:     startTime,
+		manager:           pmgr,
+		path:              path,
+		startTime:         startTime,
 		partitionInterval: IntervalInMilli(pmgr.cfg.PartitionSchemaInfo.PartitionerInterval),
-		chunkInterval: IntervalInMilli(pmgr.cfg.PartitionSchemaInfo.ChunckerInterval),
-		prefix:        "",
-		retentionDays: pmgr.cfg.PartitionSchemaInfo.SampleRetention,
-		rollupTime:    int64(pmgr.cfg.PartitionSchemaInfo.AggregatorsGranularityInSeconds) * 60 * 1000,
+		chunkInterval:     IntervalInMilli(pmgr.cfg.PartitionSchemaInfo.ChunckerInterval),
+		prefix:            "",
+		retentionDays:     pmgr.cfg.PartitionSchemaInfo.SampleRetention,
+		rollupTime:        int64(pmgr.cfg.PartitionSchemaInfo.AggregatorsGranularityInSeconds) * 60 * 1000,
 	}
 
 	aggrType, _ := aggregate.AggrsFromString(pmgr.cfg.PartitionSchemaInfo.Aggregators)
@@ -135,12 +135,12 @@ func (p *PartitionManager) createNewPartition(t int64) (*DBPartition, error) {
 }
 
 func (p *PartitionManager) updatePartitionInSchema(partition *DBPartition) error {
-	p.cfg.Partitions = append(p.cfg.Partitions, config.Partition{StartTime:partition.startTime, SchemaInfo: p.cfg.PartitionSchemaInfo})
+	p.cfg.Partitions = append(p.cfg.Partitions, config.Partition{StartTime: partition.startTime, SchemaInfo: p.cfg.PartitionSchemaInfo})
 	data, err := json.Marshal(p.cfg)
 	if err != nil {
 		return errors.Wrap(err, "Failed to update new partition in schema file")
 	}
-	err = p.container.Sync.PutObject(&v3io.PutObjectInput{Path:p.path + config.SCHEMA_CONFIG, Body: data})
+	err = p.container.Sync.PutObject(&v3io.PutObjectInput{Path: p.path + config.SCHEMA_CONFIG, Body: data})
 	return err
 }
 
@@ -159,16 +159,16 @@ func (p *PartitionManager) GetHead() *DBPartition {
 }
 
 type DBPartition struct {
-	manager        *PartitionManager
-	path           string             // Full path (in the DB) to the partition
-	startTime      int64              // Start from time/date
-	partitionInterval int64             // Number of millis stored in the partition
-	chunkInterval  int64                // number of millis stored in each chunk
-	prefix         string             // Path prefix
-	retentionDays  int                // Keep samples for N hours
-	defaultRollups aggregate.AggrType // Default Aggregation functions to apply on sample update
-	rollupTime     int64              // Time range per aggregation bucket
-	rollupBuckets  int                // Total number of buckets per partition
+	manager           *PartitionManager
+	path              string             // Full path (in the DB) to the partition
+	startTime         int64              // Start from time/date
+	partitionInterval int64              // Number of millis stored in the partition
+	chunkInterval     int64              // number of millis stored in each chunk
+	prefix            string             // Path prefix
+	retentionDays     int                // Keep samples for N hours
+	defaultRollups    aggregate.AggrType // Default Aggregation functions to apply on sample update
+	rollupTime        int64              // Time range per aggregation bucket
+	rollupBuckets     int                // Total number of buckets per partition
 }
 
 func (p *DBPartition) IsCyclic() bool {
@@ -201,7 +201,7 @@ func (p *DBPartition) GetShardingKeys(name string) []string {
 // return metric object full path
 func (p *DBPartition) GetMetricPath(name string, hash uint64) string {
 
-	return fmt.Sprintf("%s%s_%x.%016x", p.path, name, int(hash % uint64(p.GetHashingBuckets())), hash)
+	return fmt.Sprintf("%s%s_%x.%016x", p.path, name, int(hash%uint64(p.GetHashingBuckets())), hash)
 }
 
 func (p *DBPartition) AggrType() aggregate.AggrType {
@@ -232,17 +232,17 @@ func (p *DBPartition) GetChunkMint(t int64) int64 {
 
 // is the time t in the range of the chunk starting at mint
 func (p *DBPartition) InChunkRange(mint, t int64) bool {
-	return t >= mint && t < (mint+ IntervalInMilli(p.manager.cfg.PartitionSchemaInfo.ChunckerInterval))
+	return t >= mint && t < (mint+IntervalInMilli(p.manager.cfg.PartitionSchemaInfo.ChunckerInterval))
 }
 
 // is the time t ahead of the range of the chunk starting at mint
 func (p *DBPartition) IsAheadOfChunk(mint, t int64) bool {
-	return t >= (mint+ IntervalInMilli(p.manager.cfg.PartitionSchemaInfo.ChunckerInterval))
+	return t >= (mint + IntervalInMilli(p.manager.cfg.PartitionSchemaInfo.ChunckerInterval))
 }
 
 // Get ID of the Chunk covering time t
 func (p *DBPartition) TimeToChunkId(tmilli int64) int {
-	return int((tmilli - p.startTime) / IntervalInMilli(p.manager.cfg.PartitionSchemaInfo.ChunckerInterval)) + 1
+	return int((tmilli-p.startTime)/IntervalInMilli(p.manager.cfg.PartitionSchemaInfo.ChunckerInterval)) + 1
 }
 
 // is t covered by this partition
@@ -250,7 +250,7 @@ func (p *DBPartition) InRange(t int64) bool {
 	if p.manager.cyclic {
 		return true
 	}
-	return (t >= p.startTime) && (t < p.startTime + p.partitionInterval)
+	return (t >= p.startTime) && (t < p.startTime+p.partitionInterval)
 }
 
 // return the mint and maxt for this partition, may need maxt for cyclic partition
@@ -327,10 +327,9 @@ func TimeToDHM(tmilli int64) (int, int) {
 	return d, h
 }
 
-
 func IntervalInMilli(format string) int64 {
-	interval,_ := strconv.Atoi(format[0:len(format) - 1])
-	unit := format[len(format) -1]
+	interval, _ := strconv.Atoi(format[0 : len(format)-1])
+	unit := format[len(format)-1]
 	minutesVal := int64(interval * 60 * 1000)
 	switch unit {
 	case 'Y':
