@@ -261,10 +261,12 @@ func (p *DBPartition) InRange(t int64) bool {
 // TODO: add non cyclic partitions
 func (p *DBPartition) GetPartitionRange(maxt int64) (int64, int64) {
 	// start p.days ago, rounded to next hour
-	maxtInHours := maxt/1000/3600 + 1
-	intervalInHours := IntervalInMilli(p.manager.cfg.PartitionSchemaInfo.PartitionerInterval) / (3600 * 1000)
-	newMin := (maxtInHours - intervalInHours) * 3600 * 1000
-	return newMin, maxt
+	// TODO: no need to do string parsing every time, srore the time in mili as private var
+	return p.startTime, p.startTime + IntervalInMilli(p.manager.cfg.PartitionSchemaInfo.PartitionerInterval)
+	//maxtInHours := maxt/1000/3600 + 1
+	//intervalInHours := IntervalInMilli(p.manager.cfg.PartitionSchemaInfo.PartitionerInterval) / (3600 * 1000)
+	//newMin := (maxtInHours - intervalInHours) * 3600 * 1000
+	//return newMin, maxt
 }
 
 // return the valid minimum time in a cyclic partition based on max time

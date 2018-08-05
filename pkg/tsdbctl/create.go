@@ -67,7 +67,7 @@ func newCreateCommandeer(rootCommandeer *RootCommandeer) *createCommandeer {
 	cmd.Flags().StringVarP(&commandeer.defaultRollups, "rollups", "r", "",
 		"Default aggregation rollups, comma seperated: count,avg,sum,min,max,stddev")
 	cmd.Flags().IntVarP(&commandeer.rollupInterval, "rollup-interval", "i", 3600, "aggregation interval in seconds")
-	cmd.Flags().IntVarP(&commandeer.shardingBuckets, "sharding-buckets", "b", 64, "number of buckets to split key")
+	cmd.Flags().IntVarP(&commandeer.shardingBuckets, "sharding-buckets", "b", 8, "number of buckets to split key")
 	cmd.Flags().IntVarP(&commandeer.sampleRetention, "sample-retention", "a", 0, "sample retention in hours")
 
 	commandeer.cmd = cmd

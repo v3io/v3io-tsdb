@@ -23,8 +23,11 @@ package tsdb
 import (
 	"fmt"
 	"github.com/v3io/v3io-tsdb/pkg/config"
+	"github.com/v3io/v3io-tsdb/pkg/formatter"
 	"github.com/v3io/v3io-tsdb/pkg/partmgr"
 	"github.com/v3io/v3io-tsdb/pkg/utils"
+	"math/rand"
+	"os"
 	"testing"
 	"time"
 )
@@ -38,10 +41,10 @@ func TestTsdbIntegration(t *testing.T) {
 		t.Skip("Skipping integration test.")
 	}
 
-	basetime = time.Now().Unix()*1000 - 3600000 // now - 1hr
+	basetime = time.Now().Unix()*1000 - 3600*1000*15 // now - 15hr
+	time.Unix(basetime/1000, 0)
 
-	d, h := partmgr.TimeToDHM(basetime)
-	fmt.Println("base=", d, h)
+	fmt.Println("base time =", time.Unix(basetime/1000, 0).String())
 	cfg, err := config.LoadConfig("../../v3io.yaml")
 	if err != nil {
 		t.Fatal(err)
@@ -53,8 +56,6 @@ func TestTsdbIntegration(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	//adapter.partitionMngr.GetHead().NextPart(0)
-
 	appender, err := adapter.Appender()
 	if err != nil {
 		t.Fatal(err)
@@ -62,15 +63,24 @@ func TestTsdbIntegration(t *testing.T) {
 
 	lset := utils.FromStrings("__name__", "http_req", "method", "post")
 
-	err = DoAppend(lset, appender, 50, 30)
+	err = DoAppend(lset, appender, 350, 120)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	time.Sleep(time.Second * 2)
-	//return
+	lset = utils.FromStrings("__name__", "http_req", "method", "get")
 
-	qry, err := adapter.Querier(nil, basetime-6*3600*1000, basetime+2*3600*1000)
+	err = DoAppend(lset, appender, 180, 240)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	appender.WaitForCompletion(0)
+	fmt.Println("Append Done!")
+
+	return
+
+	qry, err := adapter.Querier(nil, basetime-3*3600*1000, basetime+14*3600*1000)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -82,61 +92,43 @@ func TestTsdbIntegration(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	lasth := 0
-	for set.Next() {
-		if set.Err() != nil {
-			t.Fatal(set.Err())
-		}
+	f, err := formatter.NewFormatter("", nil)
+	if err != nil {
+		t.Fatal(err, "failed to start formatter")
+	}
 
-		series := set.At()
-		fmt.Println("\nLables:", series.Labels())
-		iter := series.Iterator()
-		//iter.Seek(basetime-1*3600*1000)
-		for iter.Next() {
-
-			t, v := iter.At()
-			d, h := partmgr.TimeToDHM(t)
-			if h != lasth {
-				fmt.Println()
-			}
-			m := (t % (3600 * 1000)) / 60000
-			fmt.Printf("t=%d:%d:%d,v=%.2f ", d, h, m, v)
-			lasth = h
-		}
-		if iter.Err() != nil {
-			t.Fatal(iter.Err())
-		}
-
-		fmt.Println()
+	err = f.Write(os.Stdout, set)
+	if err != nil {
+		t.Fatal(err)
 	}
 
 }
 
 func DoAppend(lset utils.Labels, app Appender, num, interval int) error {
 	// TODO: Implement this test
-	return nil
-	/*
-		//time.Sleep(time.Second * 1)
-		curTime := int64(basetime)
+	//return nil
 
-		ref, err := app.Add(lset, curTime, 2)
+	//time.Sleep(time.Second * 1)
+	curTime := int64(basetime)
+
+	ref, err := app.Add(lset, curTime, 2)
+	if err != nil {
+		return err
+	}
+
+	for i := 0; i <= num; i++ {
+		time.Sleep(time.Millisecond * 10)
+		curTime += int64(interval * 1000)
+		t := curTime + int64(rand.Intn(100)) - 50
+		_, h := partmgr.TimeToDHM(t)
+		v := rand.Float64()*10 + float64(h*100)
+		fmt.Printf("t-%d,v%3.2f ", t, v)
+		err = app.AddFast(lset, ref, t, v)
 		if err != nil {
 			return err
 		}
+	}
 
-		for i := 0; i <= num; i++ {
-			time.Sleep(time.Millisecond * 80)
-			curTime += int64(interval * 1000)
-			t := curTime + int64(rand.Intn(100)) - 50
-			_, h := partmgr.TimeToDHM(t)
-			v := rand.Float64()*10 + float64(h*100)
-			fmt.Printf("t-%d,v%3.2f ", t, v)
-			err = app.AddFast(lset, ref, t, v)
-			if err != nil {
-				return err
-			}
-		}
+	return nil
 
-		return nil
-	*/
 }

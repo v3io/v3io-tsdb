@@ -33,19 +33,19 @@ type setSorter struct {
 	err   error
 }
 
-func (s setSorter) Next() bool {
-	if s.index >= len(s.list) {
+func (s *setSorter) Next() bool {
+	if s.index >= len(s.list)-1 {
 		return false
 	}
 	s.index++
 	return true
 }
 
-func (s setSorter) At() Series {
+func (s *setSorter) At() Series {
 	return s.list[s.index]
 }
 
-func (s setSorter) Err() error { return s.err }
+func (s *setSorter) Err() error { return s.err }
 
 type IterSortMerger struct {
 	iters        []SeriesSet

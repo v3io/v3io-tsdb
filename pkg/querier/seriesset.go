@@ -158,7 +158,7 @@ func (s *V3ioSeriesSet) Next() bool {
 	return true
 }
 
-// convert raw chunks to fixed interval aggragator
+// convert raw chunks to fixed interval aggregator
 func (s *V3ioSeriesSet) chunks2IntervalAggregates() {
 
 	iter := s.currSeries.Iterator()
