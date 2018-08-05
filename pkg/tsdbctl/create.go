@@ -107,7 +107,7 @@ func (cc *createCommandeer) create() error {
 	}
 
 	aggrs := strings.Split(cc.defaultRollups, ",")
-	fields, err := aggregate.SchemaFieldFromString(aggrs)
+	fields, err := aggregate.SchemaFieldFromString(aggrs, "v")
 	if err != nil {
 		return errors.Wrap(err, "Failed to create aggregators list")
 	}

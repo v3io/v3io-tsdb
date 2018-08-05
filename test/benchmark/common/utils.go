@@ -26,7 +26,7 @@ func CreateTSDB(v3ioConfig *config.V3ioConfig, newTsdbPath string) error {
 	}
 
 	aggrs := strings.Split("*", ",")
-	fields, err := aggregate.SchemaFieldFromString(aggrs)
+	fields, err := aggregate.SchemaFieldFromString(aggrs, "v")
 	if err != nil {
 		return errors.Wrap(err, "Failed to create aggregators list")
 	}

@@ -195,7 +195,11 @@ func (p *DBPartition) GetTablePath() string {
 
 // return list of Sharding Keys matching the name
 func (p *DBPartition) GetShardingKeys(name string) []string {
-	return []string{name}
+	var res []string
+	for i := 0; i < p.manager.cfg.TableSchemaInfo.ShardingBuckets; i++ {
+		res = append(res, fmt.Sprintf("%s_%x", name, i))
+	}
+	return res
 }
 
 // return metric object full path

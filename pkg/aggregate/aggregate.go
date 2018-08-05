@@ -59,25 +59,25 @@ var aggrToString = map[AggrType]string{
 }
 
 var aggrToSchemaField = map[string]config.SchemaField{
-	"count":  {Name: "_v_count", Type: "array", Nullable: true, Items: "double"},
-	"sum":    {Name: "_v_sum", Type: "array", Nullable: true, Items: "double"},
-	"sqr":    {Name: "_v_sqr", Type: "array", Nullable: true, Items: "double"},
-	"max":    {Name: "_v_max", Type: "array", Nullable: true, Items: "double"},
-	"min":    {Name: "_v_min", Type: "array", Nullable: true, Items: "double"},
-	"last":   {Name: "_v_last", Type: "array", Nullable: true, Items: "double"},
-	"avg":    {Name: "_v_avg", Type: "array", Nullable: true, Items: "double"},
-	"rate":   {Name: "_v_rate", Type: "array", Nullable: true, Items: "double"},
-	"stddev": {Name: "_v_stddev", Type: "array", Nullable: true, Items: "double"},
-	"stdvar": {Name: "_v_stdvar", Type: "array", Nullable: true, Items: "double"},
+	"count":  {Name: "count", Type: "array", Nullable: true, Items: "double"},
+	"sum":    {Name: "sum", Type: "array", Nullable: true, Items: "double"},
+	"sqr":    {Name: "sqr", Type: "array", Nullable: true, Items: "double"},
+	"max":    {Name: "max", Type: "array", Nullable: true, Items: "double"},
+	"min":    {Name: "min", Type: "array", Nullable: true, Items: "double"},
+	"last":   {Name: "last", Type: "array", Nullable: true, Items: "double"},
+	"avg":    {Name: "avg", Type: "array", Nullable: true, Items: "double"},
+	"rate":   {Name: "rate", Type: "array", Nullable: true, Items: "double"},
+	"stddev": {Name: "stddev", Type: "array", Nullable: true, Items: "double"},
+	"stdvar": {Name: "stdvar", Type: "array", Nullable: true, Items: "double"},
 }
 
-func SchemaFieldFromString(split []string) ([]config.SchemaField, error) {
+func SchemaFieldFromString(split []string, col string) ([]config.SchemaField, error) {
 	fieldList := make([]config.SchemaField, 0, len(split))
 	for _, s := range split {
 		if strings.Compare(s, "*") == 0 {
 			fieldList = make([]config.SchemaField, 0, len(aggrToSchemaField))
 			for _, val := range aggrToSchemaField {
-				fieldList = append(fieldList, val)
+				fieldList = append(fieldList, getAggrFullName(val, col))
 			}
 			return fieldList, nil
 		} else {
@@ -85,10 +85,16 @@ func SchemaFieldFromString(split []string) ([]config.SchemaField, error) {
 			if !ok {
 				return fieldList, fmt.Errorf("Invalid aggragator type %s", s)
 			}
-			fieldList = append(fieldList, field)
+			fieldList = append(fieldList, getAggrFullName(field, col))
 		}
 	}
 	return fieldList, nil
+}
+
+func getAggrFullName(field config.SchemaField, col string) config.SchemaField {
+	fullName := fmt.Sprintf("_%s_%s", col, field.Name)
+	field.Name = fullName
+	return field
 }
 
 func (a AggrType) String() string { return aggrToString[a] }
