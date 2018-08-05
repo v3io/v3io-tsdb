@@ -19,11 +19,11 @@ get:
 
 .PHONY: test
 test: get
-	go test -tags unit $(TOPLEVEL_DIRS)
+	go test -race -tags unit $(TOPLEVEL_DIRS)
 
 .PHONY: integration
 integration: get
-	go test -tags integration $(TOPLEVEL_DIRS) -p 1 # p=1 to force Go to run pkg tests serially.
+	go test -race -tags integration $(TOPLEVEL_DIRS) -p 1 # p=1 to force Go to run pkg tests serially.
 
 .PHONY: build
 build: get
