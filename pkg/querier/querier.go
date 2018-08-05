@@ -46,7 +46,6 @@ type V3ioQuerier struct {
 	cfg           *config.V3ioConfig
 	mint, maxt    int64
 	partitionMngr *partmgr.PartitionManager
-	overlapWin    []int
 }
 
 // Standard Time Series Query, return a set of series which match the condition
@@ -89,11 +88,11 @@ func (q *V3ioQuerier) selectQry(name, functions string, step int64, win []int, f
 	if name == "" {
 		for i := 0; i < len(sets); i++ {
 			// TODO make it a Go routine per part
-			set, err := NewSetSorter(sets[i])
+			sort, err := NewSetSorter(sets[i])
 			if err != nil {
 				return nullSeriesSet{}, err
 			}
-			sets[i] = set
+			sets[i] = sort
 		}
 	}
 
@@ -119,7 +118,7 @@ func (q *V3ioQuerier) queryNumericPartition(
 	}
 
 	newAggrSeries, err := aggregate.NewAggregateSeries(
-		functions, "v", partition.AggrBuckets(), step, partition.RollupTime(), q.overlapWin)
+		functions, "v", partition.AggrBuckets(), step, partition.RollupTime(), win)
 	if err != nil {
 		return nil, err
 	}
@@ -128,7 +127,7 @@ func (q *V3ioQuerier) queryNumericPartition(
 		newSet.aggrSeries = newAggrSeries
 		newSet.interval = step
 		newSet.aggrIdx = newAggrSeries.NumFunctions() - 1
-		newSet.overlapWin = q.overlapWin
+		newSet.overlapWin = win
 	}
 
 	err = newSet.getItems(partition, name, filter, q.container, q.cfg.QryWorkers)
