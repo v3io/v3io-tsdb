@@ -14,13 +14,6 @@ type DataPoint struct {
 	Value float64
 }
 
-// DataPointTimeSorter sorts DataPoints by time.
-type DataPointTimeSorter []DataPoint
-
-func (a DataPointTimeSorter) Len() int           { return len(a) }
-func (a DataPointTimeSorter) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
-func (a DataPointTimeSorter) Less(i, j int) bool { return a[i].Time < a[j].Time }
-
 type Sample struct {
 	Lset  utils.Labels
 	Time  string

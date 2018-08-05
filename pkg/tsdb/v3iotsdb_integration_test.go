@@ -32,7 +32,6 @@ import (
 	"github.com/v3io/v3io-tsdb/pkg/tsdb/tsdbtest"
 	"github.com/v3io/v3io-tsdb/pkg/utils"
 	"path/filepath"
-	"sort"
 	"testing"
 )
 
@@ -357,19 +356,18 @@ func TestQueryDataOverlappingWindow(t *testing.T) {
 			if test.ignoreReason != "" {
 				t.Skip(test.ignoreReason)
 			}
-			testQueryDataCaseOverlappingWindow(t, v3ioConfig, test.metricName, test.labels,
+			testQueryDataOverlappingWindowCase(t, v3ioConfig, test.metricName, test.labels,
 				test.data, test.filter, test.windows, test.aggregators, test.from, test.to, test.expected)
 		})
 	}
 }
 
-func testQueryDataCaseOverlappingWindow(test *testing.T, v3ioConfig *config.V3ioConfig,
+func testQueryDataOverlappingWindowCase(test *testing.T, v3ioConfig *config.V3ioConfig,
 	metricsName string, userLabels []utils.Label, data []tsdbtest.DataPoint, filter string,
 	windows []int, aggregator string,
 	from int64, to int64, expected map[string][]tsdbtest.DataPoint) {
 	defer tsdbtest.SetUp(test, v3ioConfig)()
 
-	sort.Sort(tsdbtest.DataPointTimeSorter(data))
 	var step int64 = 3600
 
 	adapter, err := NewV3ioAdapter(v3ioConfig, nil, nil)
