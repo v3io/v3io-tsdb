@@ -316,39 +316,40 @@ func TestQueryDataOverlappingWindow(t *testing.T) {
 			metricName: "cpu",
 			labels:     utils.FromStrings("os", "linux", "iguaz", "yesplease"),
 			data: []tsdbtest.DataPoint{{Time: 1532940510, Value: 314.3},
-				{Time: 1532940510 + 200, Value: 314.3},
-				{Time: 1532970510, Value: 300.3},
-				{Time: 1532980510, Value: 3234.6}},
-			from: 0, to: 1532980510 + 1,
-			windows:     []int{1000},
+				{Time: 1532944110, Value: 314.3},
+				{Time: 1532947710, Value: 300.3},
+				{Time: 1532951310, Value: 3234.6}},
+			from: 0, to: 1532954910,
+			windows:     []int{1, 2, 4},
 			aggregators: "sum",
 			expected: map[string][]tsdbtest.DataPoint{
-				"sum": {{Time: 1532940000, Value: 628.6},
-					{Time: 1532970000, Value: 300.3},
-					{Time: 1532980000, Value: 3234.6}}},
+				"sum": {{Time: 1532937600, Value: 4163.5},
+					{Time: 1532944800, Value: 3534.9},
+					{Time: 1532948400, Value: 3234.6}}},
 		},
 
-		//{desc: "Should ingest and query with windowing on multiple agg",
-		//	metricName: "cpu",
-		//	labels: utils.FromStrings("os", "linux", "iguaz", "yesplease"),
-		//	data: []tsdbtest.DataPoint{{Time: 1532940510, Value: 314.3},
-		//		{Time: 1532940510 + 200, Value: 314.3},
-		//		{Time: 1532970510, Value: 300.3},
-		//		{Time: 1532980510, Value: 3234.6}},
-		//	from: 0, to: 1532980510 + 1,
-		//	windows: []int{1, 5},
-		//	aggregators: "sum,count,sqr",
-		//	expected: map[string][]tsdbtest.DataPoint{
-		//		"sum": {{Time: 1532940000, Value: 628.6},
-		//			{Time: 1532970000, Value: 300.3},
-		//			{Time: 1532980000, Value: 3234.6}},
-		//		"count": {{Time: 1532940000, Value: 2},
-		//			{Time: 1532970000, Value: 1},
-		//			{Time: 1532980000, Value: 1}},
-		//		"sqrt": {{Time: 1532940000, Value: 197568.98},
-		//			{Time: 1532970000, Value: 90180.09},
-		//			{Time: 1532980000, Value: 10462637.16}}},
-		//},
+		{desc: "Should ingest and query with windowing on multiple agg",
+			metricName: "cpu",
+			labels:     utils.FromStrings("os", "linux", "iguaz", "yesplease"),
+			data: []tsdbtest.DataPoint{{Time: 1532940510, Value: 314.3},
+				{Time: 1532944110, Value: 314.3},
+				{Time: 1532947710, Value: 300.3},
+				{Time: 1532951310, Value: 3234.6}},
+			from: 0, to: 1532954910,
+			windows:     []int{1, 2, 4},
+			aggregators: "sum,count,sqr",
+			expected: map[string][]tsdbtest.DataPoint{
+				"sum": {{Time: 1532937600, Value: 4163.5},
+					{Time: 1532944800, Value: 3534.9},
+					{Time: 1532948400, Value: 3234.6}},
+				"count": {{Time: 1532937600, Value: 4},
+					{Time: 1532944800, Value: 2},
+					{Time: 1532948400, Value: 1}},
+				"sqr": {{Time: 1532937600, Value: 10750386.23},
+					{Time: 1532944800, Value: 10552817.25},
+					{Time: 1532948400, Value: 10462637.16}},
+			},
+		},
 	}
 
 	for _, test := range testCases {
@@ -369,10 +370,7 @@ func testQueryDataCaseOverlappingWindow(test *testing.T, v3ioConfig *config.V3io
 	defer tsdbtest.SetUp(test, v3ioConfig)()
 
 	sort.Sort(tsdbtest.DataPointTimeSorter(data))
-	firstTime := data[0].Time
-	lastTime := data[len(data)-1].Time
-	var step int64 = 1000
-	expectedAggResults := (lastTime-firstTime)/step + 1
+	var step int64 = 3600
 
 	adapter, err := NewV3ioAdapter(v3ioConfig, nil, nil)
 	if err != nil {
@@ -405,6 +403,7 @@ func testQueryDataCaseOverlappingWindow(test *testing.T, v3ioConfig *config.V3io
 	}
 
 	set, err := qry.SelectOverlap(metricsName, aggregator, step, windows, filter)
+
 	if err != nil {
 		test.Fatalf("Failed to run Select. reason: %v", err)
 	}
@@ -416,7 +415,6 @@ func testQueryDataCaseOverlappingWindow(test *testing.T, v3ioConfig *config.V3io
 		}
 
 		series := set.At()
-		fmt.Printf("Series: %v\n", series)
 		agg := series.Labels().Get("Aggregator")
 		iter := series.Iterator()
 		if iter.Err() != nil {
@@ -424,8 +422,7 @@ func testQueryDataCaseOverlappingWindow(test *testing.T, v3ioConfig *config.V3io
 		}
 
 		actual := iteratorToSlice(iter)
-		fmt.Printf("Actual: %v\n", actual)
-		assert.EqualValues(test, expectedAggResults, len(actual))
+		assert.EqualValues(test, len(windows), len(actual))
 		for _, data := range expected[agg] {
 			assert.Contains(test, actual, data)
 		}

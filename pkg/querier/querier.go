@@ -65,7 +65,7 @@ func (q *V3ioQuerier) SelectOverlap(name, functions string, step int64, win []in
 func (q *V3ioQuerier) selectQry(name, functions string, step int64, win []int, filter string) (SeriesSet, error) {
 
 	filter = strings.Replace(filter, "__name__", "_name", -1)
-	q.logger.DebugWith("Select query", "func", functions, "step", step, "filter", filter)
+	q.logger.DebugWith("Select query", "func", functions, "step", step, "filter", filter, "win", win)
 
 	mint, maxt := q.mint, q.maxt
 	if q.partitionMngr.IsCyclic() {
@@ -79,7 +79,7 @@ func (q *V3ioQuerier) selectQry(name, functions string, step int64, win []int, f
 		}
 
 		newAggrSeries, err := aggregate.NewAggregateSeries(
-			functions, "v", partition.AggrBuckets(), step, partition.RollupTime(), q.overlapWin)
+			functions, "v", partition.AggrBuckets(), step, partition.RollupTime(), win)
 		if err != nil {
 			return nil, err
 		}
@@ -88,7 +88,7 @@ func (q *V3ioQuerier) selectQry(name, functions string, step int64, win []int, f
 			newSet.aggrSeries = newAggrSeries
 			newSet.interval = step
 			newSet.aggrIdx = newAggrSeries.NumFunctions() - 1
-			newSet.overlapWin = q.overlapWin
+			newSet.overlapWin = win
 		}
 
 		path, partFilter := partition.GetTablePath()
