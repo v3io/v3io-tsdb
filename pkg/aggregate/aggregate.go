@@ -22,6 +22,7 @@ package aggregate
 
 import (
 	"fmt"
+	"github.com/v3io/v3io-tsdb/pkg/config"
 	"strings"
 )
 
@@ -57,11 +58,49 @@ var aggrToString = map[AggrType]string{
 	aggrTypeStddev: "stddev", aggrTypeStdvar: "stdvar", aggrTypeAll: "*",
 }
 
+var aggrToSchemaField = map[string]config.SchemaField{
+	"count":  {Name: "count", Type: "array", Nullable: true, Items: "double"},
+	"sum":    {Name: "sum", Type: "array", Nullable: true, Items: "double"},
+	"sqr":    {Name: "sqr", Type: "array", Nullable: true, Items: "double"},
+	"max":    {Name: "max", Type: "array", Nullable: true, Items: "double"},
+	"min":    {Name: "min", Type: "array", Nullable: true, Items: "double"},
+	"last":   {Name: "last", Type: "array", Nullable: true, Items: "double"},
+	"avg":    {Name: "avg", Type: "array", Nullable: true, Items: "double"},
+	"rate":   {Name: "rate", Type: "array", Nullable: true, Items: "double"},
+	"stddev": {Name: "stddev", Type: "array", Nullable: true, Items: "double"},
+	"stdvar": {Name: "stdvar", Type: "array", Nullable: true, Items: "double"},
+}
+
+func SchemaFieldFromString(split []string, col string) ([]config.SchemaField, error) {
+	fieldList := make([]config.SchemaField, 0, len(split))
+	for _, s := range split {
+		if strings.Compare(s, "*") == 0 {
+			fieldList = make([]config.SchemaField, 0, len(aggrToSchemaField))
+			for _, val := range aggrToSchemaField {
+				fieldList = append(fieldList, getAggrFullName(val, col))
+			}
+			return fieldList, nil
+		} else {
+			field, ok := aggrToSchemaField[s]
+			if !ok {
+				return fieldList, fmt.Errorf("Invalid aggragator type %s", s)
+			}
+			fieldList = append(fieldList, getAggrFullName(field, col))
+		}
+	}
+	return fieldList, nil
+}
+
+func getAggrFullName(field config.SchemaField, col string) config.SchemaField {
+	fullName := fmt.Sprintf("_%s_%s", col, field.Name)
+	field.Name = fullName
+	return field
+}
+
 func (a AggrType) String() string { return aggrToString[a] }
 
 // convert comma separated string to aggregator mask
-func AggrsFromString(list string) (AggrType, error) {
-	split := strings.Split(list, ",")
+func AggrsFromString(split []string) (AggrType, error) {
 	var aggrList AggrType
 	for _, s := range split {
 		aggr, ok := aggrTypeString[s]

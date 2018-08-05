@@ -6,8 +6,9 @@ import (
 )
 
 func TestAggragators(t *testing.T) {
-	aggrString := "*"
-	aggr, err := AggrsFromString(aggrString)
+	s := make([]string, 1)
+	s[0] = "*"
+	aggr, err := AggrsFromString(s)
 	if err != nil {
 		t.Fatal(err)
 	}
