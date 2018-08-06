@@ -23,6 +23,7 @@ package appender
 import (
 	"github.com/pkg/errors"
 	"github.com/v3io/v3io-go-http"
+	"reflect"
 	"time"
 )
 
@@ -248,14 +249,16 @@ func (mc *MetricsCache) handleResponse(metric *MetricState, resp *v3io.Response,
 	metric.Lock()
 	defer metric.Unlock()
 
-	if resp.Error != nil && metric.getState() != storeStateGet {
-		reqInput := resp.Request().Input.(*v3io.UpdateItemInput)
+	reqInput := resp.Request().Input
 
+	if resp.Error != nil && metric.getState() != storeStateGet {
 		mc.logger.ErrorWith("failed IO", "id", resp.ID, "err", resp.Error, "key", metric.key,
 			"inflight", mc.updatesInFlight, "mqueue", mc.metricQueue.Length(),
-			"numsamples", metric.store.samplesQueueLength(), "update expression", reqInput.Expression)
+			"numsamples", metric.store.samplesQueueLength(), "update expression",
+			reqInput.(*v3io.UpdateItemInput).Expression)
 	} else {
-		mc.logger.DebugWith("IO resp", "id", resp.ID, "err", resp.Error, "key", metric.key)
+		mc.logger.DebugWith("IO resp", "id", resp.ID, "err", resp.Error, "key", metric.key, "request type",
+			reflect.TypeOf(reqInput), "request", reqInput)
 	}
 
 	if metric.getState() == storeStateGet {
