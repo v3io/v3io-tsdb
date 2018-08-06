@@ -89,7 +89,7 @@ func TestAggregators(t *testing.T) {
 func testAggregatorCase(t *testing.T, aggString string, data map[int64]float64, exprCol string, bucket int,
 	expectedUpdateExpr string, expectedSetExpr string, expectFail bool) {
 
-	aggregator, err := AggrsFromString(aggString)
+	aggregator, err := AggrsFromString(strings.Split(aggString, ","))
 	if err != nil {
 		if !expectFail {
 			t.Fatal(err)
