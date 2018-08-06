@@ -18,8 +18,6 @@ under the Apache 2.0 license is conditioned upon your compliance with
 such restriction.
 */
 
-// TODO: need to expand from a single partition to multiple
-
 package partmgr
 
 import (
@@ -36,7 +34,7 @@ import (
 
 // Create new Partition Manager
 func NewPartitionMngr(cfg *config.Schema, path string, cont *v3io.Container) *PartitionManager {
-	newMngr := &PartitionManager{cfg: cfg, path: path, cyclic: false, ignoreWrap: true, container: cont}
+	newMngr := &PartitionManager{cfg: cfg, path: path, cyclic: false, container: cont}
 	for _, part := range cfg.Partitions {
 		path := fmt.Sprintf("%s/%d/", newMngr.path, part.StartTime / 1000)
 		newPart := NewDBPartition(newMngr, part.StartTime, path)
@@ -84,7 +82,6 @@ type PartitionManager struct {
 	headPartition *DBPartition
 	partitions    []*DBPartition
 	cyclic        bool
-	ignoreWrap    bool
 	container     *v3io.Container
 }
 
@@ -261,15 +258,9 @@ func (p *DBPartition) InRange(t int64) bool {
 }
 
 // return the mint and maxt for this partition, may need maxt for cyclic partition
-// TODO: add non cyclic partitions
 func (p *DBPartition) GetPartitionRange(maxt int64) (int64, int64) {
 	// start p.days ago, rounded to next hour
-	// TODO: no need to do string parsing every time, srore the time in mili as private var
 	return p.startTime, p.startTime + p.partitionInterval
-	//maxtInHours := maxt/1000/3600 + 1
-	//intervalInHours := IntervalInMilli(p.manager.cfg.PartitionSchemaInfo.PartitionerInterval) / (3600 * 1000)
-	//newMin := (maxtInHours - intervalInHours) * 3600 * 1000
-	//return newMin, maxt
 }
 
 // return the valid minimum time in a cyclic partition based on max time
