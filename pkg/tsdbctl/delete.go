@@ -31,6 +31,8 @@ type delCommandeer struct {
 	rootCommandeer *RootCommandeer
 	delConfig      bool
 	force          bool
+	fromTime       int64
+	toTime         int64
 }
 
 func newDeleteCommandeer(rootCommandeer *RootCommandeer) *delCommandeer {
@@ -51,6 +53,8 @@ func newDeleteCommandeer(rootCommandeer *RootCommandeer) *delCommandeer {
 
 	cmd.Flags().BoolVarP(&commandeer.delConfig, "del-config", "d", false, "Delete the TSDB config as well")
 	cmd.Flags().BoolVarP(&commandeer.force, "force", "f", false, "Delete all elements even if some steps fail")
+	cmd.Flags().Int64VarP(&commandeer.fromTime, "from-time", "r", 0, "Delete partitions from this time and on")
+	cmd.Flags().Int64VarP(&commandeer.toTime, "to-time", "t", 0, "Delete partitions up to this time")
 	commandeer.cmd = cmd
 
 	return commandeer
@@ -66,7 +70,7 @@ func (ic *delCommandeer) delete() error {
 		return err
 	}
 
-	err := ic.rootCommandeer.adapter.DeleteDB(ic.delConfig, ic.force)
+	err := ic.rootCommandeer.adapter.DeleteDB(ic.delConfig, ic.force, ic.fromTime, ic.toTime)
 	if err != nil {
 		return errors.Wrap(err, "Failed to delete DB")
 	}

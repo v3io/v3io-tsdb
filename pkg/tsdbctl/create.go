@@ -42,7 +42,7 @@ type createCommandeer struct {
 	storageClass      string
 	chunkInterval     string
 	defaultRollups    string
-	rollupInterval    int
+	rollupInterval    string
 	shardingBuckets   int
 	sampleRetention   int
 }
@@ -66,7 +66,7 @@ func newCreateCommandeer(rootCommandeer *RootCommandeer) *createCommandeer {
 	cmd.Flags().StringVarP(&commandeer.chunkInterval, "chunk-interval", "t", "1H", "time in a single chunk")
 	cmd.Flags().StringVarP(&commandeer.defaultRollups, "rollups", "r", "",
 		"Default aggregation rollups, comma seperated: count,avg,sum,min,max,stddev")
-	cmd.Flags().IntVarP(&commandeer.rollupInterval, "rollup-interval", "i", 3600, "aggregation interval in seconds")
+	cmd.Flags().StringVarP(&commandeer.rollupInterval, "rollup-interval", "i", "1H", "aggregation interval")
 	cmd.Flags().IntVarP(&commandeer.shardingBuckets, "sharding-buckets", "b", 8, "number of buckets to split key")
 	cmd.Flags().IntVarP(&commandeer.sampleRetention, "sample-retention", "a", 0, "sample retention in hours")
 
@@ -90,9 +90,13 @@ func (cc *createCommandeer) create() error {
 		return errors.Wrap(err, "Failed to parse chunk interval")
 	}
 
+	if err := cc.validateFormat(cc.rollupInterval); err != nil {
+		return errors.Wrap(err, "Failed to parse rollup interval")
+	}
+
 	defaultRollup := config.Rollup{
 		Aggregators:                     cc.defaultRollups,
-		AggregatorsGranularityInSeconds: cc.rollupInterval,
+		AggregatorsGranularity: cc.rollupInterval,
 		StorageClass:                    DEFAULT_STORAGE_CLASS,
 		SampleRetention:                 cc.sampleRetention,
 		LayerRetentionTime:              "1Y", //TODO
@@ -116,7 +120,7 @@ func (cc *createCommandeer) create() error {
 	partitionSchema := config.PartitionSchema{
 		Version:                         tableSchema.Version,
 		Aggregators:                     aggrs,
-		AggregatorsGranularityInSeconds: cc.rollupInterval,
+		AggregatorsGranularity:          cc.rollupInterval,
 		StorageClass:                    DEFAULT_STORAGE_CLASS,
 		SampleRetention:                 cc.sampleRetention,
 		ChunckerInterval:                tableSchema.ChunckerInterval,
@@ -140,8 +144,8 @@ func (cc *createCommandeer) validateFormat(format string) error {
 		return fmt.Errorf("format is inncorrect, not a number")
 	}
 	unit := string(format[len(format)-1])
-	if !(unit == "Y" || unit == "M" || unit == "D" || unit == "H" || unit == "m") {
-		return fmt.Errorf("format is inncorrect, not part of Y/M/D/H/m")
+	if !(unit == "y" || unit == "m" || unit == "d" || unit == "h" || unit == "M") {
+		return fmt.Errorf("format is inncorrect, not part of y,m,d,h,M")
 	}
 	return nil
 }
