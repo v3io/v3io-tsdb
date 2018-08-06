@@ -217,6 +217,13 @@ func TestQueryData(t *testing.T) {
 				{Time: 1532940510 + 10, Value: 3234.6}},
 			from: 1532940510 + 1, to: 0,
 			expected: []tsdbtest.DataPoint{}},
+
+		{desc: "Should query with filter on not existing metric name", metricName: "cpu",
+			labels: utils.FromStrings("os", "linux", "iguaz", "yesplease"),
+			data:   []tsdbtest.DataPoint{{Time: 1532940510, Value: 33.3}},
+			filter: "_name=='hahaha'",
+			from:   0, to: 1532940510 + 1,
+			expected: []tsdbtest.DataPoint{}},
 	}
 
 	for _, test := range testCases {
@@ -233,32 +240,8 @@ func TestQueryData(t *testing.T) {
 func testQueryDataCase(test *testing.T, v3ioConfig *config.V3ioConfig,
 	metricsName string, userLabels []utils.Label, data []tsdbtest.DataPoint, filter string, aggregator string,
 	from int64, to int64, expected []tsdbtest.DataPoint) {
-	defer tsdbtest.SetUp(test, v3ioConfig)()
-
-	adapter, err := NewV3ioAdapter(v3ioConfig, nil, nil)
-	if err != nil {
-		test.Fatalf("Failed to create v3io adapter. reason: %s", err)
-	}
-
-	appender, err := adapter.Appender()
-	if err != nil {
-		test.Fatalf("Failed to get appender. reason: %s", err)
-	}
-
-	labels := utils.Labels{utils.Label{Name: "__name__", Value: metricsName}}
-	labels = append(labels, userLabels...)
-
-	ref, err := appender.Add(labels, data[0].Time, data[0].Value)
-	if err != nil {
-		test.Fatalf("Failed to add data to appender. reason: %s", err)
-	}
-	for _, curr := range data[1:] {
-		appender.AddFast(labels, ref, curr.Time, curr.Value)
-	}
-
-	if _, err := appender.WaitForCompletion(0); err != nil {
-		test.Fatalf("Failed to wait for appender completion. reason: %s", err)
-	}
+	adapter, teardown := tsdbtest.SetUpWithData(test, v3ioConfig, metricsName, data, userLabels)
+	defer teardown()
 
 	qry, err := adapter.Querier(nil, from, to)
 	if err != nil {
@@ -287,7 +270,7 @@ func testQueryDataCase(test *testing.T, v3ioConfig *config.V3ioConfig,
 		counter++
 	}
 
-	if counter == 0 {
+	if counter == 0 && len(expected) > 0 {
 		test.Fatalf("No data was recieved")
 	}
 }
@@ -366,34 +349,10 @@ func testQueryDataOverlappingWindowCase(test *testing.T, v3ioConfig *config.V3io
 	metricsName string, userLabels []utils.Label, data []tsdbtest.DataPoint, filter string,
 	windows []int, aggregator string,
 	from int64, to int64, expected map[string][]tsdbtest.DataPoint) {
-	defer tsdbtest.SetUp(test, v3ioConfig)()
+	adapter, teardown := tsdbtest.SetUpWithData(test, v3ioConfig, metricsName, data, userLabels)
+	defer teardown()
 
 	var step int64 = 3600
-
-	adapter, err := NewV3ioAdapter(v3ioConfig, nil, nil)
-	if err != nil {
-		test.Fatalf("Failed to create v3io adapter. reason: %s", err)
-	}
-
-	appender, err := adapter.Appender()
-	if err != nil {
-		test.Fatalf("Failed to get appender. reason: %s", err)
-	}
-
-	labels := utils.Labels{utils.Label{Name: "__name__", Value: metricsName}}
-	labels = append(labels, userLabels...)
-
-	ref, err := appender.Add(labels, data[0].Time, data[0].Value)
-	if err != nil {
-		test.Fatalf("Failed to add data to appender. reason: %s", err)
-	}
-	for _, curr := range data[1:] {
-		appender.AddFast(labels, ref, curr.Time, curr.Value)
-	}
-
-	if _, err := appender.WaitForCompletion(0); err != nil {
-		test.Fatalf("Failed to wait for appender completion. reason: %s", err)
-	}
 
 	qry, err := adapter.Querier(nil, from, to)
 	if err != nil {
@@ -401,7 +360,6 @@ func testQueryDataOverlappingWindowCase(test *testing.T, v3ioConfig *config.V3io
 	}
 
 	set, err := qry.SelectOverlap(metricsName, aggregator, step, windows, filter)
-
 	if err != nil {
 		test.Fatalf("Failed to run Select. reason: %v", err)
 	}
@@ -427,7 +385,7 @@ func testQueryDataOverlappingWindowCase(test *testing.T, v3ioConfig *config.V3io
 		counter++
 	}
 
-	if counter == 0 {
+	if counter == 0 && len(expected) > 0 {
 		test.Fatalf("No data was recieved")
 	}
 }
