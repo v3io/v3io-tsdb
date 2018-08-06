@@ -15,7 +15,7 @@ const relativeProjectPath = "src/github.com/v3io/v3io-tsdb"
 This method will try and load the configuration file from several locations by the following order:
 1. Current package's 'testdata/v3io.yaml' folder
 2. $GOPATH/src/github.com/v3io/v3io-tsdb/v3io.yaml
-3. Environment variable named 'CONF'
+3. Environment variable named 'V3IO_CONF'
 */
 func GetV3ioConfigPath() (string, error) {
 	localConfigFile := filepath.Join(TsdbDefaultTestConfigPath, config.DefaultConfigurationFileName)
@@ -31,7 +31,7 @@ func GetV3ioConfigPath() (string, error) {
 		}
 	}
 
-	if configurationPath := os.Getenv("CONF"); configurationPath != "" {
+	if configurationPath := os.Getenv("V3IO_CONF"); configurationPath != "" {
 		return configurationPath, nil
 	}
 
