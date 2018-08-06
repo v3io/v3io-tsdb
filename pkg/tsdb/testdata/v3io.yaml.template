@@ -13,15 +13,9 @@ path: <tsdb path>
 verbose: "warn"
 
 # Default timeout 10 seconds
-timeout: 30
+timeout: 10
 
-workers: 20
+workers: 8
 
 username: <user name>
 password: <password>
-
-performance:
-  reportOnShutdown: true
-  output: "stdout"
-  reportPeriodically: true
-  reportInterval: 30

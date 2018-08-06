@@ -53,11 +53,14 @@ func CreateTestTSDB(t testing.TB, v3ioConfig *config.V3ioConfig) {
 }
 
 func SetUp(t testing.TB, v3ioConfig *config.V3ioConfig) func() {
-	v3ioConfig.Path = fmt.Sprintf("%s-%d", v3ioConfig.Path, time.Now().Nanosecond())
+	v3ioConfig.Path = fmt.Sprintf("%s-%d", t.Name(), time.Now().Nanosecond())
 	CreateTestTSDB(t, v3ioConfig)
 
 	return func() {
-		DeleteTSDB(t, v3ioConfig)
+		// Don't delete the table if the test has failed
+		if !t.Failed() {
+			DeleteTSDB(t, v3ioConfig)
+		}
 	}
 }
 

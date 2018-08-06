@@ -318,7 +318,7 @@ func TestDeleteTSDB(t *testing.T) {
 		DefaultRollups: "count,sum",
 		RollupMin:      10,
 	}
-	v3ioConfig.Path = "delete_test_metrics"
+	v3ioConfig.Path = t.Name()
 	if err := CreateTSDB(v3ioConfig, &dbConfig); err != nil {
 		t.Fatalf("Failed to create TSDB. reason: %s", err)
 	}
