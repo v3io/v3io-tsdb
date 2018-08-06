@@ -10,11 +10,11 @@ import (
 
 func CreateTSDB(v3ioConfig *config.V3ioConfig, newTsdbPath string) error {
 	defaultRollup := config.Rollup{
-		Aggregators:                     "*",
-		AggregatorsGranularity:          "1h",
-		StorageClass:                    "local",
-		SampleRetention:                 0,
-		LayerRetentionTime:              "1y",
+		Aggregators:            "*",
+		AggregatorsGranularity: "1h",
+		StorageClass:           "local",
+		SampleRetention:        0,
+		LayerRetentionTime:     "1y",
 	}
 
 	tableSchema := config.TableSchema{
@@ -33,13 +33,13 @@ func CreateTSDB(v3ioConfig *config.V3ioConfig, newTsdbPath string) error {
 	fields = append(fields, config.SchemaField{Name: "_name", Type: "string", Nullable: false, Items: ""})
 
 	partitionSchema := config.PartitionSchema{
-		Version:                         tableSchema.Version,
-		Aggregators:                     aggrs,
-		AggregatorsGranularity:          "1h",
-		StorageClass:                    "local",
-		SampleRetention:                 0,
-		ChunckerInterval:                tableSchema.ChunckerInterval,
-		PartitionerInterval:             tableSchema.PartitionerInterval,
+		Version:                tableSchema.Version,
+		Aggregators:            aggrs,
+		AggregatorsGranularity: "1h",
+		StorageClass:           "local",
+		SampleRetention:        0,
+		ChunckerInterval:       tableSchema.ChunckerInterval,
+		PartitionerInterval:    tableSchema.PartitionerInterval,
 	}
 
 	schema := config.Schema{

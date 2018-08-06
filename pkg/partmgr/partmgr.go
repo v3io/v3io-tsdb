@@ -27,16 +27,16 @@ import (
 	"github.com/v3io/v3io-go-http"
 	"github.com/v3io/v3io-tsdb/pkg/aggregate"
 	"github.com/v3io/v3io-tsdb/pkg/config"
-	"sync"
 	"github.com/v3io/v3io-tsdb/pkg/utils"
 	"math"
+	"sync"
 )
 
 // Create new Partition Manager
 func NewPartitionMngr(cfg *config.Schema, path string, cont *v3io.Container) *PartitionManager {
 	newMngr := &PartitionManager{cfg: cfg, path: path, cyclic: false, container: cont}
 	for _, part := range cfg.Partitions {
-		path := fmt.Sprintf("%s/%d/", newMngr.path, part.StartTime / 1000)
+		path := fmt.Sprintf("%s/%d/", newMngr.path, part.StartTime/1000)
 		newPart := NewDBPartition(newMngr, part.StartTime, path)
 		newMngr.partitions = append(newMngr.partitions, newPart)
 		if newMngr.headPartition == nil {
@@ -52,9 +52,9 @@ func NewPartitionMngr(cfg *config.Schema, path string, cont *v3io.Container) *Pa
 
 // Create and Init a new Partition
 func NewDBPartition(pmgr *PartitionManager, startTime int64, path string) *DBPartition {
-	rollupTime, _ :=  utils.Str2duration(pmgr.cfg.PartitionSchemaInfo.AggregatorsGranularity)
-    partitionInterval, _ := utils.Str2duration(pmgr.cfg.PartitionSchemaInfo.PartitionerInterval)
-    chunkInterval, _ := utils.Str2duration(pmgr.cfg.PartitionSchemaInfo.ChunckerInterval)
+	rollupTime, _ := utils.Str2duration(pmgr.cfg.PartitionSchemaInfo.AggregatorsGranularity)
+	partitionInterval, _ := utils.Str2duration(pmgr.cfg.PartitionSchemaInfo.PartitionerInterval)
+	chunkInterval, _ := utils.Str2duration(pmgr.cfg.PartitionSchemaInfo.ChunckerInterval)
 	newPart := DBPartition{
 		manager:           pmgr,
 		path:              path,
@@ -102,7 +102,7 @@ func (p *PartitionManager) Init() error {
 }
 
 func (p *PartitionManager) TimeToPart(t int64) (*DBPartition, error) {
-	interval,_ := utils.Str2duration(p.cfg.PartitionSchemaInfo.PartitionerInterval)
+	interval, _ := utils.Str2duration(p.cfg.PartitionSchemaInfo.PartitionerInterval)
 	if p.headPartition == nil {
 		_, err := p.createNewPartition(interval * (t / interval))
 		return p.headPartition, err
@@ -131,7 +131,7 @@ func (p *PartitionManager) TimeToPart(t int64) (*DBPartition, error) {
 
 func (p *PartitionManager) createNewPartition(t int64) (*DBPartition, error) {
 	time := t & 0x7FFFFFFFFFFFFFF0
-	path := fmt.Sprintf("%s/%d/", p.path, time / 1000)
+	path := fmt.Sprintf("%s/%d/", p.path, time/1000)
 	partition := NewDBPartition(p, time, path)
 	p.headPartition = partition
 	p.partitions = append(p.partitions, partition)
@@ -152,7 +152,7 @@ func (p *PartitionManager) updatePartitionInSchema(partition *DBPartition) error
 func (p *PartitionManager) PartsForRange(mint, maxt int64) []*DBPartition {
 	var parts []*DBPartition
 	for _, part := range p.partitions {
-		if part.startTime >= mint && (maxt == 0 || part.startTime + part.partitionInterval < maxt) {
+		if part.startTime >= mint && (maxt == 0 || part.startTime+part.partitionInterval < maxt) {
 			parts = append(parts, part)
 		}
 	}

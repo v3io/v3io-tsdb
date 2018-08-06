@@ -95,11 +95,11 @@ func (cc *createCommandeer) create() error {
 	}
 
 	defaultRollup := config.Rollup{
-		Aggregators:                     cc.defaultRollups,
+		Aggregators:            cc.defaultRollups,
 		AggregatorsGranularity: cc.rollupInterval,
-		StorageClass:                    DEFAULT_STORAGE_CLASS,
-		SampleRetention:                 cc.sampleRetention,
-		LayerRetentionTime:              "1Y", //TODO
+		StorageClass:           DEFAULT_STORAGE_CLASS,
+		SampleRetention:        cc.sampleRetention,
+		LayerRetentionTime:     "1Y", //TODO
 	}
 
 	tableSchema := config.TableSchema{
@@ -118,13 +118,13 @@ func (cc *createCommandeer) create() error {
 	fields = append(fields, config.SchemaField{Name: "_name", Type: "string", Nullable: false, Items: ""})
 
 	partitionSchema := config.PartitionSchema{
-		Version:                         tableSchema.Version,
-		Aggregators:                     aggrs,
-		AggregatorsGranularity:          cc.rollupInterval,
-		StorageClass:                    DEFAULT_STORAGE_CLASS,
-		SampleRetention:                 cc.sampleRetention,
-		ChunckerInterval:                tableSchema.ChunckerInterval,
-		PartitionerInterval:             tableSchema.PartitionerInterval,
+		Version:                tableSchema.Version,
+		Aggregators:            aggrs,
+		AggregatorsGranularity: cc.rollupInterval,
+		StorageClass:           DEFAULT_STORAGE_CLASS,
+		SampleRetention:        cc.sampleRetention,
+		ChunckerInterval:       tableSchema.ChunckerInterval,
+		PartitionerInterval:    tableSchema.PartitionerInterval,
 	}
 
 	schema := config.Schema{

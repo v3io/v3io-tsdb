@@ -176,13 +176,11 @@ func (a *V3ioAdapter) DeleteDB(configExists bool, force bool, fromTime int64, to
 
 	partitions := a.partitionMngr.PartsForRange(fromTime, toTime)
 	for _, part := range partitions {
-		fmt.Println("part ", part.GetTablePath())
 		a.logger.Info("Delete partition %s", part.GetTablePath())
 		err := utils.DeleteTable(a.container, part.GetTablePath(), "", a.cfg.QryWorkers)
 		if err != nil && !force {
 			return err
 		}
-		fmt.Println("after ",part.GetTablePath())
 		// delete the Directory object
 		a.container.Sync.DeleteObject(&v3io.DeleteObjectInput{Path: part.GetTablePath()})
 	}
