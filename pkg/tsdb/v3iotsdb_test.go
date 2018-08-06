@@ -23,11 +23,9 @@ package tsdb
 import (
 	"fmt"
 	"github.com/v3io/v3io-tsdb/pkg/config"
-	"github.com/v3io/v3io-tsdb/pkg/formatter"
 	"github.com/v3io/v3io-tsdb/pkg/partmgr"
 	"github.com/v3io/v3io-tsdb/pkg/utils"
 	"math/rand"
-	"os"
 	"testing"
 	"time"
 )
@@ -80,28 +78,30 @@ func TestTsdbIntegration(t *testing.T) {
 
 	return
 
-	qry, err := adapter.Querier(nil, basetime-3*3600*1000, basetime+14*3600*1000)
-	if err != nil {
-		t.Fatal(err)
-	}
+	// TODO: remove unreacheble code
+	/*
+		qry, err := adapter.Querier(nil, basetime-3*3600*1000, basetime+14*3600*1000)
+		if err != nil {
+			t.Fatal(err)
+		}
 
-	set, err := qry.Select("http_req", "", 0, "")
-	//set, err := qry.Select("count,avg,sum", 1000*3600, "_name=='http_req'")
-	//set, err := qry.SelectOverlap("count,avg,sum,max", 1000*3600, []int{4, 2, 1}, "_name=='http_req'")
-	if err != nil {
-		t.Fatal(err)
-	}
+		set, err := qry.Select("http_req", "", 0, "")
+		//set, err := qry.Select("count,avg,sum", 1000*3600, "_name=='http_req'")
+		//set, err := qry.SelectOverlap("count,avg,sum,max", 1000*3600, []int{4, 2, 1}, "_name=='http_req'")
+		if err != nil {
+			t.Fatal(err)
+		}
 
-	f, err := formatter.NewFormatter("", nil)
-	if err != nil {
-		t.Fatal(err, "failed to start formatter")
-	}
+		f, err := formatter.NewFormatter("", nil)
+		if err != nil {
+			t.Fatal(err, "failed to start formatter")
+		}
 
-	err = f.Write(os.Stdout, set)
-	if err != nil {
-		t.Fatal(err)
-	}
-
+		err = f.Write(os.Stdout, set)
+		if err != nil {
+			t.Fatal(err)
+		}
+	*/
 }
 
 func DoAppend(lset utils.Labels, app Appender, num, interval int) error {
@@ -130,5 +130,4 @@ func DoAppend(lset utils.Labels, app Appender, num, interval int) error {
 	}
 
 	return nil
-
 }

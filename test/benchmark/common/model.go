@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/pkg/errors"
-	"github.com/v3io/v3io-tsdb/pkg/utils"
+	"github.com/v3io/v3io-tsdb/pkg/tsdb/tsdbtest"
 	"math/rand"
 	"time"
 )
@@ -104,7 +104,7 @@ func MakeRandomFloat64() float64 {
 	return rand.Float64() * 100
 }
 
-func JsonTemplate2Sample(sampleJsonTemplate string, time int64, value float64) (*Sample, error) {
+func JsonTemplate2Sample(sampleJsonTemplate string, time int64, value float64) (*tsdbtest.Sample, error) {
 	sampleJson := fmt.Sprintf(sampleJsonTemplate, time, value)
 	sample, err := unmarshallSample(sampleJson)
 	if err != nil {
@@ -114,18 +114,12 @@ func JsonTemplate2Sample(sampleJsonTemplate string, time int64, value float64) (
 	return sample, nil
 }
 
-func unmarshallSample(sampleJsonString string) (*Sample, error) {
-	sample := Sample{}
+func unmarshallSample(sampleJsonString string) (*tsdbtest.Sample, error) {
+	sample := tsdbtest.Sample{}
 	err := json.Unmarshal([]byte(sampleJsonString), &sample)
 	if err != nil {
 		return nil, err
 	}
 
 	return &sample, nil
-}
-
-type Sample struct {
-	Lset  utils.Labels
-	Time  string
-	Value float64
 }

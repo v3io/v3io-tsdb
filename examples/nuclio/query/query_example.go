@@ -14,7 +14,7 @@ import (
 )
 
 // Configuration
-const tsdbConfig = `
+var tsdbConfig = `
 path: "pmetric"
 `
 
