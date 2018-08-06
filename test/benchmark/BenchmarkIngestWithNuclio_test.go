@@ -41,7 +41,9 @@ func BenchmarkIngestWithNuclio(b *testing.B) {
 
 	// Update TSDB instance path for this test
 	v3ioConfig.Path = tsdbPath
-	tsdbtest.CreateTestTSDB(b, v3ioConfig)
+	if err := tsdb.CreateTSDB(v3ioConfig, &testDBcfg); err != nil {
+		b.Fatal("Failed to create TSDB", err)
+	}
 
 	data := nutest.DataBind{
 		Name:      defaultDbName,

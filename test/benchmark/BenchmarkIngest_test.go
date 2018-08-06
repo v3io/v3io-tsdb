@@ -3,6 +3,7 @@ package benchmark
 import (
 	"fmt"
 	"github.com/pkg/errors"
+	"github.com/v3io/v3io-tsdb/pkg/config"
 	"github.com/v3io/v3io-tsdb/pkg/tsdb"
 	"github.com/v3io/v3io-tsdb/pkg/tsdb/tsdbtest"
 	"github.com/v3io/v3io-tsdb/pkg/utils"
@@ -14,6 +15,13 @@ import (
 )
 
 const metricNamePrefix = "Name_"
+
+var testDBcfg = config.DBPartConfig{
+	DaysPerObj:     7,
+	HrInChunk:      1,
+	DefaultRollups: "*",
+	RollupMin:      5,
+}
 
 func BenchmarkIngest(b *testing.B) {
 	b.StopTimer()
@@ -33,7 +41,9 @@ func BenchmarkIngest(b *testing.B) {
 
 	// Update TSDB instance path for this test
 	v3ioConfig.Path = tsdbPath
-	tsdbtest.CreateTestTSDB(b, v3ioConfig)
+	if err := tsdb.CreateTSDB(v3ioConfig, &testDBcfg); err != nil {
+		b.Fatal("Failed to create TSDB", err)
+	}
 
 	adapter, err := tsdb.NewV3ioAdapter(v3ioConfig, nil, nil)
 	if err != nil {
