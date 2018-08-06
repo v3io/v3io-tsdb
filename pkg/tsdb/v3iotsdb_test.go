@@ -77,31 +77,6 @@ func TestTsdbIntegration(t *testing.T) {
 	fmt.Println("Append Done!")
 
 	return
-
-	// TODO: remove unreacheble code
-	/*
-		qry, err := adapter.Querier(nil, basetime-3*3600*1000, basetime+14*3600*1000)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		set, err := qry.Select("http_req", "", 0, "")
-		//set, err := qry.Select("count,avg,sum", 1000*3600, "_name=='http_req'")
-		//set, err := qry.SelectOverlap("count,avg,sum,max", 1000*3600, []int{4, 2, 1}, "_name=='http_req'")
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		f, err := formatter.NewFormatter("", nil)
-		if err != nil {
-			t.Fatal(err, "failed to start formatter")
-		}
-
-		err = f.Write(os.Stdout, set)
-		if err != nil {
-			t.Fatal(err)
-		}
-	*/
 }
 
 func DoAppend(lset utils.Labels, app Appender, num, interval int) error {
@@ -128,6 +103,5 @@ func DoAppend(lset utils.Labels, app Appender, num, interval int) error {
 			return err
 		}
 	}
-
 	return nil
 }
