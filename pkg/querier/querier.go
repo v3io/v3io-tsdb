@@ -65,7 +65,7 @@ func (q *V3ioQuerier) SelectOverlap(name, functions string, step int64, win []in
 func (q *V3ioQuerier) selectQry(name, functions string, step int64, win []int, filter string) (SeriesSet, error) {
 
 	filter = strings.Replace(filter, "__name__", "_name", -1)
-	q.logger.DebugWith("Select query", "func", functions, "step", step, "filter", filter, "win", win)
+	q.logger.DebugWith("Select query", "func", functions, "step", step, "filter", filter, "window", win)
 
 	mint, maxt := q.mint, q.maxt
 	if q.partitionMngr.IsCyclic() {
