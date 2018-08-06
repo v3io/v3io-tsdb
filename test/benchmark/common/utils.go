@@ -11,18 +11,18 @@ import (
 func CreateTSDB(v3ioConfig *config.V3ioConfig, newTsdbPath string) error {
 	defaultRollup := config.Rollup{
 		Aggregators:                     "*",
-		AggregatorsGranularityInSeconds: 3600,
+		AggregatorsGranularity:          "1h",
 		StorageClass:                    "local",
 		SampleRetention:                 0,
-		LayerRetentionTime:              "1Y",
+		LayerRetentionTime:              "1y",
 	}
 
 	tableSchema := config.TableSchema{
 		Version:             0,
 		RollupLayers:        []config.Rollup{defaultRollup},
 		ShardingBuckets:     64,
-		PartitionerInterval: "1D",
-		ChunckerInterval:    "1H",
+		PartitionerInterval: "1d",
+		ChunckerInterval:    "1h",
 	}
 
 	aggrs := strings.Split("*", ",")
@@ -35,7 +35,7 @@ func CreateTSDB(v3ioConfig *config.V3ioConfig, newTsdbPath string) error {
 	partitionSchema := config.PartitionSchema{
 		Version:                         tableSchema.Version,
 		Aggregators:                     aggrs,
-		AggregatorsGranularityInSeconds: 3600,
+		AggregatorsGranularity:          "1h",
 		StorageClass:                    "local",
 		SampleRetention:                 0,
 		ChunckerInterval:                tableSchema.ChunckerInterval,
@@ -52,5 +52,5 @@ func CreateTSDB(v3ioConfig *config.V3ioConfig, newTsdbPath string) error {
 }
 
 func DeleteTSDB(adapter *tsdb.V3ioAdapter, deleteConf bool, force bool) {
-	adapter.DeleteDB(deleteConf, force)
+	adapter.DeleteDB(deleteConf, force, 0, 0)
 }
