@@ -150,8 +150,8 @@ func TestQueryData(t *testing.T) {
 	}{
 		{desc: "Should ingest and query one data point", metricName: "cpu",
 			labels: utils.FromStrings("testLabel", "balbala"),
-			data: []tsdbtest.DataPoint{{Time: 1532940510, Value: 314.3}},
-			from: 0, to: 1532940510 + 1,
+			data:   []tsdbtest.DataPoint{{Time: 1532940510, Value: 314.3}},
+			from:   0, to: 1532940510 + 1,
 			expected: map[string][]tsdbtest.DataPoint{"": {{Time: 1532940510, Value: 314.3}}}},
 
 		{desc: "Should ingest and query multiple data points", metricName: "cpu",
@@ -166,22 +166,22 @@ func TestQueryData(t *testing.T) {
 
 		{desc: "Should query with filter on metric name", metricName: "cpu",
 			labels: utils.FromStrings("os", "linux", "iguaz", "yesplease"),
-			data: []tsdbtest.DataPoint{{Time: 1532940510, Value: 33.3}},
+			data:   []tsdbtest.DataPoint{{Time: 1532940510, Value: 33.3}},
 			filter: "_name=='cpu'",
-			from: 0, to: 1532940510 + 1,
+			from:   0, to: 1532940510 + 1,
 			expected: map[string][]tsdbtest.DataPoint{"": {{Time: 1532940510, Value: 33.3}}}},
 
 		{desc: "Should query with filter on label name", metricName: "cpu",
 			labels: utils.FromStrings("os", "linux", "iguaz", "yesplease"),
-			data: []tsdbtest.DataPoint{{Time: 1532940510, Value: 31.3}},
+			data:   []tsdbtest.DataPoint{{Time: 1532940510, Value: 31.3}},
 			filter: "os=='linux'",
-			from: 0, to: 1532940510 + 1,
+			from:   0, to: 1532940510 + 1,
 			expected: map[string][]tsdbtest.DataPoint{"": {{Time: 1532940510, Value: 31.3}}}},
 
 		{desc: "Should ingest and query data with '-' in the metric name (IG-8585)", metricName: "cool-cpu",
 			labels: utils.FromStrings("testLabel", "balbala"),
-			data: []tsdbtest.DataPoint{{Time: 1532940510, Value: 314.3}},
-			from: 0, to: 1532940510 + 1,
+			data:   []tsdbtest.DataPoint{{Time: 1532940510, Value: 314.3}},
+			from:   0, to: 1532940510 + 1,
 			expected: map[string][]tsdbtest.DataPoint{"": {{Time: 1532940510, Value: 314.3}}}},
 
 		{desc: "Should ingest and query by time", metricName: "cpu",
@@ -208,7 +208,7 @@ func TestQueryData(t *testing.T) {
 				{Time: 1532940510 + 10, Value: 100.4}},
 			from: 1532940510, to: 1532940510 + 11,
 			aggregators: "sum",
-			expected: map[string][]tsdbtest.DataPoint{"sum": {{Time: 1532940000, Value: 701.0}}}},
+			expected:    map[string][]tsdbtest.DataPoint{"sum": {{Time: 1532940000, Value: 701.0}}}},
 
 		{desc: "Should ingest and query multiple aggregators", metricName: "cpu",
 			labels: utils.FromStrings("os", "linux", "iguaz", "yesplease"),
@@ -230,9 +230,9 @@ func TestQueryData(t *testing.T) {
 
 		{desc: "Should query with filter on not existing metric name", metricName: "cpu",
 			labels: utils.FromStrings("os", "linux", "iguaz", "yesplease"),
-			data: []tsdbtest.DataPoint{{Time: 1532940510, Value: 33.3}},
+			data:   []tsdbtest.DataPoint{{Time: 1532940510, Value: 33.3}},
 			filter: "_name=='hahaha'",
-			from: 0, to: 1532940510 + 1,
+			from:   0, to: 1532940510 + 1,
 			expected: map[string][]tsdbtest.DataPoint{}},
 	}
 
@@ -309,13 +309,13 @@ func TestQueryDataOverlappingWindow(t *testing.T) {
 	}{
 		{desc: "Should ingest and query with windowing",
 			metricName: "cpu",
-			labels: utils.FromStrings("os", "linux", "iguaz", "yesplease"),
+			labels:     utils.FromStrings("os", "linux", "iguaz", "yesplease"),
 			data: []tsdbtest.DataPoint{{Time: 1532940510, Value: 314.3},
 				{Time: 1532944110, Value: 314.3},
 				{Time: 1532947710, Value: 300.3},
 				{Time: 1532951310, Value: 3234.6}},
 			from: 0, to: 1532954910,
-			windows: []int{1, 2, 4},
+			windows:     []int{1, 2, 4},
 			aggregators: "sum",
 			expected: map[string][]tsdbtest.DataPoint{
 				"sum": {{Time: 1532937600, Value: 4163.5},
@@ -325,13 +325,13 @@ func TestQueryDataOverlappingWindow(t *testing.T) {
 
 		{desc: "Should ingest and query with windowing on multiple agg",
 			metricName: "cpu",
-			labels: utils.FromStrings("os", "linux", "iguaz", "yesplease"),
+			labels:     utils.FromStrings("os", "linux", "iguaz", "yesplease"),
 			data: []tsdbtest.DataPoint{{Time: 1532940510, Value: 314.3},
 				{Time: 1532944110, Value: 314.3},
 				{Time: 1532947710, Value: 300.3},
 				{Time: 1532951310, Value: 3234.6}},
 			from: 0, to: 1532954910,
-			windows: []int{1, 2, 4},
+			windows:     []int{1, 2, 4},
 			aggregators: "sum,count,sqr",
 			expected: map[string][]tsdbtest.DataPoint{
 				"sum": {{Time: 1532937600, Value: 4163.5},
