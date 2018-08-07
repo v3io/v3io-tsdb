@@ -24,7 +24,7 @@ func CreateTSDB(v3ioConfig *config.V3ioConfig) error {
 		Version:             0,
 		RollupLayers:        []config.Rollup{defaultRollup},
 		ShardingBuckets:     64,
-		PartitionerInterval: "1d",
+		PartitionerInterval: "2d",
 		ChunckerInterval:    "1h",
 	}
 

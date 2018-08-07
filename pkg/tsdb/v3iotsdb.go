@@ -173,16 +173,18 @@ func (a *V3ioAdapter) Querier(_ context.Context, mint, maxt int64) (*querier.V3i
 }
 
 func (a *V3ioAdapter) DeleteDB(configExists bool, force bool, fromTime int64, toTime int64) error {
-
+	//part.startTime+part.partitionInterval < maxt
 	partitions := a.partitionMngr.PartsForRange(fromTime, toTime)
 	for _, part := range partitions {
-		a.logger.Info("Delete partition %s", part.GetTablePath())
-		err := utils.DeleteTable(a.container, part.GetTablePath(), "", a.cfg.QryWorkers)
-		if err != nil && !force {
-			return err
+		if toTime == 0 || part.GetEndTime() < toTime {
+			a.logger.Info("Delete partition %s", part.GetTablePath())
+			err := utils.DeleteTable(a.container, part.GetTablePath(), "", a.cfg.QryWorkers)
+			if err != nil && !force {
+				return err
+			}
+			// delete the Directory object
+			a.container.Sync.DeleteObject(&v3io.DeleteObjectInput{Path: part.GetTablePath()})
 		}
-		// delete the Directory object
-		a.container.Sync.DeleteObject(&v3io.DeleteObjectInput{Path: part.GetTablePath()})
 	}
 	path := a.cfg.Path + "/names/"
 	a.logger.Info("Delete metric names in path %s", path)

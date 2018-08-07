@@ -34,7 +34,8 @@ import (
 
 // Create new Partition Manager
 func NewPartitionMngr(cfg *config.Schema, path string, cont *v3io.Container) *PartitionManager {
-	newMngr := &PartitionManager{cfg: cfg, path: path, cyclic: false, container: cont}
+	currentPartitionInterval, _ := utils.Str2duration(cfg.PartitionSchemaInfo.PartitionerInterval)
+	newMngr := &PartitionManager{cfg: cfg, path: path, cyclic: false, container: cont, currentPartitionInterval: currentPartitionInterval}
 	for _, part := range cfg.Partitions {
 		path := fmt.Sprintf("%s/%d/", newMngr.path, part.StartTime/1000)
 		newPart := NewDBPartition(newMngr, part.StartTime, path)
@@ -76,13 +77,14 @@ func NewDBPartition(pmgr *PartitionManager, startTime int64, path string) *DBPar
 }
 
 type PartitionManager struct {
-	mtx           sync.RWMutex
-	path          string
-	cfg           *config.Schema
-	headPartition *DBPartition
-	partitions    []*DBPartition
-	cyclic        bool
-	container     *v3io.Container
+	mtx                      sync.RWMutex
+	path                     string
+	cfg                      *config.Schema
+	headPartition            *DBPartition
+	partitions               []*DBPartition
+	cyclic                   bool
+	container                *v3io.Container
+	currentPartitionInterval int64 //TODO update on schema changes
 }
 
 func (p *PartitionManager) IsCyclic() bool {
@@ -102,14 +104,13 @@ func (p *PartitionManager) Init() error {
 }
 
 func (p *PartitionManager) TimeToPart(t int64) (*DBPartition, error) {
-	interval, _ := utils.Str2duration(p.cfg.PartitionSchemaInfo.PartitionerInterval)
 	if p.headPartition == nil {
-		_, err := p.createNewPartition(interval * (t / interval))
+		_, err := p.createNewPartition(p.currentPartitionInterval * (t / p.currentPartitionInterval))
 		return p.headPartition, err
 	} else {
 		if t >= p.headPartition.startTime {
-			if (t - p.headPartition.startTime) > interval {
-				_, err := p.createNewPartition(p.headPartition.startTime + interval)
+			if (t - p.headPartition.startTime) > p.currentPartitionInterval {
+				_, err := p.createNewPartition(p.headPartition.startTime + p.currentPartitionInterval)
 				if err != nil {
 					return nil, err
 				}
@@ -133,6 +134,7 @@ func (p *PartitionManager) createNewPartition(t int64) (*DBPartition, error) {
 	time := t & 0x7FFFFFFFFFFFFFF0
 	path := fmt.Sprintf("%s/%d/", p.path, time/1000)
 	partition := NewDBPartition(p, time, path)
+	p.currentPartitionInterval = partition.partitionInterval
 	p.headPartition = partition
 	p.partitions = append(p.partitions, partition)
 	err := p.updatePartitionInSchema(partition)
@@ -152,7 +154,7 @@ func (p *PartitionManager) updatePartitionInSchema(partition *DBPartition) error
 func (p *PartitionManager) PartsForRange(mint, maxt int64) []*DBPartition {
 	var parts []*DBPartition
 	for _, part := range p.partitions {
-		if part.startTime >= mint && (maxt == 0 || part.startTime+part.partitionInterval < maxt) {
+		if part.startTime >= mint && (maxt == 0 || part.startTime < maxt) {
 			parts = append(parts, part)
 		}
 	}
@@ -187,6 +189,10 @@ func (p *DBPartition) NextPart(t int64) (*DBPartition, error) {
 
 func (p *DBPartition) GetStartTime() int64 {
 	return p.startTime
+}
+
+func (p *DBPartition) GetEndTime() int64 {
+	return p.startTime + p.partitionInterval
 }
 
 // return path to metrics table

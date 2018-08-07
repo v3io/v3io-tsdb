@@ -62,11 +62,11 @@ func newCreateCommandeer(rootCommandeer *RootCommandeer) *createCommandeer {
 		},
 	}
 
-	cmd.Flags().StringVarP(&commandeer.partitionInterval, "partition-interval", "m", "1D", "time covered per partition")
-	cmd.Flags().StringVarP(&commandeer.chunkInterval, "chunk-interval", "t", "1H", "time in a single chunk")
+	cmd.Flags().StringVarP(&commandeer.partitionInterval, "partition-interval", "m", "2d", "time covered per partition")
+	cmd.Flags().StringVarP(&commandeer.chunkInterval, "chunk-interval", "t", "1h", "time in a single chunk")
 	cmd.Flags().StringVarP(&commandeer.defaultRollups, "rollups", "r", "",
 		"Default aggregation rollups, comma seperated: count,avg,sum,min,max,stddev")
-	cmd.Flags().StringVarP(&commandeer.rollupInterval, "rollup-interval", "i", "1H", "aggregation interval")
+	cmd.Flags().StringVarP(&commandeer.rollupInterval, "rollup-interval", "i", "1h", "aggregation interval")
 	cmd.Flags().IntVarP(&commandeer.shardingBuckets, "sharding-buckets", "b", 8, "number of buckets to split key")
 	cmd.Flags().IntVarP(&commandeer.sampleRetention, "sample-retention", "a", 0, "sample retention in hours")
 
@@ -99,7 +99,7 @@ func (cc *createCommandeer) create() error {
 		AggregatorsGranularity: cc.rollupInterval,
 		StorageClass:           DEFAULT_STORAGE_CLASS,
 		SampleRetention:        cc.sampleRetention,
-		LayerRetentionTime:     "1Y", //TODO
+		LayerRetentionTime:     "1y", //TODO
 	}
 
 	tableSchema := config.TableSchema{
