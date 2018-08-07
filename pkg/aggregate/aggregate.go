@@ -73,7 +73,7 @@ var aggrToSchemaField = map[string]config.SchemaField{
 
 func SchemaFieldFromString(split []string, col string) ([]config.SchemaField, error) {
 	fieldList := make([]config.SchemaField, 0, len(split))
-	if len(split) != 0 {
+	if len(split) != 0 && split[0] != "" {
 		for _, s := range split {
 			if strings.Compare(s, "*") == 0 {
 				fieldList = make([]config.SchemaField, 0, len(aggrToSchemaField))
