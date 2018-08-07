@@ -284,7 +284,7 @@ func testQueryDataCase(test *testing.T, v3ioConfig *config.V3ioConfig,
 	}
 
 	if counter == 0 && len(expected) > 0 {
-		test.Fatalf("No data was recieved")
+		test.Fatalf("No data was received")
 	}
 }
 
@@ -403,7 +403,7 @@ func testQueryDataOverlappingWindowCase(test *testing.T, v3ioConfig *config.V3io
 
 	fmt.Println("after counter", counter)
 	if counter == 0 && len(expected) > 0 {
-		test.Fatalf("No data was recieved")
+		test.Fatalf("No data was received")
 	}
 }
 
