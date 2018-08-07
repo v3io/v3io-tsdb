@@ -38,7 +38,7 @@ func BenchmarkIngest(b *testing.B) {
 	}
 
 	if testConfig.CleanupAfterTest {
-		defer adapter.DeleteDB(true, true)
+		defer adapter.DeleteDB(true, true, 0, 0)
 	}
 
 	appender, err := adapter.Appender()

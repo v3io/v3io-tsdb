@@ -33,7 +33,7 @@ func Str2duration(duration string) (int64, error) {
 	multiply := 3600 * 1000 // hour by default
 	if len(duration) > 0 {
 		last := duration[len(duration)-1:]
-		if last == "m" || last == "h" || last == "d" || last == "y" {
+		if last == "m" || last == "h" || last == "d" || last == "y" || last == "M" || last == "w" {
 			duration = duration[0 : len(duration)-1]
 			switch last {
 			case "m":
@@ -44,6 +44,8 @@ func Str2duration(duration string) (int64, error) {
 				multiply = 24 * 3600 * 1000
 			case "w":
 				multiply = 7 * 24 * 3600 * 1000
+			case "M":
+				multiply = 30 * 24 * 3600 * 1000
 			case "y":
 				multiply = 365 * 24 * 3600 * 1000
 			}

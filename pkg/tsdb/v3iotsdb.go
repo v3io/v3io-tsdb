@@ -172,20 +172,23 @@ func (a *V3ioAdapter) Querier(_ context.Context, mint, maxt int64) (*querier.V3i
 	return querier.NewV3ioQuerier(a.container, a.logger, mint, maxt, a.cfg, a.partitionMngr), nil
 }
 
-func (a *V3ioAdapter) DeleteDB(configExists bool, force bool) error {
-
-	path := a.partitionMngr.GetHead().GetTablePath()
-	a.logger.Info("Delete partition %s", path)
-	err := utils.DeleteTable(a.container, path, "", a.cfg.QryWorkers)
-	if err != nil && !force {
-		return err
+func (a *V3ioAdapter) DeleteDB(configExists bool, force bool, fromTime int64, toTime int64) error {
+	//part.startTime+part.partitionInterval < maxt
+	partitions := a.partitionMngr.PartsForRange(fromTime, toTime)
+	for _, part := range partitions {
+		if toTime == 0 || part.GetEndTime() < toTime {
+			a.logger.Info("Delete partition %s", part.GetTablePath())
+			err := utils.DeleteTable(a.container, part.GetTablePath(), "", a.cfg.QryWorkers)
+			if err != nil && !force {
+				return err
+			}
+			// delete the Directory object
+			a.container.Sync.DeleteObject(&v3io.DeleteObjectInput{Path: part.GetTablePath()})
+		}
 	}
-	// delete the Directory object
-	a.container.Sync.DeleteObject(&v3io.DeleteObjectInput{Path: path})
-
-	path = a.cfg.Path + "/names/"
+	path := a.cfg.Path + "/names/"
 	a.logger.Info("Delete metric names in path %s", path)
-	err = utils.DeleteTable(a.container, path, "", a.cfg.QryWorkers)
+	err := utils.DeleteTable(a.container, path, "", a.cfg.QryWorkers)
 	if err != nil && !force {
 		return err
 	}
@@ -207,19 +210,22 @@ func (a *V3ioAdapter) DeleteDB(configExists bool, force bool) error {
 
 // return number of objects in a table
 func (a *V3ioAdapter) CountMetrics(part string) (int, error) {
-	path := a.partitionMngr.GetHead().GetTablePath()
-	input := v3io.GetItemsInput{Path: path, Filter: "", AttributeNames: []string{"__size"}}
-	iter, err := utils.NewAsyncItemsCursor(a.container, &input, a.cfg.QryWorkers, []string{})
-	if err != nil {
-		return 0, err
-	}
-
 	count := 0
-	for iter.Next() {
-		count++
-	}
-	if iter.Err() != nil {
-		return count, errors.Wrap(iter.Err(), "failed on count iterator")
+
+	partitions := a.partitionMngr.GetPartitions()
+	for _, part := range partitions {
+		input := v3io.GetItemsInput{Path: part.GetTablePath(), Filter: "", AttributeNames: []string{"__size"}}
+		iter, err := utils.NewAsyncItemsCursor(a.container, &input, a.cfg.QryWorkers, []string{})
+		if err != nil {
+			return 0, err
+		}
+
+		for iter.Next() {
+			count++
+		}
+		if iter.Err() != nil {
+			return count, errors.Wrap(iter.Err(), "failed on count iterator")
+		}
 	}
 
 	return count, nil
