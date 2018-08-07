@@ -26,11 +26,13 @@ import (
 	"fmt"
 	"github.com/stretchr/testify/assert"
 	"github.com/v3io/v3io-go-http"
+	"github.com/v3io/v3io-tsdb/pkg/aggregate"
 	"github.com/v3io/v3io-tsdb/pkg/config"
 	. "github.com/v3io/v3io-tsdb/pkg/tsdb"
 	"github.com/v3io/v3io-tsdb/pkg/tsdb/tsdbtest"
 	"github.com/v3io/v3io-tsdb/pkg/utils"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -274,26 +276,12 @@ func TestCreateTSDB(t *testing.T) {
 
 	testCases := []struct {
 		desc         string
-		conf         config.DBPartConfig
+		conf         config.Schema
 		ignoreReason string
 	}{
-		{desc: "Should create TSDB with standard configuration", conf: config.DBPartConfig{
-			Signature:      "TSDB",
-			Version:        "1.0",
-			DaysPerObj:     1,
-			HrInChunk:      1,
-			DefaultRollups: "count,sum",
-			RollupMin:      10,
-		}},
+		{desc: "Should create TSDB with standard configuration", conf: createSchema("sum,count")},
 
-		{desc: "Should create TSDB with wildcard aggregations", conf: config.DBPartConfig{
-			Signature:      "TSDB",
-			Version:        "1.0",
-			DaysPerObj:     1,
-			HrInChunk:      1,
-			DefaultRollups: "*",
-			RollupMin:      10,
-		}},
+		{desc: "Should create TSDB with wildcard aggregations", conf: createSchema("*")},
 	}
 
 	for _, test := range testCases {
@@ -307,15 +295,15 @@ func TestCreateTSDB(t *testing.T) {
 
 }
 
-func testCreateTSDBcase(t *testing.T, v3ioConfig *config.V3ioConfig, dbConfig config.DBPartConfig) {
-	defer tsdbtest.SetUpWithDBConfig(t, v3ioConfig, dbConfig)()
+func testCreateTSDBcase(t *testing.T, v3ioConfig *config.V3ioConfig, dbConfig config.Schema) {
+	defer tsdbtest.SetUpWithDBConfig(t, v3ioConfig, &dbConfig)()
 
 	adapter, err := NewV3ioAdapter(v3ioConfig, nil, nil)
 	if err != nil {
 		t.Fatalf("Failed to create adapter. reason: %s", err)
 	}
 
-	actualDbConfig := *adapter.GetDBConfig()
+	actualDbConfig := *adapter.GetSchema()
 	assert.Equal(t, actualDbConfig, dbConfig)
 }
 
@@ -325,15 +313,8 @@ func TestDeleteTSDB(t *testing.T) {
 		t.Fatalf("Failed to load test configuration. reason: %s", err)
 	}
 
-	dbConfig := config.DBPartConfig{
-		Signature:      "TSDB",
-		Version:        "1.0",
-		DaysPerObj:     1,
-		HrInChunk:      1,
-		DefaultRollups: "count,sum",
-		RollupMin:      10,
-	}
-	if err := CreateTSDB(v3ioConfig, &dbConfig); err != nil {
+	schema := createSchema("count,sum")
+	if err := CreateTSDB(v3ioConfig, &schema); err != nil {
 		t.Fatalf("Failed to create TSDB. reason: %s", err)
 	}
 
@@ -356,4 +337,44 @@ func TestDeleteTSDB(t *testing.T) {
 	if res := <-responseChan; res.Error == nil {
 		t.Fatal("Did not delete TSDB properly")
 	}
+}
+
+func createSchema(agg string) config.Schema {
+	defaultRollup := config.Rollup{
+		Aggregators:            agg,
+		AggregatorsGranularity: "1h",
+		StorageClass:           "local",
+		SampleRetention:        0,
+		LayerRetentionTime:     "1y",
+	}
+
+	tableSchema := config.TableSchema{
+		Version:             0,
+		RollupLayers:        []config.Rollup{defaultRollup},
+		ShardingBuckets:     64,
+		PartitionerInterval: "2d",
+		ChunckerInterval:    "1h",
+	}
+
+	aggrs := strings.Split("*", ",")
+	fields, _ := aggregate.SchemaFieldFromString(aggrs, "v")
+	fields = append(fields, config.SchemaField{Name: "_name", Type: "string", Nullable: false, Items: ""})
+
+	partitionSchema := config.PartitionSchema{
+		Version:                tableSchema.Version,
+		Aggregators:            aggrs,
+		AggregatorsGranularity: "1h",
+		StorageClass:           "local",
+		SampleRetention:        0,
+		ChunckerInterval:       tableSchema.ChunckerInterval,
+		PartitionerInterval:    tableSchema.PartitionerInterval,
+	}
+
+	schema := config.Schema{
+		TableSchemaInfo:     tableSchema,
+		PartitionSchemaInfo: partitionSchema,
+		Partitions:          []config.Partition{},
+		Fields:              fields,
+	}
+	return schema
 }
