@@ -29,7 +29,7 @@ func DeleteTSDB(t *testing.T, v3ioConfig *config.V3ioConfig) {
 		t.Fatalf("Failed to create adapter. reason: %s", err)
 	}
 
-	if err := adapter.DeleteDB(true, true); err != nil {
+	if err := adapter.DeleteDB(true, true, 0, 0); err != nil {
 		t.Fatalf("Failed to delete DB on teardown. reason: %s", err)
 	}
 }
@@ -63,36 +63,36 @@ func SetUpWithDBConfig(t *testing.T, v3ioConfig *config.V3ioConfig, schema *conf
 // TODO: refactor - move to commmot test infra
 func createSchema() (schema *config.Schema, err error) {
 	defaultRollup := config.Rollup{
-		Aggregators:                     "*",
-		AggregatorsGranularityInSeconds: 3600,
-		StorageClass:                    "local",
-		SampleRetention:                 0,
-		LayerRetentionTime:              "1Y",
+		Aggregators:            "*",
+		AggregatorsGranularity: "1h",
+		StorageClass:           "local",
+		SampleRetention:        0,
+		LayerRetentionTime:     "1y",
 	}
 
 	tableSchema := config.TableSchema{
 		Version:             0,
 		RollupLayers:        []config.Rollup{defaultRollup},
 		ShardingBuckets:     64,
-		PartitionerInterval: "1D",
-		ChunckerInterval:    "1H",
+		PartitionerInterval: "1d",
+		ChunckerInterval:    "1h",
 	}
 
 	aggrs := strings.Split("*", ",")
 	fields, err := aggregate.SchemaFieldFromString(aggrs, "v")
 	if err != nil {
-		return nil, errors.Wrap(err, "Failed to create list of aggregator functions")
+		return nil, errors.Wrap(err, "Failed to create aggregators list")
 	}
 	fields = append(fields, config.SchemaField{Name: "_name", Type: "string", Nullable: false, Items: ""})
 
 	partitionSchema := config.PartitionSchema{
-		Version:                         tableSchema.Version,
-		Aggregators:                     aggrs,
-		AggregatorsGranularityInSeconds: 3600,
-		StorageClass:                    "local",
-		SampleRetention:                 0,
-		ChunckerInterval:                tableSchema.ChunckerInterval,
-		PartitionerInterval:             tableSchema.PartitionerInterval,
+		Version:                tableSchema.Version,
+		Aggregators:            aggrs,
+		AggregatorsGranularity: "1h",
+		StorageClass:           "local",
+		SampleRetention:        0,
+		ChunckerInterval:       tableSchema.ChunckerInterval,
+		PartitionerInterval:    tableSchema.PartitionerInterval,
 	}
 
 	schema = &config.Schema{
