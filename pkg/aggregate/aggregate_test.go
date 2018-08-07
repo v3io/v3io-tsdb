@@ -46,8 +46,7 @@ func TestAggregators(t *testing.T) {
 			data:      map[int64]float64{1: 7.5, 2: 2.5},
 			exprCol:   "v", bucket: 1,
 			expectedUpdateExpr: fmt.Sprintf("_v_min[1]=min(_v_min[1],%f);_v_max[1]=max(_v_max[1],%f);", 2.5, 7.5),
-			expectedSetExpr:    fmt.Sprintf("_v_min[1]=%f;_v_max[1]=%f;", 2.5, 7.5),
-			ignoreReason:       "enable when bug is fixed - IG-8675"},
+			expectedSetExpr:    fmt.Sprintf("_v_min[1]=%f;_v_max[1]=%f;", 2.5, 7.5)},
 
 		{desc: "Should aggregate data with Count,Sum,Sqr,Last aggregators",
 			aggString: "count,sum,sqr,last",
@@ -64,8 +63,7 @@ func TestAggregators(t *testing.T) {
 				"_v_sqr[1]=_v_sqr[1]+%f;_v_min[1]=min(_v_min[1],%f);_v_max[1]=max(_v_max[1],%f);"+
 				"_v_last[1]=%f;", 10.0, 62.5, 2.5, 7.5, 2.5),
 			expectedSetExpr: fmt.Sprintf("_v_count[1]=2;_v_sum[1]=%f;_v_sqr[1]=%f;"+
-				"_v_min[1]=%f;_v_max[1]=%f;_v_last[1]=%f;", 10.0, 62.5, 2.5, 7.5, 2.5),
-			ignoreReason: "enable when bug is fixed - IG-8675"},
+				"_v_min[1]=%f;_v_max[1]=%f;_v_last[1]=%f;", 10.0, 62.5, 2.5, 7.5, 2.5)},
 
 		{desc: "Should aggregate data with Bad aggregator",
 			aggString: "not-real",

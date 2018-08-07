@@ -23,6 +23,7 @@ package aggregate
 import (
 	"fmt"
 	"github.com/v3io/v3io-tsdb/pkg/config"
+	"math"
 	"strings"
 )
 
@@ -127,10 +128,10 @@ func NewAggregatorList(aggrType AggrType) *AggregatorList {
 		list = append(list, &SqrAggregator{FloatAggregator{attr: "sqr"}})
 	}
 	if (aggrType & aggrTypeMin) != 0 {
-		list = append(list, &MinAggregator{FloatAggregator{attr: "min"}})
+		list = append(list, &MinAggregator{FloatAggregator{attr: "min", val: math.Inf(1)}})
 	}
 	if (aggrType & aggrTypeMax) != 0 {
-		list = append(list, &MaxAggregator{FloatAggregator{attr: "max"}})
+		list = append(list, &MaxAggregator{FloatAggregator{attr: "max", val: math.Inf(-1)}})
 	}
 	if (aggrType & aggrTypeLast) != 0 {
 		list = append(list, &LastAggregator{FloatAggregator{attr: "last"}, 0})
