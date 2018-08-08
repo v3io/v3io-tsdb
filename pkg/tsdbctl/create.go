@@ -31,8 +31,8 @@ import (
 	"strings"
 )
 
-const SCHEMA_VERSION = 0
-const DEFAULT_STORAGE_CLASS = "local"
+const schemaVersion = 0
+const defaultStorageClass = "local"
 
 type createCommandeer struct {
 	cmd               *cobra.Command
@@ -97,13 +97,13 @@ func (cc *createCommandeer) create() error {
 	defaultRollup := config.Rollup{
 		Aggregators:            cc.defaultRollups,
 		AggregatorsGranularity: cc.rollupInterval,
-		StorageClass:           DEFAULT_STORAGE_CLASS,
+		StorageClass:           defaultStorageClass,
 		SampleRetention:        cc.sampleRetention,
 		LayerRetentionTime:     "1y", //TODO
 	}
 
 	tableSchema := config.TableSchema{
-		Version:             SCHEMA_VERSION,
+		Version:             schemaVersion,
 		RollupLayers:        []config.Rollup{defaultRollup},
 		ShardingBuckets:     cc.shardingBuckets,
 		PartitionerInterval: cc.partitionInterval,
@@ -121,7 +121,7 @@ func (cc *createCommandeer) create() error {
 		Version:                tableSchema.Version,
 		Aggregators:            aggrs,
 		AggregatorsGranularity: cc.rollupInterval,
-		StorageClass:           DEFAULT_STORAGE_CLASS,
+		StorageClass:           defaultStorageClass,
 		SampleRetention:        cc.sampleRetention,
 		ChunckerInterval:       tableSchema.ChunckerInterval,
 		PartitionerInterval:    tableSchema.PartitionerInterval,

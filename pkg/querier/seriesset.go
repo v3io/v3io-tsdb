@@ -163,12 +163,6 @@ func (s *V3ioSeriesSet) chunks2IntervalAggregates() {
 
 	iter := s.currSeries.Iterator()
 	if iter.Next() {
-
-		if iter.Err() != nil {
-			s.err = iter.Err()
-			return
-		}
-
 		t0, _ := iter.At()
 		s.baseTime = (t0 / s.interval) * s.interval
 
@@ -176,10 +170,14 @@ func (s *V3ioSeriesSet) chunks2IntervalAggregates() {
 			t, v := iter.At()
 			s.aggrSet.AppendAllCells(int((t-s.baseTime)/s.interval), v)
 			if !iter.Next() {
-				// s.err = iter.error()  // if the internal iterator has error we dont need to err the aggregator
 				break
 			}
 		}
+	}
+
+	if iter.Err() != nil {
+		s.err = iter.Err()
+		return
 	}
 }
 

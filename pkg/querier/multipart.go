@@ -3,7 +3,6 @@ package querier
 import (
 	"github.com/v3io/v3io-tsdb/pkg/utils"
 	"sort"
-	"strings"
 )
 
 func NewSetSorter(set SeriesSet) (SeriesSet, error) {
@@ -185,33 +184,4 @@ func (it *mergedSeriesIterator) At() (t int64, v float64) {
 
 func (it *mergedSeriesIterator) Err() error {
 	return it.cur.Err()
-}
-
-// for future use, merge sort labels from multiple partitions
-func mergeLables(a, b []string) []string {
-	maxl := len(a)
-	if len(b) > len(a) {
-		maxl = len(b)
-	}
-	res := make([]string, 0, maxl*10/9)
-
-	for len(a) > 0 && len(b) > 0 {
-		d := strings.Compare(a[0], b[0])
-
-		if d == 0 {
-			res = append(res, a[0])
-			a, b = a[1:], b[1:]
-		} else if d < 0 {
-			res = append(res, a[0])
-			a = a[1:]
-		} else if d > 0 {
-			res = append(res, b[0])
-			b = b[1:]
-		}
-	}
-
-	// Append all remaining elements.
-	res = append(res, a...)
-	res = append(res, b...)
-	return res
 }

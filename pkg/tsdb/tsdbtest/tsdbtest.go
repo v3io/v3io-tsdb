@@ -7,7 +7,6 @@ import (
 	"github.com/v3io/v3io-tsdb/pkg/config"
 	. "github.com/v3io/v3io-tsdb/pkg/tsdb"
 	"github.com/v3io/v3io-tsdb/pkg/utils"
-	"strings"
 	"testing"
 	"time"
 )
@@ -78,7 +77,7 @@ func createSchema() (schema *config.Schema, err error) {
 		ChunckerInterval:    "1h",
 	}
 
-	aggrs := strings.Split("*", ",")
+	aggrs := []string{"*"}
 	fields, err := aggregate.SchemaFieldFromString(aggrs, "v")
 	if err != nil {
 		return nil, errors.Wrap(err, "Failed to create aggregators list")

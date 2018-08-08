@@ -32,7 +32,6 @@ import (
 	"github.com/v3io/v3io-tsdb/pkg/tsdb/tsdbtest"
 	"github.com/v3io/v3io-tsdb/pkg/utils"
 	"path/filepath"
-	"strings"
 	"testing"
 )
 
@@ -356,7 +355,7 @@ func createSchema(agg string) config.Schema {
 		ChunckerInterval:    "1h",
 	}
 
-	aggrs := strings.Split("*", ",")
+	aggrs := []string{"*"}
 	fields, _ := aggregate.SchemaFieldFromString(aggrs, "v")
 	fields = append(fields, config.SchemaField{Name: "_name", Type: "string", Nullable: false, Items: ""})
 

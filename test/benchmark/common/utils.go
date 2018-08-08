@@ -48,7 +48,6 @@ func CreateTSDB(v3ioConfig *config.V3ioConfig) error {
 	schema := config.Schema{
 		TableSchemaInfo:     tableSchema,
 		PartitionSchemaInfo: partitionSchema,
-		Partitions:          []config.Partition{},
 		Fields:              fields,
 	}
 	return tsdb.CreateTSDB(v3ioConfig, &schema)

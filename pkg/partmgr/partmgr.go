@@ -29,23 +29,22 @@ import (
 	"github.com/v3io/v3io-tsdb/pkg/config"
 	"github.com/v3io/v3io-tsdb/pkg/utils"
 	"math"
+	"path"
 	"sync"
 )
 
 // Create new Partition Manager
-func NewPartitionMngr(cfg *config.Schema, path string, cont *v3io.Container) *PartitionManager {
+func NewPartitionMngr(cfg *config.Schema, partPath string, cont *v3io.Container) *PartitionManager {
 	currentPartitionInterval, _ := utils.Str2duration(cfg.PartitionSchemaInfo.PartitionerInterval)
-	newMngr := &PartitionManager{cfg: cfg, path: path, cyclic: false, container: cont, currentPartitionInterval: currentPartitionInterval}
+	newMngr := &PartitionManager{cfg: cfg, path: partPath, cyclic: false, container: cont, currentPartitionInterval: currentPartitionInterval}
 	for _, part := range cfg.Partitions {
-		path := fmt.Sprintf("%s/%d/", newMngr.path, part.StartTime/1000)
-		newPart := NewDBPartition(newMngr, part.StartTime, path)
+		partPath := path.Join(newMngr.path, string(part.StartTime/1000))
+		newPart := NewDBPartition(newMngr, part.StartTime, partPath)
 		newMngr.partitions = append(newMngr.partitions, newPart)
 		if newMngr.headPartition == nil {
 			newMngr.headPartition = newPart
-		} else {
-			if newMngr.headPartition.startTime < newPart.startTime {
-				newMngr.headPartition = newPart
-			}
+		} else if newMngr.headPartition.startTime < newPart.startTime {
+			newMngr.headPartition = newPart
 		}
 	}
 	return newMngr
@@ -105,6 +104,7 @@ func (p *PartitionManager) Init() error {
 
 func (p *PartitionManager) TimeToPart(t int64) (*DBPartition, error) {
 	if p.headPartition == nil {
+		// Rounding t to the nearest PartitionInterval multiple
 		_, err := p.createNewPartition(p.currentPartitionInterval * (t / p.currentPartitionInterval))
 		return p.headPartition, err
 	} else {
@@ -132,8 +132,8 @@ func (p *PartitionManager) TimeToPart(t int64) (*DBPartition, error) {
 
 func (p *PartitionManager) createNewPartition(t int64) (*DBPartition, error) {
 	time := t & 0x7FFFFFFFFFFFFFF0
-	path := fmt.Sprintf("%s/%d/", p.path, time/1000)
-	partition := NewDBPartition(p, time, path)
+	partPath := path.Join(p.path, string(time/1000))
+	partition := NewDBPartition(p, time, partPath)
 	p.currentPartitionInterval = partition.partitionInterval
 	p.headPartition = partition
 	p.partitions = append(p.partitions, partition)
@@ -147,7 +147,7 @@ func (p *PartitionManager) updatePartitionInSchema(partition *DBPartition) error
 	if err != nil {
 		return errors.Wrap(err, "Failed to update new partition in schema file")
 	}
-	err = p.container.Sync.PutObject(&v3io.PutObjectInput{Path: p.path + config.SCHEMA_CONFIG, Body: data})
+	err = p.container.Sync.PutObject(&v3io.PutObjectInput{Path: path.Join(p.path, config.SCHEMA_CONFIG), Body: data})
 	return err
 }
 
@@ -202,8 +202,9 @@ func (p *DBPartition) GetTablePath() string {
 
 // return list of Sharding Keys matching the name
 func (p *DBPartition) GetShardingKeys(name string) []string {
-	var res []string
-	for i := 0; i < p.manager.cfg.TableSchemaInfo.ShardingBuckets; i++ {
+	shardingKeysNum := p.manager.cfg.TableSchemaInfo.ShardingBuckets
+	var res = make([]string, p.manager.cfg.TableSchemaInfo.ShardingBuckets)
+	for i := 0; i < shardingKeysNum; i++ {
 		res = append(res, fmt.Sprintf("%s_%x", name, i))
 	}
 	return res
@@ -325,7 +326,6 @@ func (p *DBPartition) GetHashingBuckets() int {
 // Convert time in milisec to Day index and hour
 func TimeToDHM(tmilli int64) (int, int) {
 	t := int(tmilli / 1000)
-	//m := t/60 - ((t/3600) * 60)
 	h := (t / 3600) % 24
 	d := t / 3600 / 24
 	return d, h

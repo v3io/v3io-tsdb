@@ -32,6 +32,7 @@ import (
 	"github.com/v3io/v3io-tsdb/pkg/partmgr"
 	"github.com/v3io/v3io-tsdb/pkg/querier"
 	"github.com/v3io/v3io-tsdb/pkg/utils"
+	pathUtil "path"
 	"time"
 )
 
@@ -59,12 +60,12 @@ func CreateTSDB(v3iocfg *config.V3ioConfig, schema *config.Schema) error {
 	}
 
 	// check if the config file already exist, abort if it does
-	_, err = container.Sync.GetObject(&v3io.GetObjectInput{Path: v3iocfg.Path + config.SCHEMA_CONFIG})
+	_, err = container.Sync.GetObject(&v3io.GetObjectInput{Path: pathUtil.Join(v3iocfg.Path, config.SCHEMA_CONFIG)})
 	if err == nil {
 		return fmt.Errorf("TSDB already exist in path: " + v3iocfg.Path)
 	}
 
-	err = container.Sync.PutObject(&v3io.PutObjectInput{Path: v3iocfg.Path + config.SCHEMA_CONFIG, Body: data})
+	err = container.Sync.PutObject(&v3io.PutObjectInput{Path: pathUtil.Join(v3iocfg.Path, config.SCHEMA_CONFIG), Body: data})
 
 	return err
 }
@@ -114,8 +115,8 @@ func (a *V3ioAdapter) GetContainer() (*v3io.Container, string) {
 
 func (a *V3ioAdapter) connect() error {
 
-	fullpath := a.cfg.V3ioUrl + "/" + a.cfg.Container + "/" + a.cfg.Path
-	resp, err := a.container.Sync.GetObject(&v3io.GetObjectInput{Path: a.cfg.Path + config.SCHEMA_CONFIG})
+	fullpath := pathUtil.Join(a.cfg.V3ioUrl, a.cfg.Container, a.cfg.Path)
+	resp, err := a.container.Sync.GetObject(&v3io.GetObjectInput{Path: pathUtil.Join(a.cfg.Path, config.SCHEMA_CONFIG)})
 	if err != nil {
 		return errors.Wrap(err, "Failed to read schema at path: "+fullpath)
 	}
@@ -173,7 +174,6 @@ func (a *V3ioAdapter) Querier(_ context.Context, mint, maxt int64) (*querier.V3i
 }
 
 func (a *V3ioAdapter) DeleteDB(configExists bool, force bool, fromTime int64, toTime int64) error {
-	//part.startTime+part.partitionInterval < maxt
 	partitions := a.partitionMngr.PartsForRange(fromTime, toTime)
 	for _, part := range partitions {
 		if toTime == 0 || part.GetEndTime() < toTime {
@@ -196,10 +196,11 @@ func (a *V3ioAdapter) DeleteDB(configExists bool, force bool, fromTime int64, to
 	a.container.Sync.DeleteObject(&v3io.DeleteObjectInput{Path: path})
 
 	if configExists {
-		a.logger.Info("Delete TSDB config in path %s", a.cfg.Path+config.SCHEMA_CONFIG)
-		err = a.container.Sync.DeleteObject(&v3io.DeleteObjectInput{Path: a.cfg.Path + config.SCHEMA_CONFIG})
+		schemaPath := pathUtil.Join(a.cfg.Path, config.SCHEMA_CONFIG)
+		a.logger.Info("Delete TSDB config in path %s", schemaPath)
+		err = a.container.Sync.DeleteObject(&v3io.DeleteObjectInput{Path: schemaPath})
 		if err != nil && !force {
-			return errors.New("Cant delete config or not found in " + a.cfg.Path + config.SCHEMA_CONFIG)
+			return errors.New("Cant delete config or not found in " + schemaPath)
 		}
 		// delete the Directory object
 		a.container.Sync.DeleteObject(&v3io.DeleteObjectInput{Path: a.cfg.Path + "/"})
