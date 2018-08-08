@@ -30,12 +30,12 @@ import (
 	. "github.com/v3io/v3io-tsdb/pkg/tsdb"
 	"github.com/v3io/v3io-tsdb/pkg/tsdb/tsdbtest"
 	"github.com/v3io/v3io-tsdb/pkg/utils"
-	"path/filepath"
+	"path"
 	"testing"
 )
 
 func TestIngestData(t *testing.T) {
-	v3ioConfig, err := config.LoadConfig(filepath.Join("..", "..", config.DefaultConfigurationFileName))
+	v3ioConfig, err := config.LoadConfig(path.Join("..", "..", config.DefaultConfigurationFileName))
 	if err != nil {
 		t.Fatalf("Failed to load test configuration. reason: %s", err)
 	}
@@ -130,7 +130,7 @@ func testIngestDataCase(t *testing.T, v3ioConfig *config.V3ioConfig,
 }
 
 func TestQueryData(t *testing.T) {
-	v3ioConfig, err := config.LoadConfig(filepath.Join("..", "..", config.DefaultConfigurationFileName))
+	v3ioConfig, err := config.LoadConfig(path.Join("..", "..", config.DefaultConfigurationFileName))
 	if err != nil {
 		t.Fatalf("Failed to load test configuration. reason: %s", err)
 	}
@@ -267,7 +267,7 @@ func testQueryDataCase(test *testing.T, v3ioConfig *config.V3ioConfig,
 }
 
 func TestCreateTSDB(t *testing.T) {
-	v3ioConfig, err := config.LoadConfig(filepath.Join("..", "..", config.DefaultConfigurationFileName))
+	v3ioConfig, err := config.LoadConfig(path.Join("..", "..", config.DefaultConfigurationFileName))
 	if err != nil {
 		t.Fatalf("Failed to load test configuration. reason: %s", err)
 	}
@@ -320,7 +320,7 @@ func testCreateTSDBcase(t *testing.T, v3ioConfig *config.V3ioConfig, dbConfig co
 }
 
 func TestDeleteTSDB(t *testing.T) {
-	v3ioConfig, err := config.LoadConfig(filepath.Join("..", "..", config.DefaultConfigurationFileName))
+	v3ioConfig, err := config.LoadConfig(path.Join("..", "..", config.DefaultConfigurationFileName))
 	if err != nil {
 		t.Fatalf("Failed to load test configuration. reason: %s", err)
 	}

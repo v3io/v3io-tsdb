@@ -7,7 +7,7 @@ import (
 	"github.com/v3io/v3io-tsdb/pkg/config"
 	"io/ioutil"
 	"os"
-	"path/filepath"
+	"path"
 )
 
 const TsdbBenchIngestConfig = "TSDB_BENCH_INGEST_CONFIG"
@@ -29,7 +29,7 @@ type BenchmarkIngestConfig struct {
 }
 
 func GetV3ioConfigPath() string {
-	return filepath.Join(TsdbDefaultTestConfigPath, config.DefaultConfigurationFileName)
+	return path.Join(TsdbDefaultTestConfigPath, config.DefaultConfigurationFileName)
 }
 
 func LoadBenchmarkIngestConfigs() (*BenchmarkIngestConfig, *config.V3ioConfig, error) {
@@ -68,7 +68,7 @@ func loadBenchmarkIngestConfigFromFile(benchConfigFile string) (*BenchmarkIngest
 	}
 
 	if benchConfigFile == "" {
-		benchConfigFile = filepath.Join(TsdbDefaultTestConfigPath, "tsdb-bench-test-config.yaml") // relative path
+		benchConfigFile = path.Join(TsdbDefaultTestConfigPath, "tsdb-bench-test-config.yaml") // relative path
 	}
 
 	configData, err := ioutil.ReadFile(benchConfigFile)

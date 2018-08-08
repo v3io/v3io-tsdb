@@ -8,12 +8,12 @@ import (
 	"github.com/v3io/v3io-tsdb/pkg/config"
 	"github.com/v3io/v3io-tsdb/pkg/tsdb/tsdbtest"
 	"os"
-	"path/filepath"
+	"path"
 	"testing"
 )
 
 func TestIngestIntegration(t *testing.T) {
-	v3ioConfig, err := config.LoadConfig(filepath.Join("..", "..", "..", config.DefaultConfigurationFileName))
+	v3ioConfig, err := config.LoadConfig(path.Join("..", "..", "..", config.DefaultConfigurationFileName))
 	defer tsdbtest.SetUp(t, v3ioConfig)()
 	tsdbConfig = fmt.Sprintf(`path: "%v"`, v3ioConfig.Path)
 
