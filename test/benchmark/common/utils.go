@@ -3,6 +3,7 @@ package common
 import (
 	"fmt"
 	"github.com/pkg/errors"
+	"github.com/v3io/v3io-tsdb/pkg/aggregate"
 	"github.com/v3io/v3io-tsdb/pkg/config"
 	"github.com/v3io/v3io-tsdb/pkg/tsdb"
 	"github.com/v3io/v3io-tsdb/pkg/utils"
@@ -11,13 +12,46 @@ import (
 )
 
 func CreateTSDB(v3ioConfig *config.V3ioConfig) error {
-	dbcfg := config.DBPartConfig{
-		DaysPerObj:     7,
-		HrInChunk:      1,
-		DefaultRollups: "*",
-		RollupMin:      5,
+	defaultRollup := config.Rollup{
+		Aggregators:            "*",
+		AggregatorsGranularity: "1h",
+		StorageClass:           "local",
+		SampleRetention:        0,
+		LayerRetentionTime:     "1y",
 	}
-	return tsdb.CreateTSDB(v3ioConfig, &dbcfg)
+
+	tableSchema := config.TableSchema{
+		Version:             0,
+		RollupLayers:        []config.Rollup{defaultRollup},
+		ShardingBuckets:     64,
+		PartitionerInterval: "2d",
+		ChunckerInterval:    "1h",
+	}
+
+	aggrs := strings.Split("*", ",")
+	fields, err := aggregate.SchemaFieldFromString(aggrs, "v")
+	if err != nil {
+		return errors.Wrap(err, "Failed to create aggregators list")
+	}
+	fields = append(fields, config.SchemaField{Name: "_name", Type: "string", Nullable: false, Items: ""})
+
+	partitionSchema := config.PartitionSchema{
+		Version:                tableSchema.Version,
+		Aggregators:            aggrs,
+		AggregatorsGranularity: "1h",
+		StorageClass:           "local",
+		SampleRetention:        0,
+		ChunckerInterval:       tableSchema.ChunckerInterval,
+		PartitionerInterval:    tableSchema.PartitionerInterval,
+	}
+
+	schema := config.Schema{
+		TableSchemaInfo:     tableSchema,
+		PartitionSchemaInfo: partitionSchema,
+		Partitions:          []config.Partition{},
+		Fields:              fields,
+	}
+	return tsdb.CreateTSDB(v3ioConfig, &schema)
 }
 
 func ValidateCountOfSamples(adapter *tsdb.V3ioAdapter, expected int, startTimeMs, endTimeMs int64) error {

@@ -45,6 +45,9 @@ type Series interface {
 
 	// Iterator returns a new iterator of the data of the series.
 	Iterator() SeriesIterator
+
+	// unique key for sorting
+	GetKey() uint64
 }
 
 // SeriesIterator iterates over the data of a time series.

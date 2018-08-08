@@ -49,7 +49,9 @@ type AsyncItemsCursor struct {
 	Cnt           int
 }
 
-func NewAsyncItemsCursor(container *v3io.Container, input *v3io.GetItemsInput, workers int) (*AsyncItemsCursor, error) {
+func NewAsyncItemsCursor(
+	container *v3io.Container, input *v3io.GetItemsInput,
+	workers int, shardingKeys []string) (*AsyncItemsCursor, error) {
 
 	// TODO: use workers from Context.numWorkers (if no ShardingKey)
 	if workers == 0 || input.ShardingKey != "" {
@@ -63,15 +65,17 @@ func NewAsyncItemsCursor(container *v3io.Container, input *v3io.GetItemsInput, w
 		workers:      workers,
 	}
 
-	if input.ShardingKey != "" {
-		newAsyncItemsCursor.workers = 1
-		input := v3io.GetItemsInput{
-			Path: input.Path, AttributeNames: input.AttributeNames, Filter: input.Filter,
-			ShardingKey: input.ShardingKey}
-		_, err := container.GetItems(&input, 0, newAsyncItemsCursor.responseChan)
+	if len(shardingKeys) > 0 {
+		newAsyncItemsCursor.workers = len(shardingKeys)
+		for i := 0; i < newAsyncItemsCursor.workers; i++ {
+			input := v3io.GetItemsInput{
+				Path: input.Path, AttributeNames: input.AttributeNames, Filter: input.Filter,
+				ShardingKey: shardingKeys[i]}
+			_, err := container.GetItems(&input, 0, newAsyncItemsCursor.responseChan)
 
-		if err != nil {
-			return nil, err
+			if err != nil {
+				return nil, err
+			}
 		}
 
 		return newAsyncItemsCursor, nil
