@@ -73,7 +73,7 @@ func (a *FloatAggregator) UpdateExpr(col string, bucket int) string {
 }
 
 func (a *FloatAggregator) InitExpr(col string, buckets int) string {
-	return fmt.Sprintf("_%s_%s=init_array(%d,'double');", col, a.attr, buckets)
+	return fmt.Sprintf("_%s_%s=init_array(%d,'double',NaN);", col, a.attr, buckets)
 }
 
 // Sum Aggregator
@@ -137,9 +137,5 @@ func (a *LastAggregator) Aggregate(t int64, v float64) {
 	}
 }
 func (a *LastAggregator) UpdateExpr(col string, bucket int) string {
-	if math.IsNaN(a.val) {
-		// TODO: replace with NaN when engine will support that syntax
-		return fmt.Sprintf("_%s_%s[%d]=%f;", col, a.attr, bucket, -math.MaxFloat64)
-	}
 	return fmt.Sprintf("_%s_%s[%d]=%f;", col, a.attr, bucket, a.val)
 }
