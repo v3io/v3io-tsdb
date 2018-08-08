@@ -56,16 +56,16 @@ func (q *V3ioQuerier) Select(name, functions string, step int64, filter string) 
 
 // Overlapping windows Time Series Query, return a set of series each with a list of aggregated results per window
 // e.g. get the last 1hr, 6hr, 24hr stats per metric (specify a 1hr step of 3600*1000, 1,6,24 windows, and max time)
-func (q *V3ioQuerier) SelectOverlap(name, functions string, step int64, win []int, filter string) (SeriesSet, error) {
-	sort.Sort(sort.Reverse(sort.IntSlice(win)))
-	return q.selectQry(name, functions, step, win, filter)
+func (q *V3ioQuerier) SelectOverlap(name, functions string, step int64, windows []int, filter string) (SeriesSet, error) {
+	sort.Sort(sort.Reverse(sort.IntSlice(windows)))
+	return q.selectQry(name, functions, step, windows, filter)
 }
 
 // base query function
-func (q *V3ioQuerier) selectQry(name, functions string, step int64, win []int, filter string) (SeriesSet, error) {
+func (q *V3ioQuerier) selectQry(name, functions string, step int64, windows []int, filter string) (SeriesSet, error) {
 
 	filter = strings.Replace(filter, "__name__", "_name", -1)
-	q.logger.DebugWith("Select query", "func", functions, "step", step, "filter", filter)
+	q.logger.DebugWith("Select query", "func", functions, "step", step, "filter", filter, "window", windows)
 
 	mint, maxt := q.mint, q.maxt
 	if q.partitionMngr.IsCyclic() {
@@ -79,7 +79,7 @@ func (q *V3ioQuerier) selectQry(name, functions string, step int64, win []int, f
 		}
 
 		newAggrSeries, err := aggregate.NewAggregateSeries(
-			functions, "v", partition.AggrBuckets(), step, partition.RollupTime(), q.overlapWin)
+			functions, "v", partition.AggrBuckets(), step, partition.RollupTime(), windows)
 		if err != nil {
 			return nil, err
 		}
@@ -88,7 +88,7 @@ func (q *V3ioQuerier) selectQry(name, functions string, step int64, win []int, f
 			newSet.aggrSeries = newAggrSeries
 			newSet.interval = step
 			newSet.aggrIdx = newAggrSeries.NumFunctions() - 1
-			newSet.overlapWin = q.overlapWin
+			newSet.overlapWin = windows
 		}
 
 		path, partFilter := partition.GetTablePath()
