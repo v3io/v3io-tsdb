@@ -154,7 +154,7 @@ func (p *PartitionManager) updatePartitionInSchema(partition *DBPartition) error
 func (p *PartitionManager) PartsForRange(mint, maxt int64) []*DBPartition {
 	var parts []*DBPartition
 	for _, part := range p.partitions {
-		if part.startTime >= mint && (maxt == 0 || part.startTime < maxt) {
+		if part.startTime+p.currentPartitionInterval >= mint && (maxt == 0 || part.startTime <= maxt) {
 			parts = append(parts, part)
 		}
 	}
