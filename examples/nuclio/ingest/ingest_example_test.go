@@ -5,15 +5,13 @@ package ingest
 import (
 	"fmt"
 	"github.com/nuclio/nuclio-test-go"
-	"github.com/v3io/v3io-tsdb/pkg/config"
 	"github.com/v3io/v3io-tsdb/pkg/tsdb/tsdbtest"
 	"os"
-	"path/filepath"
 	"testing"
 )
 
 func TestIngestIntegration(t *testing.T) {
-	v3ioConfig, err := config.LoadConfig(filepath.Join("..", "..", "..", config.DefaultConfigurationFileName))
+	v3ioConfig, err := tsdbtest.LoadV3ioConfig()
 	defer tsdbtest.SetUp(t, v3ioConfig)()
 	tsdbConfig = fmt.Sprintf(`path: "%v"`, v3ioConfig.Path)
 

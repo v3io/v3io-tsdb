@@ -5,6 +5,7 @@ import (
 	"github.com/ghodss/yaml"
 	"github.com/pkg/errors"
 	"github.com/v3io/v3io-tsdb/pkg/config"
+	"github.com/v3io/v3io-tsdb/pkg/tsdb/tsdbtest"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -28,16 +29,12 @@ type BenchmarkIngestConfig struct {
 	CleanupAfterTest     bool   `json:"CleanupAfterTest,omitempty" yaml:"CleanupAfterTest"`
 }
 
-func GetV3ioConfigPath() string {
-	return filepath.Join(TsdbDefaultTestConfigPath, config.DefaultConfigurationFileName)
-}
-
 func LoadBenchmarkIngestConfigs() (*BenchmarkIngestConfig, *config.V3ioConfig, error) {
 	testConfig, err := loadBenchmarkIngestConfigFromFile("")
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "Failed to load test configuration.")
 	}
-	v3ioConfig, err := config.LoadConfig(GetV3ioConfigPath())
+	v3ioConfig, err := tsdbtest.LoadV3ioConfig()
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "Failed to load test configuration.")
 	}

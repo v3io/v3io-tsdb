@@ -32,11 +32,12 @@ import (
 	"github.com/v3io/v3io-tsdb/pkg/tsdb/tsdbtest"
 	"github.com/v3io/v3io-tsdb/pkg/utils"
 	"path/filepath"
+	"sort"
 	"testing"
 )
 
 func TestIngestData(t *testing.T) {
-	v3ioConfig, err := config.LoadConfig(filepath.Join("..", "..", config.DefaultConfigurationFileName))
+	v3ioConfig, err := tsdbtest.LoadV3ioConfig()
 	if err != nil {
 		t.Fatalf("Failed to load test configuration. reason: %s", err)
 	}
@@ -84,6 +85,10 @@ func testIngestDataCase(t *testing.T, v3ioConfig *config.V3ioConfig,
 	metricsName string, userLabels []utils.Label, data []tsdbtest.DataPoint) {
 	defer tsdbtest.SetUp(t, v3ioConfig)()
 
+	sort.Sort(tsdbtest.DataPointTimeSorter(data))
+	from := data[0].Time
+	to := data[len(data)-1].Time
+
 	adapter, err := NewV3ioAdapter(v3ioConfig, nil, nil)
 	if err != nil {
 		t.Fatalf("Failed to create v3io adapter. reason: %s", err)
@@ -109,29 +114,11 @@ func testIngestDataCase(t *testing.T, v3ioConfig *config.V3ioConfig,
 		t.Fatalf("Failed to wait for appender completion. reason: %s", err)
 	}
 
-	responseChan := make(chan *v3io.Response)
-	container, _ := adapter.GetContainer()
-	container.GetItems(&v3io.GetItemsInput{
-		Path:           fmt.Sprintf("/%s/0/", v3ioConfig.Path),
-		AttributeNames: []string{"*"},
-	}, 30, responseChan)
-
-	res := <-responseChan
-	getItemsResp := res.Output.(*v3io.GetItemsOutput)
-
-	for _, item := range getItemsResp.Items {
-		for _, label := range userLabels {
-			actual := item.GetField(label.Name)
-			if actual != label.Value {
-				t.Fatalf("Records were not saved correctly for label %s, actual: %v, expected: %v",
-					label.Name, actual, label.Value)
-			}
-		}
-	}
+	tsdbtest.ValidateCountOfSamples(t, adapter, metricsName, len(data), from, to)
 }
 
 func TestQueryData(t *testing.T) {
-	v3ioConfig, err := config.LoadConfig(filepath.Join("..", "..", config.DefaultConfigurationFileName))
+	v3ioConfig, err := tsdbtest.LoadV3ioConfig()
 	if err != nil {
 		t.Fatalf("Failed to load test configuration. reason: %s", err)
 	}
@@ -408,7 +395,7 @@ func testQueryDataOverlappingWindowCase(test *testing.T, v3ioConfig *config.V3io
 }
 
 func TestCreateTSDB(t *testing.T) {
-	v3ioConfig, err := config.LoadConfig(filepath.Join("..", "..", config.DefaultConfigurationFileName))
+	v3ioConfig, err := tsdbtest.LoadV3ioConfig()
 	if err != nil {
 		t.Fatalf("Failed to load test configuration. reason: %s", err)
 	}
@@ -461,7 +448,7 @@ func testCreateTSDBcase(t *testing.T, v3ioConfig *config.V3ioConfig, dbConfig co
 }
 
 func TestDeleteTSDB(t *testing.T) {
-	v3ioConfig, err := config.LoadConfig(filepath.Join("..", "..", config.DefaultConfigurationFileName))
+	v3ioConfig, err := tsdbtest.LoadV3ioConfig()
 	if err != nil {
 		t.Fatalf("Failed to load test configuration. reason: %s", err)
 	}
@@ -474,6 +461,7 @@ func TestDeleteTSDB(t *testing.T) {
 		DefaultRollups: "count,sum",
 		RollupMin:      10,
 	}
+	v3ioConfig.Path = t.Name()
 	if err := CreateTSDB(v3ioConfig, &dbConfig); err != nil {
 		t.Fatalf("Failed to create TSDB. reason: %s", err)
 	}
