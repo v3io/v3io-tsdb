@@ -62,7 +62,7 @@ type Rollup struct {
 	StorageClass string `json:"storageClass"`
 	//in hours. 0  means no need to save samples
 	SampleRetention int `json:"sampleRetention"`
-	// format : 1M, 7D, 3H . Possible intervals: Y/M/D/H/M
+	// format : 1m, 7d, 3h . Possible intervals: y/m/d/h/M
 	LayerRetentionTime string `json:"layerRetentionTime"`
 }
 
