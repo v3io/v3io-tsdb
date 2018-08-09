@@ -28,7 +28,6 @@ import (
 	"github.com/v3io/v3io-tsdb/pkg/tsdb"
 	"github.com/v3io/v3io-tsdb/pkg/utils"
 	"io"
-	"math"
 	"os"
 	"sort"
 	"strconv"
@@ -268,20 +267,15 @@ func strToTV(tarr, varr string) ([]int64, []float64, error) {
 		return nil, nil, errors.New("time and value arrays must have the same number of elements")
 	}
 
-	tarray := []int64{}
-	varray := []float64{}
+	var tarray []int64
+	var varray []float64
 
 	for i := 0; i < len(vlist); i++ {
-
 		var v float64
 		var err error
-		if vlist[i] == "NaN" {
-			v = math.NaN()
-		} else {
-			v, err = strconv.ParseFloat(vlist[i], 64)
-			if err != nil {
-				return nil, nil, errors.Wrap(err, "not a valid float value")
-			}
+		v, err = strconv.ParseFloat(vlist[i], 64)
+		if err != nil {
+			return nil, nil, errors.WithStack(err)
 		}
 
 		varray = append(varray, v)
