@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/pkg/errors"
 	"github.com/v3io/v3io-tsdb/pkg/tsdb"
+	"github.com/v3io/v3io-tsdb/pkg/tsdb/tsdbtest"
 	"github.com/v3io/v3io-tsdb/pkg/utils"
 	"github.com/v3io/v3io-tsdb/test/benchmark/common"
 	"io/ioutil"
@@ -11,6 +12,8 @@ import (
 	"testing"
 	"time"
 )
+
+const metricNamePrefix = "Name_"
 
 func BenchmarkIngest(b *testing.B) {
 	b.StopTimer()
@@ -26,11 +29,14 @@ func BenchmarkIngest(b *testing.B) {
 	}
 
 	// Create test path (tsdb instance)
-	tsdbPath := common.NormalizePath(fmt.Sprintf("tsdb-%s-%d-%s", b.Name(), b.N, time.Now().Format(time.RFC3339)))
+	tsdbPath := tsdbtest.NormalizePath(fmt.Sprintf("tsdb-%s-%d-%s", b.Name(), b.N, time.Now().Format(time.RFC3339)))
 
 	// Update TSDB instance path for this test
 	v3ioConfig.Path = tsdbPath
-	common.CreateTSDB(v3ioConfig)
+	schema := tsdbtest.CreateSchema(b, "*")
+	if err := tsdb.CreateTSDB(v3ioConfig, &schema); err != nil {
+		b.Fatal("Failed to create TSDB", err)
+	}
 
 	adapter, err := tsdb.NewV3ioAdapter(v3ioConfig, nil, nil)
 	if err != nil {
@@ -108,9 +114,7 @@ func BenchmarkIngest(b *testing.B) {
 
 	b.Logf("\nTest complete. %d samples added to %s\n", count, tsdbPath)
 
-	if err := common.ValidateCountOfSamples(adapter, count, testStartTimeMs, testEndTimeMs); err != nil {
-		b.Error(err)
-	}
+	tsdbtest.ValidateCountOfSamples(b, adapter, metricNamePrefix, count, testStartTimeMs, testEndTimeMs)
 }
 
 func runTest(

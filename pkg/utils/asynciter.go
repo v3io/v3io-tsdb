@@ -21,6 +21,7 @@ such restriction.
 package utils
 
 import (
+	"fmt"
 	"github.com/nuclio/logger"
 	"github.com/pkg/errors"
 	"github.com/v3io/v3io-go-http"
@@ -143,12 +144,12 @@ func (ic *AsyncItemsCursor) NextItem() (v3io.Item, error) {
 	// Read response from channel
 	resp := <-ic.responseChan
 	if resp.Error != nil {
+		fmt.Println("error reading from response channel:", resp, "error", resp.Error, "request:", resp.Request().Input)
 		return nil, errors.Wrap(resp.Error, "Failed to get next items")
 	}
 
 	getItemsResp := resp.Output.(*v3io.GetItemsOutput)
 	shard := resp.Context.(int)
-	//fmt.Println("got resp:",shard, len(getItemsResp.Items), getItemsResp.Last)
 	resp.Release()
 
 	// set the cursor items and reset the item index
@@ -157,7 +158,6 @@ func (ic *AsyncItemsCursor) NextItem() (v3io.Item, error) {
 
 	if !getItemsResp.Last {
 		// if not last, make a new request to that shard
-
 		input := v3io.GetItemsInput{
 			Path: ic.input.Path, AttributeNames: ic.input.AttributeNames, Filter: ic.input.Filter,
 			TotalSegments: ic.totalSegments, Segment: shard, Marker: getItemsResp.NextMarker}
@@ -168,7 +168,6 @@ func (ic *AsyncItemsCursor) NextItem() (v3io.Item, error) {
 		}
 
 	} else {
-		//fmt.Println("last",shard,len(getItemsResp.Items))
 		// Mark one more shard as completed
 		ic.lastShards++
 	}

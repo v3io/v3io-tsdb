@@ -2,11 +2,12 @@ package tsdbtest
 
 import (
 	"fmt"
-	"github.com/pkg/errors"
 	"github.com/v3io/v3io-tsdb/pkg/aggregate"
 	"github.com/v3io/v3io-tsdb/pkg/config"
 	. "github.com/v3io/v3io-tsdb/pkg/tsdb"
 	"github.com/v3io/v3io-tsdb/pkg/utils"
+	"regexp"
+	"strings"
 	"testing"
 	"time"
 )
@@ -16,13 +17,20 @@ type DataPoint struct {
 	Value float64
 }
 
+// DataPointTimeSorter sorts DataPoints by time
+type DataPointTimeSorter []DataPoint
+
+func (a DataPointTimeSorter) Len() int           { return len(a) }
+func (a DataPointTimeSorter) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
+func (a DataPointTimeSorter) Less(i, j int) bool { return a[i].Time < a[j].Time }
+
 type Sample struct {
 	Lset  utils.Labels
 	Time  string
 	Value float64
 }
 
-func DeleteTSDB(t *testing.T, v3ioConfig *config.V3ioConfig) {
+func DeleteTSDB(t testing.TB, v3ioConfig *config.V3ioConfig) {
 	adapter, err := NewV3ioAdapter(v3ioConfig, nil, nil)
 	if err != nil {
 		t.Fatalf("Failed to create adapter. reason: %s", err)
@@ -33,36 +41,122 @@ func DeleteTSDB(t *testing.T, v3ioConfig *config.V3ioConfig) {
 	}
 }
 
-func SetUp(t *testing.T, v3ioConfig *config.V3ioConfig) func() {
-	v3ioConfig.Path = fmt.Sprintf("%s-%d", v3ioConfig.Path, time.Now().Nanosecond())
-	schema, err := createSchema()
-	if err != nil {
-		t.Fatalf("Failed to create schema. Error: %s", err)
-	}
-
-	if err := CreateTSDB(v3ioConfig, schema); err != nil {
-		t.Fatalf("Failed to create TSDB. Error: %s", err)
-	}
-
-	return func() {
-		DeleteTSDB(t, v3ioConfig)
+func CreateTestTSDB(t testing.TB, v3ioConfig *config.V3ioConfig) {
+	schema := CreateSchema(t, "*")
+	if err := CreateTSDB(v3ioConfig, &schema); err != nil {
+		t.Fatalf("Failed to create TSDB. reason: %s", err)
 	}
 }
 
+func SetUp(t testing.TB, v3ioConfig *config.V3ioConfig) func() {
+	v3ioConfig.Path = fmt.Sprintf("%s-%d", t.Name(), time.Now().Nanosecond())
+	CreateTestTSDB(t, v3ioConfig)
+
+	return func() {
+		// Don't delete the table if the test has failed
+		if !t.Failed() {
+			DeleteTSDB(t, v3ioConfig)
+		}
+	}
+}
+
+func SetUpWithData(t *testing.T, v3ioConfig *config.V3ioConfig, metricName string, data []DataPoint, userLabels utils.Labels) (*V3ioAdapter, func()) {
+	teardown := SetUp(t, v3ioConfig)
+	adapter := InsertData(t, v3ioConfig, metricName, data, userLabels)
+	return adapter, teardown
+}
+
 func SetUpWithDBConfig(t *testing.T, v3ioConfig *config.V3ioConfig, schema *config.Schema) func() {
+	v3ioConfig.Path = fmt.Sprintf("%s-%d", t.Name(), time.Now().Nanosecond())
 	if err := CreateTSDB(v3ioConfig, schema); err != nil {
 		t.Fatalf("Failed to create TSDB. reason: %s", err)
 	}
 
 	return func() {
-		DeleteTSDB(t, v3ioConfig)
+		// Don't delete the table if the test has failed
+		if !t.Failed() {
+			DeleteTSDB(t, v3ioConfig)
+		}
 	}
 }
 
-// TODO: refactor - move to commmot test infra
-func createSchema() (schema *config.Schema, err error) {
+func InsertData(t *testing.T, v3ioConfig *config.V3ioConfig, metricName string, data []DataPoint, userLabels utils.Labels) *V3ioAdapter {
+	adapter, err := NewV3ioAdapter(v3ioConfig, nil, nil)
+	if err != nil {
+		t.Fatalf("Failed to create v3io adapter. reason: %s", err)
+	}
+
+	appender, err := adapter.Appender()
+	if err != nil {
+		t.Fatalf("Failed to get appender. reason: %s", err)
+	}
+
+	labels := utils.Labels{utils.Label{Name: "__name__", Value: metricName}}
+	labels = append(labels, userLabels...)
+
+	ref, err := appender.Add(labels, data[0].Time, data[0].Value)
+	if err != nil {
+		t.Fatalf("Failed to add data to appender. reason: %s", err)
+	}
+	for _, curr := range data[1:] {
+		appender.AddFast(labels, ref, curr.Time, curr.Value)
+	}
+
+	if _, err := appender.WaitForCompletion(0); err != nil {
+		t.Fatalf("Failed to wait for appender completion. reason: %s", err)
+	}
+
+	return adapter
+}
+
+func ValidateCountOfSamples(t testing.TB, adapter *V3ioAdapter, metricName string, expected int, startTimeMs, endTimeMs int64) {
+	qry, err := adapter.Querier(nil, startTimeMs, endTimeMs)
+	if err != nil {
+		t.Fatal(err, "failed to create Querier instance.")
+	}
+	stepSize, err := utils.Str2duration("1h")
+	if err != nil {
+		t.Fatal(err, "failed to create step")
+	}
+
+	set, err := qry.Select("", "count", stepSize, fmt.Sprintf("starts(__name__, '%v')", metricName))
+
+	var actual int
+	for set.Next() {
+		if set.Err() != nil {
+			t.Fatal(set.Err(), "failed to get next element from result set")
+		}
+
+		series := set.At()
+		iter := series.Iterator()
+		for iter.Next() {
+			if iter.Err() != nil {
+				t.Fatal(set.Err(), "failed to get next time-value pair from iterator")
+			}
+			_, v := iter.At()
+			actual += int(v)
+		}
+	}
+
+	if set.Err() != nil {
+		t.Fatal(set.Err())
+	}
+
+	if expected != actual {
+		t.Fatalf("Check failed: actual result is not as expected (%d != %d)", expected, actual)
+	}
+}
+
+func NormalizePath(path string) string {
+	chars := []string{":", "+"}
+	r := strings.Join(chars, "")
+	re := regexp.MustCompile("[" + r + "]+")
+	return re.ReplaceAllString(path, "_")
+}
+
+func CreateSchema(t testing.TB, agg string) config.Schema {
 	defaultRollup := config.Rollup{
-		Aggregators:            "*",
+		Aggregators:            agg,
 		AggregatorsGranularity: "1h",
 		StorageClass:           "local",
 		SampleRetention:        0,
@@ -80,7 +174,7 @@ func createSchema() (schema *config.Schema, err error) {
 	aggrs := []string{"*"}
 	fields, err := aggregate.SchemaFieldFromString(aggrs, "v")
 	if err != nil {
-		return nil, errors.Wrap(err, "Failed to create aggregators list")
+		t.Fatal("Failed to create aggregators list", err)
 	}
 	fields = append(fields, config.SchemaField{Name: "_name", Type: "string", Nullable: false, Items: ""})
 
@@ -94,11 +188,11 @@ func createSchema() (schema *config.Schema, err error) {
 		PartitionerInterval:    tableSchema.PartitionerInterval,
 	}
 
-	schema = &config.Schema{
+	schema := config.Schema{
 		TableSchemaInfo:     tableSchema,
 		PartitionSchemaInfo: partitionSchema,
 		Partitions:          []config.Partition{},
 		Fields:              fields,
 	}
-	return schema, err
+	return schema
 }

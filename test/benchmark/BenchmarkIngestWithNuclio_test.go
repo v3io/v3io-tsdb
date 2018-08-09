@@ -7,7 +7,6 @@ import (
 	"github.com/nuclio/nuclio-test-go"
 	"github.com/pkg/errors"
 	"github.com/v3io/v3io-go-http"
-	"github.com/v3io/v3io-tsdb/pkg/config"
 	"github.com/v3io/v3io-tsdb/pkg/tsdb"
 	"github.com/v3io/v3io-tsdb/pkg/tsdb/tsdbtest"
 	"github.com/v3io/v3io-tsdb/pkg/utils"
@@ -38,11 +37,14 @@ func BenchmarkIngestWithNuclio(b *testing.B) {
 	}
 
 	// Create test path (tsdb instance)
-	tsdbPath = common.NormalizePath(fmt.Sprintf("tsdb-%s-%d-%s", b.Name(), b.N, time.Now().Format(time.RFC3339)))
+	tsdbPath = tsdbtest.NormalizePath(fmt.Sprintf("tsdb-%s-%d-%s", b.Name(), b.N, time.Now().Format(time.RFC3339)))
 
 	// Update TSDB instance path for this test
 	v3ioConfig.Path = tsdbPath
-	common.CreateTSDB(v3ioConfig)
+	schema := tsdbtest.CreateSchema(b, "count,sum")
+	if err := tsdb.CreateTSDB(v3ioConfig, &schema); err != nil {
+		b.Fatal("Failed to create TSDB", err)
+	}
 
 	data := nutest.DataBind{
 		Name:      defaultDbName,
@@ -101,9 +103,7 @@ func BenchmarkIngestWithNuclio(b *testing.B) {
 
 	tc.Logger.Warn("\nTest complete. Count: %d", count)
 
-	if err := common.ValidateCountOfSamples(v3ioAdapter, count, testStartTimeMs, testEndTimeMs); err != nil {
-		b.Error(err)
-	}
+	tsdbtest.ValidateCountOfSamples(b, v3ioAdapter, metricNamePrefix, count, testStartTimeMs, testEndTimeMs)
 }
 
 func runNuclioTest(tc *nutest.TestContext, sampleTemplateJson string, timestamp int64) (int, error) {
@@ -128,7 +128,7 @@ func runNuclioTest(tc *nutest.TestContext, sampleTemplateJson string, timestamp 
 
 // InitContext runs only once when the function runtime starts
 func initContext(context *nuclio.Context) error {
-	v3ioConfig, err := config.LoadConfig(common.GetV3ioConfigPath())
+	v3ioConfig, err := tsdbtest.LoadV3ioConfig()
 	if err != nil {
 		return errors.Wrap(err, "failed to load configuration")
 	}

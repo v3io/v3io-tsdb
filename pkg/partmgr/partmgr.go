@@ -30,6 +30,7 @@ import (
 	"github.com/v3io/v3io-tsdb/pkg/utils"
 	"math"
 	"path"
+	"strconv"
 	"sync"
 )
 
@@ -38,7 +39,7 @@ func NewPartitionMngr(cfg *config.Schema, partPath string, cont *v3io.Container)
 	currentPartitionInterval, _ := utils.Str2duration(cfg.PartitionSchemaInfo.PartitionerInterval)
 	newMngr := &PartitionManager{cfg: cfg, path: partPath, cyclic: false, container: cont, currentPartitionInterval: currentPartitionInterval}
 	for _, part := range cfg.Partitions {
-		partPath := path.Join(newMngr.path, string(part.StartTime/1000))
+		partPath := path.Join(newMngr.path, strconv.FormatInt(part.StartTime/1000, 10)) + "/"
 		newPart := NewDBPartition(newMngr, part.StartTime, partPath)
 		newMngr.partitions = append(newMngr.partitions, newPart)
 		if newMngr.headPartition == nil {
@@ -132,7 +133,7 @@ func (p *PartitionManager) TimeToPart(t int64) (*DBPartition, error) {
 
 func (p *PartitionManager) createNewPartition(t int64) (*DBPartition, error) {
 	time := t & 0x7FFFFFFFFFFFFFF0
-	partPath := path.Join(p.path, string(time/1000))
+	partPath := path.Join(p.path, strconv.FormatInt(time/1000, 10)) + "/"
 	partition := NewDBPartition(p, time, partPath)
 	p.currentPartitionInterval = partition.partitionInterval
 	p.headPartition = partition
@@ -203,16 +204,16 @@ func (p *DBPartition) GetTablePath() string {
 // return list of Sharding Keys matching the name
 func (p *DBPartition) GetShardingKeys(name string) []string {
 	shardingKeysNum := p.manager.cfg.TableSchemaInfo.ShardingBuckets
-	var res = make([]string, p.manager.cfg.TableSchemaInfo.ShardingBuckets)
+	var res = make([]string, 0, shardingKeysNum)
 	for i := 0; i < shardingKeysNum; i++ {
 		res = append(res, fmt.Sprintf("%s_%x", name, i))
 	}
+
 	return res
 }
 
 // return metric object full path
 func (p *DBPartition) GetMetricPath(name string, hash uint64) string {
-
 	return fmt.Sprintf("%s%s_%x.%016x", p.path, name, int(hash%uint64(p.GetHashingBuckets())), hash)
 }
 
