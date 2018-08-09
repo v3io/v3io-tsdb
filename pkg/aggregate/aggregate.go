@@ -77,7 +77,7 @@ func SchemaFieldFromString(aggregators []string, col string) ([]config.SchemaFie
 	if len(aggregators) != 0 && aggregators[0] != "" {
 		for _, s := range aggregators {
 			trimmed := strings.TrimSpace(s)
-			if strings.Compare(trimmed, "*") == 0 {
+			if trimmed == "*" {
 				fieldList = make([]config.SchemaField, 0, len(aggrToSchemaField))
 				for _, val := range aggrToSchemaField {
 					fieldList = append(fieldList, getAggrFullName(val, col))
