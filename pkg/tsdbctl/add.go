@@ -271,9 +271,7 @@ func strToTV(tarr, varr string) ([]int64, []float64, error) {
 	var varray []float64
 
 	for i := 0; i < len(vlist); i++ {
-		var v float64
-		var err error
-		v, err = strconv.ParseFloat(vlist[i], 64)
+		v, err := strconv.ParseFloat(vlist[i], 64)
 		if err != nil {
 			return nil, nil, errors.WithStack(err)
 		}
