@@ -74,8 +74,8 @@ var aggrToSchemaField = map[string]config.SchemaField{
 
 func SchemaFieldFromString(aggregators []string, col string) ([]config.SchemaField, error) {
 	fieldList := make([]config.SchemaField, 0, len(aggregators))
-	if len(aggregators) != 0 && aggregators[0] != "" {
-		for _, s := range aggregators {
+	for _, s := range aggregators {
+		if s != "" {
 			trimmed := strings.TrimSpace(s)
 			if trimmed == "*" {
 				fieldList = make([]config.SchemaField, 0, len(aggrToSchemaField))
@@ -86,7 +86,7 @@ func SchemaFieldFromString(aggregators []string, col string) ([]config.SchemaFie
 			} else {
 				field, ok := aggrToSchemaField[trimmed]
 				if !ok {
-					return nil, fmt.Errorf("Invalid aggragator type %s", trimmed)
+					return nil, fmt.Errorf("invalid aggragator type %s", trimmed)
 				}
 				fieldList = append(fieldList, getAggrFullName(field, col))
 			}
