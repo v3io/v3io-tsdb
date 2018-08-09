@@ -21,9 +21,9 @@ such restriction.
 package tsdbctl
 
 import (
-	"testing"
 	"github.com/stretchr/testify/suite"
 	"math"
+	"testing"
 )
 
 type testSuite struct {
