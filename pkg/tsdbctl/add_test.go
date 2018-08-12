@@ -28,6 +28,10 @@ import (
 	"testing"
 )
 
+type testAddSuite struct {
+	suite.Suite
+}
+
 func (suite *testSuite) TestStrToTV() {
 
 	ts, vs, err := strToTV("1533814796000,1533894796000", "10.1,202")
@@ -57,5 +61,5 @@ func (suite *testSuite) TestStrToTVInvalidInput() {
 }
 
 func TestAddSuite(t *testing.T) {
-	suite.Run(t, new(testSuite))
+	suite.Run(t, new(testAddSuite))
 }

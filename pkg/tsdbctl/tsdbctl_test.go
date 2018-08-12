@@ -28,11 +28,11 @@ import (
 	"testing"
 )
 
-type testSuite struct {
+type testTsdbctlSuite struct {
 	suite.Suite
 }
 
-func (suite *testSuite) TestPopulateConfigWithTenant() {
+func (suite *testTsdbctlSuite) TestPopulateConfigWithTenant() {
 	rc := RootCommandeer{v3ioPath: "Vel@Odar:p455w0rd@localhost:80123/123"}
 	cfg := &config.V3ioConfig{
 		Path: "/x/y/z",
@@ -58,5 +58,5 @@ func (suite *testSuite) TestPopulateConfigWithTenant() {
 }
 
 func TestTsdbctlSuite(t *testing.T) {
-	suite.Run(t, new(testSuite))
+	suite.Run(t, new(testTsdbctlSuite))
 }
