@@ -57,6 +57,6 @@ func (suite *testSuite) TestPopulateConfigWithTenant() {
 	suite.Require().Equal(expectedRc, rc)
 }
 
-func TestBuilderSuite(t *testing.T) {
+func TestTsdbctlSuite(t *testing.T) {
 	suite.Run(t, new(testSuite))
 }
