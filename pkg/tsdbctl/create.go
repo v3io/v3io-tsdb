@@ -144,8 +144,8 @@ func (cc *createCommandeer) validateFormat(format string) error {
 		return fmt.Errorf("format is inncorrect, not a number")
 	}
 	unit := string(format[len(format)-1])
-	if !(unit == "y" || unit == "m" || unit == "d" || unit == "h" || unit == "M") {
-		return fmt.Errorf("format is inncorrect, not part of y,m,d,h,M")
+	if !(unit == "m" || unit == "d" || unit == "h") {
+		return fmt.Errorf("format is inncorrect, not part of m,d,h")
 	}
 	return nil
 }
