@@ -127,7 +127,10 @@ func (a *V3ioAdapter) connect() error {
 		return errors.Wrap(err, "Failed to Unmarshal schema at path: "+fullpath)
 	}
 
-	a.partitionMngr = partmgr.NewPartitionMngr(&schema, a.cfg.Path, a.container)
+	a.partitionMngr, err = partmgr.NewPartitionMngr(&schema, a.cfg.Path, a.container)
+	if err != nil {
+		return errors.Wrap(err, "Failed to init DB partition manager at path: "+fullpath)
+	}
 	err = a.partitionMngr.Init()
 	if err != nil {
 		return errors.Wrap(err, "Failed to init DB partition manager at path: "+fullpath)

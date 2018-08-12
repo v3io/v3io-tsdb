@@ -35,12 +35,18 @@ import (
 )
 
 // Create new Partition Manager
-func NewPartitionMngr(cfg *config.Schema, partPath string, cont *v3io.Container) *PartitionManager {
-	currentPartitionInterval, _ := utils.Str2duration(cfg.PartitionSchemaInfo.PartitionerInterval)
+func NewPartitionMngr(cfg *config.Schema, partPath string, cont *v3io.Container) (*PartitionManager, error) {
+	currentPartitionInterval, err := utils.Str2duration(cfg.PartitionSchemaInfo.PartitionerInterval)
+	if err != nil {
+		return nil, err
+	}
 	newMngr := &PartitionManager{cfg: cfg, path: partPath, cyclic: false, container: cont, currentPartitionInterval: currentPartitionInterval}
 	for _, part := range cfg.Partitions {
 		partPath := path.Join(newMngr.path, strconv.FormatInt(part.StartTime/1000, 10)) + "/"
-		newPart := NewDBPartition(newMngr, part.StartTime, partPath)
+		newPart, err := NewDBPartition(newMngr, part.StartTime, partPath)
+		if err != nil {
+			return nil, err
+		}
 		newMngr.partitions = append(newMngr.partitions, newPart)
 		if newMngr.headPartition == nil {
 			newMngr.headPartition = newPart
@@ -48,14 +54,23 @@ func NewPartitionMngr(cfg *config.Schema, partPath string, cont *v3io.Container)
 			newMngr.headPartition = newPart
 		}
 	}
-	return newMngr
+	return newMngr, nil
 }
 
 // Create and Init a new Partition
-func NewDBPartition(pmgr *PartitionManager, startTime int64, path string) *DBPartition {
-	rollupTime, _ := utils.Str2duration(pmgr.cfg.PartitionSchemaInfo.AggregatorsGranularity)
-	partitionInterval, _ := utils.Str2duration(pmgr.cfg.PartitionSchemaInfo.PartitionerInterval)
-	chunkInterval, _ := utils.Str2duration(pmgr.cfg.PartitionSchemaInfo.ChunckerInterval)
+func NewDBPartition(pmgr *PartitionManager, startTime int64, path string) (*DBPartition, error) {
+	rollupTime, err := utils.Str2duration(pmgr.cfg.PartitionSchemaInfo.AggregatorsGranularity)
+	if err != nil {
+		return nil, err
+	}
+	partitionInterval, err := utils.Str2duration(pmgr.cfg.PartitionSchemaInfo.PartitionerInterval)
+	if err != nil {
+		return nil, err
+	}
+	chunkInterval, err := utils.Str2duration(pmgr.cfg.PartitionSchemaInfo.ChunckerInterval)
+	if err != nil {
+		return nil, err
+	}
 	newPart := DBPartition{
 		manager:           pmgr,
 		path:              path,
@@ -67,13 +82,16 @@ func NewDBPartition(pmgr *PartitionManager, startTime int64, path string) *DBPar
 		rollupTime:        rollupTime,
 	}
 
-	aggrType, _ := aggregate.AggrsFromString(pmgr.cfg.PartitionSchemaInfo.Aggregators)
+	aggrType, err := aggregate.AggrsFromString(pmgr.cfg.PartitionSchemaInfo.Aggregators)
+	if err != nil {
+		return nil, err
+	}
 	newPart.defaultRollups = aggrType
 	if rollupTime != 0 {
 		newPart.rollupBuckets = int(math.Ceil(float64(partitionInterval) / float64(rollupTime)))
 	}
 
-	return &newPart
+	return &newPart, nil
 }
 
 type PartitionManager struct {
@@ -134,11 +152,14 @@ func (p *PartitionManager) TimeToPart(t int64) (*DBPartition, error) {
 func (p *PartitionManager) createNewPartition(t int64) (*DBPartition, error) {
 	time := t & 0x7FFFFFFFFFFFFFF0
 	partPath := path.Join(p.path, strconv.FormatInt(time/1000, 10)) + "/"
-	partition := NewDBPartition(p, time, partPath)
+	partition, err := NewDBPartition(p, time, partPath)
+	if err != nil {
+		return nil, err
+	}
 	p.currentPartitionInterval = partition.partitionInterval
 	p.headPartition = partition
 	p.partitions = append(p.partitions, partition)
-	err := p.updatePartitionInSchema(partition)
+	err = p.updatePartitionInSchema(partition)
 	return partition, err
 }
 

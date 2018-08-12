@@ -269,6 +269,9 @@ func testQueryDataCase(test *testing.T, v3ioConfig *config.V3ioConfig,
 		assert.ElementsMatch(test, expected[agg], actual)
 	}
 
+	if set.Err() != nil {
+		test.Fatalf("Failed to query metric. reason: %v", set.Err())
+	}
 	if counter == 0 && len(expected) > 0 {
 		test.Fatalf("No data was received")
 	}
@@ -386,6 +389,9 @@ func testQueryDataOverlappingWindowCase(test *testing.T, v3ioConfig *config.V3io
 		}
 	}
 
+	if set.Err() != nil {
+		test.Fatalf("Failed to query metric. reason: %v", set.Err())
+	}
 	if counter == 0 && len(expected) > 0 {
 		test.Fatalf("No data was received")
 	}

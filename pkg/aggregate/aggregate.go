@@ -75,8 +75,8 @@ var aggrToSchemaField = map[string]config.SchemaField{
 func SchemaFieldFromString(aggregators []string, col string) ([]config.SchemaField, error) {
 	fieldList := make([]config.SchemaField, 0, len(aggregators))
 	for _, s := range aggregators {
-		if s != "" {
-			trimmed := strings.TrimSpace(s)
+		trimmed := strings.TrimSpace(s)
+		if trimmed != "" {
 			if trimmed == "*" {
 				fieldList = make([]config.SchemaField, 0, len(aggrToSchemaField))
 				for _, val := range aggrToSchemaField {
@@ -86,7 +86,7 @@ func SchemaFieldFromString(aggregators []string, col string) ([]config.SchemaFie
 			} else {
 				field, ok := aggrToSchemaField[trimmed]
 				if !ok {
-					return nil, fmt.Errorf("invalid aggragator type %s", trimmed)
+					return nil, fmt.Errorf("invalid aggragator type '%s'", trimmed)
 				}
 				fieldList = append(fieldList, getAggrFullName(field, col))
 			}
@@ -108,11 +108,13 @@ func AggrsFromString(split []string) (AggrType, error) {
 	var aggrList AggrType
 	for _, s := range split {
 		trimmed := strings.TrimSpace(s)
-		aggr, ok := aggrTypeString[trimmed]
-		if !ok {
-			return aggrList, fmt.Errorf("Invalid aggragator type %s", s)
+		if trimmed != "" {
+			aggr, ok := aggrTypeString[trimmed]
+			if !ok {
+				return aggrList, fmt.Errorf("invalid aggragator type '%s'", s)
+			}
+			aggrList = aggrList | aggr
 		}
-		aggrList = aggrList | aggr
 	}
 	return aggrList, nil
 }

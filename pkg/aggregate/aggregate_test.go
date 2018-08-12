@@ -77,6 +77,13 @@ func TestAggregators(t *testing.T) {
 			exprCol:   "v", bucket: 1,
 			expectedUpdateExpr: fmt.Sprintf("_v_min[1]=min(_v_min[1],%f);_v_max[1]=max(_v_max[1],%f);", 2.5, 7.5),
 			expectedSetExpr:    fmt.Sprintf("_v_min[1]=%f;_v_max[1]=%f;", 2.5, 7.5)},
+
+		{desc: "Should aggregate data when specifying aggregators with empty values",
+			aggString: "min , ,max   ",
+			data:      map[int64]float64{1: 7.5, 2: 2.5},
+			exprCol:   "v", bucket: 1,
+			expectedUpdateExpr: fmt.Sprintf("_v_min[1]=min(_v_min[1],%f);_v_max[1]=max(_v_max[1],%f);", 2.5, 7.5),
+			expectedSetExpr:    fmt.Sprintf("_v_min[1]=%f;_v_max[1]=%f;", 2.5, 7.5)},
 	}
 
 	for _, test := range testCases {
