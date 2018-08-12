@@ -51,9 +51,18 @@ func (suite *testAddSuite) TestStrToTVSpecialValues() {
 	suite.Require().Equal(vs[1:], []float64{math.Inf(1), math.Inf(-1)})
 }
 
-func (suite *testAddSuite) TestStrToTVInvalidInput() {
+func (suite *testAddSuite) TestStrToTVInvalidValue() {
 
 	ts, vs, err := strToTV("1533814796000,1533894796000,1533899796000", "1.2,5,z")
+
+	suite.Require().Nil(ts)
+	suite.Require().Nil(vs)
+	suite.Require().Error(err)
+}
+
+func (suite *testAddSuite) TestStrToTVInvalidTime() {
+
+	ts, vs, err := strToTV("1533814796000,1533894796000,abc", "1.2,5,5.1")
 
 	suite.Require().Nil(ts)
 	suite.Require().Nil(vs)
