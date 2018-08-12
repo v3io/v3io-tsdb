@@ -32,7 +32,7 @@ type testAddSuite struct {
 	suite.Suite
 }
 
-func (suite *testSuite) TestStrToTV() {
+func (suite *testAddSuite) TestStrToTV() {
 
 	ts, vs, err := strToTV("1533814796000,1533894796000", "10.1,202")
 
@@ -41,7 +41,7 @@ func (suite *testSuite) TestStrToTV() {
 	suite.Require().Equal(vs, []float64{10.1, 202})
 }
 
-func (suite *testSuite) TestStrToTVSpecialValues() {
+func (suite *testAddSuite) TestStrToTVSpecialValues() {
 
 	ts, vs, err := strToTV("1533814796000,1533894796000,1533899796000", "NaN,Inf,-Inf")
 
@@ -51,7 +51,7 @@ func (suite *testSuite) TestStrToTVSpecialValues() {
 	suite.Require().Equal(vs[1:], []float64{math.Inf(1), math.Inf(-1)})
 }
 
-func (suite *testSuite) TestStrToTVInvalidInput() {
+func (suite *testAddSuite) TestStrToTVInvalidInput() {
 
 	ts, vs, err := strToTV("1533814796000,1533894796000,1533899796000", "1.2,5,z")
 
