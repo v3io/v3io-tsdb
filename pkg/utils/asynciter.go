@@ -24,6 +24,7 @@ import (
 	"github.com/nuclio/logger"
 	"github.com/pkg/errors"
 	"github.com/v3io/v3io-go-http"
+	"fmt"
 )
 
 type ItemsCursor interface {
@@ -69,7 +70,7 @@ func NewAsyncItemsCursor(
 		newAsyncItemsCursor.workers = len(shardingKeys)
 		for i := 0; i < newAsyncItemsCursor.workers; i++ {
 			input := v3io.GetItemsInput{
-				Path: input.Path, AttributeNames: input.AttributeNames, Filter: input.Filter,
+				Path:        input.Path, AttributeNames: input.AttributeNames, Filter: input.Filter,
 				ShardingKey: shardingKeys[i]}
 			_, err := container.GetItems(&input, 0, newAsyncItemsCursor.responseChan)
 
@@ -84,7 +85,7 @@ func NewAsyncItemsCursor(
 	for i := 0; i < newAsyncItemsCursor.workers; i++ {
 		newAsyncItemsCursor.totalSegments = workers
 		input := v3io.GetItemsInput{
-			Path: input.Path, AttributeNames: input.AttributeNames, Filter: input.Filter,
+			Path:          input.Path, AttributeNames: input.AttributeNames, Filter: input.Filter,
 			TotalSegments: newAsyncItemsCursor.totalSegments, Segment: i}
 		_, err := container.GetItems(&input, i, newAsyncItemsCursor.responseChan)
 
@@ -143,7 +144,7 @@ func (ic *AsyncItemsCursor) NextItem() (v3io.Item, error) {
 	// Read response from channel
 	resp := <-ic.responseChan
 	if resp.Error != nil {
-		ic.logger.Warn("error reading from response channel:", resp, "error", resp.Error, "request:", resp.Request().Input)
+		fmt.Println("error reading from response channel:", resp, "error", resp.Error, "request:", resp.Request().Input)
 		return nil, errors.Wrap(resp.Error, "Failed to get next items")
 	}
 
@@ -158,7 +159,7 @@ func (ic *AsyncItemsCursor) NextItem() (v3io.Item, error) {
 	if !getItemsResp.Last {
 		// if not last, make a new request to that shard
 		input := v3io.GetItemsInput{
-			Path: ic.input.Path, AttributeNames: ic.input.AttributeNames, Filter: ic.input.Filter,
+			Path:          ic.input.Path, AttributeNames: ic.input.AttributeNames, Filter: ic.input.Filter,
 			TotalSegments: ic.totalSegments, Segment: shard, Marker: getItemsResp.NextMarker}
 		_, err := ic.container.GetItems(&input, shard, ic.responseChan)
 
