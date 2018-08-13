@@ -2,6 +2,7 @@ package tsdbtest
 
 import (
 	"fmt"
+	"github.com/v3io/v3io-tsdb/pkg/aggregate"
 	"github.com/v3io/v3io-tsdb/pkg/config"
 	. "github.com/v3io/v3io-tsdb/pkg/tsdb"
 	"github.com/v3io/v3io-tsdb/pkg/utils"
@@ -29,26 +30,20 @@ type Sample struct {
 	Value float64
 }
 
-var testDbConfig = config.DBPartConfig{
-	DaysPerObj:     1,
-	HrInChunk:      1,
-	DefaultRollups: "*",
-	RollupMin:      10,
-}
-
 func DeleteTSDB(t testing.TB, v3ioConfig *config.V3ioConfig) {
 	adapter, err := NewV3ioAdapter(v3ioConfig, nil, nil)
 	if err != nil {
 		t.Fatalf("Failed to create adapter. reason: %s", err)
 	}
 
-	if err := adapter.DeleteDB(true, true); err != nil {
+	if err := adapter.DeleteDB(true, true, 0, 0); err != nil {
 		t.Fatalf("Failed to delete DB on teardown. reason: %s", err)
 	}
 }
 
 func CreateTestTSDB(t testing.TB, v3ioConfig *config.V3ioConfig) {
-	if err := CreateTSDB(v3ioConfig, &testDbConfig); err != nil {
+	schema := CreateSchema(t, "*")
+	if err := CreateTSDB(v3ioConfig, &schema); err != nil {
 		t.Fatalf("Failed to create TSDB. reason: %s", err)
 	}
 }
@@ -71,14 +66,17 @@ func SetUpWithData(t *testing.T, v3ioConfig *config.V3ioConfig, metricName strin
 	return adapter, teardown
 }
 
-func SetUpWithDBConfig(t *testing.T, v3ioConfig *config.V3ioConfig, dbConfig config.DBPartConfig) func() {
+func SetUpWithDBConfig(t *testing.T, v3ioConfig *config.V3ioConfig, schema *config.Schema) func() {
 	v3ioConfig.Path = fmt.Sprintf("%s-%d", t.Name(), time.Now().Nanosecond())
-	if err := CreateTSDB(v3ioConfig, &dbConfig); err != nil {
+	if err := CreateTSDB(v3ioConfig, schema); err != nil {
 		t.Fatalf("Failed to create TSDB. reason: %s", err)
 	}
 
 	return func() {
-		DeleteTSDB(t, v3ioConfig)
+		// Don't delete the table if the test has failed
+		if !t.Failed() {
+			DeleteTSDB(t, v3ioConfig)
+		}
 	}
 }
 
@@ -135,10 +133,13 @@ func ValidateCountOfSamples(t testing.TB, adapter *V3ioAdapter, metricName strin
 			if iter.Err() != nil {
 				t.Fatal(set.Err(), "failed to get next time-value pair from iterator")
 			}
-
 			_, v := iter.At()
 			actual += int(v)
 		}
+	}
+
+	if set.Err() != nil {
+		t.Fatal(set.Err())
 	}
 
 	if expected != actual {
@@ -151,4 +152,47 @@ func NormalizePath(path string) string {
 	r := strings.Join(chars, "")
 	re := regexp.MustCompile("[" + r + "]+")
 	return re.ReplaceAllString(path, "_")
+}
+
+func CreateSchema(t testing.TB, agg string) config.Schema {
+	defaultRollup := config.Rollup{
+		Aggregators:            agg,
+		AggregatorsGranularity: "1h",
+		StorageClass:           "local",
+		SampleRetention:        0,
+		LayerRetentionTime:     "1y",
+	}
+
+	tableSchema := config.TableSchema{
+		Version:             0,
+		RollupLayers:        []config.Rollup{defaultRollup},
+		ShardingBuckets:     1,
+		PartitionerInterval: "2d",
+		ChunckerInterval:    "1h",
+	}
+
+	aggrs := []string{"*"}
+	fields, err := aggregate.SchemaFieldFromString(aggrs, "v")
+	if err != nil {
+		t.Fatal("Failed to create aggregators list", err)
+	}
+	fields = append(fields, config.SchemaField{Name: "_name", Type: "string", Nullable: false, Items: ""})
+
+	partitionSchema := config.PartitionSchema{
+		Version:                tableSchema.Version,
+		Aggregators:            aggrs,
+		AggregatorsGranularity: "1h",
+		StorageClass:           "local",
+		SampleRetention:        0,
+		ChunckerInterval:       tableSchema.ChunckerInterval,
+		PartitionerInterval:    tableSchema.PartitionerInterval,
+	}
+
+	schema := config.Schema{
+		TableSchemaInfo:     tableSchema,
+		PartitionSchemaInfo: partitionSchema,
+		Partitions:          []config.Partition{},
+		Fields:              fields,
+	}
+	return schema
 }

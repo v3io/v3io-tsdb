@@ -23,7 +23,6 @@ such restriction.
 package tsdb_test
 
 import (
-	"fmt"
 	"github.com/stretchr/testify/assert"
 	"github.com/v3io/v3io-go-http"
 	"github.com/v3io/v3io-tsdb/pkg/chunkenc"
@@ -64,7 +63,7 @@ func TestIngestData(t *testing.T) {
 				{Time: 1532940510 + 5, Value: 300.3},
 				{Time: 1532940510 - 10, Value: 3234.6}}},
 
-		{desc: "Should ingest record with '-' in the metric name (IG-8585)", metricName: "cool-cpu",
+		{desc: "Should ingest record with a dash in the metric name (IG-8585)", metricName: "cool-cpu",
 			labels: utils.FromStrings("os", "linux", "iguaz", "yesplease"),
 			data: []tsdbtest.DataPoint{{Time: 1532940510, Value: 314.3},
 				{Time: 1532940510 + 5, Value: 300.3},
@@ -270,6 +269,9 @@ func testQueryDataCase(test *testing.T, v3ioConfig *config.V3ioConfig,
 		assert.ElementsMatch(test, expected[agg], actual)
 	}
 
+	if set.Err() != nil {
+		test.Fatalf("Failed to query metric. reason: %v", set.Err())
+	}
 	if counter == 0 && len(expected) > 0 {
 		test.Fatalf("No data was received")
 	}
@@ -366,7 +368,6 @@ func testQueryDataOverlappingWindowCase(test *testing.T, v3ioConfig *config.V3io
 
 	var counter int
 	for counter = 0; set.Next(); counter++ {
-		fmt.Println("counter", counter)
 		if set.Err() != nil {
 			test.Fatalf("Failed to query metric. reason: %v", set.Err())
 		}
@@ -388,7 +389,9 @@ func testQueryDataOverlappingWindowCase(test *testing.T, v3ioConfig *config.V3io
 		}
 	}
 
-	fmt.Println("after counter", counter)
+	if set.Err() != nil {
+		test.Fatalf("Failed to query metric. reason: %v", set.Err())
+	}
 	if counter == 0 && len(expected) > 0 {
 		test.Fatalf("No data was received")
 	}
@@ -402,26 +405,12 @@ func TestCreateTSDB(t *testing.T) {
 
 	testCases := []struct {
 		desc         string
-		conf         config.DBPartConfig
+		conf         config.Schema
 		ignoreReason string
 	}{
-		{desc: "Should create TSDB with standard configuration", conf: config.DBPartConfig{
-			Signature:      "TSDB",
-			Version:        "1.0",
-			DaysPerObj:     1,
-			HrInChunk:      1,
-			DefaultRollups: "count,sum",
-			RollupMin:      10,
-		}},
+		{desc: "Should create TSDB with standard configuration", conf: tsdbtest.CreateSchema(t, "sum,count")},
 
-		{desc: "Should create TSDB with wildcard aggregations", conf: config.DBPartConfig{
-			Signature:      "TSDB",
-			Version:        "1.0",
-			DaysPerObj:     1,
-			HrInChunk:      1,
-			DefaultRollups: "*",
-			RollupMin:      10,
-		}},
+		{desc: "Should create TSDB with wildcard aggregations", conf: tsdbtest.CreateSchema(t, "*")},
 	}
 
 	for _, test := range testCases {
@@ -435,15 +424,15 @@ func TestCreateTSDB(t *testing.T) {
 
 }
 
-func testCreateTSDBcase(t *testing.T, v3ioConfig *config.V3ioConfig, dbConfig config.DBPartConfig) {
-	defer tsdbtest.SetUpWithDBConfig(t, v3ioConfig, dbConfig)()
+func testCreateTSDBcase(t *testing.T, v3ioConfig *config.V3ioConfig, dbConfig config.Schema) {
+	defer tsdbtest.SetUpWithDBConfig(t, v3ioConfig, &dbConfig)()
 
 	adapter, err := NewV3ioAdapter(v3ioConfig, nil, nil)
 	if err != nil {
 		t.Fatalf("Failed to create adapter. reason: %s", err)
 	}
 
-	actualDbConfig := *adapter.GetDBConfig()
+	actualDbConfig := *adapter.GetSchema()
 	assert.Equal(t, actualDbConfig, dbConfig)
 }
 
@@ -453,16 +442,9 @@ func TestDeleteTSDB(t *testing.T) {
 		t.Fatalf("Failed to load test configuration. reason: %s", err)
 	}
 
-	dbConfig := config.DBPartConfig{
-		Signature:      "TSDB",
-		Version:        "1.0",
-		DaysPerObj:     1,
-		HrInChunk:      1,
-		DefaultRollups: "count,sum",
-		RollupMin:      10,
-	}
+	schema := tsdbtest.CreateSchema(t, "count,sum")
 	v3ioConfig.Path = t.Name()
-	if err := CreateTSDB(v3ioConfig, &dbConfig); err != nil {
+	if err := CreateTSDB(v3ioConfig, &schema); err != nil {
 		t.Fatalf("Failed to create TSDB. reason: %s", err)
 	}
 
@@ -477,7 +459,7 @@ func TestDeleteTSDB(t *testing.T) {
 		t.Fatal("Failed to create TSDB")
 	}
 
-	if err := adapter.DeleteDB(true, true); err != nil {
+	if err := adapter.DeleteDB(true, true, 0, 0); err != nil {
 		t.Fatalf("Failed to delete DB on teardown. reason: %s", err)
 	}
 

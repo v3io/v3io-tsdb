@@ -41,7 +41,8 @@ func BenchmarkIngestWithNuclio(b *testing.B) {
 
 	// Update TSDB instance path for this test
 	v3ioConfig.Path = tsdbPath
-	if err := tsdb.CreateTSDB(v3ioConfig, &testDBcfg); err != nil {
+	schema := tsdbtest.CreateSchema(b, "count,sum")
+	if err := tsdb.CreateTSDB(v3ioConfig, &schema); err != nil {
 		b.Fatal("Failed to create TSDB", err)
 	}
 

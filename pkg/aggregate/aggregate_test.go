@@ -70,6 +70,20 @@ func TestAggregators(t *testing.T) {
 			data:      map[int64]float64{1: 7.5, 2: 2.5},
 			exprCol:   "v", bucket: 1,
 			expectedUpdateExpr: "_v_count[1]=_v_count[1]+2;", expectedSetExpr: "_v_count[1]=2;", expectFail: true},
+
+		{desc: "Should aggregate data when specifying aggregators with sapces",
+			aggString: "min , max   ",
+			data:      map[int64]float64{1: 7.5, 2: 2.5},
+			exprCol:   "v", bucket: 1,
+			expectedUpdateExpr: fmt.Sprintf("_v_min[1]=min(_v_min[1],%f);_v_max[1]=max(_v_max[1],%f);", 2.5, 7.5),
+			expectedSetExpr:    fmt.Sprintf("_v_min[1]=%f;_v_max[1]=%f;", 2.5, 7.5)},
+
+		{desc: "Should aggregate data when specifying aggregators with empty values",
+			aggString: "min , ,max   ",
+			data:      map[int64]float64{1: 7.5, 2: 2.5},
+			exprCol:   "v", bucket: 1,
+			expectedUpdateExpr: fmt.Sprintf("_v_min[1]=min(_v_min[1],%f);_v_max[1]=max(_v_max[1],%f);", 2.5, 7.5),
+			expectedSetExpr:    fmt.Sprintf("_v_min[1]=%f;_v_max[1]=%f;", 2.5, 7.5)},
 	}
 
 	for _, test := range testCases {
@@ -87,7 +101,7 @@ func TestAggregators(t *testing.T) {
 func testAggregatorCase(t *testing.T, aggString string, data map[int64]float64, exprCol string, bucket int,
 	expectedUpdateExpr string, expectedSetExpr string, expectFail bool) {
 
-	aggregator, err := AggrsFromString(aggString)
+	aggregator, err := AggrsFromString(strings.Split(aggString, ","))
 	if err != nil {
 		if !expectFail {
 			t.Fatal(err)

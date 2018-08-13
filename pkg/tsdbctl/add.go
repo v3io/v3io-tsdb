@@ -290,7 +290,7 @@ func strToTV(tarr, varr string) ([]int64, []float64, error) {
 			} else if strings.HasPrefix(tstr, "now-") {
 				t, err := utils.Str2duration(tstr[4:])
 				if err != nil {
-					return nil, nil, errors.Wrap(err, "not a valid time 'now-??', 'now' need to follow with nn[s|h|m|d]")
+					return nil, nil, errors.Wrap(err, "could not parse pattern following 'now-'")
 				}
 				tarray = append(tarray, now-int64(t))
 			} else {
