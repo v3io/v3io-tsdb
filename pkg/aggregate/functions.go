@@ -97,7 +97,7 @@ func (a *SqrAggregator) Aggregate(t int64, v float64) {
 // Minimum Aggregator
 type MinAggregator struct{ FloatAggregator }
 
-func (a *MinAggregator) Clear() { a.val = math.Inf(1) }
+func (a *MinAggregator) Clear() { a.val = math.MaxFloat64 }
 
 func (a *MinAggregator) Aggregate(t int64, v float64) {
 	if !math.IsNaN(v) && (math.IsNaN(a.val) || v < a.val) {
@@ -105,13 +105,13 @@ func (a *MinAggregator) Aggregate(t int64, v float64) {
 	}
 }
 func (a *MinAggregator) UpdateExpr(col string, bucket int) string {
-	return fmt.Sprintf("_%s_%s[%d]=min(_%s_%s[%d],%f);", col, a.attr, bucket, col, a.attr, bucket, a.val)
+	return fmt.Sprintf("_%s_%s[%d]=min(_%s_%s[%d],%e);", col, a.attr, bucket, col, a.attr, bucket, a.val)
 }
 
 // Maximum Aggregator
 type MaxAggregator struct{ FloatAggregator }
 
-func (a *MaxAggregator) Clear() { a.val = math.Inf(-1) }
+func (a *MaxAggregator) Clear() { a.val = -math.MaxFloat64 }
 
 func (a *MaxAggregator) Aggregate(t int64, v float64) {
 	if !math.IsNaN(v) && (math.IsNaN(a.val) || v > a.val) {
@@ -119,7 +119,7 @@ func (a *MaxAggregator) Aggregate(t int64, v float64) {
 	}
 }
 func (a *MaxAggregator) UpdateExpr(col string, bucket int) string {
-	return fmt.Sprintf("_%s_%s[%d]=max(_%s_%s[%d],%f);", col, a.attr, bucket, col, a.attr, bucket, a.val)
+	return fmt.Sprintf("_%s_%s[%d]=max(_%s_%s[%d],%e);", col, a.attr, bucket, col, a.attr, bucket, a.val)
 }
 
 // Last value Aggregator
