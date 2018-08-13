@@ -22,6 +22,7 @@ package aggregate
 
 import (
 	"fmt"
+	"github.com/v3io/v3io-tsdb/pkg/utils"
 	"math"
 )
 
@@ -65,11 +66,12 @@ func (a *FloatAggregator) Clear()          { a.val = 0 }
 func (a *FloatAggregator) GetAttr() string { return a.attr }
 func (a *FloatAggregator) GetVal() float64 { return a.val }
 func (a *FloatAggregator) SetExpr(col string, bucket int) string {
-	return fmt.Sprintf("_%s_%s[%d]=%f;", col, a.attr, bucket, a.val)
+	return fmt.Sprintf("_%s_%s[%d]=%s;", col, a.attr, bucket, utils.FloatToNormalizedScientificStr(a.val))
 }
 
 func (a *FloatAggregator) UpdateExpr(col string, bucket int) string {
-	return fmt.Sprintf("_%s_%s[%d]=_%s_%s[%d]+%f;", col, a.attr, bucket, col, a.attr, bucket, a.val)
+	return fmt.Sprintf("_%s_%s[%d]=_%s_%s[%d]+%s;", col, a.attr, bucket, col, a.attr, bucket,
+		utils.FloatToNormalizedScientificStr(a.val))
 }
 
 func (a *FloatAggregator) InitExpr(col string, buckets int) string {
@@ -97,7 +99,7 @@ func (a *SqrAggregator) Aggregate(t int64, v float64) {
 // Minimum Aggregator
 type MinAggregator struct{ FloatAggregator }
 
-func (a *MinAggregator) Clear() { a.val = 0 } // TODO: use math.Inf(1)
+func (a *MinAggregator) Clear() { a.val = math.MaxFloat64 } // TODO: use math.Inf(1)
 
 func (a *MinAggregator) Aggregate(t int64, v float64) {
 	if !math.IsNaN(v) && (math.IsNaN(a.val) || v < a.val) {
@@ -105,13 +107,14 @@ func (a *MinAggregator) Aggregate(t int64, v float64) {
 	}
 }
 func (a *MinAggregator) UpdateExpr(col string, bucket int) string {
-	return fmt.Sprintf("_%s_%s[%d]=min(_%s_%s[%d],%f);", col, a.attr, bucket, col, a.attr, bucket, a.val)
+	return fmt.Sprintf("_%s_%s[%d]=min(_%s_%s[%d],%s);", col, a.attr, bucket, col, a.attr, bucket,
+		utils.FloatToNormalizedScientificStr(a.val))
 }
 
 // Maximum Aggregator
 type MaxAggregator struct{ FloatAggregator }
 
-func (a *MaxAggregator) Clear() { a.val = 0 } // TODO: use math.Inf(-1)
+func (a *MaxAggregator) Clear() { a.val = -math.MaxFloat64 } // TODO: use math.Inf(-1)
 
 func (a *MaxAggregator) Aggregate(t int64, v float64) {
 	if !math.IsNaN(v) && (math.IsNaN(a.val) || v > a.val) {
@@ -119,7 +122,8 @@ func (a *MaxAggregator) Aggregate(t int64, v float64) {
 	}
 }
 func (a *MaxAggregator) UpdateExpr(col string, bucket int) string {
-	return fmt.Sprintf("_%s_%s[%d]=max(_%s_%s[%d],%f);", col, a.attr, bucket, col, a.attr, bucket, a.val)
+	return fmt.Sprintf("_%s_%s[%d]=max(_%s_%s[%d],%s);", col, a.attr, bucket, col, a.attr, bucket,
+		utils.FloatToNormalizedScientificStr(a.val))
 }
 
 // Last value Aggregator
@@ -128,7 +132,7 @@ type LastAggregator struct {
 	lastT int64
 }
 
-func (a *LastAggregator) Clear() { a.val = 0 } // TODO: use math.Inf(1)
+func (a *LastAggregator) Clear() { a.val = -math.MaxFloat64 } // TODO: use math.Inf(1)
 
 func (a *LastAggregator) Aggregate(t int64, v float64) {
 	if t > a.lastT {
@@ -136,10 +140,7 @@ func (a *LastAggregator) Aggregate(t int64, v float64) {
 		a.lastT = t
 	}
 }
+
 func (a *LastAggregator) UpdateExpr(col string, bucket int) string {
-	if math.IsNaN(a.val) {
-		// TODO: replace with math.Inf(-1) when engine will support that syntax
-		return ""
-	}
-	return fmt.Sprintf("_%s_%s[%d]=%f;", col, a.attr, bucket, a.val)
+	return fmt.Sprintf("_%s_%s[%d]=%s;", col, a.attr, bucket, utils.FloatToNormalizedScientificStr(a.val))
 }
