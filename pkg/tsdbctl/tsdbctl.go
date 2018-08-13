@@ -102,8 +102,7 @@ func (rc *RootCommandeer) initialize() error {
 		cfg = &config.V3ioConfig{} // initialize struct, will try and set it from individual flags
 		config.InitDefaults(cfg)
 	}
-	rc.populateConfig(cfg)
-	return nil
+	return rc.populateConfig(cfg)
 }
 
 func (rc *RootCommandeer) populateConfig(cfg *config.V3ioConfig) error {
