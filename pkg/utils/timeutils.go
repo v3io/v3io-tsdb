@@ -52,7 +52,8 @@ func Str2duration(duration string) (int64, error) {
 
 	i, err := strconv.Atoi(duration)
 	if err != nil {
-		return 0, errors.Wrap(err, "not a valid duration, use nn[s|h|m|d]")
+		return 0, errors.Wrap(err,
+			`not a valid duration. Accepted pattern: [0-9]+[dhms]. Examples: 30d (30 days), 5m (5 minutes)`)
 	}
 
 	return int64(i * multiply), nil
@@ -66,7 +67,7 @@ func Str2unixTime(tstr string) (int64, error) {
 	} else if strings.HasPrefix(tstr, "now-") {
 		t, err := Str2duration(tstr[4:])
 		if err != nil {
-			return 0, errors.Wrap(err, "not a valid time 'now-??', 'now' need to follow with nn[s|h|m|d]")
+			return 0, errors.Wrap(err, "could not parse pattern following 'now-'")
 		}
 		return time.Now().Unix()*1000 - int64(t), nil
 	}

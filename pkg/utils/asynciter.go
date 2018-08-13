@@ -21,7 +21,6 @@ such restriction.
 package utils
 
 import (
-	"fmt"
 	"github.com/nuclio/logger"
 	"github.com/pkg/errors"
 	"github.com/v3io/v3io-go-http"
@@ -144,7 +143,7 @@ func (ic *AsyncItemsCursor) NextItem() (v3io.Item, error) {
 	// Read response from channel
 	resp := <-ic.responseChan
 	if resp.Error != nil {
-		fmt.Println("error reading from response channel:", resp, "error", resp.Error, "request:", resp.Request().Input)
+		ic.logger.Warn("error reading from response channel:", resp, "error", resp.Error, "request:", resp.Request().Input)
 		return nil, errors.Wrap(resp.Error, "Failed to get next items")
 	}
 
