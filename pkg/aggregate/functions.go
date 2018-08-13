@@ -142,5 +142,9 @@ func (a *LastAggregator) Aggregate(t int64, v float64) {
 }
 
 func (a *LastAggregator) UpdateExpr(col string, bucket int) string {
+	if math.IsNaN(a.val) {
+		return ""
+	}
+
 	return fmt.Sprintf("_%s_%s[%d]=%s;", col, a.attr, bucket, utils.FloatToNormalizedScientificStr(a.val))
 }
