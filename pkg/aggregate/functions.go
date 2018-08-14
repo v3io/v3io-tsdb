@@ -103,7 +103,7 @@ type MinAggregator struct{ FloatAggregator }
 func (a *MinAggregator) Clear() { a.val = math.Inf(1) }
 
 func (a *MinAggregator) Aggregate(t int64, v float64) {
-	if utils.IsDefined(v) && (utils.IsUndefined(a.val) || v < a.val) {
+	if v < a.val {
 		a.val = v
 	}
 }
@@ -118,7 +118,7 @@ type MaxAggregator struct{ FloatAggregator }
 func (a *MaxAggregator) Clear() { a.val = math.Inf(-1) }
 
 func (a *MaxAggregator) Aggregate(t int64, v float64) {
-	if utils.IsDefined(v) && (utils.IsUndefined(a.val) || v > a.val) {
+	if v > a.val {
 		a.val = v
 	}
 }
