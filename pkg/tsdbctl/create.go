@@ -29,6 +29,7 @@ import (
 	"github.com/v3io/v3io-tsdb/pkg/tsdb"
 	"strconv"
 	"strings"
+	"github.com/v3io/v3io-tsdb/pkg/utils"
 )
 
 const schemaVersion = 0
@@ -45,6 +46,7 @@ type createCommandeer struct {
 	rollupInterval    string
 	shardingBuckets   int
 	sampleRetention   int
+	sampleRate        string
 }
 
 func newCreateCommandeer(rootCommandeer *RootCommandeer) *createCommandeer {
@@ -69,6 +71,7 @@ func newCreateCommandeer(rootCommandeer *RootCommandeer) *createCommandeer {
 	cmd.Flags().StringVarP(&commandeer.rollupInterval, "rollup-interval", "i", "1h", "aggregation interval")
 	cmd.Flags().IntVarP(&commandeer.shardingBuckets, "sharding-buckets", "b", 1, "number of buckets to split key")
 	cmd.Flags().IntVarP(&commandeer.sampleRetention, "sample-retention", "a", 0, "sample retention in hours")
+	cmd.Flags().StringVarP(&commandeer.sampleRate, "sample-rate", "x", "1/m", "sample rate")
 
 	commandeer.cmd = cmd
 
@@ -101,6 +104,22 @@ func (cc *createCommandeer) create() error {
 		SampleRetention:        cc.sampleRetention,
 		LayerRetentionTime:     "1y", //TODO
 	}
+
+	minimumSampleSize, maximumSampleSize := int64(2), int64(8)   // bytes
+	chunksInPartition := 64
+	minimumChunkSize, maximumChunkSize := 200, 62000   //bytes
+
+	expectedSample, err := utils.Str2duration(cc.sampleRate) // 5m , 1h
+	minimunExpectedSampleSize := expectedSample * minimumSampleSize //
+	maximumExpectedSampleSize := expectedSample * maximumSampleSize
+	
+
+
+	if err != nil {
+		return errors.Wrap(err, "Failed to parse sample-rate")
+	}
+
+	chunkSize := 0
 
 	tableSchema := config.TableSchema{
 		Version:             schemaVersion,

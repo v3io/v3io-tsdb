@@ -25,6 +25,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"fmt"
 )
 
 // convert duration string e.g. 24h to time (unix milisecond)
@@ -33,16 +34,16 @@ func Str2duration(duration string) (int64, error) {
 	multiply := 3600 * 1000 // hour by default
 	if len(duration) > 0 {
 		last := duration[len(duration)-1:]
-		if last == "m" || last == "h" || last == "d" {
-			duration = duration[0 : len(duration)-1]
-			switch last {
-			case "m":
-				multiply = 60 * 1000
-			case "h":
-				multiply = 3600 * 1000
-			case "d":
-				multiply = 24 * 3600 * 1000
-			}
+		duration = duration[0 : len(duration)-1]
+		switch last {
+		case "m":
+			multiply = 60 * 1000
+		case "h":
+			multiply = 3600 * 1000
+		case "d":
+			multiply = 24 * 3600 * 1000
+		default:
+			return 0, fmt.Errorf(`not a valid duration. Accepted pattern: [0-9]+[dhms]. Examples: 30d (30 days), 5m (5 minutes)`)
 		}
 	}
 
