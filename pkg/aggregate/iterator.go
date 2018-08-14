@@ -124,6 +124,7 @@ func (as *AggregateSeries) NewSetFromAttrs(
 
 	aggrSet := AggregateSet{length: length, interval: as.interval, overlapWin: as.overlapWindows}
 	aggrSet.dataArrays = dataArrays
+	aggrSet.validCells = make([]bool, length, length)
 
 	arrayIndex := start
 	i := 0
@@ -137,6 +138,7 @@ func (as *AggregateSeries) NewSetFromAttrs(
 			for aggr, array := range aggrArrays {
 				aggrSet.mergeArrayCell(aggr, cellIndex, array[arrayIndex])
 			}
+			aggrSet.setValid(i)
 		} else {
 
 			// overlapping time windows (last 1hr, 6hr, ..)
@@ -147,6 +149,7 @@ func (as *AggregateSeries) NewSetFromAttrs(
 						for aggr, array := range aggrArrays {
 							aggrSet.mergeArrayCell(aggr, i, array[arrayIndex])
 						}
+						aggrSet.setValid(i)
 					}
 				}
 			}
@@ -177,12 +180,13 @@ func (as *AggregateSeries) NewSetFromChunks(length int) *AggregateSet {
 	}
 
 	newAggregateSet.dataArrays = dataArrays
+	newAggregateSet.validCells = make([]bool, length, length)
 	return &newAggregateSet
-
 }
 
 type AggregateSet struct {
 	dataArrays map[AggrType][]float64
+	validCells []bool
 	length     int
 	maxCell    int
 	baseTime   int64
@@ -192,6 +196,12 @@ type AggregateSet struct {
 
 func (as *AggregateSet) GetMaxCell() int {
 	return as.maxCell
+}
+
+func (as *AggregateSet) setValid(cell int) {
+	if cell < as.length {
+		as.validCells[cell] = true
+	}
 }
 
 // append the value to a cell in all relevant aggregation arrays
@@ -208,6 +218,7 @@ func (as *AggregateSet) AppendAllCells(cell int, val float64) {
 	for aggr, _ := range as.dataArrays {
 		as.updateCell(aggr, cell, val)
 	}
+	as.validCells[cell] = true
 }
 
 // append/merge (v3io) aggregation values into aggregation per requested interval/step
@@ -227,7 +238,6 @@ func (as *AggregateSet) mergeArrayCell(aggr AggrType, cell int, val uint64) {
 	} else {
 		float := math.Float64frombits(val)
 		as.updateCell(aggr, cell, float)
-
 	}
 }
 
@@ -242,11 +252,11 @@ func (as *AggregateSet) updateCell(aggr AggrType, cell int, val float64) {
 	case aggrTypeSqr:
 		as.dataArrays[aggr][cell] += val * val
 	case aggrTypeMin:
-		if val < as.dataArrays[aggr][cell] {
+		if val < as.dataArrays[aggr][cell] || !as.validCells[cell] {
 			as.dataArrays[aggr][cell] = val
 		}
 	case aggrTypeMax:
-		if val > as.dataArrays[aggr][cell] {
+		if val > as.dataArrays[aggr][cell] || !as.validCells[cell] {
 			as.dataArrays[aggr][cell] = val
 		}
 	case aggrTypeLast:
@@ -255,34 +265,41 @@ func (as *AggregateSet) updateCell(aggr AggrType, cell int, val float64) {
 }
 
 // return the value per aggregate or complex function
-func (as *AggregateSet) GetCellValue(aggr AggrType, cell int) float64 {
+func (as *AggregateSet) GetCellValue(aggr AggrType, cell int) (float64, bool) {
 
-	if cell > as.maxCell || cell >= as.length { // TODO: should >Len return NaN or Zero ?
-		return math.NaN()
+	if cell > as.maxCell || cell >= as.length || !as.validCells[cell] { // TODO: should >Len return NaN or Zero ?
+		return math.NaN(), false
+	}
+
+	// if no samples in this bucket the result is undefined
+	var cnt float64
+	if aggr == aggrTypeAvg || aggr == aggrTypeStddev || aggr == aggrTypeStdvar {
+		cnt = as.dataArrays[aggrTypeCount][cell]
+		if cnt == 0 {
+			return math.NaN(), false
+		}
 	}
 
 	switch aggr {
 	case aggrTypeAvg:
-		return as.dataArrays[aggrTypeSum][cell] / as.dataArrays[aggrTypeCount][cell]
+		return as.dataArrays[aggrTypeSum][cell] / cnt, true
 	case aggrTypeStddev:
-		cnt := as.dataArrays[aggrTypeCount][cell]
 		sum := as.dataArrays[aggrTypeSum][cell]
 		sqr := as.dataArrays[aggrTypeSqr][cell]
-		return math.Sqrt((cnt*sqr - sum*sum) / (cnt * (cnt - 1)))
+		return math.Sqrt((cnt*sqr - sum*sum) / (cnt * (cnt - 1))), true
 	case aggrTypeStdvar:
-		cnt := as.dataArrays[aggrTypeCount][cell]
 		sum := as.dataArrays[aggrTypeSum][cell]
 		sqr := as.dataArrays[aggrTypeSqr][cell]
-		return (cnt*sqr - sum*sum) / (cnt * (cnt - 1))
+		return (cnt*sqr - sum*sum) / (cnt * (cnt - 1)), true
 	case aggrTypeRate:
 		if cell == 0 {
-			return math.NaN()
+			return math.NaN(), false
 		}
 		last := as.dataArrays[aggrTypeLast][cell-1]
 		this := as.dataArrays[aggrTypeLast][cell]
-		return (this - last) / float64(as.interval/1000) // clac rate per sec
+		return (this - last) / float64(as.interval/1000), true // clac rate per sec
 	default:
-		return as.dataArrays[aggr][cell]
+		return as.dataArrays[aggr][cell], true
 	}
 
 }

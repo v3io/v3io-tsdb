@@ -39,15 +39,35 @@ type V3ioSeries struct {
 	set  *V3ioSeriesSet
 	lset utils.Labels
 	iter SeriesIterator
+	hash uint64
 }
 
-func (s *V3ioSeries) Labels() utils.Labels     { return s.lset }
+func (s *V3ioSeries) Labels() utils.Labels { return s.lset }
+
+// get the unique series key for sorting
+func (s *V3ioSeries) GetKey() uint64 {
+	if s.hash == 0 {
+		s.hash = s.lset.Hash()
+	}
+	return s.hash
+}
+
 func (s *V3ioSeries) Iterator() SeriesIterator { return s.iter }
 
 // initialize the label set from _lset & name attributes
 func initLabels(set *V3ioSeriesSet) utils.Labels {
-	name := set.iter.GetField("_name").(string)
-	lsetAttr := set.iter.GetField("_lset").(string)
+	name, nok := set.iter.GetField("_name").(string)
+	if !nok {
+		name = "UNKNOWN"
+	}
+	lsetAttr, lok := set.iter.GetField("_lset").(string)
+	if !lok {
+		lsetAttr = "UNKNOWN"
+	}
+	if !lok || !nok {
+		set.logger.Error("Error in initLabels, bad field values")
+	}
+
 	lset := utils.Labels{utils.Label{Name: "__name__", Value: name}}
 
 	splitLset := strings.Split(lsetAttr, ",")
@@ -71,7 +91,7 @@ func (s *V3ioSeries) initSeriesIter() {
 	}
 
 	newIterator := v3ioSeriesIterator{
-		mint: s.set.mint, maxt: maxt, chunkTime: s.set.partition.HoursInChunk() * 3600 * 1000,
+		mint: s.set.mint, maxt: maxt, chunkTime: s.set.partition.TimePerChunk(),
 		isCyclic: s.set.partition.IsCyclic()}
 	newIterator.chunks = []chunkenc.Chunk{}
 
@@ -108,7 +128,7 @@ type v3ioSeriesIterator struct {
 
 	chunks     []chunkenc.Chunk
 	chunkIndex int
-	chunkTime  int
+	chunkTime  int64
 	iter       chunkenc.Iterator
 }
 
@@ -148,8 +168,6 @@ func (it *v3ioSeriesIterator) Seek(t int64) bool {
 			it.iter = it.chunks[it.chunkIndex].Iterator()
 		}
 	}
-
-	return false
 }
 
 // move to the next iterator item
@@ -213,6 +231,7 @@ type aggrSeriesIterator struct {
 // advance iterator to time t
 func (s *aggrSeriesIterator) Seek(t int64) bool {
 	if t <= s.set.baseTime {
+		s.index = 0
 		return true
 	}
 
@@ -236,7 +255,7 @@ func (s *aggrSeriesIterator) Next() bool {
 
 // return the time & value at the current bucket
 func (s *aggrSeriesIterator) At() (t int64, v float64) {
-	val := s.set.aggrSet.GetCellValue(s.aggrType, s.index)
+	val, _ := s.set.aggrSet.GetCellValue(s.aggrType, s.index)
 	return s.set.aggrSet.GetCellTime(s.set.baseTime, s.index), val
 }
 

@@ -21,6 +21,7 @@ such restriction.
 package utils
 
 import (
+	"fmt"
 	"github.com/nuclio/logger"
 	"github.com/pkg/errors"
 	"github.com/v3io/v3io-go-http"
@@ -49,7 +50,9 @@ type AsyncItemsCursor struct {
 	Cnt           int
 }
 
-func NewAsyncItemsCursor(container *v3io.Container, input *v3io.GetItemsInput, workers int) (*AsyncItemsCursor, error) {
+func NewAsyncItemsCursor(
+	container *v3io.Container, input *v3io.GetItemsInput,
+	workers int, shardingKeys []string) (*AsyncItemsCursor, error) {
 
 	// TODO: use workers from Context.numWorkers (if no ShardingKey)
 	if workers == 0 || input.ShardingKey != "" {
@@ -63,15 +66,17 @@ func NewAsyncItemsCursor(container *v3io.Container, input *v3io.GetItemsInput, w
 		workers:      workers,
 	}
 
-	if input.ShardingKey != "" {
-		newAsyncItemsCursor.workers = 1
-		input := v3io.GetItemsInput{
-			Path: input.Path, AttributeNames: input.AttributeNames, Filter: input.Filter,
-			ShardingKey: input.ShardingKey}
-		_, err := container.GetItems(&input, 0, newAsyncItemsCursor.responseChan)
+	if len(shardingKeys) > 0 {
+		newAsyncItemsCursor.workers = len(shardingKeys)
+		for i := 0; i < newAsyncItemsCursor.workers; i++ {
+			input := v3io.GetItemsInput{
+				Path: input.Path, AttributeNames: input.AttributeNames, Filter: input.Filter,
+				ShardingKey: shardingKeys[i]}
+			_, err := container.GetItems(&input, 0, newAsyncItemsCursor.responseChan)
 
-		if err != nil {
-			return nil, err
+			if err != nil {
+				return nil, err
+			}
 		}
 
 		return newAsyncItemsCursor, nil
@@ -93,7 +98,7 @@ func NewAsyncItemsCursor(container *v3io.Container, input *v3io.GetItemsInput, w
 	return newAsyncItemsCursor, nil
 }
 
-// Err returns the last error
+// error returns the last error
 func (ic *AsyncItemsCursor) Err() error {
 	return ic.currentError
 }
@@ -139,12 +144,12 @@ func (ic *AsyncItemsCursor) NextItem() (v3io.Item, error) {
 	// Read response from channel
 	resp := <-ic.responseChan
 	if resp.Error != nil {
+		fmt.Println("error reading from response channel:", resp, "error", resp.Error, "request:", resp.Request().Input)
 		return nil, errors.Wrap(resp.Error, "Failed to get next items")
 	}
 
 	getItemsResp := resp.Output.(*v3io.GetItemsOutput)
 	shard := resp.Context.(int)
-	//fmt.Println("got resp:",shard, len(getItemsResp.Items), getItemsResp.Last)
 	resp.Release()
 
 	// set the cursor items and reset the item index
@@ -153,7 +158,6 @@ func (ic *AsyncItemsCursor) NextItem() (v3io.Item, error) {
 
 	if !getItemsResp.Last {
 		// if not last, make a new request to that shard
-
 		input := v3io.GetItemsInput{
 			Path: ic.input.Path, AttributeNames: ic.input.AttributeNames, Filter: ic.input.Filter,
 			TotalSegments: ic.totalSegments, Segment: shard, Marker: getItemsResp.NextMarker}
@@ -164,7 +168,6 @@ func (ic *AsyncItemsCursor) NextItem() (v3io.Item, error) {
 		}
 
 	} else {
-		//fmt.Println("last",shard,len(getItemsResp.Items))
 		// Mark one more shard as completed
 		ic.lastShards++
 	}

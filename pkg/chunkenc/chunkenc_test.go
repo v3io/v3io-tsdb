@@ -1,3 +1,5 @@
+// +build unit
+
 /*
 Copyright 2018 Iguazio Systems Ltd.
 
@@ -39,6 +41,7 @@ type sample struct {
 // [132 180 199 187 191 88 63 240 - 0 0 0 0 0 0 154 8 - 194 95 255 108 7 126 113 172 - 46 18 195 104 59 202 237 129 - 119 243 146]
 
 func TestXor(tst *testing.T) {
+	tst.Skip("Needs to be refactored - Doesn't test anything")
 
 	samples := GenSamples(1000, 5, 1000, 100)
 	//samples := RealSample(1000)
@@ -100,6 +103,8 @@ func TestXor(tst *testing.T) {
 }
 
 func TestBstream(t *testing.T) {
+	t.Skip("Needs to be refactored - Doesn't test anything")
+
 	src := &bstream{count: 8, stream: []byte{0x55, 0x44, 0x33}}
 
 	bs := newBWriter(8)

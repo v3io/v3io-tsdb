@@ -96,7 +96,7 @@ func (cc *checkCommandeer) check() error {
 	input := v3io.GetItemInput{Path: objPath, AttributeNames: allAtters}
 	resp, err := container.Sync.GetItem(&input)
 	if err != nil {
-		return errors.Wrap(err, "GetItems err")
+		return errors.Wrap(err, "failed to GetItem")
 	}
 
 	// print metadata

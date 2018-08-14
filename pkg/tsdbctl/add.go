@@ -21,15 +21,14 @@ such restriction.
 package tsdbctl
 
 import (
-	"bytes"
 	"encoding/csv"
 	"fmt"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/v3io/v3io-tsdb/pkg/tsdb"
 	"github.com/v3io/v3io-tsdb/pkg/utils"
-	"io/ioutil"
-	"math"
+	"io"
+	"os"
 	"sort"
 	"strconv"
 	"strings"
@@ -46,6 +45,7 @@ type addCommandeer struct {
 	tArr           string
 	vArr           string
 	inFile         string
+	stdin          bool
 	delay          int
 }
 
@@ -60,7 +60,11 @@ func newAddCommandeer(rootCommandeer *RootCommandeer) *addCommandeer {
 		Short:   "add samples to metric. e.g. add http_req method=get -d 99.9",
 		RunE: func(cmd *cobra.Command, args []string) error {
 
-			if commandeer.inFile == "" {
+			if commandeer.inFile != "" && commandeer.stdin {
+				return errors.New("--file and --stdin are mutually exclusive")
+			}
+
+			if commandeer.inFile == "" && !commandeer.stdin {
 				// if its not using an input CSV file check for name & labels arguments
 				if len(args) == 0 {
 					return errors.New("add require metric name and/or labels")
@@ -81,6 +85,7 @@ func newAddCommandeer(rootCommandeer *RootCommandeer) *addCommandeer {
 	cmd.Flags().StringVarP(&commandeer.tArr, "times", "t", "", "time array, comma separated")
 	cmd.Flags().StringVarP(&commandeer.vArr, "values", "d", "", "values array, comma separated")
 	cmd.Flags().StringVarP(&commandeer.inFile, "file", "f", "", "CSV input file")
+	cmd.Flags().BoolVar(&commandeer.stdin, "stdin", false, "read from standard input")
 	cmd.Flags().IntVar(&commandeer.delay, "delay", 0, "Add delay per insert batch in milisec")
 
 	commandeer.cmd = cmd
@@ -102,7 +107,12 @@ func (ac *addCommandeer) add() error {
 		return err
 	}
 
-	if ac.inFile == "" {
+	append, err := ac.rootCommandeer.adapter.Appender()
+	if err != nil {
+		return errors.Wrap(err, "failed to create Appender")
+	}
+
+	if ac.inFile == "" && !ac.stdin {
 		// process direct CLI input
 		if lset, err = strToLabels(ac.name, ac.lset); err != nil {
 			return err
@@ -117,40 +127,55 @@ func (ac *addCommandeer) add() error {
 			return err
 		}
 
-		append, err := ac.rootCommandeer.adapter.Appender()
-		if err != nil {
-			return errors.Wrap(err, "failed to create Appender")
-		}
-
-		ref, err := ac.appendMetric(append, lset, tarray, varray, true)
+		_, err = ac.appendMetric(append, lset, tarray, varray, true)
 		if err != nil {
 			return err
 		}
 
-		return append.WaitForReady(ref)
+		_, err = append.WaitForCompletion(0)
+		return err
 	}
 
-	// process a CSV file input
-	data, err := ioutil.ReadFile(ac.inFile)
-	if err != nil {
-		errors.Wrap(err, "cant open/read CSV input file: "+ac.inFile)
+	ac.appendMetrics(append, lset)
+
+	// make sure all writes are committed
+	_, err = append.WaitForCompletion(0)
+
+	if err == nil {
+		fmt.Println("\nDone!")
+	} else {
+		fmt.Printf("operation timed out. Error: %v", err)
 	}
 
-	r := csv.NewReader(bytes.NewReader(data))
+	return err
+}
 
-	records, err := r.ReadAll()
-	if err != nil {
-		errors.Wrap(err, "cant read/process CSV input")
+func (ac *addCommandeer) appendMetrics(append tsdb.Appender, lset utils.Labels) error {
+
+	var fp *os.File
+	var err error
+	if ac.inFile == "" {
+		fp = os.Stdin
+	} else {
+		fp, err = os.Open(ac.inFile)
+		if err != nil {
+			return errors.Wrapf(err, "cant open/read CSV input file: %s", ac.inFile)
+		}
 	}
+	defer fp.Close()
 
-	append, err := ac.rootCommandeer.adapter.Appender()
-	if err != nil {
-		return errors.Wrap(err, "failed to create Appender")
-	}
+	r := csv.NewReader(fp)
 
-	refMap := map[uint64]bool{}
+	for num := 0; true; num++ {
 
-	for num, line := range records {
+		line, err := r.Read()
+		if err != nil {
+			if err == io.EOF {
+				break
+			} else {
+				return errors.Wrap(err, "failed to read CSV record")
+			}
+		}
 
 		// print a dot on every 1000 inserts
 		if num%1000 == 999 {
@@ -178,27 +203,13 @@ func (ac *addCommandeer) add() error {
 			return err
 		}
 
-		ref, err := ac.appendMetric(append, lset, tarray, varray, false)
+		_, err = ac.appendMetric(append, lset, tarray, varray, false)
 		if err != nil {
 			return err
 		}
 
-		refMap[ref] = true
 	}
-	fmt.Println("\nDone!")
 
-	// make sure all writes are committed
-	return ac.waitForWrites(append, &refMap)
-}
-
-func (ac *addCommandeer) waitForWrites(append tsdb.Appender, refMap *map[uint64]bool) error {
-
-	for ref, _ := range *refMap {
-		err := append.WaitForReady(ref)
-		if err != nil {
-			return err
-		}
-	}
 	return nil
 }
 
@@ -256,20 +267,13 @@ func strToTV(tarr, varr string) ([]int64, []float64, error) {
 		return nil, nil, errors.New("time and value arrays must have the same number of elements")
 	}
 
-	tarray := []int64{}
-	varray := []float64{}
+	var tarray []int64
+	var varray []float64
 
 	for i := 0; i < len(vlist); i++ {
-
-		var v float64
-		var err error
-		if vlist[i] == "NaN" {
-			v = math.NaN()
-		} else {
-			v, err = strconv.ParseFloat(vlist[i], 64)
-			if err != nil {
-				return nil, nil, errors.Wrap(err, "not a valid float value")
-			}
+		v, err := strconv.ParseFloat(vlist[i], 64)
+		if err != nil {
+			return nil, nil, errors.WithStack(err)
 		}
 
 		varray = append(varray, v)
@@ -286,7 +290,7 @@ func strToTV(tarr, varr string) ([]int64, []float64, error) {
 			} else if strings.HasPrefix(tstr, "now-") {
 				t, err := utils.Str2duration(tstr[4:])
 				if err != nil {
-					return nil, nil, errors.Wrap(err, "not a valid time 'now-??', 'now' need to follow with nn[s|h|m|d]")
+					return nil, nil, errors.Wrap(err, "could not parse pattern following 'now-'")
 				}
 				tarray = append(tarray, now-int64(t))
 			} else {

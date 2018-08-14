@@ -32,11 +32,9 @@ import (
 	"github.com/v3io/v3io-tsdb/pkg/partmgr"
 	"github.com/v3io/v3io-tsdb/pkg/querier"
 	"github.com/v3io/v3io-tsdb/pkg/utils"
+	pathUtil "path"
 	"time"
 )
-
-const DB_VERSION = "1.0"
-const DB_CONFIG_PATH = "/dbconfig.json"
 
 type V3ioAdapter struct {
 	startTimeMargin int64
@@ -47,7 +45,7 @@ type V3ioAdapter struct {
 	partitionMngr   *partmgr.PartitionManager
 }
 
-func CreateTSDB(v3iocfg *config.V3ioConfig, dbconfig *config.DBPartConfig) error {
+func CreateTSDB(v3iocfg *config.V3ioConfig, schema *config.Schema) error {
 
 	logger, _ := utils.NewLogger(v3iocfg.Verbose)
 	container, err := utils.CreateContainer(
@@ -56,21 +54,18 @@ func CreateTSDB(v3iocfg *config.V3ioConfig, dbconfig *config.DBPartConfig) error
 		return errors.Wrap(err, "Failed to create data container")
 	}
 
-	dbconfig.Signature = "TSDB"
-	dbconfig.Version = DB_VERSION
-
-	data, err := json.Marshal(dbconfig)
+	data, err := json.Marshal(schema)
 	if err != nil {
-		return errors.Wrap(err, "Failed to Marshal DB config")
+		return errors.Wrap(err, "Failed to Marshal schema file")
 	}
 
 	// check if the config file already exist, abort if it does
-	_, err = container.Sync.GetObject(&v3io.GetObjectInput{Path: v3iocfg.Path + DB_CONFIG_PATH})
+	_, err = container.Sync.GetObject(&v3io.GetObjectInput{Path: pathUtil.Join(v3iocfg.Path, config.SCHEMA_CONFIG)})
 	if err == nil {
 		return fmt.Errorf("TSDB already exist in path: " + v3iocfg.Path)
 	}
 
-	err = container.Sync.PutObject(&v3io.PutObjectInput{Path: v3iocfg.Path + DB_CONFIG_PATH, Body: data})
+	err = container.Sync.PutObject(&v3io.PutObjectInput{Path: pathUtil.Join(v3iocfg.Path, config.SCHEMA_CONFIG), Body: data})
 
 	return err
 }
@@ -106,7 +101,7 @@ func NewV3ioAdapter(cfg *config.V3ioConfig, container *v3io.Container, logger lo
 	return &newV3ioAdapter, err
 }
 
-func (a *V3ioAdapter) GetDBConfig() *config.DBPartConfig {
+func (a *V3ioAdapter) GetSchema() *config.Schema {
 	return a.partitionMngr.GetConfig()
 }
 
@@ -120,23 +115,22 @@ func (a *V3ioAdapter) GetContainer() (*v3io.Container, string) {
 
 func (a *V3ioAdapter) connect() error {
 
-	fullpath := a.cfg.V3ioUrl + "/" + a.cfg.Container + "/" + a.cfg.Path
-	resp, err := a.container.Sync.GetObject(&v3io.GetObjectInput{Path: a.cfg.Path + "/dbconfig.json"})
+	fullpath := pathUtil.Join(a.cfg.V3ioUrl, a.cfg.Container, a.cfg.Path)
+	resp, err := a.container.Sync.GetObject(&v3io.GetObjectInput{Path: pathUtil.Join(a.cfg.Path, config.SCHEMA_CONFIG)})
 	if err != nil {
-		return errors.Wrap(err, "Failed to read DB config at path: "+fullpath)
+		return errors.Wrap(err, "Failed to read schema at path: "+fullpath)
 	}
 
-	dbcfg := config.DBPartConfig{}
-	err = json.Unmarshal(resp.Body(), &dbcfg)
+	schema := config.Schema{}
+	err = json.Unmarshal(resp.Body(), &schema)
 	if err != nil {
-		return errors.Wrap(err, "Failed to Unmarshal DB config at path: "+fullpath)
+		return errors.Wrap(err, "Failed to Unmarshal schema at path: "+fullpath)
 	}
 
-	if dbcfg.Signature != "TSDB" {
-		return fmt.Errorf("Bad TSDB signature at path %s", fullpath)
+	a.partitionMngr, err = partmgr.NewPartitionMngr(&schema, a.cfg.Path, a.container)
+	if err != nil {
+		return errors.Wrap(err, "Failed to init DB partition manager at path: "+fullpath)
 	}
-
-	a.partitionMngr = partmgr.NewPartitionMngr(&dbcfg, a.cfg.Path)
 	err = a.partitionMngr.Init()
 	if err != nil {
 		return errors.Wrap(err, "Failed to init DB partition manager at path: "+fullpath)
@@ -145,14 +139,21 @@ func (a *V3ioAdapter) connect() error {
 	msg := "Starting V3IO TSDB client, server is at : " + fullpath
 	a.logger.Info(msg)
 
-	a.MetricsCache = appender.NewMetricsCache(a.container, a.logger, a.cfg, a.partitionMngr)
+	return nil
+}
+
+func (a *V3ioAdapter) InitAppenderCache() error {
+	if a.MetricsCache == nil {
+		a.MetricsCache = appender.NewMetricsCache(a.container, a.logger, a.cfg, a.partitionMngr)
+		return a.MetricsCache.Start()
+	}
 
 	return nil
 }
 
 // Create an appender interface, for writing metrics
 func (a *V3ioAdapter) Appender() (Appender, error) {
-	err := a.MetricsCache.StartIfNeeded()
+	err := a.InitAppenderCache()
 	if err != nil {
 		return nil, err
 	}
@@ -175,10 +176,21 @@ func (a *V3ioAdapter) Querier(_ context.Context, mint, maxt int64) (*querier.V3i
 	return querier.NewV3ioQuerier(a.container, a.logger, mint, maxt, a.cfg, a.partitionMngr), nil
 }
 
-func (a *V3ioAdapter) DeleteDB(config bool, force bool) error {
-
-	path := a.partitionMngr.GetHead().GetPath()
-	a.logger.Info("Delete partition %s", path)
+func (a *V3ioAdapter) DeleteDB(configExists bool, force bool, fromTime int64, toTime int64) error {
+	partitions := a.partitionMngr.PartsForRange(fromTime, toTime)
+	for _, part := range partitions {
+		if toTime == 0 || part.GetEndTime() < toTime {
+			a.logger.Info("Delete partition %s", part.GetTablePath())
+			err := utils.DeleteTable(a.container, part.GetTablePath(), "", a.cfg.QryWorkers)
+			if err != nil && !force {
+				return err
+			}
+			// delete the Directory object
+			a.container.Sync.DeleteObject(&v3io.DeleteObjectInput{Path: part.GetTablePath()})
+		}
+	}
+	path := a.cfg.Path + "/names/"
+	a.logger.Info("Delete metric names in path %s", path)
 	err := utils.DeleteTable(a.container, path, "", a.cfg.QryWorkers)
 	if err != nil && !force {
 		return err
@@ -186,20 +198,12 @@ func (a *V3ioAdapter) DeleteDB(config bool, force bool) error {
 	// delete the Directory object
 	a.container.Sync.DeleteObject(&v3io.DeleteObjectInput{Path: path})
 
-	path = a.cfg.Path + "/names/"
-	a.logger.Info("Delete metric names in path %s", path)
-	err = utils.DeleteTable(a.container, path, "", a.cfg.QryWorkers)
-	if err != nil && !force {
-		return err
-	}
-	// delete the Directory object
-	a.container.Sync.DeleteObject(&v3io.DeleteObjectInput{Path: path})
-
-	if config {
-		a.logger.Info("Delete TSDB config in path %s", a.cfg.Path+DB_CONFIG_PATH)
-		err = a.container.Sync.DeleteObject(&v3io.DeleteObjectInput{Path: a.cfg.Path + DB_CONFIG_PATH})
+	if configExists {
+		schemaPath := pathUtil.Join(a.cfg.Path, config.SCHEMA_CONFIG)
+		a.logger.Info("Delete TSDB config in path %s", schemaPath)
+		err = a.container.Sync.DeleteObject(&v3io.DeleteObjectInput{Path: schemaPath})
 		if err != nil && !force {
-			return errors.New("Cant delete config or not found in " + a.cfg.Path + DB_CONFIG_PATH)
+			return errors.New("Cant delete config or not found in " + schemaPath)
 		}
 		// delete the Directory object
 		a.container.Sync.DeleteObject(&v3io.DeleteObjectInput{Path: a.cfg.Path + "/"})
@@ -210,19 +214,21 @@ func (a *V3ioAdapter) DeleteDB(config bool, force bool) error {
 
 // return number of objects in a table
 func (a *V3ioAdapter) CountMetrics(part string) (int, error) {
-
-	input := v3io.GetItemsInput{Path: a.partitionMngr.GetHead().GetPath(), AttributeNames: []string{"__size"}}
-	iter, err := utils.NewAsyncItemsCursor(a.container, &input, a.cfg.QryWorkers)
-	if err != nil {
-		return 0, err
-	}
-
 	count := 0
-	for iter.Next() {
-		count++
-	}
-	if iter.Err() != nil {
-		return count, errors.Wrap(iter.Err(), "failed on count iterator")
+	partitions := a.partitionMngr.GetPartitions()
+	for _, part := range partitions {
+		input := v3io.GetItemsInput{Path: part.GetTablePath(), Filter: "", AttributeNames: []string{"__size"}}
+		iter, err := utils.NewAsyncItemsCursor(a.container, &input, a.cfg.QryWorkers, []string{})
+		if err != nil {
+			return 0, err
+		}
+
+		for iter.Next() {
+			count++
+		}
+		if iter.Err() != nil {
+			return count, errors.Wrap(iter.Err(), "failed on count iterator")
+		}
 	}
 
 	return count, nil
@@ -242,9 +248,9 @@ func (a v3ioAppender) AddFast(lset utils.Labels, ref uint64, t int64, v float64)
 	return a.metricsCache.AddFast(ref, t, v)
 }
 
-// faster Add using refID obtained from Add (avoid some hash/lookup overhead)
-func (a v3ioAppender) WaitForReady(ref uint64) error {
-	return a.metricsCache.WaitForReady(ref)
+// wait for completion of all updates
+func (a v3ioAppender) WaitForCompletion(timeout time.Duration) (int, error) {
+	return a.metricsCache.WaitForCompletion(timeout)
 }
 
 // in V3IO all ops a committed (no client cache)
@@ -255,7 +261,7 @@ func (a v3ioAppender) Rollback() error { return nil }
 type Appender interface {
 	Add(l utils.Labels, t int64, v float64) (uint64, error)
 	AddFast(l utils.Labels, ref uint64, t int64, v float64) error
-	WaitForReady(ref uint64) error
+	WaitForCompletion(timeout time.Duration) (int, error)
 	Commit() error
 	Rollback() error
 }
