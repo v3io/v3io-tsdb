@@ -227,7 +227,8 @@ func (p *DBPartition) GetShardingKeys(name string) []string {
 	shardingKeysNum := p.manager.cfg.TableSchemaInfo.ShardingBuckets
 	var res = make([]string, 0, shardingKeysNum)
 	for i := 0; i < shardingKeysNum; i++ {
-		res = append(res, fmt.Sprintf("%s_%x", name, i))
+		// Trailing dot for rangescan queries
+		res = append(res, fmt.Sprintf("%s_%x.", name, i))
 	}
 
 	return res
