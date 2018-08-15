@@ -181,7 +181,7 @@ func (a *V3ioAdapter) DeleteDB(configExists bool, force bool, fromTime int64, to
 	for _, part := range partitions {
 		if toTime == 0 || part.GetEndTime() < toTime {
 			a.logger.Info("Delete partition %s", part.GetTablePath())
-			err := utils.DeleteTable(a.container, part.GetTablePath(), "", a.cfg.QryWorkers)
+			err := utils.DeleteTable(a.logger, a.container, part.GetTablePath(), "", a.cfg.QryWorkers)
 			if err != nil && !force {
 				return err
 			}
@@ -191,7 +191,7 @@ func (a *V3ioAdapter) DeleteDB(configExists bool, force bool, fromTime int64, to
 	}
 	path := a.cfg.Path + "/names/"
 	a.logger.Info("Delete metric names in path %s", path)
-	err := utils.DeleteTable(a.container, path, "", a.cfg.QryWorkers)
+	err := utils.DeleteTable(a.logger, a.container, path, "", a.cfg.QryWorkers)
 	if err != nil && !force {
 		return err
 	}
@@ -218,7 +218,7 @@ func (a *V3ioAdapter) CountMetrics(part string) (int, error) {
 	partitions := a.partitionMngr.GetPartitions()
 	for _, part := range partitions {
 		input := v3io.GetItemsInput{Path: part.GetTablePath(), Filter: "", AttributeNames: []string{"__size"}}
-		iter, err := utils.NewAsyncItemsCursor(a.container, &input, a.cfg.QryWorkers, []string{})
+		iter, err := utils.NewAsyncItemsCursor(a.container, &input, a.cfg.QryWorkers, []string{}, a.logger)
 		if err != nil {
 			return 0, err
 		}

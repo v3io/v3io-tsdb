@@ -139,7 +139,7 @@ func (q *V3ioQuerier) LabelValues(name string) ([]string, error) {
 
 	list := []string{}
 	input := v3io.GetItemsInput{Path: q.cfg.Path + "/names/", AttributeNames: []string{"__name"}, Filter: ""}
-	iter, err := utils.NewAsyncItemsCursor(q.container, &input, q.cfg.QryWorkers, []string{})
+	iter, err := utils.NewAsyncItemsCursor(q.container, &input, q.cfg.QryWorkers, []string{}, q.logger)
 	q.logger.DebugWith("GetItems to read names", "input", input, "err", err)
 	if err != nil {
 		return list, err
