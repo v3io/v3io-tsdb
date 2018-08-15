@@ -144,7 +144,8 @@ func (ic *AsyncItemsCursor) NextItem() (v3io.Item, error) {
 	resp := <-ic.responseChan
 
 	// Ignore 404s
-	if resp.Error != nil && strings.Contains(resp.Error.Error(), "404") {
+	// TODO: use response status code once it will be return from 'v3io-go-http'
+	if resp.Error != nil && strings.Contains(resp.Error.Error(), "status 404") {
 		fmt.Println("Got 404", resp.Error, "input:", resp.Request().Input)
 		ic.lastShards++
 		return ic.NextItem()
