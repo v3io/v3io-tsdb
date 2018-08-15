@@ -25,6 +25,7 @@ import (
 	"github.com/nuclio/logger"
 	"github.com/pkg/errors"
 	"github.com/v3io/v3io-go-http"
+	"strings"
 )
 
 type ItemsCursor interface {
@@ -73,7 +74,6 @@ func NewAsyncItemsCursor(
 				Path: input.Path, AttributeNames: input.AttributeNames, Filter: input.Filter,
 				ShardingKey: shardingKeys[i]}
 			_, err := container.GetItems(&input, 0, newAsyncItemsCursor.responseChan)
-
 			if err != nil {
 				return nil, err
 			}
@@ -131,7 +131,6 @@ func (ic *AsyncItemsCursor) NextItem() (v3io.Item, error) {
 		// next time we'll give next item
 		ic.itemIndex++
 		ic.Cnt++
-
 		return ic.currentItem, nil
 	}
 
@@ -143,6 +142,14 @@ func (ic *AsyncItemsCursor) NextItem() (v3io.Item, error) {
 
 	// Read response from channel
 	resp := <-ic.responseChan
+
+	// Ignore 404s
+	// TODO: use response status code once it will be return from 'v3io-go-http'
+	if resp.Error != nil && strings.Contains(resp.Error.Error(), "status 404") {
+		fmt.Println("Got 404", resp.Error, "input:", resp.Request().Input)
+		ic.lastShards++
+		return ic.NextItem()
+	}
 	if resp.Error != nil {
 		fmt.Println("error reading from response channel:", resp, "error", resp.Error, "request:", resp.Request().Input)
 		return nil, errors.Wrap(resp.Error, "Failed to get next items")

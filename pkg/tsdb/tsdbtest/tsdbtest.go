@@ -166,7 +166,7 @@ func CreateSchema(t testing.TB, agg string) config.Schema {
 	tableSchema := config.TableSchema{
 		Version:             0,
 		RollupLayers:        []config.Rollup{defaultRollup},
-		ShardingBuckets:     1,
+		ShardingBuckets:     8,
 		PartitionerInterval: "2d",
 		ChunckerInterval:    "1h",
 	}
