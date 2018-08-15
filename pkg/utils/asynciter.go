@@ -53,7 +53,7 @@ type AsyncItemsCursor struct {
 
 func NewAsyncItemsCursor(
 	container *v3io.Container, input *v3io.GetItemsInput,
-	workers int, shardingKeys []string) (*AsyncItemsCursor, error) {
+	workers int, shardingKeys []string, logger logger.Logger) (*AsyncItemsCursor, error) {
 
 	// TODO: use workers from Context.numWorkers (if no ShardingKey)
 	if workers == 0 || input.ShardingKey != "" {
@@ -65,6 +65,7 @@ func NewAsyncItemsCursor(
 		input:        input,
 		responseChan: make(chan *v3io.Response, 1000),
 		workers:      workers,
+		logger:       logger.GetChild("AsyncItemsCursor"),
 	}
 
 	if len(shardingKeys) > 0 {
@@ -144,9 +145,9 @@ func (ic *AsyncItemsCursor) NextItem() (v3io.Item, error) {
 	resp := <-ic.responseChan
 
 	// Ignore 404s
-	// TODO: use response status code once it will be return from 'v3io-go-http'
+	// TODO: use response status code once it will be returned from 'v3io-go-http'
 	if resp.Error != nil && strings.Contains(resp.Error.Error(), "status 404") {
-		fmt.Println("Got 404", resp.Error, "input:", resp.Request().Input)
+		ic.logger.DebugWith("Got 404", "error", resp.Error, "input:", resp.Request().Input)
 		ic.lastShards++
 		return ic.NextItem()
 	}
