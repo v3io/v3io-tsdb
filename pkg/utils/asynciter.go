@@ -21,7 +21,6 @@ such restriction.
 package utils
 
 import (
-	"fmt"
 	"github.com/nuclio/logger"
 	"github.com/pkg/errors"
 	"github.com/v3io/v3io-go-http"
@@ -147,12 +146,12 @@ func (ic *AsyncItemsCursor) NextItem() (v3io.Item, error) {
 	// Ignore 404s
 	// TODO: use response status code once it will be returned from 'v3io-go-http'
 	if resp.Error != nil && strings.Contains(resp.Error.Error(), "status 404") {
-		ic.logger.DebugWith("Got 404", "error", resp.Error, "input:", resp.Request().Input)
+		ic.logger.Debug("Got 404 - error: %v, request: %v", resp.Error, resp.Request().Input)
 		ic.lastShards++
 		return ic.NextItem()
 	}
 	if resp.Error != nil {
-		fmt.Println("error reading from response channel:", resp, "error", resp.Error, "request:", resp.Request().Input)
+		ic.logger.Warn("error reading from response channel: %v, error: %v, request: %v", resp, resp.Error, resp.Request().Input)
 		return nil, errors.Wrap(resp.Error, "Failed to get next items")
 	}
 
