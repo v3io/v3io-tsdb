@@ -75,8 +75,7 @@ func (a *FloatAggregator) UpdateExpr(col string, bucket int) string {
 }
 
 func (a *FloatAggregator) InitExpr(col string, buckets int) string {
-	// TODO: consider adding default init value per aggregator
-	return fmt.Sprintf("_%s_%s=init_array(%d,'double', %f);", col, a.attr, buckets, a.val)
+	return fmt.Sprintf("_%s_%s=init_array(%d,'double',%f);", col, a.attr, buckets, a.val)
 }
 
 // Sum Aggregator
