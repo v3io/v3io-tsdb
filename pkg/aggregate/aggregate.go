@@ -148,13 +148,13 @@ func NewAggregatorList(aggrType AggrType) *AggregatorList {
 		list = append(list, &SqrAggregator{FloatAggregator{attr: "sqr"}})
 	}
 	if (aggrType & aggrTypeMin) != 0 {
-		list = append(list, &MinAggregator{FloatAggregator{attr: "min", val: math.MaxFloat64}}) // TODO: use math.Inf(1)
+		list = append(list, &MinAggregator{FloatAggregator{attr: "min", val: math.Inf(1)}})
 	}
 	if (aggrType & aggrTypeMax) != 0 {
-		list = append(list, &MaxAggregator{FloatAggregator{attr: "max", val: -math.MaxFloat64}}) // TODO: use math.Inf(-1)
+		list = append(list, &MaxAggregator{FloatAggregator{attr: "max", val: math.Inf(-1)}})
 	}
 	if (aggrType & aggrTypeLast) != 0 {
-		list = append(list, &LastAggregator{FloatAggregator{attr: "last"}, 0})
+		list = append(list, &LastAggregator{FloatAggregator{attr: "last", val: math.Inf(-1)}, 0})
 	}
 	return &list
 }

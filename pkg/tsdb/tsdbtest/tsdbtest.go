@@ -143,7 +143,7 @@ func ValidateCountOfSamples(t testing.TB, adapter *V3ioAdapter, metricName strin
 	}
 
 	if expected != actual {
-		t.Fatalf("Check failed: actual result is not as expected (%d != %d)", expected, actual)
+		t.Fatalf("Check failed: actual result is not as expected [%d(actual) != %d(expected)]", actual, expected)
 	}
 }
 
