@@ -82,20 +82,20 @@ func (cc *createCommandeer) create() error {
 	}
 
 	if err := cc.validateFormat(cc.partitionInterval); err != nil {
-		return errors.Wrap(err, "Failed to parse partition interval")
+		return errors.Wrap(err, "failed to parse partition interval")
 	}
 
 	if err := cc.validateFormat(cc.chunkInterval); err != nil {
-		return errors.Wrap(err, "Failed to parse chunk interval")
+		return errors.Wrap(err, "failed to parse chunk interval")
 	}
 
 	if err := cc.validateFormat(cc.rollupInterval); err != nil {
-		return errors.Wrap(err, "Failed to parse rollup interval")
+		return errors.Wrap(err, "failed to parse rollup interval")
 	}
 
 	rollups, err := aggregate.AggregatorsToStringList(cc.defaultRollups)
 	if err != nil {
-		return errors.Wrap(err, "Failed to parse default rollups")
+		return errors.Wrap(err, "failed to parse default rollups")
 	}
 
 	defaultRollup := config.Rollup{
@@ -116,7 +116,7 @@ func (cc *createCommandeer) create() error {
 
 	fields, err := aggregate.SchemaFieldFromString(rollups, "v")
 	if err != nil {
-		return errors.Wrap(err, "Failed to create aggregators list")
+		return errors.Wrap(err, "failed to create aggregators list")
 	}
 	fields = append(fields, config.SchemaField{Name: "_name", Type: "string", Nullable: false, Items: ""})
 
