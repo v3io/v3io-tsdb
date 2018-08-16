@@ -136,15 +136,18 @@ func (ac *addCommandeer) add() error {
 		return err
 	}
 
-	ac.appendMetrics(append, lset)
+	err = ac.appendMetrics(append, lset)
+	if err != nil {
+		return err
+	}
 
 	// make sure all writes are committed
 	_, err = append.WaitForCompletion(0)
 
 	if err == nil {
-		fmt.Println("\nDone!")
+		ac.rootCommandeer.logger.Info("Done!")
 	} else {
-		fmt.Printf("operation timed out. Error: %v", err)
+		return errors.Wrap(err, "operation timed out")
 	}
 
 	return err
@@ -159,7 +162,7 @@ func (ac *addCommandeer) appendMetrics(append tsdb.Appender, lset utils.Labels) 
 	} else {
 		fp, err = os.Open(ac.inFile)
 		if err != nil {
-			return errors.Wrapf(err, "cant open/read CSV input file: %s", ac.inFile)
+			return errors.Wrapf(err, "failed to open CSV")
 		}
 	}
 	defer fp.Close()
