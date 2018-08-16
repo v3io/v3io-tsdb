@@ -73,7 +73,7 @@ func (s *V3ioSeriesSet) getItems(partition *partmgr.DBPartition, name, filter st
 
 	s.logger.DebugWith("Select - GetItems", "path", path, "attr", attrs, "filter", filter, "name", name)
 	input := v3io.GetItemsInput{Path: path, AttributeNames: attrs, Filter: filter, ShardingKey: name}
-	iter, err := utils.NewAsyncItemsCursor(container, &input, workers, shardingKeys)
+	iter, err := utils.NewAsyncItemsCursor(container, &input, workers, shardingKeys, s.logger)
 	if err != nil {
 		return err
 	}
