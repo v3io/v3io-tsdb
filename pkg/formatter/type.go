@@ -43,8 +43,7 @@ func (f baseFormatter) timeString(t int64) string {
 	if f.cfg.TimeFormat == "" {
 		return strconv.Itoa(int(t))
 	}
-
-	return time.Unix(t/1000, 0).Format(f.cfg.TimeFormat)
+	return time.Unix(t/1000, 0).UTC().Format(f.cfg.TimeFormat)
 }
 
 func labelsToStr(labels utils.Labels) (string, string) {
