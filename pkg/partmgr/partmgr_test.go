@@ -54,7 +54,7 @@ func TestCreateNewPartition(tst *testing.T) {
 
 func createSchema() *config.Schema {
 	defaultRollup := config.Rollup{
-		Aggregators:            "max",
+		Aggregators:            []string{"max"},
 		AggregatorsGranularity: "1h",
 		StorageClass:           "local",
 		SampleRetention:        0,
