@@ -128,7 +128,7 @@ func (p *PartitionManager) TimeToPart(t int64) (*DBPartition, error) {
 		return p.headPartition, err
 	} else {
 		if t >= p.headPartition.startTime {
-			if (t - p.headPartition.startTime) > p.currentPartitionInterval {
+			if (t - p.headPartition.startTime) >= p.currentPartitionInterval {
 				_, err := p.createNewPartition(p.headPartition.startTime + p.currentPartitionInterval)
 				if err != nil {
 					return nil, err
@@ -144,9 +144,13 @@ func (p *PartitionManager) TimeToPart(t int64) (*DBPartition, error) {
 					return p.partitions[i], nil
 				}
 			}
+			head := p.headPartition
+			part, _ := p.createNewPartition(p.currentPartitionInterval * (t / p.currentPartitionInterval))
+			p.headPartition = head
+			return part, nil
 		}
 	}
-	return p.headPartition, nil
+	return nil, nil
 }
 
 func (p *PartitionManager) createNewPartition(t int64) (*DBPartition, error) {
@@ -157,8 +161,19 @@ func (p *PartitionManager) createNewPartition(t int64) (*DBPartition, error) {
 		return nil, err
 	}
 	p.currentPartitionInterval = partition.partitionInterval
-	p.headPartition = partition
-	p.partitions = append(p.partitions, partition)
+	if p.headPartition == nil || time > p.headPartition.startTime {
+		p.headPartition = partition
+		p.partitions = append(p.partitions, partition)
+	} else {
+		for i, part := range p.partitions {
+			if part.startTime > time {
+				p.partitions = append(p.partitions, nil)
+				copy(p.partitions[i+1:], p.partitions[i:])
+				p.partitions[i] = partition
+				break
+			}
+		}
+	}
 	err = p.updatePartitionInSchema(partition)
 	return partition, err
 }
@@ -169,7 +184,9 @@ func (p *PartitionManager) updatePartitionInSchema(partition *DBPartition) error
 	if err != nil {
 		return errors.Wrap(err, "Failed to update new partition in schema file")
 	}
-	err = p.container.Sync.PutObject(&v3io.PutObjectInput{Path: path.Join(p.path, config.SCHEMA_CONFIG), Body: data})
+	if p.container != nil {
+		err = p.container.Sync.PutObject(&v3io.PutObjectInput{Path: path.Join(p.path, config.SCHEMA_CONFIG), Body: data})
+	}
 	return err
 }
 
