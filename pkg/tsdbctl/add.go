@@ -143,14 +143,12 @@ func (ac *addCommandeer) add() error {
 
 	// make sure all writes are committed
 	_, err = append.WaitForCompletion(0)
-
-	if err == nil {
-		ac.rootCommandeer.logger.Info("Done!")
-	} else {
+	if err != nil {
 		return errors.Wrap(err, "operation timed out")
 	}
 
-	return err
+	ac.rootCommandeer.logger.Info("Done!")
+	return nil
 }
 
 func (ac *addCommandeer) appendMetrics(append tsdb.Appender, lset utils.Labels) error {
