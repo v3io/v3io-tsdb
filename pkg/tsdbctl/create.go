@@ -28,7 +28,6 @@ import (
 	"github.com/v3io/v3io-tsdb/pkg/config"
 	"github.com/v3io/v3io-tsdb/pkg/tsdb"
 	"strconv"
-	"strings"
 )
 
 const schemaVersion = 0
@@ -94,8 +93,13 @@ func (cc *createCommandeer) create() error {
 		return errors.Wrap(err, "Failed to parse rollup interval")
 	}
 
+	rollups, err := aggregate.AggregatorsToStringList(cc.defaultRollups)
+	if err != nil {
+		return errors.Wrap(err, "Failed to parse default rollups")
+	}
+
 	defaultRollup := config.Rollup{
-		Aggregators:            cc.defaultRollups,
+		Aggregators:            rollups,
 		AggregatorsGranularity: cc.rollupInterval,
 		StorageClass:           defaultStorageClass,
 		SampleRetention:        cc.sampleRetention,
@@ -110,8 +114,7 @@ func (cc *createCommandeer) create() error {
 		ChunckerInterval:    cc.chunkInterval,
 	}
 
-	aggrs := strings.Split(cc.defaultRollups, ",")
-	fields, err := aggregate.SchemaFieldFromString(aggrs, "v")
+	fields, err := aggregate.SchemaFieldFromString(rollups, "v")
 	if err != nil {
 		return errors.Wrap(err, "Failed to create aggregators list")
 	}
@@ -119,7 +122,7 @@ func (cc *createCommandeer) create() error {
 
 	partitionSchema := config.PartitionSchema{
 		Version:                tableSchema.Version,
-		Aggregators:            aggrs,
+		Aggregators:            rollups,
 		AggregatorsGranularity: cc.rollupInterval,
 		StorageClass:           defaultStorageClass,
 		SampleRetention:        cc.sampleRetention,
