@@ -56,8 +56,8 @@ type V3ioConfig struct {
 }
 
 type Rollup struct {
-	Aggregators            string `json:"aggregators"`
-	AggregatorsGranularity string `json:"aggregatorsGranularity"`
+	Aggregators            []string `json:"aggregators"`
+	AggregatorsGranularity string   `json:"aggregatorsGranularity"`
 	//["cloud","local"] for the aggregators and sample chucks
 	StorageClass string `json:"storageClass"`
 	//in hours. 0  means no need to save samples
