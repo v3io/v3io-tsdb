@@ -155,8 +155,12 @@ func NormalizePath(path string) string {
 }
 
 func CreateSchema(t testing.TB, agg string) config.Schema {
+	rollups, err := aggregate.AggregatorsToStringList(agg)
+	if err != nil {
+		t.Fatal(err)
+	}
 	defaultRollup := config.Rollup{
-		Aggregators:            agg,
+		Aggregators:            rollups,
 		AggregatorsGranularity: "1h",
 		StorageClass:           "local",
 		SampleRetention:        0,
@@ -171,8 +175,7 @@ func CreateSchema(t testing.TB, agg string) config.Schema {
 		ChunckerInterval:    "1h",
 	}
 
-	aggrs := []string{"*"}
-	fields, err := aggregate.SchemaFieldFromString(aggrs, "v")
+	fields, err := aggregate.SchemaFieldFromString(rollups, "v")
 	if err != nil {
 		t.Fatal("Failed to create aggregators list", err)
 	}
@@ -180,7 +183,7 @@ func CreateSchema(t testing.TB, agg string) config.Schema {
 
 	partitionSchema := config.PartitionSchema{
 		Version:                tableSchema.Version,
-		Aggregators:            aggrs,
+		Aggregators:            rollups,
 		AggregatorsGranularity: "1h",
 		StorageClass:           "local",
 		SampleRetention:        0,
