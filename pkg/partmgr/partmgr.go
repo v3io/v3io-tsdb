@@ -124,12 +124,12 @@ func (p *PartitionManager) Init() error {
 func (p *PartitionManager) TimeToPart(t int64) (*DBPartition, error) {
 	if p.headPartition == nil {
 		// Rounding t to the nearest PartitionInterval multiple
-		_, err := p.createNewPartition(p.currentPartitionInterval * (t / p.currentPartitionInterval))
+		_, err := p.createAndUpdatePartition(p.currentPartitionInterval * (t / p.currentPartitionInterval))
 		return p.headPartition, err
 	} else {
 		if t >= p.headPartition.startTime {
 			if (t - p.headPartition.startTime) >= p.currentPartitionInterval {
-				_, err := p.createNewPartition(p.headPartition.startTime + p.currentPartitionInterval)
+				_, err := p.createAndUpdatePartition(p.headPartition.startTime + p.currentPartitionInterval)
 				if err != nil {
 					return nil, err
 				}
@@ -145,15 +145,14 @@ func (p *PartitionManager) TimeToPart(t int64) (*DBPartition, error) {
 				}
 			}
 			head := p.headPartition
-			part, _ := p.createNewPartition(p.currentPartitionInterval * (t / p.currentPartitionInterval))
+			part, _ := p.createAndUpdatePartition(p.currentPartitionInterval * (t / p.currentPartitionInterval))
 			p.headPartition = head
 			return part, nil
 		}
 	}
-	return nil, nil
 }
 
-func (p *PartitionManager) createNewPartition(t int64) (*DBPartition, error) {
+func (p *PartitionManager) createAndUpdatePartition(t int64) (*DBPartition, error) {
 	time := t & 0x7FFFFFFFFFFFFFF0
 	partPath := path.Join(p.path, strconv.FormatInt(time/1000, 10)) + "/"
 	partition, err := NewDBPartition(p, time, partPath)
@@ -184,7 +183,7 @@ func (p *PartitionManager) updatePartitionInSchema(partition *DBPartition) error
 	if err != nil {
 		return errors.Wrap(err, "Failed to update new partition in schema file")
 	}
-	if p.container != nil {
+	if p.container != nil { //tests use case only
 		err = p.container.Sync.PutObject(&v3io.PutObjectInput{Path: path.Join(p.path, config.SCHEMA_CONFIG), Body: data})
 	}
 	return err
