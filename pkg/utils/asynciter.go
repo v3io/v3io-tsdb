@@ -179,9 +179,8 @@ func (ic *AsyncItemsCursor) NextItem() (v3io.Item, error) {
 		input.Marker = getItemsResp.NextMarker
 
 		_, err := ic.container.GetItems(input, input, ic.responseChan)
-
 		if err != nil {
-			return nil, errors.Wrap(resp.Error, "Failed to request next items")
+			return nil, errors.Wrap(err, "Failed to request next items")
 		}
 
 	} else {
