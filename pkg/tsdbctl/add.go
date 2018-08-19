@@ -254,7 +254,7 @@ func strToLabels(name, lbls string) (utils.Labels, error) {
 			}
 
 			if err := utils.IsValidLabelName(splitLbl[0]); err != nil {
-				return nil, errors.Wrap(err, fmt.Sprintf("illegal lable name: '%s'", splitLbl[0]))
+				return nil, errors.Wrap(err, fmt.Sprintf("illegal label name: '%s'", splitLbl[0]))
 			}
 			lset = append(lset, utils.Label{Name: splitLbl[0], Value: splitLbl[1]})
 		}
