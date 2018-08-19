@@ -69,12 +69,13 @@ func NewAsyncItemsCursor(
 
 	if len(shardingKeys) > 0 {
 		newAsyncItemsCursor.workers = len(shardingKeys)
+
 		for i := 0; i < newAsyncItemsCursor.workers; i++ {
 			input := v3io.GetItemsInput{
-				Path: input.Path,
+				Path:           input.Path,
 				AttributeNames: input.AttributeNames,
-				Filter: input.Filter,
-				ShardingKey: shardingKeys[i],
+				Filter:         input.Filter,
+				ShardingKey:    shardingKeys[i],
 			}
 			_, err := container.GetItems(&input, &input, newAsyncItemsCursor.responseChan)
 
@@ -89,11 +90,11 @@ func NewAsyncItemsCursor(
 	for i := 0; i < newAsyncItemsCursor.workers; i++ {
 		newAsyncItemsCursor.totalSegments = workers
 		input := v3io.GetItemsInput{
-			Path: input.Path,
+			Path:           input.Path,
 			AttributeNames: input.AttributeNames,
-			Filter: input.Filter,
-			TotalSegments: newAsyncItemsCursor.totalSegments,
-			Segment: i,
+			Filter:         input.Filter,
+			TotalSegments:  newAsyncItemsCursor.totalSegments,
+			Segment:        i,
 		}
 		_, err := container.GetItems(&input, &input, newAsyncItemsCursor.responseChan)
 
@@ -139,6 +140,7 @@ func (ic *AsyncItemsCursor) NextItem() (v3io.Item, error) {
 		// next time we'll give next item
 		ic.itemIndex++
 		ic.Cnt++
+
 		return ic.currentItem, nil
 	}
 
