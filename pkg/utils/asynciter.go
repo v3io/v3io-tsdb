@@ -71,9 +71,13 @@ func NewAsyncItemsCursor(
 		newAsyncItemsCursor.workers = len(shardingKeys)
 		for i := 0; i < newAsyncItemsCursor.workers; i++ {
 			input := v3io.GetItemsInput{
-				Path: input.Path, AttributeNames: input.AttributeNames, Filter: input.Filter,
-				ShardingKey: shardingKeys[i]}
-			_, err := container.GetItems(&input, 0, newAsyncItemsCursor.responseChan)
+				Path: input.Path,
+				AttributeNames: input.AttributeNames,
+				Filter: input.Filter,
+				ShardingKey: shardingKeys[i],
+			}
+			_, err := container.GetItems(&input, &input, newAsyncItemsCursor.responseChan)
+
 			if err != nil {
 				return nil, err
 			}
@@ -85,9 +89,13 @@ func NewAsyncItemsCursor(
 	for i := 0; i < newAsyncItemsCursor.workers; i++ {
 		newAsyncItemsCursor.totalSegments = workers
 		input := v3io.GetItemsInput{
-			Path: input.Path, AttributeNames: input.AttributeNames, Filter: input.Filter,
-			TotalSegments: newAsyncItemsCursor.totalSegments, Segment: i}
-		_, err := container.GetItems(&input, i, newAsyncItemsCursor.responseChan)
+			Path: input.Path,
+			AttributeNames: input.AttributeNames,
+			Filter: input.Filter,
+			TotalSegments: newAsyncItemsCursor.totalSegments,
+			Segment: i,
+		}
+		_, err := container.GetItems(&input, &input, newAsyncItemsCursor.responseChan)
 
 		if err != nil {
 			// TODO: proper exit, release requests which passed
@@ -156,19 +164,21 @@ func (ic *AsyncItemsCursor) NextItem() (v3io.Item, error) {
 	}
 
 	getItemsResp := resp.Output.(*v3io.GetItemsOutput)
-	shard := resp.Context.(int)
-	resp.Release()
+	defer resp.Release()
 
 	// set the cursor items and reset the item index
 	ic.items = getItemsResp.Items
 	ic.itemIndex = 0
 
 	if !getItemsResp.Last {
+
 		// if not last, make a new request to that shard
-		input := v3io.GetItemsInput{
-			Path: ic.input.Path, AttributeNames: ic.input.AttributeNames, Filter: ic.input.Filter,
-			TotalSegments: ic.totalSegments, Segment: shard, Marker: getItemsResp.NextMarker}
-		_, err := ic.container.GetItems(&input, shard, ic.responseChan)
+		input := resp.Context.(*v3io.GetItemsInput)
+
+		// set next marker
+		input.Marker = getItemsResp.NextMarker
+
+		_, err := ic.container.GetItems(input, input, ic.responseChan)
 
 		if err != nil {
 			return nil, errors.Wrap(resp.Error, "Failed to request next items")
