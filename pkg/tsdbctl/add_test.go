@@ -69,6 +69,30 @@ func (suite *testAddSuite) TestStrToTVInvalidTime() {
 	suite.Require().Error(err)
 }
 
+func (suite *testAddSuite) TestStrToLabelsWithEmptyName() {
+
+	labels, err := strToLabels("", "a=A,b=B")
+
+	suite.Require().Nil(labels)
+	suite.Require().Error(err)
+}
+
+func (suite *testAddSuite) TestStrToLabelsWithIllegalName() {
+
+	labels, err := strToLabels("illegal-name", "a=A,b=B")
+
+	suite.Require().Nil(labels)
+	suite.Require().Error(err)
+}
+
+func (suite *testAddSuite) TestStrToLabelsWithIllegalLabel() {
+
+	labels, err := strToLabels("valid_name", "a=A,b-b=B")
+
+	suite.Require().Nil(labels)
+	suite.Require().Error(err)
+}
+
 func TestAddSuite(t *testing.T) {
 	suite.Run(t, new(testAddSuite))
 }
