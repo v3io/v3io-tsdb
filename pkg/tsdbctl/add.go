@@ -107,7 +107,7 @@ func (ac *addCommandeer) add() error {
 		return err
 	}
 
-	append, err := ac.rootCommandeer.adapter.Appender()
+	appender, err := ac.rootCommandeer.adapter.Appender()
 	if err != nil {
 		return errors.Wrap(err, "failed to create Appender")
 	}
@@ -127,22 +127,22 @@ func (ac *addCommandeer) add() error {
 			return err
 		}
 
-		_, err = ac.appendMetric(append, lset, tarray, varray, true)
+		_, err = ac.appendMetric(appender, lset, tarray, varray, true)
 		if err != nil {
 			return err
 		}
 
-		_, err = append.WaitForCompletion(0)
+		_, err = appender.WaitForCompletion(0)
 		return err
 	}
 
-	err = ac.appendMetrics(append, lset)
+	err = ac.appendMetrics(appender, lset)
 	if err != nil {
 		return err
 	}
 
 	// make sure all writes are committed
-	_, err = append.WaitForCompletion(0)
+	_, err = appender.WaitForCompletion(0)
 	if err != nil {
 		return errors.Wrap(err, "operation timed out")
 	}
@@ -239,6 +239,10 @@ func (ac *addCommandeer) appendMetric(
 
 func strToLabels(name, lbls string) (utils.Labels, error) {
 
+	if err := utils.IsValidMetricName(name); err != nil {
+		return nil, errors.Wrap(err, fmt.Sprintf("illegal metric name: '%s'", name))
+	}
+
 	lset := utils.Labels{utils.Label{Name: "__name__", Value: name}}
 
 	if lbls != "" {
@@ -247,6 +251,10 @@ func strToLabels(name, lbls string) (utils.Labels, error) {
 			splitLbl := strings.Split(l, "=")
 			if len(splitLbl) != 2 {
 				return nil, errors.New("labels must be in the form: key1=label1,key2=label2,...")
+			}
+
+			if err := utils.IsValidLabelName(splitLbl[0]); err != nil {
+				return nil, errors.Wrap(err, fmt.Sprintf("illegal label name: '%s'", splitLbl[0]))
 			}
 			lset = append(lset, utils.Label{Name: splitLbl[0], Value: splitLbl[1]})
 		}
