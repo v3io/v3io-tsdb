@@ -124,7 +124,7 @@ func (cc *checkCommandeer) check() error {
 				iter := chunk.Iterator()
 				for iter.Next() {
 					t, v := iter.At()
-					tstr := time.Unix(int64(t/1000), 0).Format(time.RFC3339)
+					tstr := time.Unix(int64(t/1000), 0).UTC().Format(time.RFC3339)
 					fmt.Printf("unix=%d, t=%s, v=%.4f \n", t, tstr, v)
 					count++
 				}

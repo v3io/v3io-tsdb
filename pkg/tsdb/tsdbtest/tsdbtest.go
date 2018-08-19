@@ -143,7 +143,7 @@ func ValidateCountOfSamples(t testing.TB, adapter *V3ioAdapter, metricName strin
 	}
 
 	if expected != actual {
-		t.Fatalf("Check failed: actual result is not as expected (%d != %d)", expected, actual)
+		t.Fatalf("Check failed: actual result is not as expected [%d(actual) != %d(expected)]", actual, expected)
 	}
 }
 
@@ -155,8 +155,12 @@ func NormalizePath(path string) string {
 }
 
 func CreateSchema(t testing.TB, agg string) config.Schema {
+	rollups, err := aggregate.AggregatorsToStringList(agg)
+	if err != nil {
+		t.Fatal(err)
+	}
 	defaultRollup := config.Rollup{
-		Aggregators:            agg,
+		Aggregators:            rollups,
 		AggregatorsGranularity: "1h",
 		StorageClass:           "local",
 		SampleRetention:        0,
@@ -166,13 +170,12 @@ func CreateSchema(t testing.TB, agg string) config.Schema {
 	tableSchema := config.TableSchema{
 		Version:             0,
 		RollupLayers:        []config.Rollup{defaultRollup},
-		ShardingBuckets:     1,
+		ShardingBuckets:     8,
 		PartitionerInterval: "2d",
 		ChunckerInterval:    "1h",
 	}
 
-	aggrs := []string{"*"}
-	fields, err := aggregate.SchemaFieldFromString(aggrs, "v")
+	fields, err := aggregate.SchemaFieldFromString(rollups, "v")
 	if err != nil {
 		t.Fatal("Failed to create aggregators list", err)
 	}
@@ -180,7 +183,7 @@ func CreateSchema(t testing.TB, agg string) config.Schema {
 
 	partitionSchema := config.PartitionSchema{
 		Version:                tableSchema.Version,
-		Aggregators:            aggrs,
+		Aggregators:            rollups,
 		AggregatorsGranularity: "1h",
 		StorageClass:           "local",
 		SampleRetention:        0,
