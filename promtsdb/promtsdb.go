@@ -89,6 +89,10 @@ func match2filter(oms []*labels.Matcher) (string, string, string) {
 				filter = append(filter, fmt.Sprintf("%s=='%s'", matcher.Name, matcher.Value))
 			case labels.MatchNotEqual:
 				filter = append(filter, fmt.Sprintf("%s!='%s'", matcher.Name, matcher.Value))
+			case labels.MatchRegexp:
+				filter = append(filter, fmt.Sprintf("regexp_instr(%s,'%s') == 0", matcher.Name, matcher.Value))
+			case labels.MatchNotRegexp:
+				filter = append(filter, fmt.Sprintf("regexp_instr(%s,'%s') != 0", matcher.Name, matcher.Value))
 
 			}
 		}
