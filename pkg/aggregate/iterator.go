@@ -238,17 +238,10 @@ func isValidCell(cellIndex int, aSet *AggregateSet) bool {
 		cellIndex < aSet.length
 }
 
-func isValidAggCell(cellIndex int, aSet *AggregateSet, aType AggrType) bool {
-	return cellIndex >= 0 &&
-		cellIndex < len(aSet.dataArrays[aType]) &&
-		// cellIndex < aSet.maxCell &&
-		cellIndex < aSet.length
-}
-
 // function specific aggregation
 func (as *AggregateSet) updateCell(aggr AggrType, cell int, val float64) {
 
-	if !isValidAggCell(cell, as, aggr) {
+	if !isValidCell(cell, as) {
 		return
 	}
 
@@ -275,7 +268,7 @@ func (as *AggregateSet) updateCell(aggr AggrType, cell int, val float64) {
 // return the value per aggregate or complex function
 func (as *AggregateSet) GetCellValue(aggr AggrType, cell int) (float64, bool) {
 
-	if !isValidAggCell(cell, as, aggr) {
+	if !isValidCell(cell, as) {
 		return math.NaN(), false
 	}
 
