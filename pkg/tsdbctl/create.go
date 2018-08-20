@@ -32,9 +32,6 @@ import (
 
 const schemaVersion = 0
 const defaultStorageClass = "local"
-const minimumSampleSize, maximumSampleSize = 2, 8     // bytes
-const maximumPartitionSize = 2000000                  // 2MB
-const minimumChunkSize, maximumChunkSize = 200, 62000 // bytes
 
 type createCommandeer struct {
 	cmd             *cobra.Command
@@ -96,7 +93,7 @@ func (cc *createCommandeer) create() error {
 		return errors.Wrap(err, "failed to parse sample rate")
 	}
 
-	chunkInterval, partitionInterval := calculatePartitionAndChunkInterval(rateInHours)
+	chunkInterval, partitionInterval := cc.calculatePartitionAndChunkInterval(rateInHours)
 
 	defaultRollup := config.Rollup{
 		Aggregators:            rollups,
@@ -152,6 +149,23 @@ func (cc *createCommandeer) validateFormat(format string) error {
 	return nil
 }
 
+func (cc *createCommandeer) calculatePartitionAndChunkInterval(rateInHours int) (string, string) {
+	maxNumberOfEventsPerChunk := cc.rootCommandeer.v3iocfg.MaximumChunkSize / cc.rootCommandeer.v3iocfg.MaximumSampleSize
+	minNumberOfEventsPerChunk := cc.rootCommandeer.v3iocfg.MinimumChunkSize / cc.rootCommandeer.v3iocfg.MinimumSampleSize
+
+	chunkInterval := maxNumberOfEventsPerChunk / rateInHours
+
+	// Make sure the expected chunk size is greater then the supported minimum.
+	for chunkInterval*rateInHours < minNumberOfEventsPerChunk {
+		chunkInterval++
+	}
+
+	actualCapacityOfChunk := chunkInterval * rateInHours * cc.rootCommandeer.v3iocfg.MaximumSampleSize
+	numberOfChunksInPartition := cc.rootCommandeer.v3iocfg.MaximumPartitionSize / actualCapacityOfChunk
+	partitionInterval := numberOfChunksInPartition * chunkInterval
+	return strconv.Itoa(chunkInterval) + "h", strconv.Itoa(partitionInterval) + "h"
+}
+
 func rateToHours(sampleRate string) (int, error) {
 	parsingError := fmt.Errorf(`not a valid rate. Accepted pattern: [0-9]+/[hms]. Examples: 12/m`)
 
@@ -162,42 +176,24 @@ func rateToHours(sampleRate string) (int, error) {
 		return 0, parsingError
 	}
 
-	last := sampleRate[len(sampleRate)-1:]
+	last := sampleRate[len(sampleRate)-1]
 	// get the number ignoring slash and time unit
 	sampleRate = sampleRate[:len(sampleRate)-2]
 	i, err := strconv.Atoi(sampleRate)
 	if err != nil {
-		return 0, parsingError
+		return 0, errors.Wrap(err, "failed to parse rate,  Accepted pattern: [0-9]+/[hms]. Examples: 12/m")
 	}
 	if i <= 0 {
 		return 0, fmt.Errorf("rate should be a positive number")
 	}
 	switch last {
-	case "s":
+	case 's':
 		return i * 60 * 60, nil
-	case "m":
+	case 'm':
 		return i * 60, nil
-	case "h":
+	case 'h':
 		return i, nil
 	default:
 		return 0, parsingError
 	}
-}
-
-// This method calculates the chunk and partition interval from the given sample rate.
-func calculatePartitionAndChunkInterval(rateInHours int) (string, string) {
-	maxNumberOfEventsPerChunk := maximumChunkSize / maximumSampleSize
-	minNumberOfEventsPerChunk := minimumChunkSize / minimumSampleSize
-
-	chunkInterval := maxNumberOfEventsPerChunk / rateInHours
-
-	// Make sure the expected chunk size is greater then the supported minimum.
-	for chunkInterval*rateInHours < minNumberOfEventsPerChunk {
-		chunkInterval++
-	}
-
-	actualCapacityOfChunk := chunkInterval * rateInHours * maximumSampleSize
-	numberOfChunksInPartition := maximumPartitionSize / actualCapacityOfChunk
-	partitionInterval := numberOfChunksInPartition * chunkInterval
-	return strconv.Itoa(chunkInterval) + "h", strconv.Itoa(partitionInterval) + "h"
 }
