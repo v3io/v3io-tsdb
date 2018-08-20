@@ -21,11 +21,11 @@ such restriction.
 package utils
 
 import (
+	"fmt"
 	"github.com/pkg/errors"
 	"strconv"
 	"strings"
 	"time"
-	"fmt"
 )
 
 // convert duration string e.g. 24h to time (unix milisecond)

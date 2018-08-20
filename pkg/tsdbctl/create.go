@@ -29,24 +29,24 @@ import (
 	"github.com/v3io/v3io-tsdb/pkg/tsdb"
 	"strconv"
 	"strings"
-	"github.com/v3io/v3io-tsdb/pkg/utils"
 )
 
 const schemaVersion = 0
 const defaultStorageClass = "local"
+const minimumSampleSize, maximumSampleSize = 2, 8     // bytes
+const maximumPartitionSize = 2000000                  // 2MB
+const minimumChunkSize, maximumChunkSize = 200, 62000 //bytes
 
 type createCommandeer struct {
-	cmd               *cobra.Command
-	rootCommandeer    *RootCommandeer
-	path              string
-	partitionInterval string
-	storageClass      string
-	chunkInterval     string
-	defaultRollups    string
-	rollupInterval    string
-	shardingBuckets   int
-	sampleRetention   int
-	sampleRate        string
+	cmd             *cobra.Command
+	rootCommandeer  *RootCommandeer
+	path            string
+	storageClass    string
+	defaultRollups  string
+	rollupInterval  string
+	shardingBuckets int
+	sampleRetention int
+	sampleRate      string
 }
 
 func newCreateCommandeer(rootCommandeer *RootCommandeer) *createCommandeer {
@@ -64,14 +64,12 @@ func newCreateCommandeer(rootCommandeer *RootCommandeer) *createCommandeer {
 		},
 	}
 
-	cmd.Flags().StringVarP(&commandeer.partitionInterval, "partition-interval", "m", "2d", "time covered per partition")
-	cmd.Flags().StringVarP(&commandeer.chunkInterval, "chunk-interval", "t", "1h", "time in a single chunk")
 	cmd.Flags().StringVarP(&commandeer.defaultRollups, "rollups", "r", "",
 		"Default aggregation rollups, comma seperated: count,avg,sum,min,max,stddev")
 	cmd.Flags().StringVarP(&commandeer.rollupInterval, "rollup-interval", "i", "1h", "aggregation interval")
 	cmd.Flags().IntVarP(&commandeer.shardingBuckets, "sharding-buckets", "b", 1, "number of buckets to split key")
 	cmd.Flags().IntVarP(&commandeer.sampleRetention, "sample-retention", "a", 0, "sample retention in hours")
-	cmd.Flags().StringVarP(&commandeer.sampleRate, "sample-rate", "x", "1/m", "sample rate")
+	cmd.Flags().StringVarP(&commandeer.sampleRate, "sample-rate", "s", "12/m", "sample rate")
 
 	commandeer.cmd = cmd
 
@@ -85,16 +83,13 @@ func (cc *createCommandeer) create() error {
 		return err
 	}
 
-	if err := cc.validateFormat(cc.partitionInterval); err != nil {
-		return errors.Wrap(err, "Failed to parse partition interval")
-	}
-
-	if err := cc.validateFormat(cc.chunkInterval); err != nil {
-		return errors.Wrap(err, "Failed to parse chunk interval")
-	}
-
 	if err := cc.validateFormat(cc.rollupInterval); err != nil {
 		return errors.Wrap(err, "Failed to parse rollup interval")
+	}
+
+	chunkInterval, partitionInterval, err := cc.getPartitionAndChunkInterval()
+	if err != nil {
+		return errors.Wrap(err, "failed to parse sample rate")
 	}
 
 	defaultRollup := config.Rollup{
@@ -105,28 +100,12 @@ func (cc *createCommandeer) create() error {
 		LayerRetentionTime:     "1y", //TODO
 	}
 
-	minimumSampleSize, maximumSampleSize := int64(2), int64(8)   // bytes
-	chunksInPartition := 64
-	minimumChunkSize, maximumChunkSize := 200, 62000   //bytes
-
-	expectedSample, err := utils.Str2duration(cc.sampleRate) // 5m , 1h
-	minimunExpectedSampleSize := expectedSample * minimumSampleSize //
-	maximumExpectedSampleSize := expectedSample * maximumSampleSize
-	
-
-
-	if err != nil {
-		return errors.Wrap(err, "Failed to parse sample-rate")
-	}
-
-	chunkSize := 0
-
 	tableSchema := config.TableSchema{
 		Version:             schemaVersion,
 		RollupLayers:        []config.Rollup{defaultRollup},
 		ShardingBuckets:     cc.shardingBuckets,
-		PartitionerInterval: cc.partitionInterval,
-		ChunckerInterval:    cc.chunkInterval,
+		PartitionerInterval: partitionInterval,
+		ChunckerInterval:    chunkInterval,
 	}
 
 	aggrs := strings.Split(cc.defaultRollups, ",")
@@ -154,7 +133,6 @@ func (cc *createCommandeer) create() error {
 	}
 
 	return tsdb.CreateTSDB(cc.rootCommandeer.v3iocfg, &schema)
-
 }
 
 func (cc *createCommandeer) validateFormat(format string) error {
@@ -167,4 +145,53 @@ func (cc *createCommandeer) validateFormat(format string) error {
 		return fmt.Errorf("format is inncorrect, not part of m,d,h")
 	}
 	return nil
+}
+
+func (cc *createCommandeer) rateInHours() (int, error) {
+	if len(cc.sampleRate) >= 3 {
+		last := cc.sampleRate[len(cc.sampleRate)-1:]
+		// get the number ignoring slash and time unit
+		cc.sampleRate = cc.sampleRate[0 : len(cc.sampleRate)-2]
+		i, err := strconv.Atoi(cc.sampleRate)
+		if err != nil {
+			return 0, errors.Wrap(err, `not a valid rate. Accepted pattern: [0-9]+/[dhms]. Examples: 12/m`)
+		}
+		switch last {
+		case "s":
+			return i * 60 * 60, nil
+		case "m":
+			return i * 60, nil
+		case "h":
+			return i, nil
+		case "d":
+			return i / 24, nil
+		default:
+			return 0, fmt.Errorf(`not a valid rate. Accepted pattern: [0-9]+/[dhms]. Examples: 12/m`)
+		}
+	}
+
+	return 0, fmt.Errorf(`not a valid rate. Accepted pattern: [0-9]+/[dhms]. Examples: 12/m`)
+}
+
+// This method calculates the chunk and partition interval from the given sample rate.
+func (cc *createCommandeer) getPartitionAndChunkInterval() (string, string, error) {
+	maxNumberOfEventsPerChunk := maximumChunkSize / maximumSampleSize
+	minNumberOfEventsPerChunk := minimumChunkSize / minimumSampleSize
+
+	expectedRateInHours, err := cc.rateInHours()
+	if err != nil {
+		return "", "", errors.Wrap(err, "failed to parse sample rate")
+	}
+
+	chunkInterval := maxNumberOfEventsPerChunk / expectedRateInHours
+
+	// Make sure the expected chunk size is greater then the supported minimum.
+	for chunkInterval*expectedRateInHours < minNumberOfEventsPerChunk {
+		chunkInterval++
+	}
+
+	actualCapacityOfChunk := chunkInterval * expectedRateInHours * maximumSampleSize
+	numberOfChunksInPartition := maximumPartitionSize / actualCapacityOfChunk
+	partitionInterval := numberOfChunksInPartition * chunkInterval
+	return strconv.Itoa(chunkInterval) + "h", strconv.Itoa(partitionInterval) + "h", nil
 }
