@@ -18,15 +18,15 @@ get:
 	go get -v -t -tags "unit integration" $(TOPLEVEL_DIRS)
 
 .PHONY: test
-test:
+test: get
 	go test -race -tags unit -count 1 $(TOPLEVEL_DIRS)
 
 .PHONY: integration
-integration:
+integration: get
 	go test -race -tags integration -p 1 -count 1 $(TOPLEVEL_DIRS) # p=1 to force Go to run pkg tests serially.
 
 .PHONY: build
-build:
+build: get
 	go build -v -o "$(GOPATH)/bin/$(TSDBCTL_BIN_NAME)" ./cmd/tsdbctl
 
 .PHONY: lint
