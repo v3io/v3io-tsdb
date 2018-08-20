@@ -4,6 +4,7 @@ go:
   - "1.10.x"
 
 script:
+  - make get
   - make test
   - make lint
 
