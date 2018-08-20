@@ -93,7 +93,10 @@ func (cc *createCommandeer) create() error {
 		return errors.Wrap(err, "failed to parse sample rate")
 	}
 
-	chunkInterval, partitionInterval := cc.calculatePartitionAndChunkInterval(rateInHours)
+	chunkInterval, partitionInterval, err := cc.calculatePartitionAndChunkInterval(rateInHours)
+	if err != nil {
+		return errors.Wrap(err, "failed to calculate chunk interval")
+	}
 
 	defaultRollup := config.Rollup{
 		Aggregators:            rollups,
@@ -140,34 +143,36 @@ func (cc *createCommandeer) create() error {
 func (cc *createCommandeer) validateFormat(format string) error {
 	interval := format[0 : len(format)-1]
 	if _, err := strconv.Atoi(interval); err != nil {
-		return fmt.Errorf("format is inncorrect, not a number")
+		return errors.New("format is incorrect, not a number")
 	}
 	unit := string(format[len(format)-1])
 	if !(unit == "m" || unit == "d" || unit == "h") {
-		return fmt.Errorf("format is inncorrect, not part of m,d,h")
+		return errors.New("format is incorrect, not part of m,d,h")
 	}
 	return nil
 }
 
-func (cc *createCommandeer) calculatePartitionAndChunkInterval(rateInHours int) (string, string) {
+func (cc *createCommandeer) calculatePartitionAndChunkInterval(rateInHours int) (string, string, error) {
 	maxNumberOfEventsPerChunk := cc.rootCommandeer.v3iocfg.MaximumChunkSize / cc.rootCommandeer.v3iocfg.MaximumSampleSize
 	minNumberOfEventsPerChunk := cc.rootCommandeer.v3iocfg.MinimumChunkSize / cc.rootCommandeer.v3iocfg.MinimumSampleSize
 
 	chunkInterval := maxNumberOfEventsPerChunk / rateInHours
 
 	// Make sure the expected chunk size is greater then the supported minimum.
-	for chunkInterval*rateInHours < minNumberOfEventsPerChunk {
-		chunkInterval++
+	if chunkInterval < minNumberOfEventsPerChunk/rateInHours {
+		return "", "", fmt.Errorf(
+			"calculated chunk size is less then minimum, rate - %v, calculated chunk interval - %v, minimun size - %v",
+			rateInHours, chunkInterval, cc.rootCommandeer.v3iocfg.MinimumChunkSize)
 	}
 
 	actualCapacityOfChunk := chunkInterval * rateInHours * cc.rootCommandeer.v3iocfg.MaximumSampleSize
 	numberOfChunksInPartition := cc.rootCommandeer.v3iocfg.MaximumPartitionSize / actualCapacityOfChunk
 	partitionInterval := numberOfChunksInPartition * chunkInterval
-	return strconv.Itoa(chunkInterval) + "h", strconv.Itoa(partitionInterval) + "h"
+	return strconv.Itoa(chunkInterval) + "h", strconv.Itoa(partitionInterval) + "h", nil
 }
 
 func rateToHours(sampleRate string) (int, error) {
-	parsingError := fmt.Errorf(`not a valid rate. Accepted pattern: [0-9]+/[hms]. Examples: 12/m`)
+	parsingError := errors.New(`not a valid rate. Accepted pattern: [0-9]+/[hms]. Examples: 12/m`)
 
 	if len(sampleRate) < 3 {
 		return 0, parsingError
@@ -181,10 +186,10 @@ func rateToHours(sampleRate string) (int, error) {
 	sampleRate = sampleRate[:len(sampleRate)-2]
 	i, err := strconv.Atoi(sampleRate)
 	if err != nil {
-		return 0, errors.Wrap(err, "failed to parse rate,  Accepted pattern: [0-9]+/[hms]. Examples: 12/m")
+		return 0, errors.Wrap(err, parsingError.Error())
 	}
 	if i <= 0 {
-		return 0, fmt.Errorf("rate should be a positive number")
+		return 0, errors.New("rate should be a positive number")
 	}
 	switch last {
 	case 's':
