@@ -124,7 +124,6 @@ func (as *AggregateSeries) NewSetFromAttrs(
 
 	aggrSet := AggregateSet{length: length, interval: as.interval, overlapWin: as.overlapWindows}
 	aggrSet.dataArrays = dataArrays
-	aggrSet.validCells = make([]bool, length, length)
 
 	arrayIndex := start
 	i := 0
@@ -138,7 +137,6 @@ func (as *AggregateSeries) NewSetFromAttrs(
 			for aggr, array := range aggrArrays {
 				aggrSet.mergeArrayCell(aggr, cellIndex, array[arrayIndex])
 			}
-			aggrSet.setValid(i)
 		} else {
 
 			// overlapping time windows (last 1hr, 6hr, ..)
@@ -149,7 +147,6 @@ func (as *AggregateSeries) NewSetFromAttrs(
 						for aggr, array := range aggrArrays {
 							aggrSet.mergeArrayCell(aggr, i, array[arrayIndex])
 						}
-						aggrSet.setValid(i)
 					}
 				}
 			}
@@ -180,13 +177,11 @@ func (as *AggregateSeries) NewSetFromChunks(length int) *AggregateSet {
 	}
 
 	newAggregateSet.dataArrays = dataArrays
-	newAggregateSet.validCells = make([]bool, length, length)
 	return &newAggregateSet
 }
 
 type AggregateSet struct {
 	dataArrays map[AggrType][]float64
-	validCells []bool
 	length     int
 	maxCell    int
 	baseTime   int64
@@ -198,16 +193,10 @@ func (as *AggregateSet) GetMaxCell() int {
 	return as.maxCell
 }
 
-func (as *AggregateSet) setValid(cell int) {
-	if cell < as.length {
-		as.validCells[cell] = true
-	}
-}
-
 // append the value to a cell in all relevant aggregation arrays
 func (as *AggregateSet) AppendAllCells(cell int, val float64) {
 
-	if cell >= as.length {
+	if !isValidCell(cell, as) {
 		return
 	}
 
@@ -218,7 +207,6 @@ func (as *AggregateSet) AppendAllCells(cell int, val float64) {
 	for aggr, _ := range as.dataArrays {
 		as.updateCell(aggr, cell, val)
 	}
-	as.validCells[cell] = true
 }
 
 // append/merge (v3io) aggregation values into aggregation per requested interval/step
@@ -241,8 +229,28 @@ func (as *AggregateSet) mergeArrayCell(aggr AggrType, cell int, val uint64) {
 	}
 }
 
+func isValidValue(v float64) bool {
+	return !(math.IsNaN(v) || math.IsInf(v, 1) || math.IsInf(v, -1))
+}
+
+func isValidCell(cellIndex int, aSet *AggregateSet) bool {
+	return cellIndex >= 0 &&
+		cellIndex < aSet.length
+}
+
+func isValidAggCell(cellIndex int, aSet *AggregateSet, aType AggrType) bool {
+	return cellIndex >= 0 &&
+		cellIndex < len(aSet.dataArrays[aType]) &&
+		// cellIndex < aSet.maxCell &&
+		cellIndex < aSet.length
+}
+
 // function specific aggregation
 func (as *AggregateSet) updateCell(aggr AggrType, cell int, val float64) {
+
+	if !isValidAggCell(cell, as, aggr) {
+		return
+	}
 
 	switch aggr {
 	case aggrTypeCount:
@@ -252,11 +260,11 @@ func (as *AggregateSet) updateCell(aggr AggrType, cell int, val float64) {
 	case aggrTypeSqr:
 		as.dataArrays[aggr][cell] += val * val
 	case aggrTypeMin:
-		if val < as.dataArrays[aggr][cell] || !as.validCells[cell] {
+		if val < as.dataArrays[aggr][cell] {
 			as.dataArrays[aggr][cell] = val
 		}
 	case aggrTypeMax:
-		if val > as.dataArrays[aggr][cell] || !as.validCells[cell] {
+		if val > as.dataArrays[aggr][cell] {
 			as.dataArrays[aggr][cell] = val
 		}
 	case aggrTypeLast:
@@ -267,15 +275,27 @@ func (as *AggregateSet) updateCell(aggr AggrType, cell int, val float64) {
 // return the value per aggregate or complex function
 func (as *AggregateSet) GetCellValue(aggr AggrType, cell int) (float64, bool) {
 
-	if cell > as.maxCell || cell >= as.length || !as.validCells[cell] { // TODO: should >Len return NaN or Zero ?
+	if !isValidAggCell(cell, as, aggr) {
+		return math.NaN(), false
+	}
+
+	dependsOnSum := aggr == aggrTypeStddev || aggr == aggrTypeStdvar
+	dependsOnCount := dependsOnSum || aggr == aggrTypeAvg
+
+	if dependsOnSum && !isValidValue(as.dataArrays[aggrTypeSum][cell]) {
 		return math.NaN(), false
 	}
 
 	// if no samples in this bucket the result is undefined
 	var cnt float64
-	if aggr == aggrTypeAvg || aggr == aggrTypeStddev || aggr == aggrTypeStdvar {
-		cnt = as.dataArrays[aggrTypeCount][cell]
-		if cnt == 0 {
+	if dependsOnCount {
+		if isValidValue(as.dataArrays[aggrTypeCount][cell]) {
+			cnt = as.dataArrays[aggrTypeCount][cell]
+			if cnt == 0 {
+				return math.NaN(), false
+			}
+		} else {
+			// cell is out of range
 			return math.NaN(), false
 		}
 	}
