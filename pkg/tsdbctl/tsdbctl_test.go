@@ -45,11 +45,16 @@ func (suite *testTsdbctlSuite) TestPopulateConfigWithTenant() {
 		v3ioPath: "localhost:80123/123",
 	}
 	expectedCfg := &config.V3ioConfig{
-		V3ioUrl:   "localhost:80123",
-		Container: "123",
-		Path:      "/x/y/z",
-		Username:  "Vel@Odar",
-		Password:  "p455w0rd",
+		V3ioUrl:              "localhost:80123",
+		Container:            "123",
+		Path:                 "/x/y/z",
+		Username:             "Vel@Odar",
+		Password:             "p455w0rd",
+		MinimumSampleSize:    minimumSampleSize,
+		MaximumSampleSize:    maximumSampleSize,
+		MinimumChunkSize:     minimumChunkSize,
+		MaximumChunkSize:     maximumChunkSize,
+		MaximumPartitionSize: maximumPartitionSize,
 	}
 
 	suite.Require().Nil(err)
