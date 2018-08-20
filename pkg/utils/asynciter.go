@@ -152,6 +152,7 @@ func (ic *AsyncItemsCursor) NextItem() (v3io.Item, error) {
 
 	// Read response from channel
 	resp := <-ic.responseChan
+	defer resp.Release()
 
 	// Ignore 404s
 	// TODO: use response status code once it will be returned from 'v3io-go-http'
@@ -166,7 +167,6 @@ func (ic *AsyncItemsCursor) NextItem() (v3io.Item, error) {
 	}
 
 	getItemsResp := resp.Output.(*v3io.GetItemsOutput)
-	defer resp.Release()
 
 	// set the cursor items and reset the item index
 	ic.items = getItemsResp.Items
