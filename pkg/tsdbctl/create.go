@@ -34,7 +34,7 @@ const schemaVersion = 0
 const defaultStorageClass = "local"
 const minimumSampleSize, maximumSampleSize = 2, 8     // bytes
 const maximumPartitionSize = 2000000                  // 2MB
-const minimumChunkSize, maximumChunkSize = 200, 62000 //bytes
+const minimumChunkSize, maximumChunkSize = 200, 62000 // bytes
 
 type createCommandeer struct {
 	cmd             *cobra.Command
