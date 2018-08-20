@@ -79,6 +79,31 @@ func (suite *testPromTsdbSuite) TestMatch2filterMultipleWithName() {
 	suite.Require().Equal("", aggr)
 }
 
+func (suite *testPromTsdbSuite) TestMatch2filterRegex() {
+
+	matchers := []*labels.Matcher{
+		{Type: labels.MatchRegexp, Name: "field", Value: ".*"},
+	}
+	name, filter, aggr := match2filter(matchers)
+
+	suite.Require().Equal("", name)
+	suite.Require().Equal(`regexp_instr(field,'.*') == 0`, filter)
+	suite.Require().Equal("", aggr)
+}
+
+func (suite *testPromTsdbSuite) TestMatch2filterRegexMultiple() {
+
+	matchers := []*labels.Matcher{
+		{Type: labels.MatchRegexp, Name: "field1", Value: ".*"},
+		{Type: labels.MatchNotRegexp, Name: "field2", Value: "..."},
+	}
+	name, filter, aggr := match2filter(matchers)
+
+	suite.Require().Equal("", name)
+	suite.Require().Equal(`regexp_instr(field1,'.*') == 0 and regexp_instr(field2,'...') != 0`, filter)
+	suite.Require().Equal("", aggr)
+}
+
 func TestPromTsdbSuite(t *testing.T) {
 	suite.Run(t, new(testPromTsdbSuite))
 }
