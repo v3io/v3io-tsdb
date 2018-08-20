@@ -91,10 +91,12 @@ func (cc *createCommandeer) create() error {
 		return errors.Wrap(err, "failed to parse default rollups")
 	}
 
-	chunkInterval, partitionInterval, err := cc.getPartitionAndChunkInterval()
+	rateInHours, err := rateToHours(cc.sampleRate)
 	if err != nil {
 		return errors.Wrap(err, "failed to parse sample rate")
 	}
+
+	chunkInterval, partitionInterval := calculatePartitionAndChunkInterval(rateInHours)
 
 	defaultRollup := config.Rollup{
 		Aggregators:            rollups,
@@ -150,51 +152,52 @@ func (cc *createCommandeer) validateFormat(format string) error {
 	return nil
 }
 
-func (cc *createCommandeer) rateInHours() (int, error) {
-	if len(cc.sampleRate) >= 3 {
-		last := cc.sampleRate[len(cc.sampleRate)-1:]
-		// get the number ignoring slash and time unit
-		cc.sampleRate = cc.sampleRate[0 : len(cc.sampleRate)-2]
-		i, err := strconv.Atoi(cc.sampleRate)
-		if err != nil {
-			return 0, errors.Wrap(err, `not a valid rate. Accepted pattern: [0-9]+/[dhms]. Examples: 12/m`)
-		}
-		switch last {
-		case "s":
-			return i * 60 * 60, nil
-		case "m":
-			return i * 60, nil
-		case "h":
-			return i, nil
-		case "d":
-			return i / 24, nil
-		default:
-			return 0, fmt.Errorf(`not a valid rate. Accepted pattern: [0-9]+/[dhms]. Examples: 12/m`)
-		}
+func rateToHours(sampleRate string) (int, error) {
+	parsingError := fmt.Errorf(`not a valid rate. Accepted pattern: [0-9]+/[hms]. Examples: 12/m`)
+
+	if len(sampleRate) < 3 {
+		return 0, parsingError
+	}
+	if sampleRate[len(sampleRate)-2:len(sampleRate)-1] != "/" {
+		return 0, parsingError
 	}
 
-	return 0, fmt.Errorf(`not a valid rate. Accepted pattern: [0-9]+/[dhms]. Examples: 12/m`)
+	last := sampleRate[len(sampleRate)-1:]
+	// get the number ignoring slash and time unit
+	sampleRate = sampleRate[:len(sampleRate)-2]
+	i, err := strconv.Atoi(sampleRate)
+	if err != nil {
+		return 0, parsingError
+	}
+	if i <= 0 {
+		return 0, fmt.Errorf("rate should be a positive number")
+	}
+	switch last {
+	case "s":
+		return i * 60 * 60, nil
+	case "m":
+		return i * 60, nil
+	case "h":
+		return i, nil
+	default:
+		return 0, parsingError
+	}
 }
 
 // This method calculates the chunk and partition interval from the given sample rate.
-func (cc *createCommandeer) getPartitionAndChunkInterval() (string, string, error) {
+func calculatePartitionAndChunkInterval(rateInHours int) (string, string) {
 	maxNumberOfEventsPerChunk := maximumChunkSize / maximumSampleSize
 	minNumberOfEventsPerChunk := minimumChunkSize / minimumSampleSize
 
-	expectedRateInHours, err := cc.rateInHours()
-	if err != nil {
-		return "", "", errors.Wrap(err, "failed to parse sample rate")
-	}
-
-	chunkInterval := maxNumberOfEventsPerChunk / expectedRateInHours
+	chunkInterval := maxNumberOfEventsPerChunk / rateInHours
 
 	// Make sure the expected chunk size is greater then the supported minimum.
-	for chunkInterval*expectedRateInHours < minNumberOfEventsPerChunk {
+	for chunkInterval*rateInHours < minNumberOfEventsPerChunk {
 		chunkInterval++
 	}
 
-	actualCapacityOfChunk := chunkInterval * expectedRateInHours * maximumSampleSize
+	actualCapacityOfChunk := chunkInterval * rateInHours * maximumSampleSize
 	numberOfChunksInPartition := maximumPartitionSize / actualCapacityOfChunk
 	partitionInterval := numberOfChunksInPartition * chunkInterval
-	return strconv.Itoa(chunkInterval) + "h", strconv.Itoa(partitionInterval) + "h", nil
+	return strconv.Itoa(chunkInterval) + "h", strconv.Itoa(partitionInterval) + "h"
 }
