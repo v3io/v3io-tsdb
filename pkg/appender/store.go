@@ -274,7 +274,7 @@ func (cs *chunkStore) WriteChunks(mc *MetricsCache, metric *MetricState) (bool, 
 	var pendingSamplesCount int
 
 	// loop over pending samples, add to chunks & aggregates (create required update expressions)
-	for {
+	for pendingSampleIndex < len(cs.pending) && pendingSamplesCount < mc.cfg.BatchSize && partition.InRange(cs.pending[pendingSampleIndex].t) {
 		sampleTime := cs.pending[pendingSampleIndex].t
 
 		if sampleTime <= cs.initMaxTime && !mc.cfg.OverrideOld {
@@ -308,7 +308,6 @@ func (cs *chunkStore) WriteChunks(mc *MetricsCache, metric *MetricState) (bool, 
 		if (pendingSampleIndex == len(cs.pending)-1) || pendingSamplesCount == mc.cfg.BatchSize-1 || !partition.InRange(cs.pending[pendingSampleIndex+1].t) {
 			expr = expr + cs.aggrList.SetOrUpdateExpr("v", bucket, isNewBucket)
 			expr = expr + cs.appendExpression(activeChunk)
-			cs.aggrList.Clear()
 			pendingSampleIndex++
 			pendingSamplesCount++
 			break
@@ -334,6 +333,7 @@ func (cs *chunkStore) WriteChunks(mc *MetricsCache, metric *MetricState) (bool, 
 		pendingSamplesCount++
 	}
 
+	cs.aggrList.Clear()
 	if pendingSampleIndex == len(cs.pending) {
 		cs.pending = cs.pending[:0]
 	} else {
