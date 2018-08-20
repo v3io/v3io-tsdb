@@ -68,7 +68,7 @@ func newCreateCommandeer(rootCommandeer *RootCommandeer) *createCommandeer {
 	cmd.Flags().StringVarP(&commandeer.rollupInterval, "rollup-interval", "i", "1h", "aggregation interval")
 	cmd.Flags().IntVarP(&commandeer.shardingBuckets, "sharding-buckets", "b", 8, "number of buckets to split key")
 	cmd.Flags().IntVarP(&commandeer.sampleRetention, "sample-retention", "a", 0, "sample retention in hours")
-	cmd.Flags().StringVarP(&commandeer.sampleRate, "sample-rate", "s", "12/m", "sample rate")
+	cmd.Flags().StringVar(&commandeer.sampleRate, "rate", "12/m", "sample rate")
 
 	commandeer.cmd = cmd
 
@@ -158,7 +158,7 @@ func rateToHours(sampleRate string) (int, error) {
 	if len(sampleRate) < 3 {
 		return 0, parsingError
 	}
-	if sampleRate[len(sampleRate)-2:len(sampleRate)-1] != "/" {
+	if sampleRate[len(sampleRate)-2] != '/' {
 		return 0, parsingError
 	}
 
