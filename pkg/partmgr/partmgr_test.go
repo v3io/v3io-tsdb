@@ -24,7 +24,6 @@ package partmgr
 
 import (
 	"github.com/stretchr/testify/assert"
-	"github.com/v3io/v3io-tsdb/pkg/config"
 	"github.com/v3io/v3io-tsdb/pkg/tsdb/tsdbtest/testutils"
 	"github.com/v3io/v3io-tsdb/pkg/utils"
 	"testing"
@@ -51,39 +50,4 @@ func TestCreateNewPartition(tst *testing.T) {
 	part, _ = manager.TimeToPart(startTime)
 	assert.Equal(tst, 4, len(manager.partitions))
 	assert.Equal(tst, manager.partitions[0], part)
-}
-
-func createSchema() *config.Schema {
-	defaultRollup := config.Rollup{
-		Aggregators:            []string{"max"},
-		AggregatorsGranularity: "1h",
-		StorageClass:           "local",
-		SampleRetention:        0,
-		LayerRetentionTime:     "1y",
-	}
-
-	tableSchema := config.TableSchema{
-		Version:             0,
-		RollupLayers:        []config.Rollup{defaultRollup},
-		ShardingBuckets:     8,
-		PartitionerInterval: "2d",
-		ChunckerInterval:    "1h",
-	}
-	partitionSchema := config.PartitionSchema{
-		Version:                tableSchema.Version,
-		Aggregators:            []string{"max"},
-		AggregatorsGranularity: "1h",
-		StorageClass:           "local",
-		SampleRetention:        0,
-		ChunckerInterval:       tableSchema.ChunckerInterval,
-		PartitionerInterval:    tableSchema.PartitionerInterval,
-	}
-
-	schema := config.Schema{
-		TableSchemaInfo:     tableSchema,
-		PartitionSchemaInfo: partitionSchema,
-		Partitions:          []config.Partition{},
-		Fields:              nil,
-	}
-	return &schema
 }
