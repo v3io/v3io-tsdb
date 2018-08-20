@@ -2,9 +2,9 @@ package tsdbtest
 
 import (
 	"fmt"
-	"github.com/v3io/v3io-tsdb/pkg/aggregate"
 	"github.com/v3io/v3io-tsdb/pkg/config"
 	. "github.com/v3io/v3io-tsdb/pkg/tsdb"
+	"github.com/v3io/v3io-tsdb/pkg/tsdb/tsdbtest/testutils"
 	"github.com/v3io/v3io-tsdb/pkg/utils"
 	"regexp"
 	"strings"
@@ -42,7 +42,7 @@ func DeleteTSDB(t testing.TB, v3ioConfig *config.V3ioConfig) {
 }
 
 func CreateTestTSDB(t testing.TB, v3ioConfig *config.V3ioConfig) {
-	schema := CreateSchema(t, "*")
+	schema := testutils.CreateSchema(t, "*")
 	if err := CreateTSDB(v3ioConfig, &schema); err != nil {
 		t.Fatalf("Failed to create TSDB. reason: %s", err)
 	}
@@ -152,50 +152,4 @@ func NormalizePath(path string) string {
 	r := strings.Join(chars, "")
 	re := regexp.MustCompile("[" + r + "]+")
 	return re.ReplaceAllString(path, "_")
-}
-
-func CreateSchema(t testing.TB, agg string) config.Schema {
-	rollups, err := aggregate.AggregatorsToStringList(agg)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defaultRollup := config.Rollup{
-		Aggregators:            rollups,
-		AggregatorsGranularity: "1h",
-		StorageClass:           "local",
-		SampleRetention:        0,
-		LayerRetentionTime:     "1y",
-	}
-
-	tableSchema := config.TableSchema{
-		Version:             0,
-		RollupLayers:        []config.Rollup{defaultRollup},
-		ShardingBuckets:     8,
-		PartitionerInterval: "2d",
-		ChunckerInterval:    "1h",
-	}
-
-	fields, err := aggregate.SchemaFieldFromString(rollups, "v")
-	if err != nil {
-		t.Fatal("Failed to create aggregators list", err)
-	}
-	fields = append(fields, config.SchemaField{Name: "_name", Type: "string", Nullable: false, Items: ""})
-
-	partitionSchema := config.PartitionSchema{
-		Version:                tableSchema.Version,
-		Aggregators:            rollups,
-		AggregatorsGranularity: "1h",
-		StorageClass:           "local",
-		SampleRetention:        0,
-		ChunckerInterval:       tableSchema.ChunckerInterval,
-		PartitionerInterval:    tableSchema.PartitionerInterval,
-	}
-
-	schema := config.Schema{
-		TableSchemaInfo:     tableSchema,
-		PartitionSchemaInfo: partitionSchema,
-		Partitions:          []config.Partition{},
-		Fields:              fields,
-	}
-	return schema
 }
