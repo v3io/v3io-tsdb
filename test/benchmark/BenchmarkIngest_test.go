@@ -5,6 +5,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/v3io/v3io-tsdb/pkg/tsdb"
 	"github.com/v3io/v3io-tsdb/pkg/tsdb/tsdbtest"
+	"github.com/v3io/v3io-tsdb/pkg/tsdb/tsdbtest/testutils"
 	"github.com/v3io/v3io-tsdb/pkg/utils"
 	"github.com/v3io/v3io-tsdb/test/benchmark/common"
 	"io/ioutil"
@@ -33,7 +34,7 @@ func BenchmarkIngest(b *testing.B) {
 
 	// Update TSDB instance path for this test
 	v3ioConfig.Path = tsdbPath
-	schema := tsdbtest.CreateSchema(b, "*")
+	schema := testutils.CreateSchema(b, "*")
 	if err := tsdb.CreateTSDB(v3ioConfig, &schema); err != nil {
 		b.Fatal("Failed to create TSDB", err)
 	}

@@ -25,14 +25,15 @@ package partmgr
 import (
 	"github.com/stretchr/testify/assert"
 	"github.com/v3io/v3io-tsdb/pkg/config"
+	"github.com/v3io/v3io-tsdb/pkg/tsdb/tsdbtest/testutils"
 	"github.com/v3io/v3io-tsdb/pkg/utils"
 	"testing"
 )
 
 func TestCreateNewPartition(tst *testing.T) {
-	schema := createSchema()
+	schema := testutils.CreateSchema(tst, "*")
 	interval, _ := utils.Str2duration(schema.PartitionSchemaInfo.PartitionerInterval)
-	manager, _ := NewPartitionMngr(schema, "/", nil)
+	manager, _ := NewPartitionMngr(&schema, "/", nil)
 	startTime := interval + 1
 	//first partition
 	part, _ := manager.TimeToPart(startTime + interval)

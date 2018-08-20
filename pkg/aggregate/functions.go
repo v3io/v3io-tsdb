@@ -75,14 +75,14 @@ func (a *FloatAggregator) UpdateExpr(col string, bucket int) string {
 }
 
 func (a *FloatAggregator) InitExpr(col string, buckets int) string {
-	return fmt.Sprintf("_%s_%s=init_array(%d,'double');", col, a.attr, buckets)
+	return fmt.Sprintf("_%s_%s=init_array(%d,'double',%f);", col, a.attr, buckets, a.val)
 }
 
 // Sum Aggregator
 type SumAggregator struct{ FloatAggregator }
 
 func (a *SumAggregator) Aggregate(t int64, v float64) {
-	if !math.IsNaN(v) {
+	if utils.IsDefined(v) {
 		a.val += v
 	}
 }
@@ -91,7 +91,7 @@ func (a *SumAggregator) Aggregate(t int64, v float64) {
 type SqrAggregator struct{ FloatAggregator }
 
 func (a *SqrAggregator) Aggregate(t int64, v float64) {
-	if !math.IsNaN(v) {
+	if utils.IsDefined(v) {
 		a.val += v * v
 	}
 }
@@ -99,10 +99,10 @@ func (a *SqrAggregator) Aggregate(t int64, v float64) {
 // Minimum Aggregator
 type MinAggregator struct{ FloatAggregator }
 
-func (a *MinAggregator) Clear() { a.val = math.MaxFloat64 } // TODO: use math.Inf(1)
+func (a *MinAggregator) Clear() { a.val = math.Inf(1) }
 
 func (a *MinAggregator) Aggregate(t int64, v float64) {
-	if !math.IsNaN(v) && (math.IsNaN(a.val) || v < a.val) {
+	if v < a.val {
 		a.val = v
 	}
 }
@@ -114,10 +114,10 @@ func (a *MinAggregator) UpdateExpr(col string, bucket int) string {
 // Maximum Aggregator
 type MaxAggregator struct{ FloatAggregator }
 
-func (a *MaxAggregator) Clear() { a.val = -math.MaxFloat64 } // TODO: use math.Inf(-1)
+func (a *MaxAggregator) Clear() { a.val = math.Inf(-1) }
 
 func (a *MaxAggregator) Aggregate(t int64, v float64) {
-	if !math.IsNaN(v) && (math.IsNaN(a.val) || v > a.val) {
+	if v > a.val {
 		a.val = v
 	}
 }
@@ -132,7 +132,7 @@ type LastAggregator struct {
 	lastT int64
 }
 
-func (a *LastAggregator) Clear() { a.val = -math.MaxFloat64 } // TODO: use math.Inf(1)
+func (a *LastAggregator) Clear() { a.val = math.Inf(-1) }
 
 func (a *LastAggregator) Aggregate(t int64, v float64) {
 	if t > a.lastT {
@@ -142,7 +142,7 @@ func (a *LastAggregator) Aggregate(t int64, v float64) {
 }
 
 func (a *LastAggregator) UpdateExpr(col string, bucket int) string {
-	if math.IsNaN(a.val) {
+	if utils.IsUndefined(a.val) {
 		return ""
 	}
 
