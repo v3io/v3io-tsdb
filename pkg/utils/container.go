@@ -85,10 +85,9 @@ func AsInt64Array(val []byte) []uint64 {
 	return array
 }
 
-func DeleteTable(container *v3io.Container, path, filter string, workers int) error {
+func DeleteTable(logger logger.Logger, container *v3io.Container, path, filter string, workers int) error {
 	input := v3io.GetItemsInput{Path: path, AttributeNames: []string{"__name"}, Filter: filter}
-	iter, err := NewAsyncItemsCursor(container, &input, workers, []string{})
-	//iter, err := container.Sync.GetItemsCursor(&input)
+	iter, err := NewAsyncItemsCursor(container, &input, workers, []string{}, logger)
 	if err != nil {
 		return err
 	}

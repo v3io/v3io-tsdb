@@ -103,6 +103,22 @@ func getAggrFullName(field config.SchemaField, col string) config.SchemaField {
 
 func (a AggrType) String() string { return aggrToString[a] }
 
+func AggregatorsToStringList(aggregators string) ([]string, error) {
+	aggrs := strings.Split(aggregators, ",")
+	aggType, err := AggrsFromString(aggrs)
+	if err != nil {
+		return nil, err
+	}
+	var list []string
+	for _, aggr := range rawAggregators {
+		if aggr&aggType != 0 {
+			list = append(list, aggrToString[aggr])
+		}
+	}
+
+	return list, nil
+}
+
 // convert comma separated string to aggregator mask
 func AggrsFromString(split []string) (AggrType, error) {
 	var aggrList AggrType
@@ -138,7 +154,7 @@ func NewAggregatorList(aggrType AggrType) *AggregatorList {
 		list = append(list, &MaxAggregator{FloatAggregator{attr: "max", val: math.Inf(-1)}})
 	}
 	if (aggrType & aggrTypeLast) != 0 {
-		list = append(list, &LastAggregator{FloatAggregator{attr: "last"}, 0})
+		list = append(list, &LastAggregator{FloatAggregator{attr: "last", val: math.Inf(-1)}, 0})
 	}
 	return &list
 }

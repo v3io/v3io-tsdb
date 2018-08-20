@@ -124,12 +124,12 @@ func (p *PartitionManager) Init() error {
 func (p *PartitionManager) TimeToPart(t int64) (*DBPartition, error) {
 	if p.headPartition == nil {
 		// Rounding t to the nearest PartitionInterval multiple
-		_, err := p.createNewPartition(p.currentPartitionInterval * (t / p.currentPartitionInterval))
+		_, err := p.createAndUpdatePartition(p.currentPartitionInterval * (t / p.currentPartitionInterval))
 		return p.headPartition, err
 	} else {
 		if t >= p.headPartition.startTime {
-			if (t - p.headPartition.startTime) > p.currentPartitionInterval {
-				_, err := p.createNewPartition(p.headPartition.startTime + p.currentPartitionInterval)
+			if (t - p.headPartition.startTime) >= p.currentPartitionInterval {
+				_, err := p.createAndUpdatePartition(p.headPartition.startTime + p.currentPartitionInterval)
 				if err != nil {
 					return nil, err
 				}
@@ -144,12 +144,15 @@ func (p *PartitionManager) TimeToPart(t int64) (*DBPartition, error) {
 					return p.partitions[i], nil
 				}
 			}
+			head := p.headPartition
+			part, _ := p.createAndUpdatePartition(p.currentPartitionInterval * (t / p.currentPartitionInterval))
+			p.headPartition = head
+			return part, nil
 		}
 	}
-	return p.headPartition, nil
 }
 
-func (p *PartitionManager) createNewPartition(t int64) (*DBPartition, error) {
+func (p *PartitionManager) createAndUpdatePartition(t int64) (*DBPartition, error) {
 	time := t & 0x7FFFFFFFFFFFFFF0
 	partPath := path.Join(p.path, strconv.FormatInt(time/1000, 10)) + "/"
 	partition, err := NewDBPartition(p, time, partPath)
@@ -157,8 +160,19 @@ func (p *PartitionManager) createNewPartition(t int64) (*DBPartition, error) {
 		return nil, err
 	}
 	p.currentPartitionInterval = partition.partitionInterval
-	p.headPartition = partition
-	p.partitions = append(p.partitions, partition)
+	if p.headPartition == nil || time > p.headPartition.startTime {
+		p.headPartition = partition
+		p.partitions = append(p.partitions, partition)
+	} else {
+		for i, part := range p.partitions {
+			if part.startTime > time {
+				p.partitions = append(p.partitions, nil)
+				copy(p.partitions[i+1:], p.partitions[i:])
+				p.partitions[i] = partition
+				break
+			}
+		}
+	}
 	err = p.updatePartitionInSchema(partition)
 	return partition, err
 }
@@ -169,7 +183,9 @@ func (p *PartitionManager) updatePartitionInSchema(partition *DBPartition) error
 	if err != nil {
 		return errors.Wrap(err, "Failed to update new partition in schema file")
 	}
-	err = p.container.Sync.PutObject(&v3io.PutObjectInput{Path: path.Join(p.path, config.SCHEMA_CONFIG), Body: data})
+	if p.container != nil { //tests use case only
+		err = p.container.Sync.PutObject(&v3io.PutObjectInput{Path: path.Join(p.path, config.SCHEMA_CONFIG), Body: data})
+	}
 	return err
 }
 
@@ -227,7 +243,8 @@ func (p *DBPartition) GetShardingKeys(name string) []string {
 	shardingKeysNum := p.manager.cfg.TableSchemaInfo.ShardingBuckets
 	var res = make([]string, 0, shardingKeysNum)
 	for i := 0; i < shardingKeysNum; i++ {
-		res = append(res, fmt.Sprintf("%s_%x", name, i))
+		// Trailing dot for rangescan queries
+		res = append(res, fmt.Sprintf("%s_%x.", name, i))
 	}
 
 	return res

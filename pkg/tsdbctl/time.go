@@ -51,7 +51,7 @@ func newTimeCommandeer(rootCommandeer *RootCommandeer) *timeCommandeer {
 
 			tint, err := strconv.Atoi(args[0])
 			if err == nil {
-				fmt.Println(time.Unix(int64(tint), 0).Format(time.RFC3339))
+				fmt.Println(time.Unix(int64(tint), 0).UTC().Format(time.RFC3339))
 				return nil
 			}
 

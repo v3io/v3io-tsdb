@@ -28,7 +28,6 @@ import (
 	"github.com/v3io/v3io-tsdb/pkg/config"
 	"github.com/v3io/v3io-tsdb/pkg/tsdb"
 	"strconv"
-	"strings"
 )
 
 const schemaVersion = 0
@@ -67,7 +66,7 @@ func newCreateCommandeer(rootCommandeer *RootCommandeer) *createCommandeer {
 	cmd.Flags().StringVarP(&commandeer.defaultRollups, "rollups", "r", "",
 		"Default aggregation rollups, comma seperated: count,avg,sum,min,max,stddev")
 	cmd.Flags().StringVarP(&commandeer.rollupInterval, "rollup-interval", "i", "1h", "aggregation interval")
-	cmd.Flags().IntVarP(&commandeer.shardingBuckets, "sharding-buckets", "b", 1, "number of buckets to split key")
+	cmd.Flags().IntVarP(&commandeer.shardingBuckets, "sharding-buckets", "b", 8, "number of buckets to split key")
 	cmd.Flags().IntVarP(&commandeer.sampleRetention, "sample-retention", "a", 0, "sample retention in hours")
 	cmd.Flags().StringVarP(&commandeer.sampleRate, "sample-rate", "s", "12/m", "sample rate")
 
@@ -84,7 +83,12 @@ func (cc *createCommandeer) create() error {
 	}
 
 	if err := cc.validateFormat(cc.rollupInterval); err != nil {
-		return errors.Wrap(err, "Failed to parse rollup interval")
+		return errors.Wrap(err, "failed to parse rollup interval")
+	}
+
+	rollups, err := aggregate.AggregatorsToStringList(cc.defaultRollups)
+	if err != nil {
+		return errors.Wrap(err, "failed to parse default rollups")
 	}
 
 	chunkInterval, partitionInterval, err := cc.getPartitionAndChunkInterval()
@@ -93,7 +97,7 @@ func (cc *createCommandeer) create() error {
 	}
 
 	defaultRollup := config.Rollup{
-		Aggregators:            cc.defaultRollups,
+		Aggregators:            rollups,
 		AggregatorsGranularity: cc.rollupInterval,
 		StorageClass:           defaultStorageClass,
 		SampleRetention:        cc.sampleRetention,
@@ -108,16 +112,15 @@ func (cc *createCommandeer) create() error {
 		ChunckerInterval:    chunkInterval,
 	}
 
-	aggrs := strings.Split(cc.defaultRollups, ",")
-	fields, err := aggregate.SchemaFieldFromString(aggrs, "v")
+	fields, err := aggregate.SchemaFieldFromString(rollups, "v")
 	if err != nil {
-		return errors.Wrap(err, "Failed to create aggregators list")
+		return errors.Wrap(err, "failed to create aggregators list")
 	}
 	fields = append(fields, config.SchemaField{Name: "_name", Type: "string", Nullable: false, Items: ""})
 
 	partitionSchema := config.PartitionSchema{
 		Version:                tableSchema.Version,
-		Aggregators:            aggrs,
+		Aggregators:            rollups,
 		AggregatorsGranularity: cc.rollupInterval,
 		StorageClass:           defaultStorageClass,
 		SampleRetention:        cc.sampleRetention,

@@ -29,6 +29,7 @@ import (
 	"github.com/v3io/v3io-tsdb/pkg/config"
 	. "github.com/v3io/v3io-tsdb/pkg/tsdb"
 	"github.com/v3io/v3io-tsdb/pkg/tsdb/tsdbtest"
+	"github.com/v3io/v3io-tsdb/pkg/tsdb/tsdbtest/testutils"
 	"github.com/v3io/v3io-tsdb/pkg/utils"
 	"path/filepath"
 	"sort"
@@ -408,9 +409,9 @@ func TestCreateTSDB(t *testing.T) {
 		conf         config.Schema
 		ignoreReason string
 	}{
-		{desc: "Should create TSDB with standard configuration", conf: tsdbtest.CreateSchema(t, "sum,count")},
+		{desc: "Should create TSDB with standard configuration", conf: testutils.CreateSchema(t, "sum,count")},
 
-		{desc: "Should create TSDB with wildcard aggregations", conf: tsdbtest.CreateSchema(t, "*")},
+		{desc: "Should create TSDB with wildcard aggregations", conf: testutils.CreateSchema(t, "*")},
 	}
 
 	for _, test := range testCases {
@@ -442,7 +443,7 @@ func TestDeleteTSDB(t *testing.T) {
 		t.Fatalf("Failed to load test configuration. reason: %s", err)
 	}
 
-	schema := tsdbtest.CreateSchema(t, "count,sum")
+	schema := testutils.CreateSchema(t, "count,sum")
 	v3ioConfig.Path = t.Name()
 	if err := CreateTSDB(v3ioConfig, &schema); err != nil {
 		t.Fatalf("Failed to create TSDB. reason: %s", err)
