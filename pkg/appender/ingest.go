@@ -23,6 +23,7 @@ package appender
 import (
 	"github.com/pkg/errors"
 	"github.com/v3io/v3io-go-http"
+	"net/http"
 	"reflect"
 	"time"
 )
@@ -274,7 +275,7 @@ func (mc *MetricsCache) handleResponse(metric *MetricState, resp *v3io.Response,
 		} else {
 			// Metrics with too many update errors go into Error state
 			metric.retryCount++
-			if metric.retryCount == maxRetriesOnWrite {
+			if e, hasStatusCode := resp.Error.(v3io.ErrorWithStatusCode); metric.retryCount == maxRetriesOnWrite || hasStatusCode && e.StatusCode() != http.StatusServiceUnavailable {
 				mc.logger.ErrorWith("Metric error, exceeded retry", "metric", metric.Lset)
 				metric.setError(errors.Wrap(resp.Error, "chunk update failed after few retries"))
 				return false
