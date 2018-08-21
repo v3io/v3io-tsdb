@@ -274,7 +274,7 @@ func (mc *MetricsCache) handleResponse(metric *MetricState, resp *v3io.Response,
 		} else {
 			// Metrics with too many update errors go into Error state
 			metric.retryCount++
-			if e, ok := resp.Error.(v3io.ErrorWithStatusCode); metric.retryCount == maxRetriesOnWrite || ok && e.StatusCode() != 503 {
+			if e, hasStatusCode := resp.Error.(v3io.ErrorWithStatusCode); metric.retryCount == maxRetriesOnWrite || hasStatusCode && e.StatusCode() != 503 {
 				mc.logger.ErrorWith("Metric error, exceeded retry", "metric", metric.Lset)
 				metric.setError(errors.Wrap(resp.Error, "chunk update failed after few retries"))
 				return false
