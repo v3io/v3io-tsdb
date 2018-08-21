@@ -272,14 +272,12 @@ func (as *AggregateSet) GetCellValue(aggr AggrType, cell int) (float64, bool) {
 		return math.NaN(), false
 	}
 
-	dependsOnSum := aggr == aggrTypeStddev || aggr == aggrTypeStdvar
-	dependsOnCount := dependsOnSum || aggr == aggrTypeAvg
+	dependsOnSumAndCount := aggr == aggrTypeStddev || aggr == aggrTypeStdvar || aggr == aggrTypeAvg
 	dependsOnSqr := aggr == aggrTypeStddev || aggr == aggrTypeStdvar
-	dependsOnLast := aggr == aggrTypeLast
+	dependsOnLast := aggr == aggrTypeLast || aggr == aggrTypeRate
 
 	// return undefined result one dependant fields is missing
-	if (dependsOnSum && !isValidValue(as.dataArrays[aggrTypeSum][cell])) ||
-		(dependsOnCount && !isValidValue(as.dataArrays[aggrTypeCount][cell])) ||
+	if (dependsOnSumAndCount && !(isValidValue(as.dataArrays[aggrTypeSum][cell]) && isValidValue(as.dataArrays[aggrTypeCount][cell]))) ||
 		(dependsOnSqr && !isValidValue(as.dataArrays[aggrTypeSqr][cell])) ||
 		(dependsOnLast && !isValidValue(as.dataArrays[aggrTypeLast][cell])) {
 		return math.NaN(), false
@@ -287,7 +285,7 @@ func (as *AggregateSet) GetCellValue(aggr AggrType, cell int) (float64, bool) {
 
 	// if no samples in this bucket the result is undefined
 	var cnt float64
-	if dependsOnCount {
+	if dependsOnSumAndCount {
 		cnt = as.dataArrays[aggrTypeCount][cell]
 		if cnt == 0 {
 			return math.NaN(), false
