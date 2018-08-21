@@ -33,9 +33,9 @@ import (
 	"strings"
 )
 
-const minimumSampleSize, maximumSampleSize = 2, 8     // bytes
-const maximumPartitionSize = 2000000                  // 2MB
-const minimumChunkSize, maximumChunkSize = 200, 62000 // bytes
+const defaultMinimumSampleSize, defaultMaximumSampleSize = 2, 8     // bytes
+const defaultMaximumPartitionSize = 2000000                         // 2MB
+const defaultMinimumChunkSize, defaultMaximumChunkSize = 200, 62000 // bytes
 
 type RootCommandeer struct {
 	adapter     *tsdb.V3ioAdapter
@@ -138,19 +138,19 @@ func (rc *RootCommandeer) populateConfig(cfg *config.V3ioConfig) error {
 		cfg.Verbose = rc.verbose
 	}
 	if cfg.MaximumChunkSize == 0 {
-		cfg.MaximumChunkSize = maximumChunkSize
+		cfg.MaximumChunkSize = defaultMaximumChunkSize
 	}
 	if cfg.MinimumChunkSize == 0 {
-		cfg.MinimumChunkSize = minimumChunkSize
+		cfg.MinimumChunkSize = defaultMinimumChunkSize
 	}
 	if cfg.MaximumSampleSize == 0 {
-		cfg.MaximumSampleSize = maximumSampleSize
+		cfg.MaximumSampleSize = defaultMaximumSampleSize
 	}
 	if cfg.MinimumSampleSize == 0 {
-		cfg.MinimumSampleSize = minimumSampleSize
+		cfg.MinimumSampleSize = defaultMinimumSampleSize
 	}
 	if cfg.MaximumPartitionSize == 0 {
-		cfg.MaximumPartitionSize = maximumPartitionSize
+		cfg.MaximumPartitionSize = defaultMaximumPartitionSize
 	}
 	rc.v3iocfg = cfg
 	return nil

@@ -161,7 +161,7 @@ func (cc *createCommandeer) calculatePartitionAndChunkInterval(rateInHours int) 
 	// Make sure the expected chunk size is greater then the supported minimum.
 	if chunkInterval < minNumberOfEventsPerChunk/rateInHours {
 		return "", "", fmt.Errorf(
-			"calculated chunk size is less then minimum, rate - %v, calculated chunk interval - %v, minimun size - %v",
+			"calculated chunk size is less then minimum, rate - %v/h, calculated chunk interval - %v, minimum size - %v",
 			rateInHours, chunkInterval, cc.rootCommandeer.v3iocfg.MinimumChunkSize)
 	}
 
