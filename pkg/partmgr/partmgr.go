@@ -230,7 +230,7 @@ func (p *DBPartition) GetStartTime() int64 {
 }
 
 func (p *DBPartition) GetEndTime() int64 {
-	return p.startTime + p.partitionInterval
+	return p.startTime + p.partitionInterval - 1
 }
 
 // return path to metrics table
@@ -272,7 +272,10 @@ func (p *DBPartition) Time2Bucket(t int64) int {
 	if p.rollupTime == 0 {
 		return 0
 	}
-	return int((t-p.startTime)/p.rollupTime) % p.rollupBuckets
+	if t > p.GetEndTime() {
+		return p.rollupBuckets - 1
+	}
+	return int((t - p.startTime) / p.rollupTime)
 }
 
 // get nearest chunk start

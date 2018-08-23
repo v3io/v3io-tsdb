@@ -33,6 +33,10 @@ import (
 	"strings"
 )
 
+const defaultMinimumSampleSize, defaultMaximumSampleSize = 2, 8     // bytes
+const defaultMaximumPartitionSize = 1700000                         // 1.7MB
+const defaultMinimumChunkSize, defaultMaximumChunkSize = 200, 62000 // bytes
+
 type RootCommandeer struct {
 	adapter     *tsdb.V3ioAdapter
 	logger      logger.Logger
@@ -132,6 +136,21 @@ func (rc *RootCommandeer) populateConfig(cfg *config.V3ioConfig) error {
 	}
 	if rc.verbose != "" {
 		cfg.Verbose = rc.verbose
+	}
+	if cfg.MaximumChunkSize == 0 {
+		cfg.MaximumChunkSize = defaultMaximumChunkSize
+	}
+	if cfg.MinimumChunkSize == 0 {
+		cfg.MinimumChunkSize = defaultMinimumChunkSize
+	}
+	if cfg.MaximumSampleSize == 0 {
+		cfg.MaximumSampleSize = defaultMaximumSampleSize
+	}
+	if cfg.MinimumSampleSize == 0 {
+		cfg.MinimumSampleSize = defaultMinimumSampleSize
+	}
+	if cfg.MaximumPartitionSize == 0 {
+		cfg.MaximumPartitionSize = defaultMaximumPartitionSize
 	}
 	rc.v3iocfg = cfg
 	return nil
