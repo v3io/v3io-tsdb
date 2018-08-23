@@ -34,7 +34,7 @@ import (
 )
 
 const defaultMinimumSampleSize, defaultMaximumSampleSize = 2, 8     // bytes
-const defaultMaximumPartitionSize = 2000000                         // 2MB
+const defaultMaximumPartitionSize = 1700000                         // 1.7MB
 const defaultMinimumChunkSize, defaultMaximumChunkSize = 200, 62000 // bytes
 
 type RootCommandeer struct {
