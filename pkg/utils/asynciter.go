@@ -24,7 +24,7 @@ import (
 	"github.com/nuclio/logger"
 	"github.com/pkg/errors"
 	"github.com/v3io/v3io-go-http"
-	"strings"
+	"net/http"
 )
 
 type ItemsCursor interface {
@@ -155,8 +155,7 @@ func (ic *AsyncItemsCursor) NextItem() (v3io.Item, error) {
 	defer resp.Release()
 
 	// Ignore 404s
-	// TODO: use response status code once it will be returned from 'v3io-go-http'
-	if resp.Error != nil && strings.Contains(resp.Error.Error(), "status 404") {
+	if e, hasErrorCode := resp.Error.(v3io.ErrorWithStatusCode); hasErrorCode && e.StatusCode() == http.StatusNotFound {
 		ic.logger.Debug("Got 404 - error: %v, request: %v", resp.Error, resp.Request().Input)
 		ic.lastShards++
 		return ic.NextItem()
