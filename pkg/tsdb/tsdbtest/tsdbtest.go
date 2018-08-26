@@ -1,6 +1,7 @@
 package tsdbtest
 
 import (
+	json2 "encoding/json"
 	"fmt"
 	"github.com/v3io/v3io-tsdb/pkg/config"
 	. "github.com/v3io/v3io-tsdb/pkg/tsdb"
@@ -10,7 +11,6 @@ import (
 	"strings"
 	"testing"
 	"time"
-	json2 "encoding/json"
 )
 
 type DataPoint struct {
