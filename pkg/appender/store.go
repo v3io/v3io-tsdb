@@ -402,9 +402,7 @@ func (cs *chunkStore) appendExpression(chunk *attrAppender) string {
 		val := base64.StdEncoding.EncodeToString(bytes)
 
 		// overwrite, merge, or append based on the chunk state
-		if chunk.state&chunkStateCommitted != 0 {
-			expr = fmt.Sprintf("%s=%s+blob('%s'); ", attr, attr, val)
-		} else if chunk.state&chunkStateMerge != 0 {
+		if chunk.state&chunkStateCommitted != 0 && chunk.state&chunkStateMerge != 0 {
 			expr = fmt.Sprintf("%s=if_not_exists(%s,blob('')) + blob('%s'); ", attr, attr, val)
 		} else {
 			expr = fmt.Sprintf("%s=blob('%s'); ", attr, val)
