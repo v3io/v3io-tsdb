@@ -33,7 +33,7 @@ func Str2duration(duration string) (int64, error) {
 	multiply := 3600 * 1000 // hour by default
 	if len(duration) > 0 {
 		last := duration[len(duration)-1:]
-		if last == "m" || last == "h" || last == "d" || last == "y" {
+		if last == "m" || last == "h" || last == "d" {
 			duration = duration[0 : len(duration)-1]
 			switch last {
 			case "m":
@@ -42,10 +42,6 @@ func Str2duration(duration string) (int64, error) {
 				multiply = 3600 * 1000
 			case "d":
 				multiply = 24 * 3600 * 1000
-			case "w":
-				multiply = 7 * 24 * 3600 * 1000
-			case "y":
-				multiply = 365 * 24 * 3600 * 1000
 			}
 		}
 	}
@@ -56,7 +52,8 @@ func Str2duration(duration string) (int64, error) {
 
 	i, err := strconv.Atoi(duration)
 	if err != nil {
-		return 0, errors.Wrap(err, "not a valid duration, use nn[s|h|m|d|y]")
+		return 0, errors.Wrap(err,
+			`not a valid duration. Accepted pattern: [0-9]+[dhms]. Examples: 30d (30 days), 5m (5 minutes)`)
 	}
 
 	return int64(i * multiply), nil
@@ -70,14 +67,14 @@ func Str2unixTime(tstr string) (int64, error) {
 	} else if strings.HasPrefix(tstr, "now-") {
 		t, err := Str2duration(tstr[4:])
 		if err != nil {
-			return 0, errors.Wrap(err, "not a valid time 'now-??', 'now' need to follow with nn[s|h|m|d|y]")
+			return 0, errors.Wrap(err, "could not parse pattern following 'now-'")
 		}
 		return time.Now().Unix()*1000 - int64(t), nil
 	}
 
 	tint, err := strconv.Atoi(tstr)
 	if err == nil {
-		return int64(tint) * 1000, nil
+		return int64(tint), nil
 	}
 
 	t, err := time.Parse(time.RFC3339, tstr)

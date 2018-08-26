@@ -129,6 +129,8 @@ func (qc *queryCommandeer) query() error {
 	qc.rootCommandeer.logger.DebugWith("Query", "from", from, "to", to, "name", qc.name,
 		"filter", qc.filter, "functions", qc.functions, "step", qc.step)
 
+	startTime := time.Now()
+
 	qry, err := qc.rootCommandeer.adapter.Querier(nil, from, to)
 	if err != nil {
 		return errors.Wrap(err, "Failed to initialize Querier")
@@ -166,33 +168,11 @@ func (qc *queryCommandeer) query() error {
 		return errors.Wrap(err, "failed to start formatter "+qc.output)
 	}
 
-	return f.Write(qc.cmd.OutOrStdout(), set)
-
-	//return qc.printSet(set)
-}
-
-func (qc *queryCommandeer) printSet(set querier.SeriesSet) error {
-
-	for set.Next() {
-		if set.Err() != nil {
-			return set.Err()
-		}
-
-		series := set.At()
-		fmt.Println("Lables:", series.Labels())
-		iter := series.Iterator()
-		for iter.Next() {
-
-			if iter.Err() != nil {
-				return iter.Err()
-			}
-
-			t, v := iter.At()
-			timeString := time.Unix(t/1000, 0).Format(time.RFC3339)
-			fmt.Printf("%s  v=%.2f\n", timeString, v)
-		}
-		fmt.Println()
+	err = f.Write(qc.cmd.OutOrStdout(), set)
+	if err == nil {
+		fmt.Println("Query done, took ", time.Since(startTime))
 	}
 
-	return nil
+	return err
+
 }

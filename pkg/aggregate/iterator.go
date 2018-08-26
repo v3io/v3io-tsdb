@@ -45,11 +45,11 @@ func NewAggregateSeries(functions, col string, buckets int, interval, rollupTime
 
 	split := strings.Split(functions, ",")
 	var aggrMask AggrType
-	aggrList := []AggrType{}
+	var aggrList []AggrType
 	for _, s := range split {
 		aggr, ok := aggrTypeString[s]
 		if !ok {
-			return nil, fmt.Errorf("Invalid aggragator type %s", s)
+			return nil, fmt.Errorf("invalid aggragator type %s", s)
 		}
 		aggrMask = aggrMask | aggr
 		aggrList = append(aggrList, aggr)
@@ -87,7 +87,7 @@ func (as *AggregateSeries) toAttrName(aggr AggrType) string {
 }
 
 func (as *AggregateSeries) GetAttrNames() []string {
-	names := []string{}
+	var names []string
 
 	for _, aggr := range rawAggregators {
 		if aggr&as.aggrMask != 0 {
@@ -115,7 +115,7 @@ func (as *AggregateSeries) NewSetFromAttrs(
 		if aggr&as.aggrMask != 0 {
 			attrBlob, ok := (*attrs)[as.toAttrName(aggr)]
 			if !ok {
-				return nil, fmt.Errorf("Aggregation Attribute %s was not found", as.toAttrName(aggr))
+				return nil, fmt.Errorf("aggregation attribute %s was not found", as.toAttrName(aggr))
 			}
 			aggrArrays[aggr] = utils.AsInt64Array(attrBlob.([]byte))
 			dataArrays[aggr] = make([]float64, length, length)
@@ -178,7 +178,6 @@ func (as *AggregateSeries) NewSetFromChunks(length int) *AggregateSet {
 
 	newAggregateSet.dataArrays = dataArrays
 	return &newAggregateSet
-
 }
 
 type AggregateSet struct {
@@ -197,7 +196,7 @@ func (as *AggregateSet) GetMaxCell() int {
 // append the value to a cell in all relevant aggregation arrays
 func (as *AggregateSet) AppendAllCells(cell int, val float64) {
 
-	if cell >= as.length {
+	if !isValidCell(cell, as) {
 		return
 	}
 
@@ -205,7 +204,7 @@ func (as *AggregateSet) AppendAllCells(cell int, val float64) {
 		as.maxCell = cell
 	}
 
-	for aggr, _ := range as.dataArrays {
+	for aggr := range as.dataArrays {
 		as.updateCell(aggr, cell, val)
 	}
 }
@@ -227,12 +226,24 @@ func (as *AggregateSet) mergeArrayCell(aggr AggrType, cell int, val uint64) {
 	} else {
 		float := math.Float64frombits(val)
 		as.updateCell(aggr, cell, float)
-
 	}
+}
+
+func isValidValue(v float64) bool {
+	return !(math.IsNaN(v) || math.IsInf(v, 1) || math.IsInf(v, -1))
+}
+
+func isValidCell(cellIndex int, aSet *AggregateSet) bool {
+	return cellIndex >= 0 &&
+		cellIndex < aSet.length
 }
 
 // function specific aggregation
 func (as *AggregateSet) updateCell(aggr AggrType, cell int, val float64) {
+
+	if !isValidCell(cell, as) {
+		return
+	}
 
 	switch aggr {
 	case aggrTypeCount:
@@ -255,36 +266,54 @@ func (as *AggregateSet) updateCell(aggr AggrType, cell int, val float64) {
 }
 
 // return the value per aggregate or complex function
-func (as *AggregateSet) GetCellValue(aggr AggrType, cell int) float64 {
+func (as *AggregateSet) GetCellValue(aggr AggrType, cell int) (float64, bool) {
 
-	if cell > as.maxCell || cell >= as.length { // TODO: should >Len return NaN or Zero ?
-		return math.NaN()
+	if !isValidCell(cell, as) {
+		return math.NaN(), false
+	}
+
+	dependsOnSumAndCount := aggr == aggrTypeStddev || aggr == aggrTypeStdvar || aggr == aggrTypeAvg
+	dependsOnSqr := aggr == aggrTypeStddev || aggr == aggrTypeStdvar
+	dependsOnLast := aggr == aggrTypeLast || aggr == aggrTypeRate
+
+	// return undefined result one dependant fields is missing
+	if (dependsOnSumAndCount && !(isValidValue(as.dataArrays[aggrTypeSum][cell]) && isValidValue(as.dataArrays[aggrTypeCount][cell]))) ||
+		(dependsOnSqr && !isValidValue(as.dataArrays[aggrTypeSqr][cell])) ||
+		(dependsOnLast && !isValidValue(as.dataArrays[aggrTypeLast][cell])) {
+		return math.NaN(), false
+	}
+
+	// if no samples in this bucket the result is undefined
+	var cnt float64
+	if dependsOnSumAndCount {
+		cnt = as.dataArrays[aggrTypeCount][cell]
+		if cnt == 0 {
+			return math.NaN(), false
+		}
 	}
 
 	switch aggr {
 	case aggrTypeAvg:
-		return as.dataArrays[aggrTypeSum][cell] / as.dataArrays[aggrTypeCount][cell]
+		return as.dataArrays[aggrTypeSum][cell] / cnt, true
 	case aggrTypeStddev:
-		cnt := as.dataArrays[aggrTypeCount][cell]
 		sum := as.dataArrays[aggrTypeSum][cell]
 		sqr := as.dataArrays[aggrTypeSqr][cell]
-		return math.Sqrt((cnt*sqr - sum*sum) / (cnt * (cnt - 1)))
+		return math.Sqrt((cnt*sqr - sum*sum) / (cnt * (cnt - 1))), true
 	case aggrTypeStdvar:
-		cnt := as.dataArrays[aggrTypeCount][cell]
 		sum := as.dataArrays[aggrTypeSum][cell]
 		sqr := as.dataArrays[aggrTypeSqr][cell]
-		return (cnt*sqr - sum*sum) / (cnt * (cnt - 1))
+		return (cnt*sqr - sum*sum) / (cnt * (cnt - 1)), true
 	case aggrTypeRate:
 		if cell == 0 {
-			return math.NaN()
+			return math.NaN(), false
 		}
+		// TODO: need to clarify the meaning of this type of aggregation. IMHO, rate has meaning for monotonic counters only
 		last := as.dataArrays[aggrTypeLast][cell-1]
 		this := as.dataArrays[aggrTypeLast][cell]
-		return (this - last) / float64(as.interval/1000) // clac rate per sec
+		return (this - last) / float64(as.interval/1000), true // rate per sec
 	default:
-		return as.dataArrays[aggr][cell]
+		return as.dataArrays[aggr][cell], true
 	}
-
 }
 
 // get the time per aggregate cell
@@ -300,7 +329,7 @@ func (as *AggregateSet) GetCellTime(base int64, index int) int64 {
 
 func (as *AggregateSet) Clear() {
 	as.maxCell = 0
-	for aggr, _ := range as.dataArrays {
+	for aggr := range as.dataArrays {
 		as.dataArrays[aggr] = as.dataArrays[aggr][:0]
 	}
 }

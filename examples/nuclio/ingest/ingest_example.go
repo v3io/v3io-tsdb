@@ -6,6 +6,7 @@ import (
 	"github.com/v3io/v3io-go-http"
 	"github.com/v3io/v3io-tsdb/pkg/config"
 	"github.com/v3io/v3io-tsdb/pkg/tsdb"
+	"github.com/v3io/v3io-tsdb/pkg/tsdb/tsdbtest"
 	"github.com/v3io/v3io-tsdb/pkg/utils"
 	"sync"
 )
@@ -13,7 +14,7 @@ import (
 // Configuration
 // Note: the TSDB (path) must be first created using the CLI or API
 // the user must also define the v3io data binding in the nuclio function with path, username, password and name it db0
-const tsdbConfig = `
+var tsdbConfig = `
 path: "pmetric"
 `
 
@@ -26,18 +27,11 @@ const pushEvent = `
 }
 `
 
-type Sample struct {
-	Lset  utils.Labels
-	Time  string
-	Value float64
-}
-
 var adapter *tsdb.V3ioAdapter
 var adapterMtx sync.RWMutex
 
 func Handler(context *nuclio.Context, event nuclio.Event) (interface{}, error) {
-
-	sample := Sample{}
+	sample := tsdbtest.Sample{}
 	err := json.Unmarshal(event.GetBody(), &sample)
 	if err != nil {
 		return nil, err
@@ -57,7 +51,6 @@ func Handler(context *nuclio.Context, event nuclio.Event) (interface{}, error) {
 
 	// Append sample to metric
 	_, err = app.Add(sample.Lset, t, sample.Value)
-
 	return "", err
 }
 

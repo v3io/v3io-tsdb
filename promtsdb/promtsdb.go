@@ -26,7 +26,7 @@ func NewV3ioProm(cfg *config.V3ioConfig, container *v3io.Container, logger logge
 }
 
 func (a *V3ioPromAdapter) Appender() (storage.Appender, error) {
-	err := a.db.MetricsCache.StartIfNeeded()
+	err := a.db.InitAppenderCache()
 	if err != nil {
 		return nil, err
 	}
@@ -89,6 +89,10 @@ func match2filter(oms []*labels.Matcher) (string, string, string) {
 				filter = append(filter, fmt.Sprintf("%s=='%s'", matcher.Name, matcher.Value))
 			case labels.MatchNotEqual:
 				filter = append(filter, fmt.Sprintf("%s!='%s'", matcher.Name, matcher.Value))
+			case labels.MatchRegexp:
+				filter = append(filter, fmt.Sprintf("regexp_instr(%s,'%s') == 0", matcher.Name, matcher.Value))
+			case labels.MatchNotRegexp:
+				filter = append(filter, fmt.Sprintf("regexp_instr(%s,'%s') != 0", matcher.Name, matcher.Value))
 
 			}
 		}
@@ -143,7 +147,7 @@ func (s *V3ioPromSeriesIterator) Next() bool { return s.s.Next() }
 // At returns the current timestamp/value pair.
 func (s *V3ioPromSeriesIterator) At() (t int64, v float64) { return s.s.At() }
 
-// Err returns the current error.
+// error returns the current error.
 func (s *V3ioPromSeriesIterator) Err() error { return s.s.Err() }
 
 type v3ioAppender struct {

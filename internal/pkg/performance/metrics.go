@@ -10,8 +10,8 @@ import (
 	"sync"
 	"github.com/pkg/errors"
 	"github.com/v3io/v3io-tsdb/pkg/config"
-	"time"
 	"log"
+	"time"
 )
 
 type MetricReporter struct {
@@ -58,9 +58,40 @@ func (mr *MetricReporter) NewTimer(name string) (metrics.Timer, error) {
 	if mr.running {
 		timer = metrics.GetOrRegisterTimer(name, mr.registry)
 	} else {
-		return nil, errors.Errorf("metric reporter in not running")
+		return nil, errors.Errorf("failed to create timer '%s'. Reason: metric reporter in not running", name)
 	}
 	return timer, nil
+}
+
+func (mr *MetricReporter) NewCounter(name string) (metrics.Counter, error) {
+	var counter metrics.Counter
+	if mr.running {
+		counter = metrics.GetOrRegisterCounter(name, mr.registry)
+	} else {
+		return nil, errors.Errorf("failed to create counter '%s'. Reason: metric reporter in not running", name)
+	}
+	return counter, nil
+}
+
+func (mr *MetricReporter) NewMeter(name string) (metrics.Meter, error) {
+	var meter metrics.Meter
+	if mr.running {
+		meter = metrics.GetOrRegisterMeter(name, mr.registry)
+	} else {
+		return nil, errors.Errorf("failed to create meter '%s'. Reason: metric reporter in not running", name)
+	}
+	return meter, nil
+}
+
+func (mr *MetricReporter) NewHistogram(name string, reservoirSize int) (metrics.Histogram, error) {
+	var histogram metrics.Histogram
+	if mr.running {
+		sample := metrics.NewUniformSample(reservoirSize)
+		histogram = metrics.GetOrRegisterHistogram(name, mr.registry, sample)
+	} else {
+		return nil, errors.Errorf("failed to create histogram '%s'. Reason: metric reporter in not running", name)
+	}
+	return histogram, nil
 }
 
 func NewMetricReporterFromConfiguration(writer io.Writer, config *config.V3ioConfig) *MetricReporter {

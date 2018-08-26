@@ -21,19 +21,28 @@ such restriction.
 package tsdbctl
 
 import (
+	"fmt"
+	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
+	"github.com/v3io/v3io-tsdb/pkg/aggregate"
 	"github.com/v3io/v3io-tsdb/pkg/config"
 	"github.com/v3io/v3io-tsdb/pkg/tsdb"
+	"strconv"
 )
 
+const schemaVersion = 0
+const defaultStorageClass = "local"
+
 type createCommandeer struct {
-	cmd            *cobra.Command
-	rootCommandeer *RootCommandeer
-	path           string
-	daysPerObj     int
-	hrInChunk      int
-	defaultRollups string
-	rollupMin      int
+	cmd             *cobra.Command
+	rootCommandeer  *RootCommandeer
+	path            string
+	storageClass    string
+	defaultRollups  string
+	rollupInterval  string
+	shardingBuckets int
+	sampleRetention int
+	sampleRate      string
 }
 
 func newCreateCommandeer(rootCommandeer *RootCommandeer) *createCommandeer {
@@ -51,11 +60,12 @@ func newCreateCommandeer(rootCommandeer *RootCommandeer) *createCommandeer {
 		},
 	}
 
-	cmd.Flags().IntVarP(&commandeer.daysPerObj, "days", "d", 1, "number of days covered per partition")
-	cmd.Flags().IntVarP(&commandeer.hrInChunk, "chunk-hours", "t", 1, "number of hours in a single chunk")
 	cmd.Flags().StringVarP(&commandeer.defaultRollups, "rollups", "r", "",
 		"Default aggregation rollups, comma seperated: count,avg,sum,min,max,stddev")
-	cmd.Flags().IntVarP(&commandeer.rollupMin, "rollup-interval", "i", 60, "aggregation interval in minutes")
+	cmd.Flags().StringVarP(&commandeer.rollupInterval, "rollup-interval", "i", "1h", "aggregation interval")
+	cmd.Flags().IntVarP(&commandeer.shardingBuckets, "sharding-buckets", "b", 8, "number of buckets to split key")
+	cmd.Flags().IntVarP(&commandeer.sampleRetention, "sample-retention", "a", 0, "sample retention in hours")
+	cmd.Flags().StringVar(&commandeer.sampleRate, "rate", "12/m", "sample rate")
 
 	commandeer.cmd = cmd
 
@@ -69,13 +79,126 @@ func (cc *createCommandeer) create() error {
 		return err
 	}
 
-	dbcfg := config.DBPartConfig{
-		DaysPerObj:     cc.daysPerObj,
-		HrInChunk:      cc.hrInChunk,
-		DefaultRollups: cc.defaultRollups,
-		RollupMin:      cc.rollupMin,
+	if err := cc.validateFormat(cc.rollupInterval); err != nil {
+		return errors.Wrap(err, "failed to parse rollup interval")
 	}
 
-	return tsdb.CreateTSDB(cc.rootCommandeer.v3iocfg, &dbcfg)
+	rollups, err := aggregate.AggregatorsToStringList(cc.defaultRollups)
+	if err != nil {
+		return errors.Wrap(err, "failed to parse default rollups")
+	}
 
+	rateInHours, err := rateToHours(cc.sampleRate)
+	if err != nil {
+		return errors.Wrap(err, "failed to parse sample rate")
+	}
+
+	chunkInterval, partitionInterval, err := cc.calculatePartitionAndChunkInterval(rateInHours)
+	if err != nil {
+		return errors.Wrap(err, "failed to calculate chunk interval")
+	}
+
+	defaultRollup := config.Rollup{
+		Aggregators:            rollups,
+		AggregatorsGranularity: cc.rollupInterval,
+		StorageClass:           defaultStorageClass,
+		SampleRetention:        cc.sampleRetention,
+		LayerRetentionTime:     "1y", //TODO
+	}
+
+	tableSchema := config.TableSchema{
+		Version:             schemaVersion,
+		RollupLayers:        []config.Rollup{defaultRollup},
+		ShardingBuckets:     cc.shardingBuckets,
+		PartitionerInterval: partitionInterval,
+		ChunckerInterval:    chunkInterval,
+	}
+
+	fields, err := aggregate.SchemaFieldFromString(rollups, "v")
+	if err != nil {
+		return errors.Wrap(err, "failed to create aggregators list")
+	}
+	fields = append(fields, config.SchemaField{Name: "_name", Type: "string", Nullable: false, Items: ""})
+
+	partitionSchema := config.PartitionSchema{
+		Version:                tableSchema.Version,
+		Aggregators:            rollups,
+		AggregatorsGranularity: cc.rollupInterval,
+		StorageClass:           defaultStorageClass,
+		SampleRetention:        cc.sampleRetention,
+		ChunckerInterval:       tableSchema.ChunckerInterval,
+		PartitionerInterval:    tableSchema.PartitionerInterval,
+	}
+
+	schema := config.Schema{
+		TableSchemaInfo:     tableSchema,
+		PartitionSchemaInfo: partitionSchema,
+		Partitions:          []config.Partition{},
+		Fields:              fields,
+	}
+
+	return tsdb.CreateTSDB(cc.rootCommandeer.v3iocfg, &schema)
+}
+
+func (cc *createCommandeer) validateFormat(format string) error {
+	interval := format[0 : len(format)-1]
+	if _, err := strconv.Atoi(interval); err != nil {
+		return errors.New("format is incorrect, not a number")
+	}
+	unit := string(format[len(format)-1])
+	if !(unit == "m" || unit == "d" || unit == "h") {
+		return errors.New("format is incorrect, not part of m,d,h")
+	}
+	return nil
+}
+
+func (cc *createCommandeer) calculatePartitionAndChunkInterval(rateInHours int) (string, string, error) {
+	maxNumberOfEventsPerChunk := cc.rootCommandeer.v3iocfg.MaximumChunkSize / cc.rootCommandeer.v3iocfg.MaximumSampleSize
+	minNumberOfEventsPerChunk := cc.rootCommandeer.v3iocfg.MinimumChunkSize / cc.rootCommandeer.v3iocfg.MinimumSampleSize
+
+	chunkInterval := maxNumberOfEventsPerChunk / rateInHours
+
+	// Make sure the expected chunk size is greater then the supported minimum.
+	if chunkInterval < minNumberOfEventsPerChunk/rateInHours {
+		return "", "", fmt.Errorf(
+			"calculated chunk size is less then minimum, rate - %v/h, calculated chunk interval - %v, minimum size - %v",
+			rateInHours, chunkInterval, cc.rootCommandeer.v3iocfg.MinimumChunkSize)
+	}
+
+	actualCapacityOfChunk := chunkInterval * rateInHours * cc.rootCommandeer.v3iocfg.MaximumSampleSize
+	numberOfChunksInPartition := cc.rootCommandeer.v3iocfg.MaximumPartitionSize / actualCapacityOfChunk
+	partitionInterval := numberOfChunksInPartition * chunkInterval
+	return strconv.Itoa(chunkInterval) + "h", strconv.Itoa(partitionInterval) + "h", nil
+}
+
+func rateToHours(sampleRate string) (int, error) {
+	parsingError := errors.New(`not a valid rate. Accepted pattern: [0-9]+/[hms]. Examples: 12/m`)
+
+	if len(sampleRate) < 3 {
+		return 0, parsingError
+	}
+	if sampleRate[len(sampleRate)-2] != '/' {
+		return 0, parsingError
+	}
+
+	last := sampleRate[len(sampleRate)-1]
+	// get the number ignoring slash and time unit
+	sampleRate = sampleRate[:len(sampleRate)-2]
+	i, err := strconv.Atoi(sampleRate)
+	if err != nil {
+		return 0, errors.Wrap(err, parsingError.Error())
+	}
+	if i <= 0 {
+		return 0, errors.New("rate should be a positive number")
+	}
+	switch last {
+	case 's':
+		return i * 60 * 60, nil
+	case 'm':
+		return i * 60, nil
+	case 'h':
+		return i, nil
+	default:
+		return 0, parsingError
+	}
 }

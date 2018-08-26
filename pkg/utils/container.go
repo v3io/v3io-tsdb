@@ -42,7 +42,7 @@ func NewLogger(verbose string) (logger.Logger, error) {
 	case "error":
 		logLevel = nucliozap.ErrorLevel
 	default:
-		logLevel = nucliozap.InfoLevel
+		logLevel = nucliozap.WarnLevel
 	}
 
 	log, err := nucliozap.NewNuclioZapCmd("v3io-prom", logLevel)
@@ -85,11 +85,9 @@ func AsInt64Array(val []byte) []uint64 {
 	return array
 }
 
-func DeleteTable(container *v3io.Container, path, filter string, workers int) error {
-
+func DeleteTable(logger logger.Logger, container *v3io.Container, path, filter string, workers int) error {
 	input := v3io.GetItemsInput{Path: path, AttributeNames: []string{"__name"}, Filter: filter}
-	iter, err := NewAsyncItemsCursor(container, &input, workers)
-	//iter, err := container.Sync.GetItemsCursor(&input)
+	iter, err := NewAsyncItemsCursor(container, &input, workers, []string{}, logger)
 	if err != nil {
 		return err
 	}
@@ -127,17 +125,19 @@ func respWaitLoop(comm chan int, responseChan chan *v3io.Response, timeout time.
 	done := make(chan bool)
 
 	go func() {
+		active := false
 		for {
 			select {
 
 			case resp := <-responseChan:
 				responses++
+				active = true
+
 				if resp.Error != nil {
 					fmt.Println(resp.Error, "failed Delete response")
 				}
 
 				if requests == responses {
-					fmt.Println()
 					done <- true
 					return
 				}
@@ -149,9 +149,13 @@ func respWaitLoop(comm chan int, responseChan chan *v3io.Response, timeout time.
 				}
 
 			case <-time.After(timeout):
-				fmt.Println("\nResp loop timed out! ", requests, responses)
-				done <- true
-				return
+				if !active {
+					fmt.Println("\nResp loop timed out! ", requests, responses)
+					done <- true
+					return
+				} else {
+					active = false
+				}
 			}
 		}
 	}()
