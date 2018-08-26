@@ -29,6 +29,9 @@ func TestGetV3ioConfigPath(t *testing.T) {
 		{description: "get config from package testdata",
 			expectedPath: filepath.Join(TsdbDefaultTestConfigPath, config.DefaultConfigurationFileName),
 			setup: func() func() {
+				// Make this test agnostic to environment variables at runtime (store & recover on exit)
+				configPathEnv := os.Getenv(config.V3ioConfigEnvironmentVariable)
+				os.Unsetenv(config.V3ioConfigEnvironmentVariable)
 				if _, err := os.Stat(filepath.Join(TsdbDefaultTestConfigPath, config.DefaultConfigurationFileName)); !os.IsNotExist(err) {
 					return func() {}
 				} else {
@@ -38,6 +41,7 @@ func TestGetV3ioConfigPath(t *testing.T) {
 					}
 					createTestConfig(t, path)
 					return func() {
+						os.Setenv(config.V3ioConfigEnvironmentVariable, configPathEnv)
 						os.RemoveAll(path)
 					}
 				}
@@ -46,12 +50,16 @@ func TestGetV3ioConfigPath(t *testing.T) {
 		{description: "get config from project root",
 			expectedPath: filepath.Join(projectHome, config.DefaultConfigurationFileName),
 			setup: func() func() {
+				// Make this test agnostic to environment variables at runtime (store & recover on exit)
+				configPathEnv := os.Getenv(config.V3ioConfigEnvironmentVariable)
+				os.Unsetenv(config.V3ioConfigEnvironmentVariable)
 				if _, err := os.Stat(filepath.Join(projectHome, config.DefaultConfigurationFileName)); !os.IsNotExist(err) {
 					return func() {}
 				} else {
 					path := projectHome
 					createTestConfig(t, path)
 					return func() {
+						os.Setenv(config.V3ioConfigEnvironmentVariable, configPathEnv)
 						os.Remove(path)
 					}
 				}
@@ -60,9 +68,9 @@ func TestGetV3ioConfigPath(t *testing.T) {
 		{description: "get config from env var",
 			expectedPath: config.DefaultConfigurationFileName,
 			setup: func() func() {
-				os.Setenv(V3ioConfigEnvironmentVariable, config.DefaultConfigurationFileName)
+				os.Setenv(config.V3ioConfigEnvironmentVariable, config.DefaultConfigurationFileName)
 				return func() {
-					os.Unsetenv(V3ioConfigEnvironmentVariable)
+					os.Unsetenv(config.V3ioConfigEnvironmentVariable)
 				}
 			}},
 	}
