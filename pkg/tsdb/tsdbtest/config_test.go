@@ -32,8 +32,11 @@ func TestGetV3ioConfigPath(t *testing.T) {
 				// Make this test agnostic to environment variables at runtime (store & recover on exit)
 				configPathEnv := os.Getenv(config.V3ioConfigEnvironmentVariable)
 				os.Unsetenv(config.V3ioConfigEnvironmentVariable)
+
 				if _, err := os.Stat(filepath.Join(TsdbDefaultTestConfigPath, config.DefaultConfigurationFileName)); !os.IsNotExist(err) {
-					return func() {}
+					return func() {
+						os.Setenv(config.V3ioConfigEnvironmentVariable, configPathEnv)
+					}
 				} else {
 					path := TsdbDefaultTestConfigPath
 					if err := os.Mkdir(path, 0777); err != nil {
@@ -53,8 +56,11 @@ func TestGetV3ioConfigPath(t *testing.T) {
 				// Make this test agnostic to environment variables at runtime (store & recover on exit)
 				configPathEnv := os.Getenv(config.V3ioConfigEnvironmentVariable)
 				os.Unsetenv(config.V3ioConfigEnvironmentVariable)
+
 				if _, err := os.Stat(filepath.Join(projectHome, config.DefaultConfigurationFileName)); !os.IsNotExist(err) {
-					return func() {}
+					return func() {
+						os.Setenv(config.V3ioConfigEnvironmentVariable, configPathEnv)
+					}
 				} else {
 					path := projectHome
 					createTestConfig(t, path)
@@ -66,12 +72,16 @@ func TestGetV3ioConfigPath(t *testing.T) {
 			}},
 
 		{description: "get config from env var",
-			expectedPath: config.DefaultConfigurationFileName,
+			expectedPath: getConfigPathFromEnvOrDefault(),
 			setup: func() func() {
-				os.Setenv(config.V3ioConfigEnvironmentVariable, config.DefaultConfigurationFileName)
-				return func() {
-					os.Unsetenv(config.V3ioConfigEnvironmentVariable)
+				env := os.Getenv(config.V3ioConfigEnvironmentVariable)
+				if env == "" {
+					os.Setenv(config.V3ioConfigEnvironmentVariable, config.DefaultConfigurationFileName)
+					return func() {
+						os.Unsetenv(config.V3ioConfigEnvironmentVariable)
+					}
 				}
+				return func() {}
 			}},
 	}
 
@@ -80,6 +90,14 @@ func TestGetV3ioConfigPath(t *testing.T) {
 			testGetV3ioConfigPathCase(t, test.expectedPath, test.setup)
 		})
 	}
+}
+
+func getConfigPathFromEnvOrDefault() string {
+	configPath := os.Getenv(config.V3ioConfigEnvironmentVariable)
+	if configPath == "" {
+		configPath = config.DefaultConfigurationFileName
+	}
+	return configPath
 }
 
 func testGetV3ioConfigPathCase(t *testing.T, expected string, setup func() func()) {
