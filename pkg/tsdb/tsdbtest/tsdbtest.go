@@ -1,6 +1,7 @@
 package tsdbtest
 
 import (
+	json2 "encoding/json"
 	"fmt"
 	"github.com/v3io/v3io-tsdb/pkg/config"
 	. "github.com/v3io/v3io-tsdb/pkg/tsdb"
@@ -44,7 +45,8 @@ func DeleteTSDB(t testing.TB, v3ioConfig *config.V3ioConfig) {
 func CreateTestTSDB(t testing.TB, v3ioConfig *config.V3ioConfig) {
 	schema := testutils.CreateSchema(t, "*")
 	if err := CreateTSDB(v3ioConfig, &schema); err != nil {
-		t.Fatalf("Failed to create TSDB. reason: %s", err)
+		v3ioConfigAsJson, _ := json2.MarshalIndent(v3ioConfig, "", "  ")
+		t.Fatalf("Failed to create TSDB. Reason: %s\nConfiguration:\n%s", err, string(v3ioConfigAsJson))
 	}
 }
 
@@ -69,7 +71,8 @@ func SetUpWithData(t *testing.T, v3ioConfig *config.V3ioConfig, metricName strin
 func SetUpWithDBConfig(t *testing.T, v3ioConfig *config.V3ioConfig, schema *config.Schema) func() {
 	v3ioConfig.Path = fmt.Sprintf("%s-%d", t.Name(), time.Now().Nanosecond())
 	if err := CreateTSDB(v3ioConfig, schema); err != nil {
-		t.Fatalf("Failed to create TSDB. reason: %s", err)
+		v3ioConfigAsJson, _ := json2.MarshalIndent(v3ioConfig, "", "  ")
+		t.Fatalf("Failed to create TSDB. Reason: %s\nConfiguration:\n%s", err, string(v3ioConfigAsJson))
 	}
 
 	return func() {

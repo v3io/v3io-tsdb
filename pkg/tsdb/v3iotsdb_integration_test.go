@@ -23,6 +23,7 @@ such restriction.
 package tsdb_test
 
 import (
+	"encoding/json"
 	"github.com/stretchr/testify/assert"
 	"github.com/v3io/v3io-go-http"
 	"github.com/v3io/v3io-tsdb/pkg/chunkenc"
@@ -446,7 +447,8 @@ func TestDeleteTSDB(t *testing.T) {
 	schema := testutils.CreateSchema(t, "count,sum")
 	v3ioConfig.Path = t.Name()
 	if err := CreateTSDB(v3ioConfig, &schema); err != nil {
-		t.Fatalf("Failed to create TSDB. reason: %s", err)
+		v3ioConfigAsJson, _ := json.MarshalIndent(v3ioConfig, "", "  ")
+		t.Fatalf("Failed to create TSDB. Reason: %s\nConfiguration:\n%s", err, string(v3ioConfigAsJson))
 	}
 
 	adapter, err := NewV3ioAdapter(v3ioConfig, nil, nil)
