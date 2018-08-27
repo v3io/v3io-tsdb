@@ -47,7 +47,7 @@ type RootCommandeer struct {
 	dbPath      string
 	cfgFilePath string
 	verbose     string
-	reporter    *performance.MetricReporter
+	Reporter    *performance.MetricReporter
 }
 
 func NewRootCommandeer() *RootCommandeer {
@@ -114,7 +114,7 @@ func (rc *RootCommandeer) initialize() error {
 func (rc *RootCommandeer) populateConfig(cfg *config.V3ioConfig) error {
 	// Initialize performance monitoring
 	// TODO: support custom report writers (file, syslog, tsdb, etc.)
-	rc.reporter = performance.NewMetricReporterFromConfiguration(os.Stderr, cfg)
+	rc.Reporter = performance.NewMetricReporterFromConfiguration(os.Stderr, cfg)
 
 	if rc.v3ioPath != "" {
 		// read username and password

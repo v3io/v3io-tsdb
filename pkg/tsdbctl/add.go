@@ -217,10 +217,10 @@ func (ac *addCommandeer) appendMetrics(append tsdb.Appender, lset utils.Labels) 
 func (ac *addCommandeer) appendMetric(
 	append tsdb.Appender, lset utils.Labels, tarray []int64, varray []float64, print bool) (uint64, error) {
 
-	timer, err := ac.rootCommandeer.reporter.NewTimer("AppendMetricTimer")
+	timer, err := ac.rootCommandeer.Reporter.NewTimer("AppendMetricTimer")
 	var ref uint64
 
-	if err != nil {
+	if err == nil {
 		timer.Time(func() {
 			ac.rootCommandeer.logger.DebugWith("adding value to metric", "lset", lset, "t", tarray, "v", varray)
 
