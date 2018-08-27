@@ -28,10 +28,10 @@ import (
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/cobra/doc"
+	"github.com/v3io/v3io-tsdb/internal/pkg/performance"
 	"github.com/v3io/v3io-tsdb/pkg/config"
 	"github.com/v3io/v3io-tsdb/pkg/tsdb"
 	"strings"
-	"github.com/v3io/v3io-tsdb/internal/pkg/performance"
 )
 
 const defaultMinimumSampleSize, defaultMaximumSampleSize = 2, 8     // bytes
@@ -114,7 +114,7 @@ func (rc *RootCommandeer) initialize() error {
 func (rc *RootCommandeer) populateConfig(cfg *config.V3ioConfig) error {
 	// Initialize performance monitoring
 	// TODO: support custom report writers (file, syslog, tsdb, etc.)
-	rc.Reporter = performance.NewMetricReporterFromConfiguration(os.Stderr, cfg)
+	rc.Reporter = performance.ReporterInstanceFromConfig(os.Stderr, cfg)
 
 	if rc.v3ioPath != "" {
 		// read username and password

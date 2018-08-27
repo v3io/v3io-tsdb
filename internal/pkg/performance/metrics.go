@@ -1,18 +1,21 @@
 package performance
 
 import (
+	"fmt"
+	"github.com/pkg/errors"
 	"github.com/rcrowley/go-metrics"
+	"github.com/v3io/v3io-tsdb/pkg/config"
 	"io"
+	"log"
 	"os"
 	"os/signal"
-	"syscall"
-	"fmt"
 	"sync"
-	"github.com/pkg/errors"
-	"github.com/v3io/v3io-tsdb/pkg/config"
-	"log"
+	"syscall"
 	"time"
 )
+
+var instance *MetricReporter
+var once sync.Once
 
 type MetricReporter struct {
 	lock                  sync.Mutex
@@ -22,6 +25,20 @@ type MetricReporter struct {
 	reportPeriodically    bool
 	reportIntervalSeconds int
 	reportOnShutdown      bool
+}
+
+func ReporterInstance(writer io.Writer, reportPeriodically bool, reportIntervalSeconds int, reportOnShutdown bool) *MetricReporter {
+	once.Do(func() {
+		instance = newMetricReporter(writer, reportPeriodically, reportIntervalSeconds, reportOnShutdown)
+	})
+	return instance
+}
+
+func ReporterInstanceFromConfig(writer io.Writer, config *config.V3ioConfig) *MetricReporter {
+	return ReporterInstance(writer,
+		config.MetricsReporter.ReportPeriodically,
+		config.MetricsReporter.RepotInterval,
+		config.MetricsReporter.ReportOnShutdown)
 }
 
 func (mr *MetricReporter) Start() error {
@@ -94,14 +111,6 @@ func (mr *MetricReporter) NewHistogram(name string, reservoirSize int) (metrics.
 	return histogram, nil
 }
 
-func NewMetricReporterFromConfiguration(writer io.Writer, config *config.V3ioConfig) *MetricReporter {
-	return NewMetricReporter(
-		writer,
-		config.MetricsReporter.ReportPeriodically,
-		config.MetricsReporter.RepotInterval,
-		config.MetricsReporter.ReportOnShutdown)
-}
-
 // Listen to the SIGINT and SIGTERM
 // SIGINT will listen to CTRL-C.
 // SIGTERM will be caught if kill command executed.
@@ -117,7 +126,7 @@ func (mr *MetricReporter) registerShutdownHook() {
 	}()
 }
 
-func NewMetricReporter(outputWriter io.Writer, reportPeriodically bool, reportIntervalSeconds int, reportOnShutdown bool) *MetricReporter {
+func newMetricReporter(outputWriter io.Writer, reportPeriodically bool, reportIntervalSeconds int, reportOnShutdown bool) *MetricReporter {
 	var writer io.Writer
 
 	if outputWriter != nil {

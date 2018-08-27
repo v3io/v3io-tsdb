@@ -20,6 +20,6 @@ func Run() error {
 }
 
 func tearDown(cmd *tsdbctl.RootCommandeer) {
-	time.Sleep(100 *time.Millisecond) // postpone performance report to avoid mixing with other log messages
+	time.Sleep(100 * time.Millisecond) // postpone performance report to avoid mixing with other log messages
 	cmd.Reporter.Stop()
 }
