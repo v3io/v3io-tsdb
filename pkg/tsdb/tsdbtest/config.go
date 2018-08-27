@@ -8,7 +8,6 @@ import (
 	"strings"
 )
 
-const V3ioConfigEnvironmentVariable = "V3IO_CONF"
 const TsdbDefaultTestConfigPath = "testdata"
 const relativeProjectPath = "src/github.com/v3io/v3io-tsdb"
 
@@ -19,7 +18,7 @@ This method will try and load the configuration file from several locations by t
 3. $GOPATH/src/github.com/v3io/v3io-tsdb/v3io.yaml
 */
 func GetV3ioConfigPath() (string, error) {
-	if configurationPath := os.Getenv(V3ioConfigEnvironmentVariable); configurationPath != "" {
+	if configurationPath := os.Getenv(config.V3ioConfigEnvironmentVariable); configurationPath != "" {
 		return configurationPath, nil
 	}
 

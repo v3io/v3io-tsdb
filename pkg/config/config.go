@@ -26,6 +26,7 @@ import (
 	"os"
 )
 
+const V3ioConfigEnvironmentVariable = "V3IO_CONF"
 const DefaultConfigurationFileName = "v3io.yaml"
 const SCHEMA_CONFIG = ".schema"
 
@@ -133,7 +134,7 @@ type MetricConfig struct {
 
 func LoadConfig(path string) (*V3ioConfig, error) {
 
-	envpath := os.Getenv("V3IO_TSDBCFG_PATH")
+	envpath := os.Getenv(V3ioConfigEnvironmentVariable)
 	if envpath != "" {
 		path = envpath
 	}

@@ -87,7 +87,7 @@ AppendOneByOne: true
 ### Define following environment variables.
 > Note: you can also define variables locally in a script
 ```bash 
-    V3IO_TSDBCFG_PATH="$HOME/go/bin/v3io-custom.yaml"
+    V3IO_CONF="$HOME/go/bin/v3io-custom.yaml"
     TSDB_BENCH_INGEST_CONFIG="$HOME/go/bin/tsdb-bench-test-config.yaml"
 ```
 ### Run ingestion benchmark test for desired time interval to populate the TSDB.
@@ -111,7 +111,7 @@ Use the following script as a reference:
     cd $HOME/go/src/github.com/v3io/v3io-tsdb/cmd/tsdbctl
     
     # Note, you can select either "-bench=^BenchmarkIngest$" or "-bench=^BenchmarkIngestWithNuclio$" test
-    time V3IO_TSDBCFG_PATH="$HOME/go/bin/v3io-custom.yaml" TSDB_BENCH_INGEST_CONFIG="$HOME/go/bin/tsdb-bench-test-config.yaml" go test -benchtime $BENCH_TIME -run=DO_NOT_RUN_TESTS -bench=^BenchmarkIngest$ ../../test/benchmark
+    time V3IO_CONF="$HOME/go/bin/v3io-custom.yaml" TSDB_BENCH_INGEST_CONFIG="$HOME/go/bin/tsdb-bench-test-config.yaml" go test -benchtime $BENCH_TIME -run=DO_NOT_RUN_TESTS -bench=^BenchmarkIngest$ ../../test/benchmark
     
     echo Done
 ```
@@ -127,14 +127,14 @@ Use the following script as a reference:
     GOBIN=$HOME/go/bin
     LOOK_BACK_INTERVAL=72h
     TSDB_ROLLUP_INTERVAL=5m
-    V3IO_CONFIG_PATH=$GOBIN/v3io-custom.yaml
+    V3IO_CONF=$GOBIN/v3io-custom.yaml
     
     for x in {A..Z}
     do
       for ((i = 0; i < 10; i++))
       do
         echo Querying Name_${x}_${i} ...
-        $GOBIN/tsdbctl query Name_${x}_${i} -a count -l $LOOK_BACK_INTERVAL -i $TSDB_ROLLUP_INTERVAL  -c $V3IO_CONFIG_PATH
+        $GOBIN/tsdbctl query Name_${x}_${i} -a count -l $LOOK_BACK_INTERVAL -i $TSDB_ROLLUP_INTERVAL  -c $V3IO_CONF
       done
     done
     
