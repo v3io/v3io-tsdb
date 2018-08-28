@@ -109,8 +109,12 @@ func (p *PartitionManager) IsCyclic() bool {
 	return p.cyclic
 }
 
-func (p *PartitionManager) GetPartitions() []*DBPartition {
-	return p.partitions
+func (p *PartitionManager) GetPartitionsPaths() []string {
+	var paths []string
+	for _, part := range p.partitions {
+		paths = append(paths, part.GetTablePath())
+	}
+	return paths
 }
 
 func (p *PartitionManager) GetConfig() *config.Schema {
@@ -192,7 +196,7 @@ func (p *PartitionManager) updatePartitionInSchema(partition *DBPartition) error
 func (p *PartitionManager) PartsForRange(mint, maxt int64) []*DBPartition {
 	var parts []*DBPartition
 	for _, part := range p.partitions {
-		if part.startTime+p.currentPartitionInterval >= mint && (maxt == 0 || part.startTime <= maxt) {
+		if part.startTime >= mint && (maxt == 0 || part.startTime < maxt) {
 			parts = append(parts, part)
 		}
 	}
@@ -275,11 +279,20 @@ func (p *DBPartition) Time2Bucket(t int64) int {
 	if t > p.GetEndTime() {
 		return p.rollupBuckets - 1
 	}
+	if t < p.GetStartTime() {
+		return 0
+	}
 	return int((t - p.startTime) / p.rollupTime)
 }
 
 // get nearest chunk start
 func (p *DBPartition) GetChunkMint(t int64) int64 {
+	if t > p.GetEndTime() {
+		return p.GetEndTime() - p.chunkInterval + 1
+	}
+	if t < p.GetStartTime() {
+		return p.startTime
+	}
 	return p.chunkInterval * (t / p.chunkInterval)
 }
 
@@ -294,8 +307,12 @@ func (p *DBPartition) IsAheadOfChunk(mint, t int64) bool {
 }
 
 // Get ID of the Chunk covering time t
-func (p *DBPartition) TimeToChunkId(tmilli int64) int {
-	return int((tmilli-p.startTime)/p.chunkInterval) + 1
+func (p *DBPartition) TimeToChunkId(tmilli int64) (int, error) {
+	if tmilli >= p.startTime && tmilli <= p.GetEndTime() {
+		return int((tmilli-p.startTime)/p.chunkInterval) + 1, nil
+	} else {
+		return 0, errors.New("time " + string(tmilli) + " is not covered by time partition")
+	}
 }
 
 // is t covered by this partition
@@ -303,7 +320,7 @@ func (p *DBPartition) InRange(t int64) bool {
 	if p.manager.cyclic {
 		return true
 	}
-	return (t >= p.startTime) && (t < p.startTime+p.partitionInterval)
+	return t >= p.startTime && t < p.GetEndTime()
 }
 
 // return the mint and maxt for this partition, may need maxt for cyclic partition
@@ -340,21 +357,14 @@ func (p *DBPartition) Range2Attrs(col string, mint, maxt int64) ([]string, []int
 // All the chunk IDs which match the time range
 func (p *DBPartition) Range2Cids(mint, maxt int64) []int {
 	list := []int{}
-	start := p.TimeToChunkId(mint)
-	end := p.TimeToChunkId(maxt)
-	chunks := p.partitionInterval / p.chunkInterval
-
-	if end < start {
-		for i := start; int64(i) < chunks; i++ {
-			list = append(list, i)
-		}
-		for i := 0; i <= end; i++ {
-			list = append(list, i)
-		}
-
-		return list
+	start, err := p.TimeToChunkId(mint)
+	if err != nil {
+		start = 1
 	}
-
+	end, err := p.TimeToChunkId(maxt)
+	if err != nil {
+		end = int(p.partitionInterval / p.chunkInterval)
+	}
 	for i := start; i <= end; i++ {
 		list = append(list, i)
 	}
