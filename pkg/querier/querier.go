@@ -23,6 +23,7 @@ package querier
 import (
 	"github.com/nuclio/logger"
 	"github.com/v3io/v3io-go-http"
+	"github.com/v3io/v3io-tsdb/internal/pkg/performance"
 	"github.com/v3io/v3io-tsdb/pkg/aggregate"
 	"github.com/v3io/v3io-tsdb/pkg/config"
 	"github.com/v3io/v3io-tsdb/pkg/partmgr"
@@ -61,42 +62,56 @@ func (q *V3ioQuerier) SelectOverlap(name, functions string, step int64, windows 
 }
 
 // base query function
-func (q *V3ioQuerier) selectQry(name, functions string, step int64, windows []int, filter string) (SeriesSet, error) {
+func (q *V3ioQuerier) selectQry(name, functions string, step int64, windows []int, filter string) (set SeriesSet, err error) {
+	set = nullSeriesSet{}
 
-	filter = strings.Replace(filter, "__name__", "_name", -1)
-	q.logger.DebugWith("Select query", "func", functions, "step", step, "filter", filter, "window", windows)
-
-	parts := q.partitionMngr.PartsForRange(q.mint, q.maxt)
-	if len(parts) == 0 {
-		return nullSeriesSet{}, nil
+	queryTimer, err := performance.ReporterInstanceFromConfig(q.cfg).NewTimer("QueryTimer")
+	if err != nil {
+		return
 	}
 
-	if len(parts) == 1 {
-		return q.queryNumericPartition(parts[0], name, functions, step, windows, filter)
-	}
+	queryTimer.Time(func() {
+		filter = strings.Replace(filter, "__name__", "_name", -1)
+		q.logger.DebugWith("Select query", "func", functions, "step", step, "filter", filter, "window", windows)
 
-	sets := make([]SeriesSet, len(parts))
-	for i, part := range parts {
-		set, err := q.queryNumericPartition(part, name, functions, step, windows, filter)
-		if err != nil {
-			return nullSeriesSet{}, err
+		parts := q.partitionMngr.PartsForRange(q.mint, q.maxt)
+		if len(parts) == 0 {
+			return
 		}
-		sets[i] = set
-	}
 
-	// sort each partition when not using range scan
-	if name == "" {
-		for i := 0; i < len(sets); i++ {
-			// TODO make it a Go routine per part
-			sort, err := NewSetSorter(sets[i])
+		if len(parts) == 1 {
+			set, err = q.queryNumericPartition(parts[0], name, functions, step, windows, filter)
+			return
+		}
+
+		sets := make([]SeriesSet, len(parts))
+		for i, part := range parts {
+			set, err := q.queryNumericPartition(part, name, functions, step, windows, filter)
 			if err != nil {
-				return nullSeriesSet{}, err
+				set = nullSeriesSet{}
+				return
 			}
-			sets[i] = sort
+			sets[i] = set
 		}
-	}
 
-	return newIterSortMerger(sets)
+		// sort each partition when not using range scan
+		if name == "" {
+			for i := 0; i < len(sets); i++ {
+				// TODO make it a Go routine per part
+				sorter, err := NewSetSorter(sets[i])
+				if err != nil {
+					set = nullSeriesSet{}
+					return
+				}
+				sets[i] = sorter
+			}
+		}
+
+		set, err = newIterSortMerger(sets)
+		return
+	})
+
+	return
 }
 
 // Query a single partition (with numeric/float values)
@@ -137,7 +152,7 @@ func (q *V3ioQuerier) queryNumericPartition(
 // return the current metric names
 func (q *V3ioQuerier) LabelValues(name string) ([]string, error) {
 
-	list := []string{}
+	var list []string
 	input := v3io.GetItemsInput{Path: q.cfg.Path + "/names/", AttributeNames: []string{"__name"}, Filter: ""}
 	iter, err := utils.NewAsyncItemsCursor(q.container, &input, q.cfg.QryWorkers, []string{}, q.logger)
 	q.logger.DebugWith("GetItems to read names", "input", input, "err", err)

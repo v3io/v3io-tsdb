@@ -113,8 +113,8 @@ func (rc *RootCommandeer) initialize() error {
 
 func (rc *RootCommandeer) populateConfig(cfg *config.V3ioConfig) error {
 	// Initialize performance monitoring
-	// TODO: support custom report writers (file, syslog, tsdb, etc.)
-	rc.Reporter = performance.ReporterInstanceFromConfig(os.Stderr, cfg)
+	// TODO: support custom report writers (file, syslog, prometheus, etc.)
+	rc.Reporter = performance.ReporterInstanceFromConfig(cfg)
 
 	if rc.v3ioPath != "" {
 		// read username and password

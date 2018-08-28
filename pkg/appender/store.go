@@ -24,6 +24,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"github.com/v3io/v3io-go-http"
+	"github.com/v3io/v3io-tsdb/internal/pkg/performance"
 	"github.com/v3io/v3io-tsdb/pkg/aggregate"
 	"github.com/v3io/v3io-tsdb/pkg/chunkenc"
 	"github.com/v3io/v3io-tsdb/pkg/partmgr"
@@ -113,6 +114,9 @@ func (l pendingList) Swap(i, j int)      { l[i], l[j] = l[j], l[i] }
 // Read (Async) the current chunk state and data from the storage, used in the first chunk access
 func (cs *chunkStore) GetChunksState(mc *MetricsCache, metric *MetricState) (bool, error) {
 
+	if len(cs.pending) == 0 {
+		return false, nil
+	}
 	// init chunk and create aggregation list object based on partition policy
 	t := cs.pending[0].t
 	part, err := mc.partitionMngr.TimeToPart(t)
@@ -191,13 +195,19 @@ func (cs *chunkStore) ProcessGetResp(mc *MetricsCache, metric *MetricState, resp
 
 // Append data to the right chunk and table based on the time and state
 func (cs *chunkStore) Append(t int64, v interface{}) {
+	appendTimer, err := performance.DefaultReporterInstance().NewTimer("AppendTimer")
 
-	cs.pending = append(cs.pending, pendingData{t: t, v: v})
-	// if the new time is older than previous times, sort the list
-	if len(cs.pending) > 1 && cs.pending[len(cs.pending)-2].t < t {
-		sort.Sort(cs.pending)
+	if err != nil {
+		return
 	}
 
+	appendTimer.Time(func() {
+		cs.pending = append(cs.pending, pendingData{t: t, v: v})
+		// if the new time is older than previous times, sort the list
+		if len(cs.pending) > 1 && cs.pending[len(cs.pending)-2].t < t {
+			sort.Sort(cs.pending)
+		}
+	})
 }
 
 // return current, previous, or create new  chunk based on sample time

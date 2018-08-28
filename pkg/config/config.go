@@ -69,7 +69,7 @@ type V3ioConfig struct {
 
 type MetricsReporterConfig struct {
 	ReportOnShutdown   bool   `json:"reportOnShutdown,omitempty"`
-	Output             string `json:"output"` // stdout, syslog, etc.
+	Output             string `json:"output"` // stdout, stderr, syslog, etc.
 	ReportPeriodically bool   `json:"reportPeriodically,omitempty"`
 	RepotInterval      int    `json:"reportInterval"` // interval between consequence reports (in Seconds)
 }

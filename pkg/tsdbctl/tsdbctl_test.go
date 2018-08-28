@@ -26,6 +26,7 @@ import (
 	"github.com/stretchr/testify/suite"
 	"github.com/v3io/v3io-tsdb/pkg/config"
 	"testing"
+	"github.com/v3io/v3io-tsdb/internal/pkg/performance"
 )
 
 type testTsdbctlSuite struct {
@@ -43,6 +44,7 @@ func (suite *testTsdbctlSuite) TestPopulateConfigWithTenant() {
 	expectedRc := RootCommandeer{
 		v3iocfg:  cfg,
 		v3ioPath: "localhost:80123/123",
+		Reporter: performance.DefaultReporterInstance(),
 	}
 	expectedCfg := &config.V3ioConfig{
 		V3ioUrl:              "localhost:80123",

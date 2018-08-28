@@ -3,6 +3,7 @@ package benchmark
 import (
 	"fmt"
 	"github.com/pkg/errors"
+	"github.com/v3io/v3io-tsdb/internal/pkg/performance"
 	"github.com/v3io/v3io-tsdb/pkg/tsdb"
 	"github.com/v3io/v3io-tsdb/pkg/tsdb/tsdbtest"
 	"github.com/v3io/v3io-tsdb/pkg/tsdb/tsdbtest/testutils"
@@ -18,6 +19,8 @@ const metricNamePrefix = "Name_"
 
 func BenchmarkIngest(b *testing.B) {
 	b.StopTimer()
+	metricReporter := performance.DefaultReporterInstance()
+	metricReporter.Start()
 	log.SetFlags(0)
 	log.SetOutput(ioutil.Discard)
 	testStartTimeNano := time.Now().UnixNano()
@@ -116,6 +119,8 @@ func BenchmarkIngest(b *testing.B) {
 	b.Logf("\nTest complete. %d samples added to %s\n", count, tsdbPath)
 
 	tsdbtest.ValidateCountOfSamples(b, adapter, metricNamePrefix, count, testStartTimeMs, testEndTimeMs)
+
+	defer metricReporter.Stop()
 }
 
 func runTest(

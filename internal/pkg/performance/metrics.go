@@ -27,15 +27,30 @@ type MetricReporter struct {
 	reportOnShutdown      bool
 }
 
-func ReporterInstance(writer io.Writer, reportPeriodically bool, reportIntervalSeconds int, reportOnShutdown bool) *MetricReporter {
+func DefaultReporterInstance() *MetricReporter {
+	return ReporterInstance("stderr", true, 60, true)
+}
+
+func ReporterInstance(writeTo string, reportPeriodically bool, reportIntervalSeconds int, reportOnShutdown bool) *MetricReporter {
 	once.Do(func() {
+		var writer io.Writer
+		switch writeTo {
+		case "stdout":
+			writer = os.Stdout
+		case "stderr":
+			writer = os.Stderr
+		default:
+			writer = os.Stderr
+		}
+
 		instance = newMetricReporter(writer, reportPeriodically, reportIntervalSeconds, reportOnShutdown)
 	})
 	return instance
 }
 
-func ReporterInstanceFromConfig(writer io.Writer, config *config.V3ioConfig) *MetricReporter {
-	return ReporterInstance(writer,
+func ReporterInstanceFromConfig(config *config.V3ioConfig) *MetricReporter {
+	return ReporterInstance(
+		config.MetricsReporter.Output,
 		config.MetricsReporter.ReportPeriodically,
 		config.MetricsReporter.RepotInterval,
 		config.MetricsReporter.ReportOnShutdown)
@@ -61,8 +76,10 @@ func (mr *MetricReporter) Stop() error {
 	if mr.running {
 		mr.running = false
 		if mr.reportOnShutdown {
+			time.Sleep(300 * time.Millisecond) // postpone performance report on shutdown to avoid mixing with other log messages
 			metrics.WriteOnce(mr.registry, mr.logWriter)
 		}
+		mr.registry.UnregisterAll()
 	} else {
 		return errors.Errorf("can't stop metric reporter since it's not running.")
 	}
