@@ -49,7 +49,7 @@ func (s stubSeries) GetKey() uint64 {
 	return uint64(s)
 }
 
-func (suite *testIterSortMergerSuite) TestStrToTV() {
+func (suite *testIterSortMergerSuite) TestIterSortMerger() {
 
 	s1 := []Series{stubSeries(0), stubSeries(1)}
 	s2 := []Series{stubSeries(2), stubSeries(3)}
