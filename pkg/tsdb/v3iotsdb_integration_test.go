@@ -32,7 +32,6 @@ import (
 	"github.com/v3io/v3io-tsdb/pkg/tsdb/tsdbtest"
 	"github.com/v3io/v3io-tsdb/pkg/tsdb/tsdbtest/testutils"
 	"github.com/v3io/v3io-tsdb/pkg/utils"
-	"path/filepath"
 	"sort"
 	"testing"
 )
@@ -280,7 +279,7 @@ func testQueryDataCase(test *testing.T, v3ioConfig *config.V3ioConfig,
 }
 
 func TestQueryDataOverlappingWindow(t *testing.T) {
-	v3ioConfig, err := config.LoadConfig(filepath.Join("..", "..", config.DefaultConfigurationFileName))
+	v3ioConfig, err := config.LoadConfig("")
 	if err != nil {
 		t.Fatalf("Failed to load test configuration. reason: %s", err)
 	}
