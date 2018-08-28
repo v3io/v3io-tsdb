@@ -24,6 +24,8 @@ import (
 	"github.com/ghodss/yaml"
 	"io/ioutil"
 	"os"
+	"strings"
+	"github.com/pkg/errors"
 )
 
 const V3ioConfigEnvironmentVariable = "V3IO_CONF"
@@ -134,18 +136,28 @@ type MetricConfig struct {
 
 func LoadConfig(path string) (*V3ioConfig, error) {
 
-	envpath := os.Getenv(V3ioConfigEnvironmentVariable)
-	if envpath != "" {
-		path = envpath
+	var resolvedPath string
+
+	if strings.TrimSpace(path) != "" {
+		resolvedPath = path
+	} else {
+		envPath := os.Getenv(V3ioConfigEnvironmentVariable)
+		if envPath != "" {
+			resolvedPath = envPath
+		}
 	}
 
-	if path == "" {
-		path = DefaultConfigurationFileName
+	if resolvedPath == "" {
+		resolvedPath = DefaultConfigurationFileName
 	}
 
-	data, err := ioutil.ReadFile(path)
+	data, err := ioutil.ReadFile(resolvedPath)
 	if err != nil {
 		return nil, err
+	}
+
+	if len(data) == 0 {
+		return nil, errors.Errorf("file '%s' exists but its content is not valid", resolvedPath)
 	}
 
 	return LoadFromData(data)

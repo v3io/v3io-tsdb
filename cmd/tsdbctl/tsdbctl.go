@@ -19,5 +19,7 @@ func Run() error {
 }
 
 func tearDown(cmd *tsdbctl.RootCommandeer) {
-	cmd.Reporter.Stop()
+	if cmd.Reporter != nil { // could be nil if has failed on initialisation
+		cmd.Reporter.Stop()
+	}
 }
