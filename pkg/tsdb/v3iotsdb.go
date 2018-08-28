@@ -215,9 +215,9 @@ func (a *V3ioAdapter) DeleteDB(configExists bool, force bool, fromTime int64, to
 // return number of objects in a table
 func (a *V3ioAdapter) CountMetrics(part string) (int, error) {
 	count := 0
-	partitions := a.partitionMngr.GetPartitions()
-	for _, part := range partitions {
-		input := v3io.GetItemsInput{Path: part.GetTablePath(), Filter: "", AttributeNames: []string{"__size"}}
+	paths := a.partitionMngr.GetPartitionsPaths()
+	for _, path := range paths {
+		input := v3io.GetItemsInput{Path: path, Filter: "", AttributeNames: []string{"__size"}}
 		iter, err := utils.NewAsyncItemsCursor(a.container, &input, a.cfg.QryWorkers, []string{}, a.logger)
 		if err != nil {
 			return 0, err
