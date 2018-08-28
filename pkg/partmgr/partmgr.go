@@ -199,6 +199,7 @@ func (p *PartitionManager) ReadAndUpdateSchema() error {
 }
 
 func (p *PartitionManager) updatePartitions(schema *config.Schema) error {
+	p.partitions = []*DBPartition{}
 	for _, part := range schema.Partitions {
 		partPath := path.Join(p.path, strconv.FormatInt(part.StartTime/1000, 10)) + "/"
 		newPart, err := NewDBPartition(p, part.StartTime, partPath)
@@ -218,7 +219,7 @@ func (p *PartitionManager) updatePartitions(schema *config.Schema) error {
 func (p *PartitionManager) PartsForRange(mint, maxt int64) []*DBPartition {
 	var parts []*DBPartition
 	for _, part := range p.partitions {
-		if part.startTime >= mint && (maxt == 0 || part.startTime < maxt) {
+		if part.InRange(mint) || part.InRange(maxt) || (mint < part.GetStartTime() && maxt > part.GetEndTime()) {
 			parts = append(parts, part)
 		}
 	}
@@ -333,7 +334,7 @@ func (p *DBPartition) TimeToChunkId(tmilli int64) (int, error) {
 	if tmilli >= p.startTime && tmilli <= p.GetEndTime() {
 		return int((tmilli-p.startTime)/p.chunkInterval) + 1, nil
 	} else {
-		return 0, errors.New("time " + string(tmilli) + " is not covered by time partition")
+		return -1, errors.Errorf("time %d is not covered by time partition", tmilli)
 	}
 }
 
@@ -342,7 +343,7 @@ func (p *DBPartition) InRange(t int64) bool {
 	if p.manager.cyclic {
 		return true
 	}
-	return t >= p.startTime && t < p.GetEndTime()
+	return t >= p.startTime && t <= p.GetEndTime()
 }
 
 // return the mint and maxt for this partition, may need maxt for cyclic partition
