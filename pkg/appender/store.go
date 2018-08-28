@@ -396,7 +396,10 @@ func (cs *chunkStore) appendExpression(chunk *attrAppender) string {
 		chunk.state |= chunkStateWriting
 
 		expr := ""
-		idx := chunk.partition.TimeToChunkId(chunk.chunkMint) // TODO: add DaysPerObj from part manager
+		idx, err := chunk.partition.TimeToChunkId(chunk.chunkMint)
+		if err != nil {
+			return ""
+		}
 		attr := chunk.partition.ChunkID2Attr("v", idx)
 
 		val := base64.StdEncoding.EncodeToString(bytes)
