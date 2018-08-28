@@ -75,8 +75,8 @@ func (im *IterSortMerger) Next() bool {
 				im.err = iter.Err()
 				return false
 			}
-			completed = completed && im.done[i]
 		}
+		completed = completed && im.done[i]
 		if !im.done[i] {
 			key := iter.At().GetKey()
 			if !keyIsSet {
