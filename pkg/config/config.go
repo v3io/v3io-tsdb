@@ -22,10 +22,10 @@ package config
 
 import (
 	"github.com/ghodss/yaml"
+	"github.com/pkg/errors"
 	"io/ioutil"
 	"os"
 	"strings"
-	"github.com/pkg/errors"
 )
 
 const V3ioConfigEnvironmentVariable = "V3IO_CONF"

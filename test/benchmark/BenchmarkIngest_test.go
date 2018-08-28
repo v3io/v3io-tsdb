@@ -19,8 +19,12 @@ const metricNamePrefix = "Name_"
 
 func BenchmarkIngest(b *testing.B) {
 	b.StopTimer()
+
+	// Measure performance
 	metricReporter := performance.DefaultReporterInstance()
 	metricReporter.Start()
+	defer metricReporter.Stop()
+
 	log.SetFlags(0)
 	log.SetOutput(ioutil.Discard)
 	testStartTimeNano := time.Now().UnixNano()
@@ -119,8 +123,6 @@ func BenchmarkIngest(b *testing.B) {
 	b.Logf("\nTest complete. %d samples added to %s\n", count, tsdbPath)
 
 	tsdbtest.ValidateCountOfSamples(b, adapter, metricNamePrefix, count, testStartTimeMs, testEndTimeMs)
-
-	defer metricReporter.Stop()
 }
 
 func runTest(

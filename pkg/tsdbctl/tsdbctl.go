@@ -104,11 +104,9 @@ func (rc *RootCommandeer) initialize() error {
 		// if we couldn't load the file and its not the default
 		if rc.cfgFilePath == "" {
 			return errors.Wrap(err, "Failed to load configuration")
-		}else{
+		} else {
 			return errors.Wrap(err, fmt.Sprintf("Failed to load config from '%s'", rc.cfgFilePath))
 		}
-		cfg = &config.V3ioConfig{} // initialize struct, will try and set it from individual flags
-		config.InitDefaults(cfg)
 	}
 	return rc.populateConfig(cfg)
 }
