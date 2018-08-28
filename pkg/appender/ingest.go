@@ -23,6 +23,7 @@ package appender
 import (
 	"github.com/pkg/errors"
 	"github.com/v3io/v3io-go-http"
+	"github.com/v3io/v3io-tsdb/internal/pkg/performance"
 	"net/http"
 	"reflect"
 	"time"
@@ -219,17 +220,27 @@ func (mc *MetricsCache) postMetricUpdates(metric *MetricState) {
 	var err error
 
 	if metric.getState() == storeStatePreGet {
-		sent, err = metric.store.GetChunksState(mc, metric)
+		sent, err = metric.store.getChunksState(mc, metric)
 		if err != nil {
-			mc.logger.ErrorWith("Get item request failed", "metric", metric.Lset, "err", err)
+			// Count errors
+			if counter, ok := performance.ReporterInstanceFromConfig(mc.cfg).NewCounter("GetChunksStateError"); ok != nil {
+				counter.Inc(1)
+			}
+
+			mc.logger.ErrorWith("failed to get item state", "metric", metric.Lset, "err", err)
 			metric.setError(err)
 		} else {
 			metric.setState(storeStateGet)
 		}
 
 	} else {
-		sent, err = metric.store.WriteChunks(mc, metric)
+		sent, err = metric.store.writeChunks(mc, metric)
 		if err != nil {
+			// Count errors
+			if counter, ok := performance.ReporterInstanceFromConfig(mc.cfg).NewCounter("WriteChunksError"); ok != nil {
+				counter.Inc(1)
+			}
+
 			mc.logger.ErrorWith("Submit failed", "metric", metric.Lset, "err", err)
 			metric.setError(errors.Wrap(err, "chunk write submit failed"))
 		} else if sent {
@@ -247,6 +258,7 @@ func (mc *MetricsCache) postMetricUpdates(metric *MetricState) {
 
 // handle DB responses, if the backlog queue is empty and have data to send write more chunks to DB
 func (mc *MetricsCache) handleResponse(metric *MetricState, resp *v3io.Response, canWrite bool) bool {
+	defer resp.Release()
 	metric.Lock()
 	defer metric.Unlock()
 
@@ -264,7 +276,7 @@ func (mc *MetricsCache) handleResponse(metric *MetricState, resp *v3io.Response,
 
 	if metric.getState() == storeStateGet {
 		// Handle Get response, sync metric state with the DB
-		metric.store.ProcessGetResp(mc, metric, resp)
+		metric.store.processGetResp(mc, metric, resp)
 
 	} else {
 		// Handle Update Expression responses
@@ -273,9 +285,18 @@ func (mc *MetricsCache) handleResponse(metric *MetricState, resp *v3io.Response,
 			metric.store.ProcessWriteResp()
 			metric.retryCount = 0
 		} else {
+			// Count retries
+			if counter, ok := performance.ReporterInstanceFromConfig(mc.cfg).NewCounter("UpdateRetries"); ok != nil {
+				counter.Inc(1)
+			}
 			// Metrics with too many update errors go into Error state
 			metric.retryCount++
 			if e, hasStatusCode := resp.Error.(v3io.ErrorWithStatusCode); metric.retryCount == maxRetriesOnWrite || hasStatusCode && e.StatusCode() != http.StatusServiceUnavailable {
+				// Count errors
+				if counter, ok := performance.ReporterInstanceFromConfig(mc.cfg).NewCounter("RetryExceededError"); ok != nil {
+					counter.Inc(1)
+				}
+
 				mc.logger.ErrorWith("Metric error, exceeded retry", "metric", metric.Lset)
 				metric.setError(errors.Wrap(resp.Error, "chunk update failed after few retries"))
 				return false
@@ -283,15 +304,19 @@ func (mc *MetricsCache) handleResponse(metric *MetricState, resp *v3io.Response,
 		}
 	}
 
-	resp.Release()
 	metric.setState(storeStateReady)
 
 	var sent bool
 	var err error
 
 	if canWrite {
-		sent, err = metric.store.WriteChunks(mc, metric)
+		sent, err = metric.store.writeChunks(mc, metric)
 		if err != nil {
+			// Count errors
+			if counter, ok := performance.ReporterInstanceFromConfig(mc.cfg).NewCounter("WriteChunksError"); ok != nil {
+				counter.Inc(1)
+			}
+
 			mc.logger.ErrorWith("Submit failed", "metric", metric.Lset, "err", err)
 			metric.setError(errors.Wrap(err, "chunk write submit failed"))
 		} else if sent {
@@ -319,6 +344,11 @@ func (mc *MetricsCache) nameUpdateRespLoop() {
 			if ok {
 				metric.Lock()
 				if resp.Error != nil {
+					// Count errors
+					if counter, ok := performance.ReporterInstanceFromConfig(mc.cfg).NewCounter("UpdateNameError"); ok != nil {
+						counter.Inc(1)
+					}
+
 					mc.logger.ErrorWith("Process Update name failed", "id", resp.ID, "name", metric.name)
 				} else {
 					mc.logger.DebugWith("Process Update name resp", "id", resp.ID, "name", metric.name)

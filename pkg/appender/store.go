@@ -112,7 +112,7 @@ func (l pendingList) Less(i, j int) bool { return l[i].t < l[j].t }
 func (l pendingList) Swap(i, j int)      { l[i], l[j] = l[j], l[i] }
 
 // Read (Async) the current chunk state and data from the storage, used in the first chunk access
-func (cs *chunkStore) GetChunksState(mc *MetricsCache, metric *MetricState) (bool, error) {
+func (cs *chunkStore) getChunksState(mc *MetricsCache, metric *MetricState) (bool, error) {
 
 	if len(cs.pending) == 0 {
 		return false, nil
@@ -144,7 +144,7 @@ func (cs *chunkStore) GetChunksState(mc *MetricsCache, metric *MetricState) (boo
 }
 
 // Process the GetItem response from the DB and initialize or restore the current chunk
-func (cs *chunkStore) ProcessGetResp(mc *MetricsCache, metric *MetricState, resp *v3io.Response) {
+func (cs *chunkStore) processGetResp(mc *MetricsCache, metric *MetricState, resp *v3io.Response) {
 
 	// TODO: init based on schema, use init function, recover old state vs append based on policy
 	chunk := chunkenc.NewXORChunk()
@@ -161,6 +161,10 @@ func (cs *chunkStore) ProcessGetResp(mc *MetricsCache, metric *MetricState, resp
 
 			request, err := mc.container.PutItem(&putInput, metric, mc.nameUpdateChan)
 			if err != nil {
+				// Count errors
+				if counter, ok := performance.ReporterInstanceFromConfig(mc.cfg).NewCounter("PutNameError"); ok != nil {
+					counter.Inc(1)
+				}
 				mc.logger.ErrorWith("Update name putItem Failed", "metric", metric.key, "err", err)
 			} else {
 				mc.logger.DebugWith("Update name", "name", metric.name, "key", metric.key, "reqid", request.ID)
@@ -198,6 +202,7 @@ func (cs *chunkStore) Append(t int64, v interface{}) {
 	appendTimer, err := performance.DefaultReporterInstance().NewTimer("AppendTimer")
 
 	if err != nil {
+		// TODO: need to have a logger in context to report errors
 		return
 	}
 
@@ -253,7 +258,7 @@ func (cs *chunkStore) chunkByTime(t int64) *attrAppender {
 }
 
 // write all pending samples to DB chunks and aggregators
-func (cs *chunkStore) WriteChunks(mc *MetricsCache, metric *MetricState) (bool, error) {
+func (cs *chunkStore) writeChunks(mc *MetricsCache, metric *MetricState) (bool, error) {
 
 	// return if there are no pending updates
 	if len(cs.pending) == 0 {

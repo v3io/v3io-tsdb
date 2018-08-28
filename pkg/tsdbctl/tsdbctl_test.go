@@ -24,9 +24,9 @@ package tsdbctl
 
 import (
 	"github.com/stretchr/testify/suite"
+	"github.com/v3io/v3io-tsdb/internal/pkg/performance"
 	"github.com/v3io/v3io-tsdb/pkg/config"
 	"testing"
-	"github.com/v3io/v3io-tsdb/internal/pkg/performance"
 )
 
 type testTsdbctlSuite struct {
