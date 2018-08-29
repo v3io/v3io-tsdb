@@ -65,7 +65,10 @@ func (q *V3ioQuerier) selectQry(name, functions string, step int64, windows []in
 
 	filter = strings.Replace(filter, "__name__", "_name", -1)
 	q.logger.DebugWith("Select query", "func", functions, "step", step, "filter", filter, "window", windows)
-
+	err := q.partitionMngr.ReadAndUpdateSchema()
+	if err != nil {
+		return nullSeriesSet{}, err
+	}
 	parts := q.partitionMngr.PartsForRange(q.mint, q.maxt)
 	if len(parts) == 0 {
 		return nullSeriesSet{}, nil
