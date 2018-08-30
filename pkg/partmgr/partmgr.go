@@ -41,19 +41,7 @@ func NewPartitionMngr(cfg *config.Schema, partPath string, cont *v3io.Container)
 		return nil, err
 	}
 	newMngr := &PartitionManager{cfg: cfg, path: partPath, cyclic: false, container: cont, currentPartitionInterval: currentPartitionInterval}
-	for _, part := range cfg.Partitions {
-		partPath := path.Join(newMngr.path, strconv.FormatInt(part.StartTime/1000, 10)) + "/"
-		newPart, err := NewDBPartition(newMngr, part.StartTime, partPath)
-		if err != nil {
-			return nil, err
-		}
-		newMngr.partitions = append(newMngr.partitions, newPart)
-		if newMngr.headPartition == nil {
-			newMngr.headPartition = newPart
-		} else if newMngr.headPartition.startTime < newPart.startTime {
-			newMngr.headPartition = newPart
-		}
-	}
+	newMngr.updatePartitions(cfg)
 	return newMngr, nil
 }
 
@@ -191,6 +179,41 @@ func (p *PartitionManager) updatePartitionInSchema(partition *DBPartition) error
 		err = p.container.Sync.PutObject(&v3io.PutObjectInput{Path: path.Join(p.path, config.SCHEMA_CONFIG), Body: data})
 	}
 	return err
+}
+
+func (p *PartitionManager) ReadAndUpdateSchema() error {
+	fullPath := path.Join(p.path, config.SCHEMA_CONFIG)
+	resp, err := p.container.Sync.GetObject(&v3io.GetObjectInput{Path: fullPath})
+	if err != nil {
+		return errors.Wrap(err, "Failed to read schema at path: "+fullPath)
+	}
+
+	schema := config.Schema{}
+	err = json.Unmarshal(resp.Body(), &schema)
+	if err != nil {
+		return errors.Wrap(err, "Failed to Unmarshal schema at path: "+fullPath)
+	}
+	p.cfg = &schema
+	p.updatePartitions(&schema)
+	return nil
+}
+
+func (p *PartitionManager) updatePartitions(schema *config.Schema) error {
+	p.partitions = []*DBPartition{}
+	for _, part := range schema.Partitions {
+		partPath := path.Join(p.path, strconv.FormatInt(part.StartTime/1000, 10)) + "/"
+		newPart, err := NewDBPartition(p, part.StartTime, partPath)
+		if err != nil {
+			return err
+		}
+		p.partitions = append(p.partitions, newPart)
+		if p.headPartition == nil {
+			p.headPartition = newPart
+		} else if p.headPartition.startTime < newPart.startTime {
+			p.headPartition = newPart
+		}
+	}
+	return nil
 }
 
 func (p *PartitionManager) PartsForRange(mint, maxt int64) []*DBPartition {
