@@ -154,7 +154,7 @@ func (as *AggregateSeries) NewSetFromAttrs(
 		}
 
 		i++
-		arrayIndex = (arrayIndex + 1) % as.buckets
+		arrayIndex = (arrayIndex + 1) % (as.buckets + 1)
 	}
 
 	return &aggrSet, nil

@@ -116,7 +116,7 @@ func (s *V3ioSeriesSet) Next() bool {
 			mint := s.partition.CyclicMinTime(s.mint, maxtUpdate)
 
 			start := s.partition.Time2Bucket(mint)
-			end := s.partition.Time2Bucket(s.maxt + s.interval)
+			end := s.partition.Time2Bucket(s.maxt+s.interval) + 1
 
 			// len of the returned array, cropped at the end in case of cyclic overlap
 			length := int((maxtUpdate-mint)/s.interval) + 2
