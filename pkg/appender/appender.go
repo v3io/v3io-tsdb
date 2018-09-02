@@ -251,7 +251,8 @@ func (mc *MetricsCache) WaitForCompletion(timeout time.Duration) (int, error) {
 	} else if timeout > 0 {
 		maxWaitTime = timeout
 	} else {
-		maxWaitTime = time.Duration(mc.cfg.DefaultTimeout)
+		// if negative - use default value from configuration
+		maxWaitTime = time.Duration(mc.cfg.DefaultTimeoutInSeconds) * time.Second
 	}
 
 	select {

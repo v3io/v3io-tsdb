@@ -24,7 +24,6 @@ import (
 	"github.com/ghodss/yaml"
 	"io/ioutil"
 	"os"
-	"time"
 )
 
 const (
@@ -35,7 +34,7 @@ const (
 	defaultNumberOfWorkers      = 1
 	defaultNumberOfQueryWorkers = 8
 	defaultBatchSize            = 64
-	defaultTimeout              = 24 * time.Hour
+	defaultTimeoutInSeconds     = 24 * 60 * 60 // 24 hours
 )
 
 type V3ioConfig struct {
@@ -59,7 +58,7 @@ type V3ioConfig struct {
 	// Override last chunk (by default on restart it will append from the last point if possible)
 	OverrideOld bool `json:"overrideOld"`
 	// Default timeout duration in Seconds (if not set, 1 Hour timeout will be used )
-	DefaultTimeout int `json:"timeout,omitempty"`
+	DefaultTimeoutInSeconds int `json:"timeout,omitempty"`
 	// The size of batch to use during ingestion
 	BatchSize int `json:"batchSize,omitempty"`
 	// Size of sample in bytes for worst an best compression scenarios
@@ -178,7 +177,7 @@ func InitDefaults(cfg *V3ioConfig) {
 		cfg.BatchSize = defaultBatchSize
 	}
 
-	if cfg.DefaultTimeout == 0 {
-		cfg.DefaultTimeout = int(defaultTimeout)
+	if cfg.DefaultTimeoutInSeconds == 0 {
+		cfg.DefaultTimeoutInSeconds = int(defaultTimeoutInSeconds)
 	}
 }
