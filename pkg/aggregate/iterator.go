@@ -39,13 +39,10 @@ type AggregateSeries struct {
 
 func NewAggregateSeries(functions, col string, buckets int, interval, rollupTime int64, windows []int) (*AggregateSeries, error) {
 
-	if functions == "" || interval == 0 {
-		return nil, nil
-	}
-
 	split := strings.Split(functions, ",")
 	var aggrMask AggrType
 	var aggrList []AggrType
+
 	for _, s := range split {
 		aggr, ok := aggrTypeString[s]
 		if !ok {
@@ -56,8 +53,14 @@ func NewAggregateSeries(functions, col string, buckets int, interval, rollupTime
 	}
 
 	newAggregateSeries := AggregateSeries{
-		aggrMask: aggrMask, functions: aggrList, colName: col, buckets: buckets, rollupTime: rollupTime,
-		interval: interval, overlapWindows: windows}
+		aggrMask:       aggrMask,
+		functions:      aggrList,
+		colName:        col,
+		buckets:        buckets,
+		rollupTime:     rollupTime,
+		interval:       interval,
+		overlapWindows: windows,
+	}
 
 	return &newAggregateSeries, nil
 }
@@ -154,7 +157,7 @@ func (as *AggregateSeries) NewSetFromAttrs(
 		}
 
 		i++
-		arrayIndex = (arrayIndex + 1) % as.buckets
+		arrayIndex = (arrayIndex + 1) % (as.buckets + 1)
 	}
 
 	return &aggrSet, nil
@@ -321,9 +324,11 @@ func (as *AggregateSet) GetCellTime(base int64, index int) int64 {
 	if as.overlapWin == nil {
 		return base + int64(index)*as.interval
 	}
+
 	if index >= len(as.overlapWin) {
 		return base
 	}
+
 	return base - int64(as.overlapWin[index])*as.interval
 }
 

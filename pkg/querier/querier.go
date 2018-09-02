@@ -116,24 +116,34 @@ func (q *V3ioQuerier) queryNumericPartition(
 
 	newSet := &V3ioSeriesSet{mint: mint, maxt: maxt, partition: partition, logger: q.logger}
 
-	if functions != "" && step == 0 && partition.RollupTime() != 0 {
-		step = partition.RollupTime()
-	}
+	// if there are aggregations to be made
+	if functions != "" {
 
-	newAggrSeries, err := aggregate.NewAggregateSeries(
-		functions, "v", partition.AggrBuckets(), step, partition.RollupTime(), windows)
-	if err != nil {
-		return nil, err
-	}
+		// if step isn't passed (e.g. when using the console) - the step is the difference between max
+		// and min times (e.g. 5 minutes)
+		if step == 0 {
+			step = maxt - mint
+		}
 
-	if newAggrSeries != nil && step != 0 {
+		newAggrSeries, err := aggregate.NewAggregateSeries(functions,
+			"v",
+			partition.AggrBuckets(),
+			step,
+			partition.RollupTime(),
+			windows)
+
+		if err != nil {
+			return nil, err
+		}
+
 		newSet.aggrSeries = newAggrSeries
 		newSet.interval = step
 		newSet.aggrIdx = newAggrSeries.NumFunctions() - 1
 		newSet.overlapWin = windows
 	}
 
-	err = newSet.getItems(partition, name, filter, q.container, q.cfg.QryWorkers)
+	err := newSet.getItems(partition, name, filter, q.container, q.cfg.QryWorkers)
+
 	return newSet, err
 }
 

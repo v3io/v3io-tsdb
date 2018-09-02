@@ -196,7 +196,7 @@ func TestQueryData(t *testing.T) {
 				{Time: 1532940510 + 10, Value: 100.4}},
 			from: 1532940510, to: 1532940510 + 11,
 			aggregators: "sum",
-			expected:    map[string][]tsdbtest.DataPoint{"sum": {{Time: 1532940000, Value: 701.0}}}},
+			expected:    map[string][]tsdbtest.DataPoint{"sum": {{Time: 1532940510, Value: 701.0}}}},
 
 		{desc: "Should ingest and query multiple aggregators", metricName: "cpu",
 			labels: utils.FromStrings("os", "linux", "iguaz", "yesplease"),
@@ -205,8 +205,8 @@ func TestQueryData(t *testing.T) {
 				{Time: 1532940510 + 10, Value: 100.4}},
 			from: 1532940510, to: 1532940510 + 11,
 			aggregators: "sum,count",
-			expected: map[string][]tsdbtest.DataPoint{"sum": {{Time: 1532940000, Value: 701.0}},
-				"count": {{Time: 1532940000, Value: 3}}}},
+			expected: map[string][]tsdbtest.DataPoint{"sum": {{Time: 1532940510, Value: 701.0}},
+				"count": {{Time: 1532940510, Value: 3}}}},
 
 		{desc: "Should ingest and query with illegal time (switch from and to)", metricName: "cpu",
 			labels: utils.FromStrings("os", "linux", "iguaz", "yesplease"),

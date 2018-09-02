@@ -213,16 +213,28 @@ func NewAggrSeries(set *V3ioSeriesSet, aggr aggregate.AggrType) *V3ioSeries {
 	newSeries := V3ioSeries{set: set}
 	lset := append(initLabels(set), utils.Label{Name: "Aggregator", Value: aggr.String()})
 	newSeries.lset = lset
+
 	if set.nullSeries {
 		newSeries.iter = &nullSeriesIterator{}
 	} else {
-		newSeries.iter = &aggrSeriesIterator{set: set, aggrType: aggr, index: -1}
+
+		// `set`, the thing this iterator "iterates" over is stateful - it holds a "current" set and aggrSet.
+		// this means we need to copy all the stateful things we need into the iterator (e.g. aggrSet) so that
+		// when it's evaluated, it'll hold the proper pointer
+		newSeries.iter = &aggrSeriesIterator{
+			set:      set,
+			aggrSet:  set.aggrSet,
+			aggrType: aggr,
+			index:    -1,
+		}
 	}
+
 	return &newSeries
 }
 
 type aggrSeriesIterator struct {
 	set      *V3ioSeriesSet
+	aggrSet  *aggregate.AggregateSet
 	aggrType aggregate.AggrType
 	index    int
 	err      error
@@ -235,7 +247,7 @@ func (s *aggrSeriesIterator) Seek(t int64) bool {
 		return true
 	}
 
-	if t > s.set.baseTime+int64(s.set.aggrSet.GetMaxCell())*s.set.interval {
+	if t > s.set.baseTime+int64(s.aggrSet.GetMaxCell())*s.set.interval {
 		return false
 	}
 
@@ -245,7 +257,7 @@ func (s *aggrSeriesIterator) Seek(t int64) bool {
 
 // advance to the next time interval/bucket
 func (s *aggrSeriesIterator) Next() bool {
-	if s.index >= s.set.aggrSet.GetMaxCell() {
+	if s.index >= s.aggrSet.GetMaxCell() {
 		return false
 	}
 
@@ -255,8 +267,8 @@ func (s *aggrSeriesIterator) Next() bool {
 
 // return the time & value at the current bucket
 func (s *aggrSeriesIterator) At() (t int64, v float64) {
-	val, _ := s.set.aggrSet.GetCellValue(s.aggrType, s.index)
-	return s.set.aggrSet.GetCellTime(s.set.baseTime, s.index), val
+	val, _ := s.aggrSet.GetCellValue(s.aggrType, s.index)
+	return s.aggrSet.GetCellTime(s.set.baseTime, s.index), val
 }
 
 func (s *aggrSeriesIterator) Err() error { return s.err }
