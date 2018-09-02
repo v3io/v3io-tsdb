@@ -24,6 +24,7 @@ import (
 	"github.com/ghodss/yaml"
 	"io/ioutil"
 	"os"
+	"time"
 )
 
 const (
@@ -34,6 +35,7 @@ const (
 	defaultNumberOfWorkers      = 1
 	defaultNumberOfQueryWorkers = 8
 	defaultBatchSize            = 64
+	defaultTimeout              = int(24 * time.Hour)
 )
 
 type V3ioConfig struct {
@@ -174,5 +176,9 @@ func InitDefaults(cfg *V3ioConfig) {
 	// init default batch size
 	if cfg.BatchSize <= 0 {
 		cfg.BatchSize = defaultBatchSize
+	}
+
+	if cfg.DefaultTimeout == 0 {
+		cfg.DefaultTimeout = defaultTimeout
 	}
 }
