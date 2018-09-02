@@ -26,9 +26,15 @@ import (
 	"os"
 )
 
-const V3ioConfigEnvironmentVariable = "V3IO_CONF"
-const DefaultConfigurationFileName = "v3io.yaml"
-const SCHEMA_CONFIG = ".schema"
+const (
+	V3ioConfigEnvironmentVariable = "V3IO_CONF"
+	DefaultConfigurationFileName  = "v3io.yaml"
+	SCHEMA_CONFIG                 = ".schema"
+
+	defaultNumberOfWorkers      = 1
+	defaultNumberOfQueryWorkers = 8
+	defaultBatchSize            = 64
+)
 
 type V3ioConfig struct {
 	// V3IO Connection details: Url, Data container, relative path for this dataset, credentials
@@ -153,20 +159,20 @@ func LoadFromData(data []byte) (*V3ioConfig, error) {
 func InitDefaults(cfg *V3ioConfig) {
 	// Initialize default number of workers
 	if cfg.Workers == 0 {
-		cfg.Workers = 8
+		cfg.Workers = defaultNumberOfWorkers
 	}
 
 	// init default number Query workers if not set to Min(8,Workers)
 	if cfg.QryWorkers == 0 {
-		if cfg.Workers < 8 {
+		if cfg.Workers < defaultNumberOfQueryWorkers {
 			cfg.QryWorkers = cfg.Workers
 		} else {
-			cfg.QryWorkers = 8
+			cfg.QryWorkers = defaultNumberOfQueryWorkers
 		}
 	}
 
 	// init default batch size
 	if cfg.BatchSize <= 0 {
-		cfg.BatchSize = 64
+		cfg.BatchSize = defaultBatchSize
 	}
 }
