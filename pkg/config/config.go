@@ -31,10 +31,10 @@ const (
 	DefaultConfigurationFileName  = "v3io.yaml"
 	SCHEMA_CONFIG                 = ".schema"
 
-	defaultNumberOfWorkers      = 1
-	defaultNumberOfQueryWorkers = 8
-	defaultBatchSize            = 64
-	defaultTimeoutInSeconds     = 24 * 60 * 60 // 24 hours
+	defaultNumberOfIngestWorkers = 1
+	defaultNumberOfQueryWorkers  = 8
+	defaultBatchSize             = 64
+	defaultTimeoutInSeconds      = 24 * 60 * 60 // 24 hours
 )
 
 type V3ioConfig struct {
@@ -160,7 +160,7 @@ func LoadFromData(data []byte) (*V3ioConfig, error) {
 func InitDefaults(cfg *V3ioConfig) {
 	// Initialize default number of workers
 	if cfg.Workers == 0 {
-		cfg.Workers = defaultNumberOfWorkers
+		cfg.Workers = defaultNumberOfIngestWorkers
 	}
 
 	// init default number Query workers if not set to Min(8,Workers)
