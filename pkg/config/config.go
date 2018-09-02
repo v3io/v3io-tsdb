@@ -35,7 +35,7 @@ const (
 	defaultNumberOfWorkers      = 1
 	defaultNumberOfQueryWorkers = 8
 	defaultBatchSize            = 64
-	defaultTimeout              = int(24 * time.Hour)
+	defaultTimeout              = 24 * time.Hour
 )
 
 type V3ioConfig struct {
@@ -179,6 +179,6 @@ func InitDefaults(cfg *V3ioConfig) {
 	}
 
 	if cfg.DefaultTimeout == 0 {
-		cfg.DefaultTimeout = defaultTimeout
+		cfg.DefaultTimeout = int(defaultTimeout)
 	}
 }

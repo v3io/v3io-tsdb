@@ -251,10 +251,8 @@ func (mc *MetricsCache) WaitForCompletion(timeout time.Duration) (int, error) {
 	} else if timeout > 0 {
 		maxWaitTime = timeout
 	} else {
-		maxWaitTime = time.Duration(mc.cfg.DefaultTimeout) * time.Second
+		maxWaitTime = time.Duration(mc.cfg.DefaultTimeout)
 	}
-
-	//fmt.Printf("\nmaxWaitTime=%d\n", maxWaitTime)
 
 	select {
 	case res := <-waitChan:
