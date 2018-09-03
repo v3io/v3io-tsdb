@@ -24,8 +24,6 @@ import (
 	"fmt"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
-	"github.com/v3io/v3io-tsdb/pkg/utils"
-	"time"
 )
 
 type delCommandeer struct {
@@ -33,8 +31,6 @@ type delCommandeer struct {
 	rootCommandeer *RootCommandeer
 	delConfig      bool
 	force          bool
-	fromTime       string
-	toTime         string
 }
 
 func newDeleteCommandeer(rootCommandeer *RootCommandeer) *delCommandeer {
@@ -55,8 +51,6 @@ func newDeleteCommandeer(rootCommandeer *RootCommandeer) *delCommandeer {
 
 	cmd.Flags().BoolVarP(&commandeer.delConfig, "del-config", "d", false, "Delete the TSDB config as well")
 	cmd.Flags().BoolVarP(&commandeer.force, "force", "f", false, "Delete all elements even if some steps fail")
-	cmd.Flags().StringVarP(&commandeer.toTime, "end", "e", "", "to time")
-	cmd.Flags().StringVarP(&commandeer.fromTime, "begin", "b", "", "from time")
 	commandeer.cmd = cmd
 
 	return commandeer
@@ -72,24 +66,7 @@ func (ic *delCommandeer) delete() error {
 		return err
 	}
 
-	var err error
-	to := time.Now().Unix() * 1000
-	if ic.toTime != "" {
-		to, err = utils.Str2unixTime(ic.toTime)
-		if err != nil {
-			return err
-		}
-	}
-
-	from := to - 1000*3600 // default of last hour
-	if ic.fromTime != "" {
-		from, err = utils.Str2unixTime(ic.fromTime)
-		if err != nil {
-			return err
-		}
-	}
-
-	err = ic.rootCommandeer.adapter.DeleteDB(ic.delConfig, ic.force, from, to)
+	err := ic.rootCommandeer.adapter.DeleteDB(ic.delConfig, ic.force)
 	if err != nil {
 		return errors.Wrap(err, "Failed to delete DB")
 	}

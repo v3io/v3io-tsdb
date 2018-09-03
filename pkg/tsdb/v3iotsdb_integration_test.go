@@ -462,7 +462,7 @@ func TestDeleteTSDB(t *testing.T) {
 		t.Fatal("Failed to create TSDB")
 	}
 
-	if err := adapter.DeleteDB(true, true, 0, 0); err != nil {
+	if err := adapter.DeleteDB(true, true); err != nil {
 		t.Fatalf("Failed to delete DB on teardown. reason: %s", err)
 	}
 

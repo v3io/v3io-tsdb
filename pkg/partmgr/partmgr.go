@@ -41,7 +41,7 @@ func NewPartitionMngr(cfg *config.Schema, partPath string, cont *v3io.Container)
 		return nil, err
 	}
 	newMngr := &PartitionManager{cfg: cfg, path: partPath, cyclic: false, container: cont, currentPartitionInterval: currentPartitionInterval}
-	newMngr.updatePartitions(cfg)
+	newMngr.updatePartitionsFromSchema(cfg)
 	return newMngr, nil
 }
 
@@ -165,12 +165,12 @@ func (p *PartitionManager) createAndUpdatePartition(t int64) (*DBPartition, erro
 			}
 		}
 	}
-	err = p.updatePartitionInSchema(partition)
+	p.cfg.Partitions = append(p.cfg.Partitions, config.Partition{StartTime: partition.startTime, SchemaInfo: p.cfg.PartitionSchemaInfo})
+	err = p.updateSchema()
 	return partition, err
 }
 
-func (p *PartitionManager) updatePartitionInSchema(partition *DBPartition) error {
-	p.cfg.Partitions = append(p.cfg.Partitions, config.Partition{StartTime: partition.startTime, SchemaInfo: p.cfg.PartitionSchemaInfo})
+func (p *PartitionManager) updateSchema() error {
 	data, err := json.Marshal(p.cfg)
 	if err != nil {
 		return errors.Wrap(err, "Failed to update new partition in schema file")
@@ -179,6 +179,12 @@ func (p *PartitionManager) updatePartitionInSchema(partition *DBPartition) error
 		err = p.container.Sync.PutObject(&v3io.PutObjectInput{Path: path.Join(p.path, config.SCHEMA_CONFIG), Body: data})
 	}
 	return err
+}
+
+func (p *PartitionManager) DeletePartitionsInfo() {
+	p.partitions = []*DBPartition{}
+	p.cfg.Partitions = []config.Partition{}
+	p.updateSchema()
 }
 
 func (p *PartitionManager) ReadAndUpdateSchema() error {
@@ -191,14 +197,14 @@ func (p *PartitionManager) ReadAndUpdateSchema() error {
 	schema := config.Schema{}
 	err = json.Unmarshal(resp.Body(), &schema)
 	if err != nil {
-		return errors.Wrap(err, "Failed to Unmarshal schema at path: "+fullPath)
+		return errors.Wrap(err, "Failed to unmarshal schema at path: "+fullPath)
 	}
 	p.cfg = &schema
-	p.updatePartitions(&schema)
+	p.updatePartitionsFromSchema(&schema)
 	return nil
 }
 
-func (p *PartitionManager) updatePartitions(schema *config.Schema) error {
+func (p *PartitionManager) updatePartitionsFromSchema(schema *config.Schema) error {
 	p.partitions = []*DBPartition{}
 	for _, part := range schema.Partitions {
 		partPath := path.Join(p.path, strconv.FormatInt(part.StartTime/1000, 10)) + "/"

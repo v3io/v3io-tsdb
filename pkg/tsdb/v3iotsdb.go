@@ -176,18 +176,16 @@ func (a *V3ioAdapter) Querier(_ context.Context, mint, maxt int64) (*querier.V3i
 	return querier.NewV3ioQuerier(a.container, a.logger, mint, maxt, a.cfg, a.partitionMngr), nil
 }
 
-func (a *V3ioAdapter) DeleteDB(configExists bool, force bool, fromTime int64, toTime int64) error {
-	partitions := a.partitionMngr.PartsForRange(fromTime, toTime)
-	for _, part := range partitions {
-		if toTime == 0 || part.GetEndTime() < toTime {
-			a.logger.Info("Delete partition %s", part.GetTablePath())
-			err := utils.DeleteTable(a.logger, a.container, part.GetTablePath(), "", a.cfg.QryWorkers)
-			if err != nil && !force {
-				return err
-			}
-			// delete the Directory object
-			a.container.Sync.DeleteObject(&v3io.DeleteObjectInput{Path: part.GetTablePath()})
+func (a *V3ioAdapter) DeleteDB(configExists bool, force bool) error {
+	partitionPaths := a.partitionMngr.GetPartitionsPaths()
+	for _, path := range partitionPaths {
+		a.logger.Info("Delete partition %s", path)
+		err := utils.DeleteTable(a.logger, a.container, path, "", a.cfg.QryWorkers)
+		if err != nil && !force {
+			return err
 		}
+		// delete the Directory object
+		a.container.Sync.DeleteObject(&v3io.DeleteObjectInput{Path: path})
 	}
 	path := a.cfg.Path + "/names/"
 	a.logger.Info("Delete metric names in path %s", path)
@@ -198,6 +196,7 @@ func (a *V3ioAdapter) DeleteDB(configExists bool, force bool, fromTime int64, to
 	// delete the Directory object
 	a.container.Sync.DeleteObject(&v3io.DeleteObjectInput{Path: path})
 
+	a.partitionMngr.DeletePartitionsInfo()
 	if configExists {
 		schemaPath := pathUtil.Join(a.cfg.Path, config.SCHEMA_CONFIG)
 		a.logger.Info("Delete TSDB config in path %s", schemaPath)
