@@ -33,7 +33,7 @@ import (
 	"strings"
 )
 
-const defaultMinimumSampleSize, defaultMaximumSampleSize = 2, 8     // bytes
+const defaultMaximumSampleSize = 8                                  // bytes
 const defaultMaximumPartitionSize = 1700000                         // 1.7MB
 const defaultMinimumChunkSize, defaultMaximumChunkSize = 200, 62000 // bytes
 
@@ -145,9 +145,6 @@ func (rc *RootCommandeer) populateConfig(cfg *config.V3ioConfig) error {
 	}
 	if cfg.MaximumSampleSize == 0 {
 		cfg.MaximumSampleSize = defaultMaximumSampleSize
-	}
-	if cfg.MinimumSampleSize == 0 {
-		cfg.MinimumSampleSize = defaultMinimumSampleSize
 	}
 	if cfg.MaximumPartitionSize == 0 {
 		cfg.MaximumPartitionSize = defaultMaximumPartitionSize
