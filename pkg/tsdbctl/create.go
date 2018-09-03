@@ -27,6 +27,7 @@ import (
 	"github.com/v3io/v3io-tsdb/pkg/aggregate"
 	"github.com/v3io/v3io-tsdb/pkg/config"
 	"github.com/v3io/v3io-tsdb/pkg/tsdb"
+	"github.com/v3io/v3io-tsdb/pkg/utils"
 	"strconv"
 )
 
@@ -103,6 +104,12 @@ func (cc *createCommandeer) create() error {
 	chunkInterval, partitionInterval, err := cc.calculatePartitionAndChunkInterval(rateInHours)
 	if err != nil {
 		return errors.Wrap(err, "failed to calculate chunk interval")
+	}
+
+	chunk, _ := utils.Str2duration(chunkInterval)
+	rollupInterval, _ := utils.Str2duration(cc.rollupInterval)
+	if chunk%rollupInterval != 0 {
+		return errors.Errorf("given your sample rate of %v, the rollup interval (%v) should divide evenly the chunk interval of %v. for example rollup interval - 10m, chunk interval - 1h", cc.sampleRate, cc.rollupInterval, chunkInterval)
 	}
 
 	defaultRollup := config.Rollup{

@@ -101,6 +101,12 @@ func (qc *queryCommandeer) query() error {
 		return err
 	}
 
+	chunkIntervalStr := qc.rootCommandeer.adapter.GetSchema().TableSchemaInfo.ChunckerInterval
+	chunk, _ := utils.Str2duration(chunkIntervalStr)
+	if chunk%step != 0 {
+		return errors.Errorf("query step (%v) should divide evenly the chunk interval of %v. for example step - 10m, chunk interval - 1h", qc.step, chunkIntervalStr)
+	}
+
 	// TODO: start & end times
 	to := time.Now().Unix() * 1000
 	if qc.to != "" {
