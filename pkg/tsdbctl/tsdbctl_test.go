@@ -50,7 +50,6 @@ func (suite *testTsdbctlSuite) TestPopulateConfigWithTenant() {
 		Path:                 "/x/y/z",
 		Username:             "Vel@Odar",
 		Password:             "p455w0rd",
-		MinimumSampleSize:    defaultMinimumSampleSize,
 		MaximumSampleSize:    defaultMaximumSampleSize,
 		MinimumChunkSize:     defaultMinimumChunkSize,
 		MaximumChunkSize:     defaultMaximumChunkSize,
