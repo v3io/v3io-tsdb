@@ -174,7 +174,7 @@ func (a *V3ioAdapter) Close() error {
 // create a querier interface, used for time series queries
 func (a *V3ioAdapter) Querier(_ context.Context, mint, maxt int64) (*querier.V3ioQuerier, error) {
 	if maxt < mint {
-		return nil, errors.Errorf("Start time is lower than end time")
+		return nil, errors.Errorf("End time %d is lower than start time %d", maxt, mint)
 	}
 	return querier.NewV3ioQuerier(a.container, a.logger, mint, maxt, a.cfg, a.partitionMngr), nil
 }
