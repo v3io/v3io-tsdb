@@ -62,7 +62,6 @@ type V3ioConfig struct {
 	// The size of batch to use during ingestion
 	BatchSize int `json:"batchSize,omitempty"`
 	// Size of sample in bytes for worst an best compression scenarios
-	MinimumSampleSize int `json:"minimumSampleSize,omitempty"`
 	MaximumSampleSize int `json:"maximumSampleSize,omitempty"`
 	// Max size of a partition object
 	MaximumPartitionSize int `json:"maximumPartitionSize,omitempty"`
