@@ -279,6 +279,7 @@ func (mc *MetricsCache) handleResponse(metric *MetricState, resp *v3io.Response,
 			if e, hasStatusCode := resp.Error.(v3io.ErrorWithStatusCode); hasStatusCode && e.StatusCode() != http.StatusServiceUnavailable {
 				mc.logger.ErrorWith(fmt.Sprintf("Chuck update failed with status code %d", e.StatusCode()))
 				metric.setError(errors.Wrap(resp.Error, fmt.Sprintf("chunk update failed due to status code %d", e.StatusCode())))
+				return false
 			} else if metric.retryCount == maxRetriesOnWrite {
 				mc.logger.ErrorWith(fmt.Sprintf("Chuck update failed - exceeded %d retries", maxRetriesOnWrite), "metric", metric.Lset)
 				metric.setError(errors.Wrap(resp.Error, fmt.Sprintf("chunk update failed after %d retries", maxRetriesOnWrite)))
