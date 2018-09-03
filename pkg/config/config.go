@@ -26,9 +26,16 @@ import (
 	"os"
 )
 
-const V3ioConfigEnvironmentVariable = "V3IO_CONF"
-const DefaultConfigurationFileName = "v3io.yaml"
-const SCHEMA_CONFIG = ".schema"
+const (
+	V3ioConfigEnvironmentVariable = "V3IO_CONF"
+	DefaultConfigurationFileName  = "v3io.yaml"
+	SCHEMA_CONFIG                 = ".schema"
+
+	defaultNumberOfIngestWorkers = 1
+	defaultNumberOfQueryWorkers  = 8
+	defaultBatchSize             = 64
+	defaultTimeoutInSeconds      = 24 * 60 * 60 // 24 hours
+)
 
 type V3ioConfig struct {
 	// V3IO Connection details: Url, Data container, relative path for this dataset, credentials
@@ -51,7 +58,7 @@ type V3ioConfig struct {
 	// Override last chunk (by default on restart it will append from the last point if possible)
 	OverrideOld bool `json:"overrideOld"`
 	// Default timeout duration in Seconds (if not set, 1 Hour timeout will be used )
-	DefaultTimeout int `json:"timeout,omitempty"`
+	DefaultTimeoutInSeconds int `json:"timeout,omitempty"`
 	// The size of batch to use during ingestion
 	BatchSize int `json:"batchSize,omitempty"`
 	// Size of sample in bytes for worst an best compression scenarios
@@ -153,20 +160,24 @@ func LoadFromData(data []byte) (*V3ioConfig, error) {
 func InitDefaults(cfg *V3ioConfig) {
 	// Initialize default number of workers
 	if cfg.Workers == 0 {
-		cfg.Workers = 8
+		cfg.Workers = defaultNumberOfIngestWorkers
 	}
 
 	// init default number Query workers if not set to Min(8,Workers)
 	if cfg.QryWorkers == 0 {
-		if cfg.Workers < 8 {
+		if cfg.Workers < defaultNumberOfQueryWorkers {
 			cfg.QryWorkers = cfg.Workers
 		} else {
-			cfg.QryWorkers = 8
+			cfg.QryWorkers = defaultNumberOfQueryWorkers
 		}
 	}
 
 	// init default batch size
 	if cfg.BatchSize <= 0 {
-		cfg.BatchSize = 64
+		cfg.BatchSize = defaultBatchSize
+	}
+
+	if cfg.DefaultTimeoutInSeconds == 0 {
+		cfg.DefaultTimeoutInSeconds = int(defaultTimeoutInSeconds)
 	}
 }
