@@ -65,7 +65,7 @@ type V3ioConfig struct {
 	MaximumSampleSize int `json:"maximumSampleSize,omitempty"`
 	// Max size of a partition object
 	MaximumPartitionSize int `json:"maximumPartitionSize,omitempty"`
-	// Sample size in bytes in worst compression scenario
+	// Size of chunk in bytes for worst an best compression scenarios
 	MinimumChunkSize int `json:"minimumChunkSize,omitempty"`
 	MaximumChunkSize int `json:"maximumChunkSize,omitempty"`
 }
