@@ -165,7 +165,7 @@ func (p *PartitionManager) createAndUpdatePartition(t int64) (*DBPartition, erro
 			}
 		}
 	}
-	p.cfg.Partitions = append(p.cfg.Partitions, config.Partition{StartTime: partition.startTime, SchemaInfo: p.cfg.PartitionSchemaInfo})
+	p.cfg.Partitions = append(p.cfg.Partitions, &config.Partition{StartTime: partition.startTime, SchemaInfo: p.cfg.PartitionSchemaInfo})
 	err = p.updateSchema()
 	return partition, err
 }
@@ -181,9 +181,25 @@ func (p *PartitionManager) updateSchema() error {
 	return err
 }
 
-func (p *PartitionManager) DeletePartitionsInfo() {
-	p.partitions = []*DBPartition{}
-	p.cfg.Partitions = []config.Partition{}
+func (p *PartitionManager) DeletePartitionsFromSchema(partitionsToDelete []*DBPartition) {
+	for i := len(p.partitions) - 1; i >= 0; i-- {
+		for _, partToDelete := range partitionsToDelete {
+			if p.partitions[i].startTime == partToDelete.startTime {
+				p.partitions = append(p.partitions[:i], p.partitions[i+1:]...)
+				break
+			}
+		}
+
+	}
+	for i := len(p.cfg.Partitions) - 1; i >= 0; i-- {
+		for _, partToDelete := range partitionsToDelete {
+			if p.cfg.Partitions[i].StartTime == partToDelete.startTime {
+				p.cfg.Partitions = append(p.cfg.Partitions[:i], p.cfg.Partitions[i+1:]...)
+				break
+			}
+		}
+
+	}
 	p.updateSchema()
 }
 
@@ -225,7 +241,7 @@ func (p *PartitionManager) updatePartitionsFromSchema(schema *config.Schema) err
 func (p *PartitionManager) PartsForRange(mint, maxt int64) []*DBPartition {
 	var parts []*DBPartition
 	for _, part := range p.partitions {
-		if part.InRange(mint) || part.InRange(maxt) || (mint < part.GetStartTime() && maxt > part.GetEndTime()) {
+		if part.InRange(mint) || part.InRange(maxt) || (mint < part.GetStartTime() && (maxt > part.GetEndTime() || maxt == 0)) {
 			parts = append(parts, part)
 		}
 	}
