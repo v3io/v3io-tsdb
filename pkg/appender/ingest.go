@@ -21,6 +21,7 @@ such restriction.
 package appender
 
 import (
+	"fmt"
 	"github.com/pkg/errors"
 	"github.com/v3io/v3io-go-http"
 	"net/http"
@@ -275,9 +276,13 @@ func (mc *MetricsCache) handleResponse(metric *MetricState, resp *v3io.Response,
 		} else {
 			// Metrics with too many update errors go into Error state
 			metric.retryCount++
-			if e, hasStatusCode := resp.Error.(v3io.ErrorWithStatusCode); metric.retryCount == maxRetriesOnWrite || hasStatusCode && e.StatusCode() != http.StatusServiceUnavailable {
-				mc.logger.ErrorWith("Metric error, exceeded retry", "metric", metric.Lset)
-				metric.setError(errors.Wrap(resp.Error, "chunk update failed after few retries"))
+			if e, hasStatusCode := resp.Error.(v3io.ErrorWithStatusCode); hasStatusCode && e.StatusCode() != http.StatusServiceUnavailable {
+				mc.logger.ErrorWith(fmt.Sprintf("Chunk update failed with status code %d", e.StatusCode()))
+				metric.setError(errors.Wrap(resp.Error, fmt.Sprintf("chunk update failed due to status code %d", e.StatusCode())))
+				return false
+			} else if metric.retryCount == maxRetriesOnWrite {
+				mc.logger.ErrorWith(fmt.Sprintf("Chunk update failed - exceeded %d retries", maxRetriesOnWrite), "metric", metric.Lset)
+				metric.setError(errors.Wrap(resp.Error, fmt.Sprintf("chunk update failed after %d retries", maxRetriesOnWrite)))
 				return false
 			}
 		}

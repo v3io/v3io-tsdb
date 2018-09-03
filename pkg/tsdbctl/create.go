@@ -30,8 +30,15 @@ import (
 	"strconv"
 )
 
-const schemaVersion = 0
-const defaultStorageClass = "local"
+const (
+	schemaVersion               = 0
+	defaultStorageClass         = "local"
+	defaultIngestionRate        = "1/s"
+	defaultRollupInterval       = "1h"
+	defaultShardingBuckets      = 8
+	defaultSampleRetentionHours = 0
+	defaultLayerRetentionTime   = "1y"
+)
 
 type createCommandeer struct {
 	cmd             *cobra.Command
@@ -62,10 +69,10 @@ func newCreateCommandeer(rootCommandeer *RootCommandeer) *createCommandeer {
 
 	cmd.Flags().StringVarP(&commandeer.defaultRollups, "rollups", "r", "",
 		"Default aggregation rollups, comma seperated: count,avg,sum,min,max,stddev")
-	cmd.Flags().StringVarP(&commandeer.rollupInterval, "rollup-interval", "i", "1h", "aggregation interval")
-	cmd.Flags().IntVarP(&commandeer.shardingBuckets, "sharding-buckets", "b", 8, "number of buckets to split key")
-	cmd.Flags().IntVarP(&commandeer.sampleRetention, "sample-retention", "a", 0, "sample retention in hours")
-	cmd.Flags().StringVar(&commandeer.sampleRate, "rate", "12/m", "sample rate")
+	cmd.Flags().StringVarP(&commandeer.rollupInterval, "rollup-interval", "i", defaultRollupInterval, "aggregation interval")
+	cmd.Flags().IntVarP(&commandeer.shardingBuckets, "sharding-buckets", "b", defaultShardingBuckets, "number of buckets to split key")
+	cmd.Flags().IntVarP(&commandeer.sampleRetention, "sample-retention", "a", defaultSampleRetentionHours, "sample retention in hours")
+	cmd.Flags().StringVar(&commandeer.sampleRate, "rate", defaultIngestionRate, "sample rate")
 
 	commandeer.cmd = cmd
 
@@ -103,7 +110,7 @@ func (cc *createCommandeer) create() error {
 		AggregatorsGranularity: cc.rollupInterval,
 		StorageClass:           defaultStorageClass,
 		SampleRetention:        cc.sampleRetention,
-		LayerRetentionTime:     "1y", //TODO
+		LayerRetentionTime:     defaultLayerRetentionTime, //TODO: make configurable
 	}
 
 	tableSchema := config.TableSchema{
@@ -154,14 +161,14 @@ func (cc *createCommandeer) validateFormat(format string) error {
 
 func (cc *createCommandeer) calculatePartitionAndChunkInterval(rateInHours int) (string, string, error) {
 	maxNumberOfEventsPerChunk := cc.rootCommandeer.v3iocfg.MaximumChunkSize / cc.rootCommandeer.v3iocfg.MaximumSampleSize
-	minNumberOfEventsPerChunk := cc.rootCommandeer.v3iocfg.MinimumChunkSize / cc.rootCommandeer.v3iocfg.MinimumSampleSize
+	minNumberOfEventsPerChunk := cc.rootCommandeer.v3iocfg.MinimumChunkSize / cc.rootCommandeer.v3iocfg.MaximumSampleSize
 
 	chunkInterval := maxNumberOfEventsPerChunk / rateInHours
 
 	// Make sure the expected chunk size is greater then the supported minimum.
 	if chunkInterval < minNumberOfEventsPerChunk/rateInHours {
 		return "", "", fmt.Errorf(
-			"calculated chunk size is less then minimum, rate - %v/h, calculated chunk interval - %v, minimum size - %v",
+			"calculated chunk size is less than minimum, rate - %v/h, calculated chunk interval - %v, minimum size - %v",
 			rateInHours, chunkInterval, cc.rootCommandeer.v3iocfg.MinimumChunkSize)
 	}
 
