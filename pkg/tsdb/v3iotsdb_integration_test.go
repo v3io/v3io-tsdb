@@ -209,7 +209,7 @@ func TestQueryData(t *testing.T) {
 			expected: map[string][]tsdbtest.DataPoint{"sum": {{Time: 1532940510, Value: 701.0}},
 				"count": {{Time: 1532940510, Value: 3}}}},
 
-		{desc: "Should ingest and query with illegal time (switch from and to)", metricName: "cpu",
+		{desc: "Should fail on query with illegal time (switch from and to)", metricName: "cpu",
 			labels: utils.FromStrings("os", "linux", "iguaz", "yesplease"),
 			data: []tsdbtest.DataPoint{{Time: 1532940510, Value: 314.3},
 				{Time: 1532940510 + 5, Value: 300.3},
