@@ -73,7 +73,7 @@ type V3ioConfig struct {
 type Rollup struct {
 	Aggregators            []string `json:"aggregators"`
 	AggregatorsGranularity string   `json:"aggregatorsGranularity"`
-	//["cloud","local"] for the aggregators and sample chucks
+	//["cloud","local"] for the aggregators and sample chunks
 	StorageClass string `json:"storageClass"`
 	//in hours. 0  means no need to save samples
 	SampleRetention int `json:"sampleRetention"`
@@ -114,7 +114,7 @@ type SchemaField struct {
 type Schema struct {
 	TableSchemaInfo     TableSchema     `json:"tableSchemaInfo"`
 	PartitionSchemaInfo PartitionSchema `json:"partitionSchemaInfo"`
-	Partitions          []Partition     `json:"partitions"`
+	Partitions          []*Partition    `json:"partitions"`
 	Fields              []SchemaField   `json:"fields"`
 }
 

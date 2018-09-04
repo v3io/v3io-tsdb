@@ -142,7 +142,7 @@ func (cc *createCommandeer) create() error {
 	schema := config.Schema{
 		TableSchemaInfo:     tableSchema,
 		PartitionSchemaInfo: partitionSchema,
-		Partitions:          []config.Partition{},
+		Partitions:          []*config.Partition{},
 		Fields:              fields,
 	}
 
