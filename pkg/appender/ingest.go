@@ -86,7 +86,7 @@ func (mc *MetricsCache) metricFeed(index int) {
 						metric := app.metric
 						metric.Lock()
 
-						if !metric.hasError() && metric.isTimeInvalid(app.t) {
+						if metric.isTimeInvalid(app.t) {
 							metric.store.Append(app.t, app.v)
 							numPushed++
 							dataQueued += metric.store.samplesQueueLength()
@@ -276,7 +276,7 @@ func (mc *MetricsCache) handleResponse(metric *MetricState, resp *v3io.Response,
 		} else {
 			clear := func() {
 				resp.Release()
-				metric.store.ProcessWriteResp()
+				metric.store = NewChunkStore()
 				metric.retryCount = 0
 				metric.setState(storeStateInit)
 			}
