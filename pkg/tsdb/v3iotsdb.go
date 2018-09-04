@@ -185,12 +185,12 @@ func (a *V3ioAdapter) DeleteDB(configExists bool, force bool, fromTime int64, to
 		a.logger.Info("Delete partition %s", part.GetTablePath())
 		err := utils.DeleteTable(a.logger, a.container, part.GetTablePath(), "", a.cfg.QryWorkers)
 		if err != nil && !force {
-			return errors.Wrap(err, "Failed to delete partition %s"+part.GetTablePath())
+			return errors.Wrap(err, "Failed to delete partition "+part.GetTablePath())
 		}
 		// delete the Directory object
 		err = a.container.Sync.DeleteObject(&v3io.DeleteObjectInput{Path: part.GetTablePath()})
 		if err != nil && !force {
-			return errors.Wrap(err, "Failed to delete partition object %s"+part.GetTablePath())
+			return errors.Wrap(err, "Failed to delete partition object "+part.GetTablePath())
 		}
 	}
 	a.partitionMngr.DeletePartitionsFromSchema(partitions)
@@ -205,7 +205,7 @@ func (a *V3ioAdapter) DeleteDB(configExists bool, force bool, fromTime int64, to
 		// delete the Directory object
 		err = a.container.Sync.DeleteObject(&v3io.DeleteObjectInput{Path: path})
 		if err != nil && !force {
-			return errors.Wrap(err, "Failed to delete names object")
+			return errors.Wrap(err, "Failed to delete table object")
 		}
 	}
 	if configExists {
