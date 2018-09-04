@@ -323,7 +323,7 @@ func (cs *chunkStore) WriteChunks(mc *MetricsCache, metric *MetricState) (bool, 
 			isNewBucket = true
 		}
 
-		// if the next item is in a new chuck, gen expression and init new chunk
+		// if the next item is in a new chunk, gen expression and init new chunk
 		if !activeChunk.inRange(nextT) {
 			expr = expr + cs.appendExpression(activeChunk)
 			activeChunk = cs.chunkByTime(nextT)

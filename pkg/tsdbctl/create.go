@@ -140,7 +140,7 @@ func (cc *createCommandeer) create() error {
 	schema := config.Schema{
 		TableSchemaInfo:     tableSchema,
 		PartitionSchemaInfo: partitionSchema,
-		Partitions:          []config.Partition{},
+		Partitions:          []*config.Partition{},
 		Fields:              fields,
 	}
 
@@ -161,14 +161,17 @@ func (cc *createCommandeer) validateFormat(format string) error {
 
 func (cc *createCommandeer) calculatePartitionAndChunkInterval(rateInHours int) (string, string, error) {
 	maxNumberOfEventsPerChunk := cc.rootCommandeer.v3iocfg.MaximumChunkSize / cc.rootCommandeer.v3iocfg.MaximumSampleSize
-	minNumberOfEventsPerChunk := cc.rootCommandeer.v3iocfg.MinimumChunkSize / cc.rootCommandeer.v3iocfg.MinimumSampleSize
+	minNumberOfEventsPerChunk := cc.rootCommandeer.v3iocfg.MinimumChunkSize / cc.rootCommandeer.v3iocfg.MaximumSampleSize
 
 	chunkInterval := maxNumberOfEventsPerChunk / rateInHours
+	if chunkInterval == 0 {
+		return "", "", errors.New("sample rate is too high")
+	}
 
 	// Make sure the expected chunk size is greater then the supported minimum.
 	if chunkInterval < minNumberOfEventsPerChunk/rateInHours {
 		return "", "", fmt.Errorf(
-			"calculated chunk size is less then minimum, rate - %v/h, calculated chunk interval - %v, minimum size - %v",
+			"calculated chunk size is less than minimum, rate - %v/h, calculated chunk interval - %v, minimum size - %v",
 			rateInHours, chunkInterval, cc.rootCommandeer.v3iocfg.MinimumChunkSize)
 	}
 
