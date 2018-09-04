@@ -183,6 +183,9 @@ func (cc *createCommandeer) calculatePartitionAndChunkInterval(rateInHours int) 
 	minNumberOfEventsPerChunk := cc.rootCommandeer.v3iocfg.MinimumChunkSize / cc.rootCommandeer.v3iocfg.MaximumSampleSize
 
 	chunkInterval := maxNumberOfEventsPerChunk / rateInHours
+	if chunkInterval == 0 {
+		return "", "", errors.New("sample rate is too high")
+	}
 
 	// Make sure the expected chunk size is greater then the supported minimum.
 	if chunkInterval < minNumberOfEventsPerChunk/rateInHours {

@@ -63,8 +63,6 @@ const (
 	storeStateGet    storeState = 2 // Getting old state from storage
 	storeStateReady  storeState = 3 // Ready to update
 	storeStateUpdate storeState = 4 // Update/write in progress
-	storeStateError  storeState = 5 // Metric in error state
-	storeStateSort   storeState = 6 // TBD sort chunk(s) in case of late arrivals
 )
 
 // store is ready to update samples into the DB
@@ -76,10 +74,6 @@ func (m *MetricState) isTimeInvalid(t int64) bool {
 	return !((m.state == storeStateReady || m.state == storeStateUpdate) && t < m.store.maxTime-maxLateArrivalInterval)
 }
 
-func (m *MetricState) hasError() bool {
-	return m.state == storeStateError
-}
-
 func (m *MetricState) getState() storeState {
 	return m.state
 }
@@ -89,7 +83,6 @@ func (m *MetricState) setState(state storeState) {
 }
 
 func (m *MetricState) setError(err error) {
-	m.setState(storeStateError)
 	m.err = err
 }
 
@@ -204,22 +197,18 @@ func (mc *MetricsCache) Add(lset utils.LabelsIfc, t int64, v interface{}) (uint6
 	//hash := lset.Hash()
 	metric, ok := mc.getMetric(hash)
 
-	if ok {
-		err := metric.error()
-		if err != nil {
-			return 0, err
-		}
-		mc.appendTV(metric, t, v)
-		return metric.refId, nil
+	if !ok {
+		metric = &MetricState{Lset: lset, key: key, name: name, hash: hash}
+		metric.store = NewChunkStore()
+		mc.addMetric(hash, name, metric)
 	}
 
-	metric = &MetricState{Lset: lset, key: key, name: name, hash: hash}
-	metric.store = NewChunkStore()
-	mc.addMetric(hash, name, metric)
+	err := metric.error()
+	metric.setError(nil)
 
-	// push new/next update
 	mc.appendTV(metric, t, v)
-	return metric.refId, nil
+
+	return metric.refId, err
 }
 
 // fast Add to metric (by refId)
@@ -232,12 +221,11 @@ func (mc *MetricsCache) AddFast(ref uint64, t int64, v interface{}) error {
 	}
 
 	err := metric.error()
-	if err != nil {
-		return err
-	}
-	mc.appendTV(metric, t, v)
-	return nil
+	metric.setError(nil)
 
+	mc.appendTV(metric, t, v)
+
+	return err
 }
 
 func (mc *MetricsCache) WaitForCompletion(timeout time.Duration) (int, error) {

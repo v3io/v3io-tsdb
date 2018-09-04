@@ -36,7 +36,7 @@ import (
 
 const defaultMaximumSampleSize = 8                                  // bytes
 const defaultMaximumPartitionSize = 1700000                         // 1.7MB
-const defaultMinimumChunkSize, defaultMaximumChunkSize = 200, 62000 // bytes
+const defaultMinimumChunkSize, defaultMaximumChunkSize = 200, 32000 // bytes
 const oneHourMillis = int64(time.Hour / time.Millisecond)
 
 type RootCommandeer struct {
