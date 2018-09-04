@@ -210,13 +210,13 @@ func (p *PartitionManager) ReadAndUpdateSchema() error {
 		return errors.Wrap(err, "Failed to read schema at path: "+fullPath)
 	}
 
-	schema := config.Schema{}
-	err = json.Unmarshal(resp.Body(), &schema)
+	schema := &config.Schema{}
+	err = json.Unmarshal(resp.Body(), schema)
 	if err != nil {
 		return errors.Wrap(err, "Failed to unmarshal schema at path: "+fullPath)
 	}
-	p.cfg = &schema
-	p.updatePartitionsFromSchema(&schema)
+	p.cfg = schema
+	p.updatePartitionsFromSchema(schema)
 	return nil
 }
 
@@ -241,7 +241,7 @@ func (p *PartitionManager) updatePartitionsFromSchema(schema *config.Schema) err
 func (p *PartitionManager) PartsForRange(mint, maxt int64) []*DBPartition {
 	var parts []*DBPartition
 	for _, part := range p.partitions {
-		if part.InRange(mint) || part.InRange(maxt) || (mint < part.GetStartTime() && (maxt > part.GetEndTime() || maxt == 0)) {
+		if part.InRange(mint) || part.InRange(maxt) || (mint < part.GetStartTime() && maxt > part.GetEndTime()) {
 			parts = append(parts, part)
 		}
 	}

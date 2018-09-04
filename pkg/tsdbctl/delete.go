@@ -55,7 +55,7 @@ func newDeleteCommandeer(rootCommandeer *RootCommandeer) *delCommandeer {
 
 	cmd.Flags().BoolVarP(&commandeer.delConfig, "del-config", "d", false, "Delete the TSDB config as well")
 	cmd.Flags().BoolVarP(&commandeer.force, "force", "f", false, "Delete all elements even if some steps fail")
-	cmd.Flags().StringVarP(&commandeer.toTime, "end", "e", "0", "to time")
+	cmd.Flags().StringVarP(&commandeer.toTime, "end", "e", "now", "to time")
 	cmd.Flags().StringVarP(&commandeer.fromTime, "begin", "b", "0", "from time")
 	commandeer.cmd = cmd
 

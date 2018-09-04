@@ -185,30 +185,41 @@ func (a *V3ioAdapter) DeleteDB(configExists bool, force bool, fromTime int64, to
 		a.logger.Info("Delete partition %s", part.GetTablePath())
 		err := utils.DeleteTable(a.logger, a.container, part.GetTablePath(), "", a.cfg.QryWorkers)
 		if err != nil && !force {
-			return err
+			return errors.Wrap(err, "Failed to delete partition %s"+part.GetTablePath())
 		}
 		// delete the Directory object
-		a.container.Sync.DeleteObject(&v3io.DeleteObjectInput{Path: part.GetTablePath()})
+		err = a.container.Sync.DeleteObject(&v3io.DeleteObjectInput{Path: part.GetTablePath()})
+		if err != nil && !force {
+			return errors.Wrap(err, "Failed to delete partition object %s"+part.GetTablePath())
+		}
 	}
-	path := a.cfg.Path + "/names/"
-	a.logger.Info("Delete metric names in path %s", path)
-	err := utils.DeleteTable(a.logger, a.container, path, "", a.cfg.QryWorkers)
-	if err != nil && !force {
-		return err
-	}
-	// delete the Directory object
-	a.container.Sync.DeleteObject(&v3io.DeleteObjectInput{Path: path})
-
 	a.partitionMngr.DeletePartitionsFromSchema(partitions)
+
+	if len(a.partitionMngr.GetPartitionsPaths()) == 0 {
+		path := a.cfg.Path + "/names/"
+		a.logger.Info("Delete metric names in path %s", path)
+		err := utils.DeleteTable(a.logger, a.container, path, "", a.cfg.QryWorkers)
+		if err != nil && !force {
+			return errors.Wrap(err, "Failed to delete names table")
+		}
+		// delete the Directory object
+		err = a.container.Sync.DeleteObject(&v3io.DeleteObjectInput{Path: path})
+		if err != nil && !force {
+			return errors.Wrap(err, "Failed to delete names object")
+		}
+	}
 	if configExists {
 		schemaPath := pathUtil.Join(a.cfg.Path, config.SCHEMA_CONFIG)
 		a.logger.Info("Delete TSDB config in path %s", schemaPath)
-		err = a.container.Sync.DeleteObject(&v3io.DeleteObjectInput{Path: schemaPath})
+		err := a.container.Sync.DeleteObject(&v3io.DeleteObjectInput{Path: schemaPath})
 		if err != nil && !force {
 			return errors.New("Cant delete config or not found in " + schemaPath)
 		}
 		// delete the Directory object
-		a.container.Sync.DeleteObject(&v3io.DeleteObjectInput{Path: a.cfg.Path + "/"})
+		err = a.container.Sync.DeleteObject(&v3io.DeleteObjectInput{Path: a.cfg.Path + "/"})
+		if err != nil && !force {
+			return errors.Wrap(err, "Failed to delete table object")
+		}
 	}
 
 	return nil
