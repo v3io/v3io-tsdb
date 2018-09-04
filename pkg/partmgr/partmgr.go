@@ -369,9 +369,19 @@ func (p *DBPartition) InRange(t int64) bool {
 }
 
 // return the mint and maxt for this partition, may need maxt for cyclic partition
-func (p *DBPartition) GetPartitionRange() (int64, int64) {
+func (p *DBPartition) GetPartitionRange(maxt int64) (int64, int64) {
 	// start p.days ago, rounded to next hour
 	return p.startTime, p.startTime + p.partitionInterval
+}
+
+// return the valid minimum time in a cyclic partition based on max time
+func (p *DBPartition) CyclicMinTime(mint, maxt int64) int64 {
+	// start p.days ago, rounded to next hour
+	newMin, _ := p.GetPartitionRange(maxt)
+	if mint > newMin {
+		return mint
+	}
+	return newMin
 }
 
 // Attribute name of a chunk

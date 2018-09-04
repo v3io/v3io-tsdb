@@ -106,13 +106,9 @@ func (q *V3ioQuerier) selectQry(name, functions string, step int64, windows []in
 func (q *V3ioQuerier) queryNumericPartition(
 	partition *partmgr.DBPartition, name, functions string, step int64, windows []int, filter string) (SeriesSet, error) {
 
-	mint, maxt := partition.GetPartitionRange()
+	mint, maxt := partition.GetPartitionRange(q.maxt)
 	if q.mint > mint {
 		mint = q.mint
-		if step != 0 {
-			// temporary Aggregation fix: if mint is not aligned with steps, move it to the next step tick
-			mint += (maxt - q.mint) % step
-		}
 	}
 	if q.maxt < maxt {
 		maxt = q.maxt
