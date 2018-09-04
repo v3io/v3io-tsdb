@@ -29,6 +29,7 @@ import (
 	"github.com/v3io/v3io-tsdb/pkg/tsdb"
 	"github.com/v3io/v3io-tsdb/pkg/utils"
 	"strconv"
+	"time"
 )
 
 const (
@@ -87,7 +88,7 @@ func (cc *createCommandeer) create() error {
 		return err
 	}
 
-	if err := cc.validateFormat(cc.rollupInterval); err != nil {
+	if err := cc.validateRollupInterval(); err != nil {
 		return errors.Wrap(err, "failed to parse rollup interval")
 	}
 
@@ -104,12 +105,6 @@ func (cc *createCommandeer) create() error {
 	chunkInterval, partitionInterval, err := cc.calculatePartitionAndChunkInterval(rateInHours)
 	if err != nil {
 		return errors.Wrap(err, "failed to calculate chunk interval")
-	}
-
-	chunk, _ := utils.Str2duration(chunkInterval)
-	rollupInterval, _ := utils.Str2duration(cc.rollupInterval)
-	if chunk%rollupInterval != 0 {
-		return errors.Errorf("given your sample rate of %v, the rollup interval (%v) should divide evenly the chunk interval of %v. for example rollup interval - 10m, chunk interval - 1h", cc.sampleRate, cc.rollupInterval, chunkInterval)
 	}
 
 	defaultRollup := config.Rollup{
@@ -166,6 +161,23 @@ func (cc *createCommandeer) validateFormat(format string) error {
 	return nil
 }
 
+func (cc *createCommandeer) validateRollupInterval() error {
+	err := cc.validateFormat(cc.rollupInterval)
+	if err != nil {
+		return err
+	}
+
+	duration, err := utils.Str2duration(cc.rollupInterval)
+	if err != nil {
+		return err
+	}
+
+	if oneHourMillis%duration != 0 && duration%oneHourMillis != 0 {
+		return errors.New("rollup interval should be a divisor or a dividend of 1 hour. Example: 10m, 30m, 2h, etc..")
+	}
+	return nil
+}
+
 func (cc *createCommandeer) calculatePartitionAndChunkInterval(rateInHours int) (string, string, error) {
 	maxNumberOfEventsPerChunk := cc.rootCommandeer.v3iocfg.MaximumChunkSize / cc.rootCommandeer.v3iocfg.MaximumSampleSize
 	minNumberOfEventsPerChunk := cc.rootCommandeer.v3iocfg.MinimumChunkSize / cc.rootCommandeer.v3iocfg.MaximumSampleSize
@@ -182,7 +194,24 @@ func (cc *createCommandeer) calculatePartitionAndChunkInterval(rateInHours int) 
 	actualCapacityOfChunk := chunkInterval * rateInHours * cc.rootCommandeer.v3iocfg.MaximumSampleSize
 	numberOfChunksInPartition := cc.rootCommandeer.v3iocfg.MaximumPartitionSize / actualCapacityOfChunk
 	partitionInterval := numberOfChunksInPartition * chunkInterval
+
+	partitionInterval, err := cc.enforcePartitionInterval(partitionInterval, chunkInterval)
+	if err != nil {
+		return "", "", err
+	}
 	return strconv.Itoa(chunkInterval) + "h", strconv.Itoa(partitionInterval) + "h", nil
+}
+
+func (cc *createCommandeer) enforcePartitionInterval(partitionIntervalInHours, chunkIntervalInHours int) (int, error) {
+	rollupIntervalMillis, err := utils.Str2duration(cc.rollupInterval)
+	rollupIntervalHours := int(rollupIntervalMillis / int64(time.Hour/time.Millisecond))
+	if err != nil {
+		return 0, err
+	}
+	if rollupIntervalHours < 1 {
+		return partitionIntervalInHours, nil
+	}
+	return getNextNumberEvenlyDivided(partitionIntervalInHours, chunkIntervalInHours, rollupIntervalHours), nil
 }
 
 func rateToHours(sampleRate string) (int, error) {
@@ -215,4 +244,11 @@ func rateToHours(sampleRate string) (int, error) {
 	default:
 		return 0, parsingError
 	}
+}
+
+func getNextNumberEvenlyDivided(n, d1, d2 int) int {
+	var i int
+	for i = n; i%d1 != 0 || i%d2 != 0; i-- {
+	}
+	return i
 }
