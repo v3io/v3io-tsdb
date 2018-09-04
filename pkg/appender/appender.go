@@ -63,8 +63,6 @@ const (
 	storeStateGet    storeState = 2 // Getting old state from storage
 	storeStateReady  storeState = 3 // Ready to update
 	storeStateUpdate storeState = 4 // Update/write in progress
-	storeStateError  storeState = 5 // Metric in error state
-	storeStateSort   storeState = 6 // TBD sort chunk(s) in case of late arrivals
 )
 
 // store is ready to update samples into the DB
@@ -77,7 +75,7 @@ func (m *MetricState) isTimeInvalid(t int64) bool {
 }
 
 func (m *MetricState) hasError() bool {
-	return m.state == storeStateError
+	return m.err != nil
 }
 
 func (m *MetricState) getState() storeState {
@@ -89,7 +87,6 @@ func (m *MetricState) setState(state storeState) {
 }
 
 func (m *MetricState) setError(err error) {
-	m.setState(storeStateError)
 	m.err = err
 }
 
@@ -207,6 +204,7 @@ func (mc *MetricsCache) Add(lset utils.LabelsIfc, t int64, v interface{}) (uint6
 	if ok {
 		err := metric.error()
 		if err != nil {
+			metric.setError(nil)
 			return 0, err
 		}
 		mc.appendTV(metric, t, v)
@@ -233,6 +231,7 @@ func (mc *MetricsCache) AddFast(ref uint64, t int64, v interface{}) error {
 
 	err := metric.error()
 	if err != nil {
+		metric.setError(nil)
 		return err
 	}
 	mc.appendTV(metric, t, v)

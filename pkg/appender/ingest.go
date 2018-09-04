@@ -254,10 +254,10 @@ func (mc *MetricsCache) handleResponse(metric *MetricState, resp *v3io.Response,
 	reqInput := resp.Request().Input
 
 	if resp.Error != nil && metric.getState() != storeStateGet {
+		req := reqInput.(*v3io.UpdateItemInput)
 		mc.logger.ErrorWith("failed IO", "id", resp.ID, "err", resp.Error, "key", metric.key,
 			"inflight", mc.updatesInFlight, "mqueue", mc.metricQueue.Length(),
-			"numsamples", metric.store.samplesQueueLength(), "update expression",
-			reqInput.(*v3io.UpdateItemInput).Expression)
+			"numsamples", metric.store.samplesQueueLength(), "path", req.Path, "update expression", req.Expression)
 	} else {
 		mc.logger.DebugWith("IO resp", "id", resp.ID, "err", resp.Error, "key", metric.key, "request type",
 			reflect.TypeOf(reqInput), "request", reqInput)
@@ -274,15 +274,24 @@ func (mc *MetricsCache) handleResponse(metric *MetricState, resp *v3io.Response,
 			metric.store.ProcessWriteResp()
 			metric.retryCount = 0
 		} else {
+			clear := func() {
+				resp.Release()
+				metric.store.ProcessWriteResp()
+				metric.retryCount = 0
+				metric.setState(storeStateInit)
+			}
+
 			// Metrics with too many update errors go into Error state
 			metric.retryCount++
 			if e, hasStatusCode := resp.Error.(v3io.ErrorWithStatusCode); hasStatusCode && e.StatusCode() != http.StatusServiceUnavailable {
 				mc.logger.ErrorWith(fmt.Sprintf("Chunk update failed with status code %d", e.StatusCode()))
 				metric.setError(errors.Wrap(resp.Error, fmt.Sprintf("chunk update failed due to status code %d", e.StatusCode())))
+				clear()
 				return false
 			} else if metric.retryCount == maxRetriesOnWrite {
 				mc.logger.ErrorWith(fmt.Sprintf("Chunk update failed - exceeded %d retries", maxRetriesOnWrite), "metric", metric.Lset)
 				metric.setError(errors.Wrap(resp.Error, fmt.Sprintf("chunk update failed after %d retries", maxRetriesOnWrite)))
+				clear()
 				return false
 			}
 		}
