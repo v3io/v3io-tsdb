@@ -32,26 +32,25 @@ import (
 	"time"
 )
 
-var basetime int64
-
 type TestConfig struct {
 	desc          string
+	testStartTime int64
+	testBaseTime  int64
 	interval      int64
-	timeVariance  int
-	testDuration  string
+	testDuration  int64
 	numMetrics    int
 	numLabels     int
 	values        []float64
 	queryFunc     string
-	queryStart    string
-	queryStepSec  int64
+	queryStart    int64
+	queryStep     int64
 	expectedCount int
 	expectedSum   float64
 	expectedAvg   float64
 	expectFail    bool
 	ignoreReason  string
 	v3ioConfig    *config.V3ioConfig
-	setup         func() (*config.V3ioConfig, func())
+	setup         func() (*tsdb.V3ioAdapter, func())
 }
 
 type metricContext struct {
@@ -61,36 +60,8 @@ type metricContext struct {
 
 func TestAggregates(t *testing.T) {
 
-	testCases := []TestConfig{
-		{
-			desc:         "Test case #1",
-			interval:     10,
-			timeVariance: 0,
-			testDuration: "80h",
-			numMetrics:   1,
-			numLabels:    1,
-			values:       []float64{1, 2, 3, 4, 5},
-			queryFunc:    "count,sum,avg",
-			queryStart:   "88h",
-			queryStepSec: 60 * 60,
-			setup: func() (*config.V3ioConfig, func()) {
-				// setup:
-				v3ioConfig, err := tsdbtest.LoadV3ioConfig()
-				if err != nil {
-					t.Fatalf("Failed to read config %s", err)
-				}
-				v3ioConfig.Path = fmt.Sprintf("%s-%d", t.Name(), time.Now().Nanosecond())
-
-				tsdbtest.CreateTestTSDB(t, v3ioConfig)
-				return v3ioConfig, func() {
-					// Tear down:
-					// Don't delete the table if the test has failed
-					if !t.Failed() {
-						tsdbtest.DeleteTSDB(t, v3ioConfig)
-					}
-				}
-			},
-		},
+	testCases := []*TestConfig{
+		t1Config(t),
 	}
 
 	for _, testConfig := range testCases {
@@ -99,80 +70,81 @@ func TestAggregates(t *testing.T) {
 			if testConfig.ignoreReason != "" {
 				t.Skip(testConfig.ignoreReason)
 			}
-			testAggregatesCase(t, &testConfig)
+			testAggregatesCase(t, testConfig)
 		})
 	}
 
 }
 
+func t1Config(testCtx *testing.T) *TestConfig {
+	currentTimeNano := time.Now().UnixNano()
+
+	testDuration := int64(80 * time.Hour)
+
+	s := &TestConfig{
+		desc:          "Test case #1",
+		testStartTime: currentTimeNano,
+		testBaseTime:  currentTimeNano - testDuration - int64(time.Minute),
+		interval:      int64(10 * time.Second),
+		testDuration:  testDuration,
+		numMetrics:    1,
+		numLabels:     1,
+		values:        []float64{1, 2, 3, 4, 5},
+		queryFunc:     "count,sum,avg",
+		queryStart:    currentTimeNano - int64(88*time.Hour),
+		queryStep:     int64(1 * time.Hour),
+		setup: func() (*tsdb.V3ioAdapter, func()) {
+			return setupFunc(testCtx)
+		},
+	}
+	return s
+}
+
+// Setup for test and return tear-down function
+func setupFunc(testCtx *testing.T) (*tsdb.V3ioAdapter, func()) {
+	// setup:
+	v3ioConfig, err := tsdbtest.LoadV3ioConfig()
+	if err != nil {
+		testCtx.Fatalf("Failed to read config %s", err)
+	}
+	v3ioConfig.Path = fmt.Sprintf("%s-%d", testCtx.Name(), time.Now().Nanosecond())
+
+	tsdbtest.CreateTestTSDB(testCtx, v3ioConfig)
+
+	adapter, err := tsdb.NewV3ioAdapter(v3ioConfig, nil, nil)
+	if err != nil {
+		testCtx.Fatal(err)
+	}
+
+	return adapter, func() {
+		// Tear down:
+		// Don't delete the table if the test has failed
+		if !testCtx.Failed() {
+			tsdbtest.DeleteTSDB(testCtx, v3ioConfig)
+		}
+	}
+}
+
 func testAggregatesCase(t *testing.T, testConfig *TestConfig) {
 	// Setup & TearDown
-	cfg, tearDown := testConfig.setup()
+	adapter, tearDown := testConfig.setup()
 	defer tearDown()
 
-	duration, err := utils.Str2duration(testConfig.testDuration)
-	if err != nil {
-		t.Fatalf("Failed to read testConfig duration %s - %s", testConfig.testDuration, err)
-	}
+	startBefore := testConfig.testStartTime - testConfig.queryStart - int64(1*time.Minute)
 
-	startBefore, err := utils.Str2duration(testConfig.queryStart)
-	if err != nil {
-		t.Fatalf("Failed to read testConfig query start %s - %s", testConfig.queryStart, err)
-	}
+	total := generateData(t, testConfig, adapter)
 
-	now := time.Now().Unix() * 1000
-	basetime = now - duration - 60000 // now - duration - 1 min
-	startBefore = now - startBefore - 60000
-
-	adapter, err := tsdb.NewV3ioAdapter(cfg, nil, nil)
+	qry, err := adapter.Querier(nil, startBefore, testConfig.testStartTime)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	appender, err := adapter.Appender()
+	set, err := qry.Select("metric0", testConfig.queryFunc, nanosToMillis(testConfig.queryStep), "")
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	var metrics []*metricContext
-	for m := 0; m < testConfig.numMetrics; m++ {
-		for l := 0; l < testConfig.numLabels; l++ {
-			metrics = append(metrics, &metricContext{
-				lset: utils.FromStrings(
-					"__name__", fmt.Sprintf("metric%d", m), "label", fmt.Sprintf("lbl%d", l)),
-			})
-		}
-	}
-
-	index := 0
-	total := 0
-	var curTime int64
-	for curTime = basetime; curTime < basetime+duration; curTime += testConfig.interval * 1000 {
-		v := testConfig.values[index]
-		//trand := curTime + int64(rand.Intn(testConfig.TimeVariance) - testConfig.TimeVariance/2)
-		err := writeNext(appender, metrics, curTime, v)
-		if err != nil {
-			t.Fatal(err)
-		}
-		index = (index + 1) % len(testConfig.values)
-		total++
-	}
-	fmt.Println("total samples written:", total)
-
-	appender.WaitForCompletion(30 * time.Second)
-	time.Sleep(time.Second * 2)
-
-	qry, err := adapter.Querier(nil, startBefore, now)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	set, err := qry.Select("metric0", testConfig.queryFunc, testConfig.queryStepSec*1000, "")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	expectedCount := testConfig.queryStepSec / testConfig.interval
+	expectedCount := testConfig.queryStep / testConfig.interval
 	expectedSum := 0.0
 	for _, v := range testConfig.values {
 		expectedSum += v
@@ -198,9 +170,9 @@ func testAggregatesCase(t *testing.T, testConfig *TestConfig) {
 				totalCount += int(v)
 			}
 
-			if tm > basetime && tm < curTime-1*testConfig.queryStepSec*1000 {
+			if tm > testConfig.testBaseTime && tm < testConfig.testStartTime-testConfig.queryStep {
 				if aggr == "count" && int64(v) != expectedCount {
-					fmt.Println("\n***", curTime, curTime-3*testConfig.queryStepSec*1000-60000)
+					fmt.Println("\n***", testConfig.testStartTime, testConfig.testStartTime-3*testConfig.queryStep-int64(time.Minute))
 					t.Errorf("Count is not ok - expected %d, got %f at time %d", expectedCount, v, tm)
 				}
 				if aggr == "sum" && v != expectedSum {
@@ -225,6 +197,46 @@ func testAggregatesCase(t *testing.T, testConfig *TestConfig) {
 
 		fmt.Println()
 	}
+}
+
+func nanosToMillis(nanos int64) int64 {
+	millis := nanos / int64(time.Millisecond)
+	return millis
+}
+
+func generateData(t *testing.T, testConfig *TestConfig, adapter *tsdb.V3ioAdapter) int {
+	var metrics []*metricContext
+	for m := 0; m < testConfig.numMetrics; m++ {
+		for l := 0; l < testConfig.numLabels; l++ {
+			metrics = append(metrics, &metricContext{
+				lset: utils.FromStrings(
+					"__name__", fmt.Sprintf("metric%d", m), "label", fmt.Sprintf("lbl%d", l)),
+			})
+		}
+	}
+
+	appender, err := adapter.Appender()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	index := 0
+	total := 0
+	var curTime int64
+	for curTime = testConfig.testBaseTime; curTime < testConfig.testBaseTime+testConfig.testDuration; curTime += testConfig.interval {
+		v := testConfig.values[index]
+		err := writeNext(appender, metrics, nanosToMillis(curTime), v)
+		if err != nil {
+			t.Fatal(err)
+		}
+		index = (index + 1) % len(testConfig.values)
+		total++
+	}
+	fmt.Println("total samples written:", total)
+
+	appender.WaitForCompletion(10 * time.Second)
+
+	return total
 }
 
 func writeNext(app tsdb.Appender, metrics []*metricContext, t int64, v float64) error {
