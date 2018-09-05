@@ -199,6 +199,17 @@ func TestQueryData(t *testing.T) {
 			aggregators: "sum",
 			expected:    map[string][]tsdbtest.DataPoint{"sum": {{Time: 1532940510, Value: 701.0}}}},
 
+		{desc: "Should ingest and query an aggregator EXTRA", metricName: "cpu",
+			labels: utils.FromStrings("os", "linux", "iguaz", "yesplease"),
+			data: []tsdbtest.DataPoint{{Time: 1532940510, Value: 300.3},
+				{Time: 1532940510 + 60, Value: 300.3},
+				{Time: 1532940510 + 2*60, Value: 100.4},
+				{Time: 1532940510 + 2*60, Value: 200.0}},
+			from:        1532940510,
+			to:          1532940510 + 6*60,
+			aggregators: "sum",
+			expected:    map[string][]tsdbtest.DataPoint{"sum": {{Time: 1532940510, Value: 901.0}}}},
+
 		{desc: "Should ingest and query multiple aggregators", metricName: "cpu",
 			labels: utils.FromStrings("os", "linux", "iguaz", "yesplease"),
 			data: []tsdbtest.DataPoint{{Time: 1532940510, Value: 300.3},
@@ -252,7 +263,8 @@ func testQueryDataCase(test *testing.T, v3ioConfig *config.V3ioConfig,
 		}
 	}
 
-	set, err := qry.Select(metricsName, aggregator, 1000, filter)
+	step := int64(5 * 60 * 1000) // 5 minutes
+	set, err := qry.Select(metricsName, aggregator, step, filter)
 	if err != nil {
 		test.Fatalf("Failed to run Select. reason: %v", err)
 	}
