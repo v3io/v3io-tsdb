@@ -105,7 +105,7 @@ func (s *V3ioSeriesSet) Next() bool {
 
 		s.nullSeries = false
 
-		if s.aggrSeries.CanAggregate(s.partition.AggrType()) && s.maxt-s.mint > s.interval {
+		if s.aggrSeries.CanAggregate(s.partition.AggrType()) && s.maxt-s.mint >= s.interval {
 
 			// create series from aggregation arrays (in DB) if the partition stored the desired aggregates
 			maxtUpdate := s.maxt
@@ -113,23 +113,22 @@ func (s *V3ioSeriesSet) Next() bool {
 			if maxTime != nil && int64(maxTime.(int)) < s.maxt {
 				maxtUpdate = int64(maxTime.(int))
 			}
-			mint := s.partition.CyclicMinTime(s.mint, maxtUpdate)
 
-			start := s.partition.Time2Bucket(mint)
+			start := s.partition.Time2Bucket(s.mint)
 			end := s.partition.Time2Bucket(s.maxt+s.interval) + 1
 
-			// len of the returned array, cropped at the end in case of cyclic overlap
-			length := int((maxtUpdate-mint)/s.interval) + 2
+			// len of the returned array, time-range / interval + 2
+			length := int((maxtUpdate-s.mint)/s.interval) + 2
 
 			if s.overlapWin != nil {
-				s.baseTime = s.maxt //- int64(s.overlapWin[0]) * s.interval
+				s.baseTime = s.maxt
 			} else {
-				s.baseTime = mint
+				s.baseTime = s.mint
 			}
 
 			if length > 0 {
 				attrs := s.iter.GetFields()
-				aggrSet, err := s.aggrSeries.NewSetFromAttrs(length, start, end, mint, s.maxt, &attrs)
+				aggrSet, err := s.aggrSeries.NewSetFromAttrs(length, start, end, s.mint, s.maxt, &attrs)
 				if err != nil {
 					s.err = err
 					return false
@@ -145,12 +144,8 @@ func (s *V3ioSeriesSet) Next() bool {
 			// create series from raw chunks
 			s.currSeries = NewSeries(s)
 
-			// the number of cells is equal to divisor of (maxt-mint) and interval. if there's a
-			// remainder or if there are no cells (e.g. diff is smaller than interval), add a cell
-			numCells := (s.maxt - s.mint) / s.interval
-			if ((s.maxt-s.mint)%s.interval) != 0 || numCells == 0 {
-				numCells++
-			}
+			// the number of cells is equal to divisor of (maxt-mint) and interval.
+			numCells := (s.maxt-s.mint)/s.interval + 1
 
 			s.aggrSet = s.aggrSeries.NewSetFromChunks(int(numCells))
 			if s.overlapWin != nil {
@@ -171,12 +166,8 @@ func (s *V3ioSeriesSet) chunks2IntervalAggregates() {
 
 	iter := s.currSeries.Iterator()
 	if iter.Next() {
-		t0, _ := iter.At()
 
-		// the base time should be the first sample we receive. initially, baseTime is zero
-		if s.baseTime == 0 {
-			s.baseTime = t0
-		}
+		s.baseTime = s.mint
 
 		for {
 			t, v := iter.At()
