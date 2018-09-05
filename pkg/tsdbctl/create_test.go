@@ -16,6 +16,8 @@ func TestRateToHour(t *testing.T) {
 		{input: "1m", shouldFail: true},
 		{input: "1/t", shouldFail: true},
 		{input: "-431/t", shouldFail: true},
+		{input: "-1", shouldFail: true},
+		{input: "", shouldFail: true},
 	}
 
 	for _, testCase := range cases {

@@ -106,12 +106,18 @@ func (q *V3ioQuerier) selectQry(name, functions string, step int64, windows []in
 func (q *V3ioQuerier) queryNumericPartition(
 	partition *partmgr.DBPartition, name, functions string, step int64, windows []int, filter string) (SeriesSet, error) {
 
-	mint, maxt := partition.GetPartitionRange(q.maxt)
-	if q.mint > mint {
-		mint = q.mint
-	}
+	mint, maxt := partition.GetPartitionRange()
+
 	if q.maxt < maxt {
 		maxt = q.maxt
+	}
+
+	if q.mint > mint {
+		mint = q.mint
+		if step != 0 && step < (maxt-mint) {
+			// temporary Aggregation fix: if mint is not aligned with steps, move it to the next step tick
+			mint += (maxt - mint) % step
+		}
 	}
 
 	newSet := &V3ioSeriesSet{mint: mint, maxt: maxt, partition: partition, logger: q.logger}

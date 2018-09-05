@@ -27,13 +27,15 @@ import (
 	"github.com/v3io/v3io-tsdb/pkg/aggregate"
 	"github.com/v3io/v3io-tsdb/pkg/config"
 	"github.com/v3io/v3io-tsdb/pkg/tsdb"
+	"github.com/v3io/v3io-tsdb/pkg/utils"
 	"strconv"
+	"time"
 )
 
 const (
 	schemaVersion               = 0
 	defaultStorageClass         = "local"
-	defaultIngestionRate        = "1/s"
+	defaultIngestionRate        = ""
 	defaultRollupInterval       = "1h"
 	defaultShardingBuckets      = 8
 	defaultSampleRetentionHours = 0
@@ -86,7 +88,7 @@ func (cc *createCommandeer) create() error {
 		return err
 	}
 
-	if err := cc.validateFormat(cc.rollupInterval); err != nil {
+	if err := cc.validateRollupInterval(); err != nil {
 		return errors.Wrap(err, "failed to parse rollup interval")
 	}
 
@@ -95,6 +97,9 @@ func (cc *createCommandeer) create() error {
 		return errors.Wrap(err, "failed to parse default rollups")
 	}
 
+	if cc.sampleRate == "" {
+		return errors.New(`sample rate not provided! Please provide sample rate with --rate flag in the format of [0-9]+/[hms]. Example: 12/m`)
+	}
 	rateInHours, err := rateToHours(cc.sampleRate)
 	if err != nil {
 		return errors.Wrap(err, "failed to parse sample rate")
@@ -147,14 +152,15 @@ func (cc *createCommandeer) create() error {
 	return tsdb.CreateTSDB(cc.rootCommandeer.v3iocfg, &schema)
 }
 
-func (cc *createCommandeer) validateFormat(format string) error {
-	interval := format[0 : len(format)-1]
-	if _, err := strconv.Atoi(interval); err != nil {
-		return errors.New("format is incorrect, not a number")
+func (cc *createCommandeer) validateRollupInterval() error {
+	dayMillis := 24 * int64(time.Hour/time.Millisecond)
+	duration, err := utils.Str2duration(cc.rollupInterval)
+	if err != nil {
+		return err
 	}
-	unit := string(format[len(format)-1])
-	if !(unit == "m" || unit == "d" || unit == "h") {
-		return errors.New("format is incorrect, not part of m,d,h")
+
+	if dayMillis%duration != 0 && duration%dayMillis != 0 {
+		return errors.New("rollup interval should be a divisor or a dividend of 1 day. Example: 10m, 30m, 2h, etc.")
 	}
 	return nil
 }
@@ -176,13 +182,21 @@ func (cc *createCommandeer) calculatePartitionAndChunkInterval(rateInHours int) 
 	}
 
 	actualCapacityOfChunk := chunkInterval * rateInHours * cc.rootCommandeer.v3iocfg.MaximumSampleSize
-	numberOfChunksInPartition := cc.rootCommandeer.v3iocfg.MaximumPartitionSize / actualCapacityOfChunk
+	numberOfChunksInPartition := 0
+
+	for (numberOfChunksInPartition+24)*actualCapacityOfChunk < cc.rootCommandeer.v3iocfg.MaximumPartitionSize {
+		numberOfChunksInPartition += 24
+	}
+	if numberOfChunksInPartition == 0 {
+		return "", "", errors.Errorf("given rate is too high, can not fit a partition in a day interval with the calculated chunk size %vh", chunkInterval)
+	}
+
 	partitionInterval := numberOfChunksInPartition * chunkInterval
 	return strconv.Itoa(chunkInterval) + "h", strconv.Itoa(partitionInterval) + "h", nil
 }
 
 func rateToHours(sampleRate string) (int, error) {
-	parsingError := errors.New(`not a valid rate. Accepted pattern: [0-9]+/[hms]. Examples: 12/m`)
+	parsingError := errors.New(`not a valid rate. Accepted pattern: [0-9]+/[hms]. Example: 12/m`)
 
 	if len(sampleRate) < 3 {
 		return 0, parsingError
