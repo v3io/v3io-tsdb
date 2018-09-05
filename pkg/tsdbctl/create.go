@@ -33,7 +33,7 @@ import (
 const (
 	schemaVersion               = 0
 	defaultStorageClass         = "local"
-	defaultIngestionRate        = "-1"
+	defaultIngestionRate        = ""
 	defaultRollupInterval       = "1h"
 	defaultShardingBuckets      = 8
 	defaultSampleRetentionHours = 0
@@ -95,6 +95,9 @@ func (cc *createCommandeer) create() error {
 		return errors.Wrap(err, "failed to parse default rollups")
 	}
 
+	if cc.sampleRate == "" {
+		return errors.New(`sample rate not provided! Please provide sample rate with --rate flag in the format of [0-9]+/[hms]. Example: 12/m`)
+	}
 	rateInHours, err := rateToHours(cc.sampleRate)
 	if err != nil {
 		return errors.Wrap(err, "failed to parse sample rate")
@@ -182,9 +185,6 @@ func (cc *createCommandeer) calculatePartitionAndChunkInterval(rateInHours int) 
 }
 
 func rateToHours(sampleRate string) (int, error) {
-	if sampleRate == "-1" {
-		return 0, errors.New(`sample rate not provided! Please provide sample rate with --rate flag in the format of [0-9]+/[hms]. Example: 12/m`)
-	}
 	parsingError := errors.New(`not a valid rate. Accepted pattern: [0-9]+/[hms]. Example: 12/m`)
 
 	if len(sampleRate) < 3 {
