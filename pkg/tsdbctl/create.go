@@ -33,7 +33,7 @@ import (
 const (
 	schemaVersion               = 0
 	defaultStorageClass         = "local"
-	defaultIngestionRate        = "1/s"
+	defaultIngestionRate        = "-1"
 	defaultRollupInterval       = "1h"
 	defaultShardingBuckets      = 8
 	defaultSampleRetentionHours = 0
@@ -182,7 +182,10 @@ func (cc *createCommandeer) calculatePartitionAndChunkInterval(rateInHours int) 
 }
 
 func rateToHours(sampleRate string) (int, error) {
-	parsingError := errors.New(`not a valid rate. Accepted pattern: [0-9]+/[hms]. Examples: 12/m`)
+	if sampleRate == "-1" {
+		return 0, errors.New(`sample rate not provided! Please provide sample rate with --rate flag in the format of [0-9]+/[hms]. Example: 12/m`)
+	}
+	parsingError := errors.New(`not a valid rate. Accepted pattern: [0-9]+/[hms]. Example: 12/m`)
 
 	if len(sampleRate) < 3 {
 		return 0, parsingError
