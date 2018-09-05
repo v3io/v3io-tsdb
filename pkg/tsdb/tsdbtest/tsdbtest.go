@@ -46,7 +46,7 @@ func CreateTestTSDB(t testing.TB, v3ioConfig *config.V3ioConfig) {
 	schema := testutils.CreateSchema(t, "*")
 	if err := CreateTSDB(v3ioConfig, &schema); err != nil {
 		v3ioConfigAsJson, _ := json2.MarshalIndent(v3ioConfig, "", "  ")
-		t.Fatalf("Failed to create TSDB. Reason: %s\nConfiguration:\n%s", err, string(v3ioConfigAsJson))
+		t.Errorf(fmt.Sprintf("Failed to create TSDB. Reason: %v\nConfiguration:\n%s", err, string(v3ioConfigAsJson)))
 	}
 }
 
