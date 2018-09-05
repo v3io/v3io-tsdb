@@ -157,7 +157,7 @@ func (cc *createCommandeer) validateRollupInterval() error {
 	}
 
 	if dayMillis%duration != 0 && duration%dayMillis != 0 {
-		return errors.New("rollup interval should be a divisor or a dividend of 1 day. Example: 10m, 30m, 2h, etc..")
+		return errors.New("rollup interval should be a divisor or a dividend of 1 day. Example: 10m, 30m, 2h, etc.")
 	}
 	return nil
 }
