@@ -101,10 +101,6 @@ func (qc *queryCommandeer) query() error {
 		return err
 	}
 
-	if oneHourMillis%step != 0 && step%oneHourMillis != 0 {
-		return errors.New("interval step should be a divisor or a dividend of 1 hour. Example: 10m, 30m, 2h, etc..")
-	}
-
 	// TODO: start & end times
 	to := time.Now().Unix() * 1000
 	if qc.to != "" {

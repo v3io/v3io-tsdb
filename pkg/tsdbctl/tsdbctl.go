@@ -31,13 +31,11 @@ import (
 	"github.com/v3io/v3io-tsdb/pkg/config"
 	"github.com/v3io/v3io-tsdb/pkg/tsdb"
 	"strings"
-	"time"
 )
 
 const defaultMaximumSampleSize = 8                                  // bytes
 const defaultMaximumPartitionSize = 1700000                         // 1.7MB
 const defaultMinimumChunkSize, defaultMaximumChunkSize = 200, 32000 // bytes
-const oneHourMillis = int64(time.Hour / time.Millisecond)
 
 type RootCommandeer struct {
 	adapter     *tsdb.V3ioAdapter
