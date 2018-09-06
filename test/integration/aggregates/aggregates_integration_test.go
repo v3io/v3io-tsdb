@@ -59,7 +59,7 @@ type metricContext struct {
 }
 
 func TestAggregates(t *testing.T) {
-
+	// TODO: consider replacing with test suite
 	testCases := []*TestConfig{
 		t1Config(t),
 	}
@@ -179,17 +179,16 @@ func testAggregatesCase(t *testing.T, testConfig *TestConfig) {
 			}
 
 			if tm > testConfig.testStartTime && tm < testConfig.testEndTime-testConfig.queryStep {
-				if aggr == "count" && int64(v) != expectedCount {
-					t.Errorf("Count is not ok - expected %d, got %f at time %d", expectedCount, v, tm)
-				}
-				if aggr == "sum" && v != expectedSum {
-					t.Errorf("Sum is not ok - expected %f, got %f at time %d", expectedSum, v, tm)
-				}
-				if aggr == "avg" && v != expectedSum/float64(expectedCount) {
-					t.Errorf("Avg is not ok - expected %f, got %f at time %d", expectedSum/float64(expectedCount), v, tm)
-				}
-			}
 
+				assert.Condition(t, func() bool { return aggr == "count" && int64(v) != expectedCount },
+					"Count is not ok - expected %d, got %f at time %d", expectedCount, v, tm)
+
+				assert.Condition(t, func() bool { return aggr == "sum" && v != expectedSum },
+					"Sum is not ok - expected %f, got %f at time %d", expectedSum, v, tm)
+
+				assert.Condition(t, func() bool { return aggr == "avg" && v != expectedSum/float64(expectedCount) },
+					"Avg is not ok - expected %f, got %f at time %d", expectedSum/float64(expectedCount), v, tm)
+			}
 		}
 		if iter.Err() != nil {
 			t.Fatal(iter.Err())
@@ -240,7 +239,7 @@ func generateData(t *testing.T, testConfig *TestConfig, adapter *tsdb.V3ioAdapte
 	}
 	fmt.Println("total samples written:", total)
 
-	res, err := appender.WaitForCompletion(10 * time.Second)
+	res, err := appender.WaitForCompletion(30 * time.Second)
 
 	if err != nil {
 		t.Fatal(err, "Wait for completion has failed", res, err)

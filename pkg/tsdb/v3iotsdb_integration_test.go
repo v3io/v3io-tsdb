@@ -117,7 +117,7 @@ func testIngestDataCase(t *testing.T, v3ioConfig *config.V3ioConfig,
 		t.Fatalf("Failed to wait for appender completion. reason: %s", err)
 	}
 
-	tsdbtest.ValidateCountOfSamples(t, adapter, metricsName, len(data), from, to)
+	tsdbtest.ValidateCountOfSamples(t, adapter, metricsName, len(data), from, to, -1)
 }
 
 func TestQueryData(t *testing.T) {

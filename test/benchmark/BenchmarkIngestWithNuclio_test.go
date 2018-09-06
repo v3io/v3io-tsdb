@@ -104,7 +104,12 @@ func BenchmarkIngestWithNuclio(b *testing.B) {
 
 	tc.Logger.Warn("\nTest complete. Count: %d", count)
 
-	tsdbtest.ValidateCountOfSamples(b, v3ioAdapter, metricNamePrefix, count, testStartTimeMs, testEndTimeMs)
+	queryStepSizeMs, err := utils.Str2duration(testConfig.QueryAggregateStep)
+	if err != nil {
+		b.Fatal("unable to resolve query aggregate step size. Check configuration.")
+	}
+
+	tsdbtest.ValidateCountOfSamples(b, v3ioAdapter, metricNamePrefix, count, testStartTimeMs, testEndTimeMs, queryStepSizeMs)
 }
 
 func runNuclioTest(tc *nutest.TestContext, sampleTemplateJson string, timestamp int64) (int, error) {

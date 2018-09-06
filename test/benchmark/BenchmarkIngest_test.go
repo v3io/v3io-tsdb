@@ -106,16 +106,21 @@ func BenchmarkIngest(b *testing.B) {
 	}
 
 	// Wait for all responses, use default timeout from configuration or unlimited if not set
-	_, err = appender.WaitForCompletion(-1)
+	ec, err := appender.WaitForCompletion(0)
 	b.StopTimer()
 
 	if err != nil {
-		b.Fatalf("Test timed out. Error: %v", err)
+		b.Fatalf("Test timed out. Error: %v. Exit code: %d", err, ec)
 	}
 
 	b.Logf("\nTest complete. %d samples added to %s\n", count, tsdbPath)
 
-	tsdbtest.ValidateCountOfSamples(b, adapter, metricNamePrefix, count, testStartTimeMs, testEndTimeMs)
+	queryStepSizeMs, err := utils.Str2duration(testConfig.QueryAggregateStep)
+	if err != nil {
+		b.Fatal("unable to resolve query aggregate step size. Check configuration.")
+	}
+
+	tsdbtest.ValidateCountOfSamples(b, adapter, metricNamePrefix, count, testStartTimeMs, testEndTimeMs, queryStepSizeMs)
 }
 
 func runTest(
@@ -172,17 +177,17 @@ func appendSingle(refIndex, cycleId int, appender tsdb.Appender, sampleTemplateJ
 		return 0, errors.Wrap(err, fmt.Sprintf("unable to unmarshall sample: %s", sampleTemplateJson))
 	}
 
-	for timestamp := timestamps[timestampIndex]; timestampIndex < len(timestamps); timestampIndex++ {
+	for ; timestampIndex < len(timestamps); timestampIndex++ {
 		if cycleId == 0 && timestampIndex == 0 {
 			// initialize refIds
 			// Add first & get reference
-			ref, err := appender.Add(sample.Lset, timestamp, sample.Value)
+			ref, err := appender.Add(sample.Lset, timestamps[timestampIndex], sample.Value)
 			if err != nil {
 				return 0, errors.Wrap(err, "Add request has failed!")
 			}
 			refs[refIndex] = ref
 		} else {
-			err := appender.AddFast(sample.Lset, refs[refIndex], timestamp, sample.Value)
+			err := appender.AddFast(sample.Lset, refs[refIndex], timestamps[timestampIndex], sample.Value)
 			if err != nil {
 				return 0, errors.Wrap(err, fmt.Sprintf("AddFast request has failed!\nSample:%v", sample))
 			}
