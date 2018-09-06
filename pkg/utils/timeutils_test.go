@@ -38,6 +38,18 @@ func (suite *testTimeSuite) TestStr2durationOneHour() {
 	suite.Require().Equal(int64(time.Hour/time.Millisecond), res)
 }
 
+func (suite *testTimeSuite) TestStr2durationFiveMinutes() {
+	res, err := Str2duration("5m")
+	suite.Require().Nil(err)
+	suite.Require().Equal(int64(5*time.Minute/time.Millisecond), res)
+}
+
+func (suite *testTimeSuite) TestStr2durationZeroDays() {
+	res, err := Str2duration("0d")
+	suite.Require().Nil(err)
+	suite.Require().Equal(int64(0), res)
+}
+
 func (suite *testTimeSuite) TestStr2durationZero() {
 	res, err := Str2duration("0")
 	suite.Require().Nil(err)
@@ -46,6 +58,11 @@ func (suite *testTimeSuite) TestStr2durationZero() {
 
 func (suite *testTimeSuite) TestStr2durationNegative() {
 	_, err := Str2duration("-1")
+	suite.Require().Error(err)
+}
+
+func (suite *testTimeSuite) TestStr2durationBadFormat() {
+	_, err := Str2duration("1dhm")
 	suite.Require().Error(err)
 }
 

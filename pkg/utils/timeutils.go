@@ -53,7 +53,7 @@ func Str2duration(duration string) (int64, error) {
 	i, err := strconv.Atoi(duration)
 	if err != nil {
 		return 0, errors.Wrap(err,
-			`not a valid duration. Accepted pattern: [0-9]+[dhms]. Examples: 30d (30 days), 5m (5 minutes)`)
+			`not a valid duration. Accepted pattern: [0-9]+[dhm]. Examples: 30d (30 days), 5m (5 minutes)`)
 	}
 	if i < 0 {
 		return 0, errors.Errorf("specified duration (%s) is negative", duration)
