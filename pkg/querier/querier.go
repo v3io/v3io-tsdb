@@ -168,7 +168,7 @@ func (q *V3ioQuerier) Close() error {
 
 func (q *V3ioQuerier) getMetricNames() ([]string, error) {
 	input := v3io.GetItemsInput{
-		Path: q.cfg.Path + "/names/",
+		Path:           q.cfg.Path + "/names/",
 		AttributeNames: []string{"__name"},
 	}
 
@@ -207,7 +207,7 @@ func (q *V3ioQuerier) getLabelValues(labelKey string) ([]string, error) {
 
 	// get all labelsets
 	input := v3io.GetItemsInput{
-		Path: q.partitionMngr.GetPartitionsPaths()[0],
+		Path:           q.partitionMngr.GetPartitionsPaths()[0],
 		AttributeNames: []string{"_lset"},
 	}
 
