@@ -28,11 +28,6 @@ import (
 	"github.com/v3io/v3io-tsdb/pkg/utils"
 )
 
-func newSeriesSet(partition *partmgr.DBPartition, mint, maxt int64) *V3ioSeriesSet {
-
-	return &V3ioSeriesSet{mint: mint, maxt: maxt, partition: partition}
-}
-
 // holds the query result set
 type V3ioSeriesSet struct {
 	err        error

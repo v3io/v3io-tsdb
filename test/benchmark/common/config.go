@@ -27,6 +27,7 @@ type BenchmarkIngestConfig struct {
 	AppendOneByOne       bool   `json:"AppendOneByOne,omitempty" yaml:"AppendOneByOne"`
 	BatchSize            int    `json:"BatchSize,omitempty" yaml:"BatchSize"`
 	CleanupAfterTest     bool   `json:"CleanupAfterTest,omitempty" yaml:"CleanupAfterTest"`
+	QueryAggregateStep   string `json:"QueryAggregateStep,omitempty" yaml:"QueryAggregateStep"`
 }
 
 func LoadBenchmarkIngestConfigs() (*BenchmarkIngestConfig, *config.V3ioConfig, error) {
@@ -79,5 +80,9 @@ func loadBenchmarkIngestConfigFromFile(benchConfigFile string) (*BenchmarkIngest
 func initDefaults(cfg *BenchmarkIngestConfig) {
 	if cfg.StartTimeOffset == "" {
 		cfg.StartTimeOffset = "48h"
+	}
+
+	if cfg.QueryAggregateStep == "" {
+		cfg.QueryAggregateStep = "5m"
 	}
 }

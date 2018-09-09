@@ -46,7 +46,7 @@ func CreateTestTSDB(t testing.TB, v3ioConfig *config.V3ioConfig) {
 	schema := testutils.CreateSchema(t, "*")
 	if err := CreateTSDB(v3ioConfig, &schema); err != nil {
 		v3ioConfigAsJson, _ := json2.MarshalIndent(v3ioConfig, "", "  ")
-		t.Fatalf("Failed to create TSDB. Reason: %s\nConfiguration:\n%s", err, string(v3ioConfigAsJson))
+		t.Fatalf("Failed to create TSDB. Reason: %v\nConfiguration:\n%s", err, string(v3ioConfigAsJson))
 	}
 }
 
@@ -112,14 +112,22 @@ func InsertData(t *testing.T, v3ioConfig *config.V3ioConfig, metricName string, 
 	return adapter
 }
 
-func ValidateCountOfSamples(t testing.TB, adapter *V3ioAdapter, metricName string, expected int, startTimeMs, endTimeMs int64) {
-	qry, err := adapter.Querier(nil, startTimeMs, endTimeMs)
+func ValidateCountOfSamples(t testing.TB, adapter *V3ioAdapter, metricName string, expected int, startTimeMs, endTimeMs int64, queryAggStep int64) {
+
+	var stepSize int64
+	if queryAggStep <= 0 {
+		var err error
+		stepSize, err = utils.Str2duration("1h")
+		if err != nil {
+			t.Fatal(err, "failed to create step")
+		}
+	} else {
+		stepSize = queryAggStep
+	}
+
+	qry, err := adapter.Querier(nil, startTimeMs-stepSize, endTimeMs)
 	if err != nil {
 		t.Fatal(err, "failed to create Querier instance.")
-	}
-	stepSize, err := utils.Str2duration("1h")
-	if err != nil {
-		t.Fatal(err, "failed to create step")
 	}
 
 	set, err := qry.Select("", "count", stepSize, fmt.Sprintf("starts(__name__, '%v')", metricName))
