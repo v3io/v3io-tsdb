@@ -106,7 +106,7 @@ func BenchmarkIngest(b *testing.B) {
 	}
 
 	// Wait for all responses, use default timeout from configuration or unlimited if not set
-	ec, err := appender.WaitForCompletion(0)
+	ec, err := appender.WaitForCompletion(-1)
 	b.StopTimer()
 
 	if err != nil {
@@ -117,7 +117,8 @@ func BenchmarkIngest(b *testing.B) {
 
 	queryStepSizeMs, err := utils.Str2duration(testConfig.QueryAggregateStep)
 	if err != nil {
-		b.Fatal("unable to resolve query aggregate step size. Check configuration.")
+		b.Fatalf("unable to resolve query aggregate step size (%s). Check configuration.",
+			testConfig.QueryAggregateStep)
 	}
 
 	tsdbtest.ValidateCountOfSamples(b, adapter, metricNamePrefix, count, testStartTimeMs, testEndTimeMs, queryStepSizeMs)
