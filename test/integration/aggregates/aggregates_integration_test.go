@@ -24,6 +24,7 @@ package aggregates
 
 import (
 	"fmt"
+	"github.com/nuclio/logger"
 	"github.com/stretchr/testify/assert"
 	"github.com/v3io/v3io-tsdb/pkg/config"
 	"github.com/v3io/v3io-tsdb/pkg/tsdb"
@@ -50,6 +51,7 @@ type TestConfig struct {
 	expectFail    bool
 	ignoreReason  string
 	v3ioConfig    *config.V3ioConfig
+	logger        logger.Logger
 	setup         func() (*tsdb.V3ioAdapter, func())
 }
 
@@ -123,8 +125,9 @@ func setupFunc(testCtx *testing.T, testConfig *TestConfig) (*tsdb.V3ioAdapter, f
 		testCtx.Fatalf("Test failed. Reason: %v", err)
 	}
 
+	testConfig.logger = adapter.GetLogger(testCtx.Name())
 	// generate data and update expected result
-	testConfig.expectedCount, testConfig.expectedSum = generateData(testCtx, testConfig, adapter)
+	testConfig.expectedCount, testConfig.expectedSum = generateData(testCtx, testConfig, adapter, testConfig.logger)
 
 	return adapter, func() {
 		// Tear down:
@@ -165,13 +168,13 @@ func testAggregatesCase(t *testing.T, testConfig *TestConfig) {
 		series := set.At()
 		lset := series.Labels()
 		aggr := lset.Get("Aggregator")
-		//fmt.Printf("\nLables: %v", lset)
+		testConfig.logger.Debug(fmt.Sprintf("\nLables: %v", lset))
 
 		iter := series.Iterator()
 		for iter.Next() {
 
-			_, v := iter.At()
-			//fmt.Printf("t=%d,v=%f\n", tm, v)
+			tm, v := iter.At()
+			testConfig.logger.Debug(fmt.Sprintf("t=%d,v=%f\n", tm, v))
 
 			switch aggr {
 			case "count":
@@ -207,7 +210,7 @@ func nanosToMillis(nanos int64) int64 {
 	return millis
 }
 
-func generateData(t *testing.T, testConfig *TestConfig, adapter *tsdb.V3ioAdapter) (totalCount int, totalSum float64) {
+func generateData(t *testing.T, testConfig *TestConfig, adapter *tsdb.V3ioAdapter, logger logger.Logger) (totalCount int, totalSum float64) {
 	var metrics []*metricContext
 	for m := 0; m < testConfig.numMetrics; m++ {
 		for l := 0; l < testConfig.numLabels; l++ {
@@ -237,7 +240,7 @@ func generateData(t *testing.T, testConfig *TestConfig, adapter *tsdb.V3ioAdapte
 
 		index = (index + 1) % len(testConfig.values)
 	}
-	fmt.Printf("total samples written: %d; total sum: %f", totalCount, totalSum)
+	logger.Debug(fmt.Sprintf("total samples written: %d; total sum: %f", totalCount, totalSum))
 
 	res, err := appender.WaitForCompletion(0)
 
