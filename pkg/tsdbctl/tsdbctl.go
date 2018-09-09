@@ -124,13 +124,14 @@ func (rc *RootCommandeer) populateConfig(cfg *config.V3ioConfig) error {
 		}
 
 		slash := strings.LastIndex(rc.v3ioPath, "/")
-
-		if rc.container != "" {
-			cfg.Container = rc.container
-		} else {
-			if slash == -1 || len(rc.v3ioPath) <= slash+1 {
+		if slash == -1 || len(rc.v3ioPath) <= slash+1 {
+			if rc.container != "" {
+				cfg.Container = rc.container
+				cfg.V3ioUrl = rc.v3ioPath
+			} else {
 				return fmt.Errorf("missing container name in V3IO URL")
 			}
+		} else {
 			cfg.V3ioUrl = rc.v3ioPath[0:slash]
 			cfg.Container = rc.v3ioPath[slash+1:]
 		}
