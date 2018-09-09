@@ -25,6 +25,10 @@ test: get
 integration: get
 	go test -race -tags integration -p 1 -count 1 $(TOPLEVEL_DIRS) # p=1 to force Go to run pkg tests serially.
 
+.PHONY: bench
+bench: get
+	go test -run=XXX -bench='^BenchmarkIngest$$' -benchtime 10s -timeout 1m ./test/benchmark/...
+
 .PHONY: build
 build: get
 	go build -v -o "$(GOPATH)/bin/$(TSDBCTL_BIN_NAME)" ./cmd/tsdbctl
