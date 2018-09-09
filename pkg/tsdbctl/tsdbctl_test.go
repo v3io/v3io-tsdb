@@ -61,6 +61,29 @@ func (suite *testTsdbctlSuite) TestPopulateConfigWithTenant() {
 	suite.Require().Equal(expectedRc, rc)
 }
 
+func (suite *testTsdbctlSuite) TestContainerConfig() {
+	rc := RootCommandeer{v3ioPath: "Vel@Odar:p455w0rd@localhost:80123/123", container: "test"}
+	cfg := &config.V3ioConfig{
+		Path: "/x/y/z",
+	}
+
+	err := rc.populateConfig(cfg)
+	expectedCfg := &config.V3ioConfig{
+		V3ioUrl:              "localhost:80123",
+		Container:            "test",
+		Path:                 "/x/y/z",
+		Username:             "Vel@Odar",
+		Password:             "p455w0rd",
+		MaximumSampleSize:    defaultMaximumSampleSize,
+		MinimumChunkSize:     defaultMinimumChunkSize,
+		MaximumChunkSize:     defaultMaximumChunkSize,
+		MaximumPartitionSize: defaultMaximumPartitionSize,
+	}
+
+	suite.Require().Nil(err)
+	suite.Require().Equal(expectedCfg, rc.v3iocfg)
+}
+
 func TestTsdbctlSuite(t *testing.T) {
 	suite.Run(t, new(testTsdbctlSuite))
 }
