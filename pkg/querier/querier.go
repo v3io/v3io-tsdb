@@ -240,7 +240,7 @@ func (q *V3ioQuerier) getLabelValues(labelKey string) ([]string, error) {
 	}
 
 	if iter.Err() != nil {
-		q.logger.InfoWith("Failed to read label values, assume empty list", "err", iter.Err().Error())
+		q.logger.InfoWith("Failed to read label values, returning empty list", "err", iter.Err().Error())
 	}
 
 	var labelValues []string
