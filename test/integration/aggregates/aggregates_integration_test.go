@@ -179,7 +179,7 @@ func testAggregatesCase(t *testing.T, testConfig *TestConfig) {
 			case "sum":
 				actualSum += v
 			case "avg":
-				if ! math.IsNaN(v) {
+				if !math.IsNaN(v) {
 					actualAvgResultsCount += 1
 					actualAvgResultsSum = actualAvgResultsSum + v
 				}
