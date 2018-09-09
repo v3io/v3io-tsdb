@@ -29,6 +29,7 @@ import (
 	"github.com/v3io/v3io-tsdb/pkg/tsdb"
 	"github.com/v3io/v3io-tsdb/pkg/tsdb/tsdbtest"
 	"github.com/v3io/v3io-tsdb/pkg/utils"
+	"math"
 	"testing"
 	"time"
 )
@@ -43,7 +44,6 @@ type TestConfig struct {
 	numLabels     int
 	values        []float64
 	queryFunc     string
-	queryStart    int64
 	queryStep     int64
 	expectedCount int
 	expectedSum   float64
@@ -77,22 +77,22 @@ func TestAggregates(t *testing.T) {
 }
 
 func t1Config(testCtx *testing.T) *TestConfig {
-	currentTimeNano := time.Now().UnixNano()
+	t := time.Now()
+	currentRoundedTimeNano := time.Date(t.Year(), t.Month(), t.Day(), t.Hour(), 0, 0, 0, t.Location()).UnixNano()
 
 	testDuration := int64(80 * time.Hour)
 	testValues := []float64{1, 2, 3, 4, 5}
 
 	tc := &TestConfig{
 		desc:          "Test case #1",
-		testEndTime:   currentTimeNano,
-		testStartTime: currentTimeNano - testDuration,
+		testEndTime:   currentRoundedTimeNano,
+		testStartTime: currentRoundedTimeNano - testDuration,
 		interval:      int64(10 * time.Second),
 		testDuration:  testDuration,
 		numMetrics:    1,
 		numLabels:     1,
 		values:        testValues,
 		queryFunc:     "count,sum,avg",
-		queryStart:    currentTimeNano - int64(88*time.Hour),
 		queryStep:     int64(1 * time.Hour),
 	}
 
@@ -124,7 +124,7 @@ func setupFunc(testCtx *testing.T, testConfig *TestConfig) (*tsdb.V3ioAdapter, f
 	}
 
 	// generate data and update expected result
-	testConfig.expectedCount = generateData(testCtx, testConfig, adapter)
+	testConfig.expectedCount, testConfig.expectedSum = generateData(testCtx, testConfig, adapter)
 
 	return adapter, func() {
 		// Tear down:
@@ -140,7 +140,7 @@ func testAggregatesCase(t *testing.T, testConfig *TestConfig) {
 	adapter, tearDown := testConfig.setup()
 	defer tearDown()
 
-	startBefore := testConfig.testEndTime - testConfig.queryStart
+	startBefore := testConfig.testStartTime - testConfig.queryStep
 
 	qry, err := adapter.Querier(nil, nanosToMillis(startBefore), nanosToMillis(testConfig.testEndTime))
 	if err != nil {
@@ -152,13 +152,10 @@ func testAggregatesCase(t *testing.T, testConfig *TestConfig) {
 		t.Fatal(err)
 	}
 
-	expectedCount := testConfig.queryStep / testConfig.interval
-	expectedSum := 0.0
-	for _, v := range testConfig.values {
-		expectedSum += v
-	}
-	expectedSum = expectedSum * float64(expectedCount) / float64(len(testConfig.values))
-	totalCount := 0
+	var actualCount int
+	var actualSum float64
+	var actualAvgResultsCount int
+	var actualAvgResultsSum float64
 
 	for set.Next() {
 		if set.Err() != nil {
@@ -168,40 +165,41 @@ func testAggregatesCase(t *testing.T, testConfig *TestConfig) {
 		series := set.At()
 		lset := series.Labels()
 		aggr := lset.Get("Aggregator")
-		fmt.Println("\n\nLables:", lset)
+		//fmt.Printf("\nLables: %v", lset)
+
 		iter := series.Iterator()
 		for iter.Next() {
 
-			tm, v := iter.At()
-			fmt.Printf("t=%d,v=%f; ", tm, v)
-			if aggr == "count" {
-				totalCount += int(v)
-			}
+			_, v := iter.At()
+			//fmt.Printf("t=%d,v=%f\n", tm, v)
 
-			if tm > testConfig.testStartTime && tm < testConfig.testEndTime-testConfig.queryStep {
-
-				assert.Condition(t, func() bool { return aggr == "count" && int64(v) != expectedCount },
-					"Count is not ok - expected %d, got %f at time %d", expectedCount, v, tm)
-
-				assert.Condition(t, func() bool { return aggr == "sum" && v != expectedSum },
-					"Sum is not ok - expected %f, got %f at time %d", expectedSum, v, tm)
-
-				assert.Condition(t, func() bool { return aggr == "avg" && v != expectedSum/float64(expectedCount) },
-					"Avg is not ok - expected %f, got %f at time %d", expectedSum/float64(expectedCount), v, tm)
+			switch aggr {
+			case "count":
+				actualCount += int(v)
+			case "sum":
+				actualSum += v
+			case "avg":
+				if ! math.IsNaN(v) {
+					actualAvgResultsCount += 1
+					actualAvgResultsSum = actualAvgResultsSum + v
+				}
 			}
 		}
+
 		if iter.Err() != nil {
 			t.Fatal(iter.Err())
 		}
-
-		if aggr == "count" {
-			assert.Equal(t, testConfig.expectedCount, totalCount, "count is not as expected")
-		}
-
-		fmt.Println()
 	}
 
-	assert.NotEqual(t, 0, totalCount, "Empty set. %d != %d", expectedCount, totalCount)
+	assert.Equal(t, testConfig.expectedCount, actualCount, "total count is not as expected")
+
+	assert.Equal(t, testConfig.expectedSum, actualSum, "total sum is not as expected")
+
+	assert.Equal(t, testConfig.expectedSum/float64(testConfig.expectedCount), actualSum/float64(actualCount),
+		"total average is not as expected")
+
+	assert.Equal(t, testConfig.expectedSum/float64(testConfig.expectedCount), actualAvgResultsSum/float64(actualAvgResultsCount),
+		"calculated total average is not as expected")
 }
 
 func nanosToMillis(nanos int64) int64 {
@@ -209,7 +207,7 @@ func nanosToMillis(nanos int64) int64 {
 	return millis
 }
 
-func generateData(t *testing.T, testConfig *TestConfig, adapter *tsdb.V3ioAdapter) int {
+func generateData(t *testing.T, testConfig *TestConfig, adapter *tsdb.V3ioAdapter) (totalCount int, totalSum float64) {
 	var metrics []*metricContext
 	for m := 0; m < testConfig.numMetrics; m++ {
 		for l := 0; l < testConfig.numLabels; l++ {
@@ -226,7 +224,6 @@ func generateData(t *testing.T, testConfig *TestConfig, adapter *tsdb.V3ioAdapte
 	}
 
 	index := 0
-	total := 0
 	var curTime int64
 	for curTime = testConfig.testStartTime; curTime < testConfig.testStartTime+testConfig.testDuration; curTime += testConfig.interval {
 		v := testConfig.values[index]
@@ -234,18 +231,21 @@ func generateData(t *testing.T, testConfig *TestConfig, adapter *tsdb.V3ioAdapte
 		if err != nil {
 			t.Fatal(err)
 		}
-		index = (index + 1) % len(testConfig.values)
-		total++
-	}
-	fmt.Println("total samples written:", total)
 
-	res, err := appender.WaitForCompletion(30 * time.Second)
+		totalCount++
+		totalSum += v
+
+		index = (index + 1) % len(testConfig.values)
+	}
+	fmt.Printf("total samples written: %d; total sum: %f", totalCount, totalSum)
+
+	res, err := appender.WaitForCompletion(0)
 
 	if err != nil {
 		t.Fatal(err, "Wait for completion has failed", res, err)
 	}
 
-	return total
+	return
 }
 
 func writeNext(app tsdb.Appender, metrics []*metricContext, t int64, v float64) error {

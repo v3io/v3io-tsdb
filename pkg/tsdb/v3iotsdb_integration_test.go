@@ -223,7 +223,7 @@ func TestQueryData(t *testing.T) {
 			data: []tsdbtest.DataPoint{{Time: 1532940510, Value: 300.3},
 				{Time: 1532940510 + 60, Value: 300.3},
 				{Time: 1532940510 + 2*60, Value: 100.4},
-				{Time: 1532940510 + 2*60, Value: 200.0}},
+				{Time: 1532940510 + 5*60, Value: 200.0}},
 			from:        1532940510,
 			to:          1532940510 + 6*60,
 			step:        defaultStepMs,
