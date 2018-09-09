@@ -198,8 +198,10 @@ func (q *V3ioQuerier) getLabelValues(labelKey string) ([]string, error) {
 		return nil, err
 	}
 
+	partitionPaths := q.partitionMngr.GetPartitionsPaths()
+
 	// if no partitions yet - there are no labels
-	if len(q.partitionMngr.GetPartitionsPaths()) == 0 {
+	if len(partitionPaths) == 0 {
 		return nil, nil
 	}
 
@@ -207,7 +209,7 @@ func (q *V3ioQuerier) getLabelValues(labelKey string) ([]string, error) {
 
 	// get all labelsets
 	input := v3io.GetItemsInput{
-		Path:           q.partitionMngr.GetPartitionsPaths()[0],
+		Path:           partitionPaths[0],
 		AttributeNames: []string{"_lset"},
 	}
 
@@ -238,10 +240,10 @@ func (q *V3ioQuerier) getLabelValues(labelKey string) ([]string, error) {
 	}
 
 	if iter.Err() != nil {
-		q.logger.InfoWith("Failed to read names, assume empty list", "err", iter.Err().Error())
+		q.logger.InfoWith("Failed to read label values, assume empty list", "err", iter.Err().Error())
 	}
 
-	labelValues := []string{}
+	var labelValues []string
 	for labelValue, _ := range labelValuesMap {
 		labelValues = append(labelValues, labelValue)
 	}
