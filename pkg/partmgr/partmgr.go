@@ -41,7 +41,7 @@ func NewPartitionMngr(cfg *config.Schema, partPath string, cont *v3io.Container)
 		return nil, err
 	}
 	newMngr := &PartitionManager{cfg: cfg, path: partPath, cyclic: false, container: cont, currentPartitionInterval: currentPartitionInterval}
-	newMngr.updatePartitions(cfg)
+	newMngr.updatePartitionsFromSchema(cfg)
 	return newMngr, nil
 }
 
@@ -165,12 +165,12 @@ func (p *PartitionManager) createAndUpdatePartition(t int64) (*DBPartition, erro
 			}
 		}
 	}
-	err = p.updatePartitionInSchema(partition)
+	p.cfg.Partitions = append(p.cfg.Partitions, &config.Partition{StartTime: partition.startTime, SchemaInfo: p.cfg.PartitionSchemaInfo})
+	err = p.updateSchema()
 	return partition, err
 }
 
-func (p *PartitionManager) updatePartitionInSchema(partition *DBPartition) error {
-	p.cfg.Partitions = append(p.cfg.Partitions, config.Partition{StartTime: partition.startTime, SchemaInfo: p.cfg.PartitionSchemaInfo})
+func (p *PartitionManager) updateSchema() error {
 	data, err := json.Marshal(p.cfg)
 	if err != nil {
 		return errors.Wrap(err, "Failed to update new partition in schema file")
@@ -181,6 +181,28 @@ func (p *PartitionManager) updatePartitionInSchema(partition *DBPartition) error
 	return err
 }
 
+func (p *PartitionManager) DeletePartitionsFromSchema(partitionsToDelete []*DBPartition) {
+	for i := len(p.partitions) - 1; i >= 0; i-- {
+		for _, partToDelete := range partitionsToDelete {
+			if p.partitions[i].startTime == partToDelete.startTime {
+				p.partitions = append(p.partitions[:i], p.partitions[i+1:]...)
+				break
+			}
+		}
+
+	}
+	for i := len(p.cfg.Partitions) - 1; i >= 0; i-- {
+		for _, partToDelete := range partitionsToDelete {
+			if p.cfg.Partitions[i].StartTime == partToDelete.startTime {
+				p.cfg.Partitions = append(p.cfg.Partitions[:i], p.cfg.Partitions[i+1:]...)
+				break
+			}
+		}
+
+	}
+	p.updateSchema()
+}
+
 func (p *PartitionManager) ReadAndUpdateSchema() error {
 	fullPath := path.Join(p.path, config.SCHEMA_CONFIG)
 	resp, err := p.container.Sync.GetObject(&v3io.GetObjectInput{Path: fullPath})
@@ -188,17 +210,17 @@ func (p *PartitionManager) ReadAndUpdateSchema() error {
 		return errors.Wrap(err, "Failed to read schema at path: "+fullPath)
 	}
 
-	schema := config.Schema{}
-	err = json.Unmarshal(resp.Body(), &schema)
+	schema := &config.Schema{}
+	err = json.Unmarshal(resp.Body(), schema)
 	if err != nil {
-		return errors.Wrap(err, "Failed to Unmarshal schema at path: "+fullPath)
+		return errors.Wrap(err, "Failed to unmarshal schema at path: "+fullPath)
 	}
-	p.cfg = &schema
-	p.updatePartitions(&schema)
+	p.cfg = schema
+	p.updatePartitionsFromSchema(schema)
 	return nil
 }
 
-func (p *PartitionManager) updatePartitions(schema *config.Schema) error {
+func (p *PartitionManager) updatePartitionsFromSchema(schema *config.Schema) error {
 	p.partitions = []*DBPartition{}
 	for _, part := range schema.Partitions {
 		partPath := path.Join(p.path, strconv.FormatInt(part.StartTime/1000, 10)) + "/"
@@ -347,19 +369,9 @@ func (p *DBPartition) InRange(t int64) bool {
 }
 
 // return the mint and maxt for this partition, may need maxt for cyclic partition
-func (p *DBPartition) GetPartitionRange(maxt int64) (int64, int64) {
+func (p *DBPartition) GetPartitionRange() (int64, int64) {
 	// start p.days ago, rounded to next hour
 	return p.startTime, p.startTime + p.partitionInterval
-}
-
-// return the valid minimum time in a cyclic partition based on max time
-func (p *DBPartition) CyclicMinTime(mint, maxt int64) int64 {
-	// start p.days ago, rounded to next hour
-	newMin, _ := p.GetPartitionRange(maxt)
-	if mint > newMin {
-		return mint
-	}
-	return newMin
 }
 
 // Attribute name of a chunk

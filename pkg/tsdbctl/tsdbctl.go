@@ -35,7 +35,7 @@ import (
 
 const defaultMaximumSampleSize = 8                                  // bytes
 const defaultMaximumPartitionSize = 1700000                         // 1.7MB
-const defaultMinimumChunkSize, defaultMaximumChunkSize = 200, 62000 // bytes
+const defaultMinimumChunkSize, defaultMaximumChunkSize = 200, 32000 // bytes
 
 type RootCommandeer struct {
 	adapter     *tsdb.V3ioAdapter

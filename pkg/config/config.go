@@ -61,7 +61,7 @@ type V3ioConfig struct {
 	DefaultTimeoutInSeconds int `json:"timeout,omitempty"`
 	// The size of batch to use during ingestion
 	BatchSize int `json:"batchSize,omitempty"`
-	// Size of sample in bytes for worst an best compression scenarios
+	// Sample size in bytes in worst compression scenario
 	MaximumSampleSize int `json:"maximumSampleSize,omitempty"`
 	// Max size of a partition object
 	MaximumPartitionSize int `json:"maximumPartitionSize,omitempty"`
@@ -114,7 +114,7 @@ type SchemaField struct {
 type Schema struct {
 	TableSchemaInfo     TableSchema     `json:"tableSchemaInfo"`
 	PartitionSchemaInfo PartitionSchema `json:"partitionSchemaInfo"`
-	Partitions          []Partition     `json:"partitions"`
+	Partitions          []*Partition    `json:"partitions"`
 	Fields              []SchemaField   `json:"fields"`
 }
 
