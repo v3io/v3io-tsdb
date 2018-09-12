@@ -36,6 +36,8 @@ import (
 	"testing"
 )
 
+const defaultStepMs = 5 * 60 * 1000 // 5 minutes
+
 func TestIngestData(t *testing.T) {
 	v3ioConfig, err := tsdbtest.LoadV3ioConfig()
 	if err != nil {
@@ -114,7 +116,7 @@ func testIngestDataCase(t *testing.T, v3ioConfig *config.V3ioConfig,
 		t.Fatalf("Failed to wait for appender completion. reason: %s", err)
 	}
 
-	tsdbtest.ValidateCountOfSamples(t, adapter, metricsName, len(data), from, to)
+	tsdbtest.ValidateCountOfSamples(t, adapter, metricsName, len(data), from, to, -1)
 }
 
 func TestQueryData(t *testing.T) {
@@ -132,13 +134,17 @@ func TestQueryData(t *testing.T) {
 		aggregators  string
 		from         int64
 		to           int64
+		step         int64
 		expected     map[string][]tsdbtest.DataPoint
 		ignoreReason string
+		expectFail   bool
 	}{
 		{desc: "Should ingest and query one data point", metricName: "cpu",
-			labels: utils.FromStrings("testLabel", "balbala"),
-			data:   []tsdbtest.DataPoint{{Time: 1532940510, Value: 314.3}},
-			from:   0, to: 1532940510 + 1,
+			labels:   utils.FromStrings("testLabel", "balbala"),
+			data:     []tsdbtest.DataPoint{{Time: 1532940510, Value: 314.3}},
+			from:     0,
+			to:       1532940510 + 1,
+			step:     defaultStepMs,
 			expected: map[string][]tsdbtest.DataPoint{"": {{Time: 1532940510, Value: 314.3}}}},
 
 		{desc: "Should ingest and query multiple data points", metricName: "cpu",
@@ -146,29 +152,37 @@ func TestQueryData(t *testing.T) {
 			data: []tsdbtest.DataPoint{{Time: 1532940510 - 10, Value: 314.3},
 				{Time: 1532940510 - 5, Value: 300.3},
 				{Time: 1532940510, Value: 3234.6}},
-			from: 0, to: 1532940510 + 1,
+			from: 0,
+			to:   1532940510 + 1,
+			step: defaultStepMs,
 			expected: map[string][]tsdbtest.DataPoint{"": {{Time: 1532940510 - 10, Value: 314.3},
 				{Time: 1532940510 - 5, Value: 300.3},
 				{Time: 1532940510, Value: 3234.6}}}},
 
 		{desc: "Should query with filter on metric name", metricName: "cpu",
-			labels: utils.FromStrings("os", "linux", "iguaz", "yesplease"),
-			data:   []tsdbtest.DataPoint{{Time: 1532940510, Value: 33.3}},
-			filter: "_name=='cpu'",
-			from:   0, to: 1532940510 + 1,
+			labels:   utils.FromStrings("os", "linux", "iguaz", "yesplease"),
+			data:     []tsdbtest.DataPoint{{Time: 1532940510, Value: 33.3}},
+			filter:   "_name=='cpu'",
+			from:     0,
+			to:       1532940510 + 1,
+			step:     defaultStepMs,
 			expected: map[string][]tsdbtest.DataPoint{"": {{Time: 1532940510, Value: 33.3}}}},
 
 		{desc: "Should query with filter on label name", metricName: "cpu",
-			labels: utils.FromStrings("os", "linux", "iguaz", "yesplease"),
-			data:   []tsdbtest.DataPoint{{Time: 1532940510, Value: 31.3}},
-			filter: "os=='linux'",
-			from:   0, to: 1532940510 + 1,
+			labels:   utils.FromStrings("os", "linux", "iguaz", "yesplease"),
+			data:     []tsdbtest.DataPoint{{Time: 1532940510, Value: 31.3}},
+			filter:   "os=='linux'",
+			from:     0,
+			to:       1532940510 + 1,
+			step:     defaultStepMs,
 			expected: map[string][]tsdbtest.DataPoint{"": {{Time: 1532940510, Value: 31.3}}}},
 
 		{desc: "Should ingest and query data with '-' in the metric name (IG-8585)", metricName: "cool-cpu",
-			labels: utils.FromStrings("testLabel", "balbala"),
-			data:   []tsdbtest.DataPoint{{Time: 1532940510, Value: 314.3}},
-			from:   0, to: 1532940510 + 1,
+			labels:   utils.FromStrings("testLabel", "balbala"),
+			data:     []tsdbtest.DataPoint{{Time: 1532940510, Value: 314.3}},
+			from:     0,
+			to:       1532940510 + 1,
+			step:     defaultStepMs,
 			expected: map[string][]tsdbtest.DataPoint{"": {{Time: 1532940510, Value: 314.3}}}},
 
 		{desc: "Should ingest and query by time", metricName: "cpu",
@@ -176,7 +190,9 @@ func TestQueryData(t *testing.T) {
 			data: []tsdbtest.DataPoint{{Time: 1532940510, Value: 314.3},
 				{Time: 1532940510 + 5, Value: 300.3},
 				{Time: 1532940510 + 10, Value: 3234.6}},
-			from: 1532940510 + 2, to: 1532940510 + 12,
+			from: 1532940510 + 2,
+			to:   1532940510 + 12,
+			step: defaultStepMs,
 			expected: map[string][]tsdbtest.DataPoint{"": {{Time: 1532940510 + 5, Value: 300.3},
 				{Time: 1532940510 + 10, Value: 3234.6}}}},
 
@@ -185,7 +201,9 @@ func TestQueryData(t *testing.T) {
 			data: []tsdbtest.DataPoint{{Time: 1532940510, Value: 314.3},
 				{Time: 1532940510 + 5, Value: 300.3},
 				{Time: 1532940510 + 10, Value: 3234.6}},
-			from: 1532940510 + 1, to: 1532940510 + 4,
+			from:     1532940510 + 1,
+			to:       1532940510 + 4,
+			step:     defaultStepMs,
 			expected: map[string][]tsdbtest.DataPoint{}},
 
 		{desc: "Should ingest and query an aggregator", metricName: "cpu",
@@ -193,33 +211,54 @@ func TestQueryData(t *testing.T) {
 			data: []tsdbtest.DataPoint{{Time: 1532940510, Value: 300.3},
 				{Time: 1532940510 + 5, Value: 300.3},
 				{Time: 1532940510 + 10, Value: 100.4}},
-			from: 1532940510, to: 1532940510 + 11,
+			from:        1532940510,
+			to:          1532940510 + 11,
+			step:        defaultStepMs,
 			aggregators: "sum",
-			expected:    map[string][]tsdbtest.DataPoint{"sum": {{Time: 1532940000, Value: 701.0}}}},
+			expected:    map[string][]tsdbtest.DataPoint{"sum": {{Time: 1532940510, Value: 701.0}}}},
+
+		{desc: "Should ingest and query an aggregator with interval greater than step size", metricName: "cpu",
+			labels: utils.FromStrings("os", "linux", "iguaz", "yesplease"),
+			data: []tsdbtest.DataPoint{{Time: 1532940510, Value: 300.3},
+				{Time: 1532940510 + 60, Value: 300.3},
+				{Time: 1532940510 + 2*60, Value: 100.4},
+				{Time: 1532940510 + 5*60, Value: 200.0}},
+			from:        1532940510,
+			to:          1532940510 + 6*60,
+			step:        defaultStepMs,
+			aggregators: "sum",
+			expected:    map[string][]tsdbtest.DataPoint{"sum": {{Time: 1532940510, Value: 901.0}}}},
 
 		{desc: "Should ingest and query multiple aggregators", metricName: "cpu",
 			labels: utils.FromStrings("os", "linux", "iguaz", "yesplease"),
 			data: []tsdbtest.DataPoint{{Time: 1532940510, Value: 300.3},
 				{Time: 1532940510 + 5, Value: 300.3},
 				{Time: 1532940510 + 10, Value: 100.4}},
-			from: 1532940510, to: 1532940510 + 11,
+			from:        1532940510,
+			to:          1532940510 + 11,
+			step:        defaultStepMs,
 			aggregators: "sum,count",
-			expected: map[string][]tsdbtest.DataPoint{"sum": {{Time: 1532940000, Value: 701.0}},
-				"count": {{Time: 1532940000, Value: 3}}}},
+			expected: map[string][]tsdbtest.DataPoint{"sum": {{Time: 1532940510, Value: 701.0}},
+				"count": {{Time: 1532940510, Value: 3}}}},
 
-		{desc: "Should ingest and query with illegal time (switch from and to)", metricName: "cpu",
+		{desc: "Should fail on query with illegal time (switch from and to)", metricName: "cpu",
 			labels: utils.FromStrings("os", "linux", "iguaz", "yesplease"),
 			data: []tsdbtest.DataPoint{{Time: 1532940510, Value: 314.3},
 				{Time: 1532940510 + 5, Value: 300.3},
 				{Time: 1532940510 + 10, Value: 3234.6}},
-			from: 1532940510 + 1, to: 0,
-			expected: map[string][]tsdbtest.DataPoint{}},
+			from:       1532940510 + 1,
+			to:         0,
+			step:       defaultStepMs,
+			expectFail: true,
+		},
 
 		{desc: "Should query with filter on not existing metric name", metricName: "cpu",
-			labels: utils.FromStrings("os", "linux", "iguaz", "yesplease"),
-			data:   []tsdbtest.DataPoint{{Time: 1532940510, Value: 33.3}},
-			filter: "_name=='hahaha'",
-			from:   0, to: 1532940510 + 1,
+			labels:   utils.FromStrings("os", "linux", "iguaz", "yesplease"),
+			data:     []tsdbtest.DataPoint{{Time: 1532940510, Value: 33.3}},
+			filter:   "_name=='hahaha'",
+			from:     0,
+			to:       1532940510 + 1,
+			step:     defaultStepMs,
 			expected: map[string][]tsdbtest.DataPoint{}},
 	}
 
@@ -229,23 +268,28 @@ func TestQueryData(t *testing.T) {
 				t.Skip(test.ignoreReason)
 			}
 			testQueryDataCase(t, v3ioConfig, test.metricName, test.labels,
-				test.data, test.filter, test.aggregators, test.from, test.to, test.expected)
+				test.data, test.filter, test.aggregators, test.from, test.to, test.expected, test.expectFail)
 		})
 	}
 }
 
 func testQueryDataCase(test *testing.T, v3ioConfig *config.V3ioConfig,
 	metricsName string, userLabels []utils.Label, data []tsdbtest.DataPoint, filter string, aggregator string,
-	from int64, to int64, expected map[string][]tsdbtest.DataPoint) {
+	from int64, to int64, expected map[string][]tsdbtest.DataPoint, expectFail bool) {
 	adapter, teardown := tsdbtest.SetUpWithData(test, v3ioConfig, metricsName, data, userLabels)
 	defer teardown()
 
 	qry, err := adapter.Querier(nil, from, to)
 	if err != nil {
-		test.Fatalf("Failed to create Querier. reason: %v", err)
+		if expectFail {
+			return
+		} else {
+			test.Fatalf("Failed to create Querier. reason: %v", err)
+		}
 	}
 
-	set, err := qry.Select(metricsName, aggregator, 1000, filter)
+	step := int64(5 * 60 * 1000) // 5 minutes
+	set, err := qry.Select(metricsName, aggregator, step, filter)
 	if err != nil {
 		test.Fatalf("Failed to run Select. reason: %v", err)
 	}

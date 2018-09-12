@@ -39,13 +39,10 @@ type AggregateSeries struct {
 
 func NewAggregateSeries(functions, col string, buckets int, interval, rollupTime int64, windows []int) (*AggregateSeries, error) {
 
-	if functions == "" || interval == 0 {
-		return nil, nil
-	}
-
 	split := strings.Split(functions, ",")
 	var aggrMask AggrType
 	var aggrList []AggrType
+
 	for _, s := range split {
 		aggr, ok := aggrTypeString[s]
 		if !ok {
@@ -56,8 +53,14 @@ func NewAggregateSeries(functions, col string, buckets int, interval, rollupTime
 	}
 
 	newAggregateSeries := AggregateSeries{
-		aggrMask: aggrMask, functions: aggrList, colName: col, buckets: buckets, rollupTime: rollupTime,
-		interval: interval, overlapWindows: windows}
+		aggrMask:       aggrMask,
+		functions:      aggrList,
+		colName:        col,
+		buckets:        buckets,
+		rollupTime:     rollupTime,
+		interval:       interval,
+		overlapWindows: windows,
+	}
 
 	return &newAggregateSeries, nil
 }
@@ -66,8 +69,9 @@ func (as *AggregateSeries) CanAggregate(partitionAggr AggrType) bool {
 	// keep only real aggregators
 	aggrMask := 0x7f & as.aggrMask
 	// make sure the DB has all the aggregators we need (on bits in the mask)
-	// and that the aggregator resolution is greater/eq to requested interval
-	return ((aggrMask & partitionAggr) == aggrMask) && as.interval >= as.rollupTime
+	// and that the requested interval is greater/eq to aggregator resolution and is an even divisor
+	return ((aggrMask & partitionAggr) == aggrMask) &&
+		as.interval >= as.rollupTime && (as.interval%as.rollupTime == 0)
 }
 
 func (as *AggregateSeries) GetAggrMask() AggrType {
@@ -154,7 +158,7 @@ func (as *AggregateSeries) NewSetFromAttrs(
 		}
 
 		i++
-		arrayIndex = (arrayIndex + 1) % as.buckets
+		arrayIndex = (arrayIndex + 1) % (as.buckets + 1)
 	}
 
 	return &aggrSet, nil
@@ -173,6 +177,11 @@ func (as *AggregateSeries) NewSetFromChunks(length int) *AggregateSet {
 	for _, aggr := range rawAggregators {
 		if aggr&as.aggrMask != 0 {
 			dataArrays[aggr] = make([]float64, length, length) // TODO: len/capacity & reuse (pool)
+			if aggr == aggrTypeMax || aggr == aggrTypeMin || aggr == aggrTypeLast {
+				for i := 0; i < length; i++ {
+					dataArrays[aggr][i] = math.NaN()
+				}
+			}
 		}
 	}
 
@@ -253,11 +262,11 @@ func (as *AggregateSet) updateCell(aggr AggrType, cell int, val float64) {
 	case aggrTypeSqr:
 		as.dataArrays[aggr][cell] += val * val
 	case aggrTypeMin:
-		if val < as.dataArrays[aggr][cell] {
+		if math.IsNaN(as.dataArrays[aggr][cell]) || val < as.dataArrays[aggr][cell] {
 			as.dataArrays[aggr][cell] = val
 		}
 	case aggrTypeMax:
-		if val > as.dataArrays[aggr][cell] {
+		if math.IsNaN(as.dataArrays[aggr][cell]) || val > as.dataArrays[aggr][cell] {
 			as.dataArrays[aggr][cell] = val
 		}
 	case aggrTypeLast:
@@ -321,9 +330,11 @@ func (as *AggregateSet) GetCellTime(base int64, index int) int64 {
 	if as.overlapWin == nil {
 		return base + int64(index)*as.interval
 	}
+
 	if index >= len(as.overlapWin) {
 		return base
 	}
+
 	return base - int64(as.overlapWin[index])*as.interval
 }
 

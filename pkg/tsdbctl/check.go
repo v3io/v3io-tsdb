@@ -33,8 +33,7 @@ import (
 type checkCommandeer struct {
 	cmd            *cobra.Command
 	rootCommandeer *RootCommandeer
-	name           string
-	lset           string
+	objPath        string
 	attrs          []string
 }
 
@@ -50,14 +49,10 @@ func newCheckCommandeer(rootCommandeer *RootCommandeer) *checkCommandeer {
 		RunE: func(cmd *cobra.Command, args []string) error {
 
 			if len(args) == 0 {
-				return errors.New("add require metric name and/or labels")
+				return errors.New("check requires an object path")
 			}
 
-			commandeer.name = args[0]
-
-			if len(args) > 1 {
-				commandeer.lset = args[1]
-			}
+			commandeer.objPath = args[0]
 
 			// initialize params
 			return commandeer.check()
@@ -85,15 +80,11 @@ func (cc *checkCommandeer) check() error {
 		return err
 	}
 
-	if lset, err = strToLabels(cc.name, cc.lset); err != nil {
-		return err
-	}
-
 	// get metric data and metadata
-	allAtters := append(cc.attrs, "__name", "_name", "_lset", "_maxtime")
-	container, path := cc.rootCommandeer.adapter.GetContainer()
-	objPath := fmt.Sprintf("%s/0/%s.%016x", path, cc.name, lset.Hash())
-	input := v3io.GetItemInput{Path: objPath, AttributeNames: allAtters}
+	allAttrs := append(cc.attrs, "__name", "_name", "_lset", "_maxtime")
+	container, tablePath := cc.rootCommandeer.adapter.GetContainer()
+	objPath := fmt.Sprintf("%s/%s", tablePath, cc.objPath)
+	input := v3io.GetItemInput{Path: objPath, AttributeNames: allAttrs}
 	resp, err := container.Sync.GetItem(&input)
 	if err != nil {
 		return errors.Wrap(err, "failed to GetItem")
@@ -108,10 +99,10 @@ func (cc *checkCommandeer) check() error {
 	fmt.Printf("Object: %s,  %s {%s}  maxtime: %d\n", objName, metricName, lsetString, maxtime)
 
 	// decompress and print metrics
-	for k, attr := range cc.attrs {
+	for _, attr := range cc.attrs {
 
 		values := item.GetField(attr)
-		fmt.Println("Attr:", k)
+		fmt.Println("Attr:", attr)
 
 		if values != nil {
 			bytes := values.([]byte)

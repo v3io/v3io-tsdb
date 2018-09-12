@@ -27,11 +27,20 @@ import (
 	"github.com/v3io/v3io-tsdb/pkg/aggregate"
 	"github.com/v3io/v3io-tsdb/pkg/config"
 	"github.com/v3io/v3io-tsdb/pkg/tsdb"
+	"github.com/v3io/v3io-tsdb/pkg/utils"
 	"strconv"
+	"time"
 )
 
-const schemaVersion = 0
-const defaultStorageClass = "local"
+const (
+	schemaVersion               = 0
+	defaultStorageClass         = "local"
+	defaultIngestionRate        = ""
+	defaultRollupInterval       = "1h"
+	defaultShardingBuckets      = 8
+	defaultSampleRetentionHours = 0
+	defaultLayerRetentionTime   = "1y"
+)
 
 type createCommandeer struct {
 	cmd             *cobra.Command
@@ -62,10 +71,10 @@ func newCreateCommandeer(rootCommandeer *RootCommandeer) *createCommandeer {
 
 	cmd.Flags().StringVarP(&commandeer.defaultRollups, "rollups", "r", "",
 		"Default aggregation rollups, comma seperated: count,avg,sum,min,max,stddev")
-	cmd.Flags().StringVarP(&commandeer.rollupInterval, "rollup-interval", "i", "1h", "aggregation interval")
-	cmd.Flags().IntVarP(&commandeer.shardingBuckets, "sharding-buckets", "b", 8, "number of buckets to split key")
-	cmd.Flags().IntVarP(&commandeer.sampleRetention, "sample-retention", "a", 0, "sample retention in hours")
-	cmd.Flags().StringVar(&commandeer.sampleRate, "rate", "12/m", "sample rate")
+	cmd.Flags().StringVarP(&commandeer.rollupInterval, "rollup-interval", "i", defaultRollupInterval, "aggregation interval")
+	cmd.Flags().IntVarP(&commandeer.shardingBuckets, "sharding-buckets", "b", defaultShardingBuckets, "number of buckets to split key")
+	cmd.Flags().IntVarP(&commandeer.sampleRetention, "sample-retention", "a", defaultSampleRetentionHours, "sample retention in hours")
+	cmd.Flags().StringVar(&commandeer.sampleRate, "rate", defaultIngestionRate, "sample rate")
 
 	commandeer.cmd = cmd
 
@@ -79,7 +88,7 @@ func (cc *createCommandeer) create() error {
 		return err
 	}
 
-	if err := cc.validateFormat(cc.rollupInterval); err != nil {
+	if err := cc.validateRollupInterval(); err != nil {
 		return errors.Wrap(err, "failed to parse rollup interval")
 	}
 
@@ -88,6 +97,9 @@ func (cc *createCommandeer) create() error {
 		return errors.Wrap(err, "failed to parse default rollups")
 	}
 
+	if cc.sampleRate == "" {
+		return errors.New(`sample rate not provided! Please provide sample rate with --rate flag in the format of [0-9]+/[hms]. Example: 12/m`)
+	}
 	rateInHours, err := rateToHours(cc.sampleRate)
 	if err != nil {
 		return errors.Wrap(err, "failed to parse sample rate")
@@ -103,7 +115,7 @@ func (cc *createCommandeer) create() error {
 		AggregatorsGranularity: cc.rollupInterval,
 		StorageClass:           defaultStorageClass,
 		SampleRetention:        cc.sampleRetention,
-		LayerRetentionTime:     "1y", //TODO
+		LayerRetentionTime:     defaultLayerRetentionTime, //TODO: make configurable
 	}
 
 	tableSchema := config.TableSchema{
@@ -133,46 +145,58 @@ func (cc *createCommandeer) create() error {
 	schema := config.Schema{
 		TableSchemaInfo:     tableSchema,
 		PartitionSchemaInfo: partitionSchema,
-		Partitions:          []config.Partition{},
+		Partitions:          []*config.Partition{},
 		Fields:              fields,
 	}
 
 	return tsdb.CreateTSDB(cc.rootCommandeer.v3iocfg, &schema)
 }
 
-func (cc *createCommandeer) validateFormat(format string) error {
-	interval := format[0 : len(format)-1]
-	if _, err := strconv.Atoi(interval); err != nil {
-		return errors.New("format is incorrect, not a number")
+func (cc *createCommandeer) validateRollupInterval() error {
+	dayMillis := 24 * int64(time.Hour/time.Millisecond)
+	duration, err := utils.Str2duration(cc.rollupInterval)
+	if err != nil {
+		return err
 	}
-	unit := string(format[len(format)-1])
-	if !(unit == "m" || unit == "d" || unit == "h") {
-		return errors.New("format is incorrect, not part of m,d,h")
+
+	if dayMillis%duration != 0 && duration%dayMillis != 0 {
+		return errors.New("rollup interval should be a divisor or a dividend of 1 day. Example: 10m, 30m, 2h, etc.")
 	}
 	return nil
 }
 
 func (cc *createCommandeer) calculatePartitionAndChunkInterval(rateInHours int) (string, string, error) {
 	maxNumberOfEventsPerChunk := cc.rootCommandeer.v3iocfg.MaximumChunkSize / cc.rootCommandeer.v3iocfg.MaximumSampleSize
-	minNumberOfEventsPerChunk := cc.rootCommandeer.v3iocfg.MinimumChunkSize / cc.rootCommandeer.v3iocfg.MinimumSampleSize
+	minNumberOfEventsPerChunk := cc.rootCommandeer.v3iocfg.MinimumChunkSize / cc.rootCommandeer.v3iocfg.MaximumSampleSize
 
 	chunkInterval := maxNumberOfEventsPerChunk / rateInHours
+	if chunkInterval == 0 {
+		return "", "", errors.New("sample rate is too high")
+	}
 
 	// Make sure the expected chunk size is greater then the supported minimum.
 	if chunkInterval < minNumberOfEventsPerChunk/rateInHours {
 		return "", "", fmt.Errorf(
-			"calculated chunk size is less then minimum, rate - %v/h, calculated chunk interval - %v, minimum size - %v",
+			"calculated chunk size is less than minimum, rate - %v/h, calculated chunk interval - %v, minimum size - %v",
 			rateInHours, chunkInterval, cc.rootCommandeer.v3iocfg.MinimumChunkSize)
 	}
 
 	actualCapacityOfChunk := chunkInterval * rateInHours * cc.rootCommandeer.v3iocfg.MaximumSampleSize
-	numberOfChunksInPartition := cc.rootCommandeer.v3iocfg.MaximumPartitionSize / actualCapacityOfChunk
+	numberOfChunksInPartition := 0
+
+	for (numberOfChunksInPartition+24)*actualCapacityOfChunk < cc.rootCommandeer.v3iocfg.MaximumPartitionSize {
+		numberOfChunksInPartition += 24
+	}
+	if numberOfChunksInPartition == 0 {
+		return "", "", errors.Errorf("given rate is too high, can not fit a partition in a day interval with the calculated chunk size %vh", chunkInterval)
+	}
+
 	partitionInterval := numberOfChunksInPartition * chunkInterval
 	return strconv.Itoa(chunkInterval) + "h", strconv.Itoa(partitionInterval) + "h", nil
 }
 
 func rateToHours(sampleRate string) (int, error) {
-	parsingError := errors.New(`not a valid rate. Accepted pattern: [0-9]+/[hms]. Examples: 12/m`)
+	parsingError := errors.New(`not a valid rate. Accepted pattern: [0-9]+/[hms]. Example: 12/m`)
 
 	if len(sampleRate) < 3 {
 		return 0, parsingError

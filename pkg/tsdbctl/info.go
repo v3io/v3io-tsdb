@@ -84,7 +84,7 @@ func (ic *infoCommandeer) info() error {
 		}
 
 		// get all metric names
-		names, err := qry.LabelValues("")
+		names, err := qry.LabelValues("__name__")
 		if err != nil {
 			return errors.Wrap(err, "Failed to get labels")
 		}

@@ -22,6 +22,7 @@ package querier
 
 import (
 	"github.com/nuclio/logger"
+	"github.com/pkg/errors"
 	"github.com/v3io/v3io-go-http"
 	"github.com/v3io/v3io-tsdb/internal/pkg/performance"
 	"github.com/v3io/v3io-tsdb/pkg/aggregate"
@@ -65,9 +66,18 @@ func (q *V3ioQuerier) SelectOverlap(name, functions string, step int64, windows 
 func (q *V3ioQuerier) selectQry(name, functions string, step int64, windows []int, filter string) (set SeriesSet, err error) {
 	set = nullSeriesSet{}
 
-	queryTimer, err := performance.ReporterInstanceFromConfig(q.cfg).NewTimer("QueryTimer")
+	filter = strings.Replace(filter, "__name__", "_name", -1)
+	q.logger.DebugWith("Select query", "func", functions, "step", step, "filter", filter, "window", windows)
+	err = q.partitionMngr.ReadAndUpdateSchema()
+
 	if err != nil {
-		return
+		return nullSeriesSet{}, errors.Wrap(err, "failed to read/update schema")
+	}
+
+	queryTimer, err := performance.ReporterInstanceFromConfig(q.cfg).NewTimer("QueryTimer")
+
+	if err != nil {
+		return nullSeriesSet{}, errors.Wrap(err, "failed to create performance metric [QueryTimer]")
 	}
 
 	queryTimer.Time(func() {
@@ -118,59 +128,155 @@ func (q *V3ioQuerier) selectQry(name, functions string, step int64, windows []in
 func (q *V3ioQuerier) queryNumericPartition(
 	partition *partmgr.DBPartition, name, functions string, step int64, windows []int, filter string) (SeriesSet, error) {
 
-	mint, maxt := partition.GetPartitionRange(q.maxt)
-	if q.mint > mint {
-		mint = q.mint
-	}
+	mint, maxt := partition.GetPartitionRange()
+
 	if q.maxt < maxt {
 		maxt = q.maxt
 	}
 
+	if q.mint > mint {
+		mint = q.mint
+		if step != 0 && step < (maxt-mint) {
+			// temporary Aggregation fix: if mint is not aligned with steps, move it to the next step tick
+			mint += (maxt - mint) % step
+		}
+	}
+
 	newSet := &V3ioSeriesSet{mint: mint, maxt: maxt, partition: partition, logger: q.logger}
 
-	if functions != "" && step == 0 && partition.RollupTime() != 0 {
-		step = partition.RollupTime()
-	}
+	// if there are aggregations to be made
+	if functions != "" {
 
-	newAggrSeries, err := aggregate.NewAggregateSeries(
-		functions, "v", partition.AggrBuckets(), step, partition.RollupTime(), windows)
-	if err != nil {
-		return nil, err
-	}
+		// if step isn't passed (e.g. when using the console) - the step is the difference between max
+		// and min times (e.g. 5 minutes)
+		if step == 0 {
+			step = maxt - mint
+		}
 
-	if newAggrSeries != nil && step != 0 {
+		newAggrSeries, err := aggregate.NewAggregateSeries(functions,
+			"v",
+			partition.AggrBuckets(),
+			step,
+			partition.RollupTime(),
+			windows)
+
+		if err != nil {
+			return nil, err
+		}
+
 		newSet.aggrSeries = newAggrSeries
 		newSet.interval = step
 		newSet.aggrIdx = newAggrSeries.NumFunctions() - 1
 		newSet.overlapWin = windows
 	}
 
-	err = newSet.getItems(partition, name, filter, q.container, q.cfg.QryWorkers)
+	err := newSet.getItems(partition, name, filter, q.container, q.cfg.QryWorkers)
+
 	return newSet, err
 }
 
 // return the current metric names
-func (q *V3ioQuerier) LabelValues(name string) ([]string, error) {
-
-	var list []string
-	input := v3io.GetItemsInput{Path: q.cfg.Path + "/names/", AttributeNames: []string{"__name"}, Filter: ""}
-	iter, err := utils.NewAsyncItemsCursor(q.container, &input, q.cfg.QryWorkers, []string{}, q.logger)
-	q.logger.DebugWith("GetItems to read names", "input", input, "err", err)
+func (q *V3ioQuerier) LabelValues(labelKey string) (result []string, err error) {
+	labelValuesTimer, err := performance.ReporterInstanceFromConfig(q.cfg).NewTimer("LabelValuesTimer")
 	if err != nil {
-		return list, err
+		return result, errors.Wrap(err, "failed to obtain timer object for [LabelValuesTimer]")
 	}
 
-	for iter.Next() {
-		name := iter.GetField("__name").(string)
-		list = append(list, name)
-	}
-
-	if iter.Err() != nil {
-		q.logger.InfoWith("Failed to read names, assume empty list", "err", iter.Err().Error())
-	}
-	return list, nil
+	labelValuesTimer.Time(func() {
+		if labelKey == "__name__" {
+			result, err = q.getMetricNames()
+		} else {
+			result, err = q.getLabelValues(labelKey)
+		}
+	})
+	return
 }
 
 func (q *V3ioQuerier) Close() error {
 	return nil
+}
+
+func (q *V3ioQuerier) getMetricNames() ([]string, error) {
+	input := v3io.GetItemsInput{
+		Path:           q.cfg.Path + "/names/",
+		AttributeNames: []string{"__name"},
+	}
+
+	iter, err := utils.NewAsyncItemsCursor(q.container, &input, q.cfg.QryWorkers, []string{}, q.logger)
+	if err != nil {
+		return nil, err
+	}
+
+	var metricNames []string
+
+	for iter.Next() {
+		metricNames = append(metricNames, iter.GetField("__name").(string))
+	}
+
+	if iter.Err() != nil {
+		q.logger.InfoWith("Failed to read metric names, returning empty list", "err", iter.Err().Error())
+	}
+
+	return metricNames, nil
+}
+
+func (q *V3ioQuerier) getLabelValues(labelKey string) ([]string, error) {
+
+	// sync partition manager (hack)
+	err := q.partitionMngr.ReadAndUpdateSchema()
+	if err != nil {
+		return nil, err
+	}
+
+	partitionPaths := q.partitionMngr.GetPartitionsPaths()
+
+	// if no partitions yet - there are no labels
+	if len(partitionPaths) == 0 {
+		return nil, nil
+	}
+
+	labelValuesMap := map[string]struct{}{}
+
+	// get all labelsets
+	input := v3io.GetItemsInput{
+		Path:           partitionPaths[0],
+		AttributeNames: []string{"_lset"},
+	}
+
+	iter, err := utils.NewAsyncItemsCursor(q.container, &input, q.cfg.QryWorkers, []string{}, q.logger)
+	if err != nil {
+		return nil, err
+	}
+
+	// iterate over the results
+	for iter.Next() {
+		labelSet := iter.GetField("_lset").(string)
+
+		// the labelSet will be k1=v1,k2=v2, k2=v3. Assuming labelKey is "k2", we want to convert
+		// that to [v2, v3]
+
+		// split at "," to get k=v pairs
+		for _, label := range strings.Split(labelSet, ",") {
+
+			// split at "=" to get label key and label value
+			splitLabel := strings.SplitN(label, "=", 2)
+
+			// if we got two elements and the first element (the key) is equal to what we're looking
+			// for, save the label value in the map. use a map to prevent duplications
+			if len(splitLabel) == 2 && splitLabel[0] == labelKey {
+				labelValuesMap[splitLabel[1]] = struct{}{}
+			}
+		}
+	}
+
+	if iter.Err() != nil {
+		q.logger.InfoWith("Failed to read label values, returning empty list", "err", iter.Err().Error())
+	}
+
+	var labelValues []string
+	for labelValue := range labelValuesMap {
+		labelValues = append(labelValues, labelValue)
+	}
+
+	return labelValues, nil
 }

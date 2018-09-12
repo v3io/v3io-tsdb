@@ -25,6 +25,7 @@ import (
 	"fmt"
 	"github.com/pkg/errors"
 	"github.com/v3io/v3io-go-http"
+	"github.com/v3io/v3io-tsdb/internal/pkg/performance"
 	"github.com/v3io/v3io-tsdb/pkg/aggregate"
 	"github.com/v3io/v3io-tsdb/pkg/config"
 	"github.com/v3io/v3io-tsdb/pkg/utils"
@@ -41,19 +42,7 @@ func NewPartitionMngr(cfg *config.Schema, partPath string, cont *v3io.Container)
 		return nil, err
 	}
 	newMngr := &PartitionManager{cfg: cfg, path: partPath, cyclic: false, container: cont, currentPartitionInterval: currentPartitionInterval}
-	for _, part := range cfg.Partitions {
-		partPath := path.Join(newMngr.path, strconv.FormatInt(part.StartTime/1000, 10)) + "/"
-		newPart, err := NewDBPartition(newMngr, part.StartTime, partPath)
-		if err != nil {
-			return nil, err
-		}
-		newMngr.partitions = append(newMngr.partitions, newPart)
-		if newMngr.headPartition == nil {
-			newMngr.headPartition = newPart
-		} else if newMngr.headPartition.startTime < newPart.startTime {
-			newMngr.headPartition = newPart
-		}
-	}
+	newMngr.updatePartitionsFromSchema(cfg)
 	return newMngr, nil
 }
 
@@ -177,20 +166,98 @@ func (p *PartitionManager) createAndUpdatePartition(t int64) (*DBPartition, erro
 			}
 		}
 	}
-	err = p.updatePartitionInSchema(partition)
+	p.cfg.Partitions = append(p.cfg.Partitions, &config.Partition{StartTime: partition.startTime, SchemaInfo: p.cfg.PartitionSchemaInfo})
+	err = p.updateSchema()
 	return partition, err
 }
 
-func (p *PartitionManager) updatePartitionInSchema(partition *DBPartition) error {
-	p.cfg.Partitions = append(p.cfg.Partitions, config.Partition{StartTime: partition.startTime, SchemaInfo: p.cfg.PartitionSchemaInfo})
-	data, err := json.Marshal(p.cfg)
+func (p *PartitionManager) updateSchema() (err error) {
+	timer, err := performance.DefaultReporterInstance().NewTimer("UpdateSchemaTimer")
+
 	if err != nil {
-		return errors.Wrap(err, "Failed to update new partition in schema file")
+		err = errors.Wrap(err, "failed to create timer: UpdateSchemaTimer")
+		return
 	}
-	if p.container != nil { //tests use case only
-		err = p.container.Sync.PutObject(&v3io.PutObjectInput{Path: path.Join(p.path, config.SCHEMA_CONFIG), Body: data})
+
+	timer.Time(func() {
+		data, err := json.Marshal(p.cfg)
+		if err != nil {
+			err = errors.Wrap(err, "Failed to update new partition in schema file")
+			return
+		}
+		if p.container != nil { //tests use case only
+			err = p.container.Sync.PutObject(&v3io.PutObjectInput{Path: path.Join(p.path, config.SCHEMA_CONFIG), Body: data})
+		}
+	})
+
+	return
+}
+
+func (p *PartitionManager) DeletePartitionsFromSchema(partitionsToDelete []*DBPartition) {
+	for i := len(p.partitions) - 1; i >= 0; i-- {
+		for _, partToDelete := range partitionsToDelete {
+			if p.partitions[i].startTime == partToDelete.startTime {
+				p.partitions = append(p.partitions[:i], p.partitions[i+1:]...)
+				break
+			}
+		}
+
 	}
-	return err
+	for i := len(p.cfg.Partitions) - 1; i >= 0; i-- {
+		for _, partToDelete := range partitionsToDelete {
+			if p.cfg.Partitions[i].StartTime == partToDelete.startTime {
+				p.cfg.Partitions = append(p.cfg.Partitions[:i], p.cfg.Partitions[i+1:]...)
+				break
+			}
+		}
+
+	}
+	p.updateSchema()
+}
+
+func (p *PartitionManager) ReadAndUpdateSchema() (err error) {
+	timer, err := performance.DefaultReporterInstance().NewTimer("ReadAndUpdateSchemaTimer")
+
+	if err != nil {
+		err = errors.Wrap(err, "failed to create timer: ReadAndUpdateSchemaTimer")
+		return
+	}
+
+	timer.Time(func() {
+		fullPath := path.Join(p.path, config.SCHEMA_CONFIG)
+		resp, err := p.container.Sync.GetObject(&v3io.GetObjectInput{Path: fullPath})
+		if err != nil {
+			err = errors.Wrap(err, "Failed to read schema at path: "+fullPath)
+		}
+
+		schema := &config.Schema{}
+		err = json.Unmarshal(resp.Body(), schema)
+		if err != nil {
+			err = errors.Wrap(err, "Failed to unmarshal schema at path: "+fullPath)
+		}
+		p.cfg = schema
+		p.updatePartitionsFromSchema(schema)
+	})
+
+	return
+}
+
+func (p *PartitionManager) updatePartitionsFromSchema(schema *config.Schema) error {
+	p.partitions = []*DBPartition{}
+	for _, part := range schema.Partitions {
+		partPath := path.Join(p.path, strconv.FormatInt(part.StartTime/1000, 10)) + "/"
+		newPart, err := NewDBPartition(p, part.StartTime, partPath)
+		if err != nil {
+			return err
+		}
+		p.partitions = append(p.partitions, newPart)
+		if p.headPartition == nil {
+			p.headPartition = newPart
+		} else if p.headPartition.startTime < newPart.startTime {
+			p.headPartition = newPart
+		}
+	}
+	return nil
 }
 
 func (p *PartitionManager) PartsForRange(mint, maxt int64) []*DBPartition {
@@ -324,19 +391,9 @@ func (p *DBPartition) InRange(t int64) bool {
 }
 
 // return the mint and maxt for this partition, may need maxt for cyclic partition
-func (p *DBPartition) GetPartitionRange(maxt int64) (int64, int64) {
+func (p *DBPartition) GetPartitionRange() (int64, int64) {
 	// start p.days ago, rounded to next hour
 	return p.startTime, p.startTime + p.partitionInterval
-}
-
-// return the valid minimum time in a cyclic partition based on max time
-func (p *DBPartition) CyclicMinTime(mint, maxt int64) int64 {
-	// start p.days ago, rounded to next hour
-	newMin, _ := p.GetPartitionRange(maxt)
-	if mint > newMin {
-		return mint
-	}
-	return newMin
 }
 
 // Attribute name of a chunk

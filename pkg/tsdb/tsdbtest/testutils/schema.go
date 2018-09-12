@@ -46,7 +46,7 @@ func CreateSchema(t testing.TB, agg string) config.Schema {
 	schema := config.Schema{
 		TableSchemaInfo:     tableSchema,
 		PartitionSchemaInfo: partitionSchema,
-		Partitions:          []config.Partition{},
+		Partitions:          []*config.Partition{},
 		Fields:              fields,
 	}
 	return schema
