@@ -280,7 +280,7 @@ func (cs *chunkStore) writeChunks(mc *MetricsCache, metric *MetricState) (hasPen
 		t0 := cs.pending[0].t
 		partition, err := mc.partitionMngr.TimeToPart(t0)
 		if err != nil {
-			hasPendingUpdates, err = false, err
+			hasPendingUpdates = false
 			return
 		}
 		if partition.GetStartTime() > cs.lastTid {
@@ -391,7 +391,7 @@ func (cs *chunkStore) writeChunks(mc *MetricsCache, metric *MetricState) (hasPen
 			&v3io.UpdateItemInput{Path: path, Expression: &expr}, metric, mc.responseChan)
 		if err != nil {
 			mc.logger.ErrorWith("UpdateItem Failed", "err", err)
-			hasPendingUpdates, err = false, err
+			hasPendingUpdates = false
 		}
 
 		// add async request ID to the requests map (can be avoided if V3IO will add user data in request)

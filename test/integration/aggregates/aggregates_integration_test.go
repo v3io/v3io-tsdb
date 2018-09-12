@@ -26,6 +26,7 @@ import (
 	"fmt"
 	"github.com/nuclio/logger"
 	"github.com/stretchr/testify/assert"
+	"github.com/v3io/v3io-tsdb/internal/pkg/performance"
 	"github.com/v3io/v3io-tsdb/pkg/config"
 	"github.com/v3io/v3io-tsdb/pkg/tsdb"
 	"github.com/v3io/v3io-tsdb/pkg/tsdb/tsdbtest"
@@ -125,12 +126,17 @@ func setupFunc(testCtx *testing.T, testConfig *TestConfig) (*tsdb.V3ioAdapter, f
 		testCtx.Fatalf("Test failed. Reason: %v", err)
 	}
 
+	// Measure performance
+	metricReporter := performance.DefaultReporterInstance()
+	metricReporter.Start()
+
 	testConfig.logger = adapter.GetLogger(testCtx.Name())
 	// generate data and update expected result
 	testConfig.expectedCount, testConfig.expectedSum = generateData(testCtx, testConfig, adapter, testConfig.logger)
 
 	return adapter, func() {
 		// Tear down:
+		defer metricReporter.Stop()
 		// Don't delete the table if the test has failed
 		if !testCtx.Failed() {
 			tsdbtest.DeleteTSDB(testCtx, v3ioConfig)

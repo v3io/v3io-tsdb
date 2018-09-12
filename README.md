@@ -106,7 +106,7 @@ such as partitioning strategy, retention, aggregators, etc. this can be done via
 
 ```go
 	// Load v3io connection/path details (see YAML below)
-	v3iocfg, _ := cfg, err = config.LoadConfig("v3io.yaml")
+	v3iocfg, _ := cfg, err = config.GetOrLoadFromFile("v3io.yaml")
 
 	// Specify the default DB configuration (can be modified per partition)
 	dbcfg := config.DBPartConfig{
@@ -127,8 +127,8 @@ In order to use the TSDB we need to create an adapter, the `NewV3ioAdapter` func
 parameters: the configuration structure, v3io data container object and logger object. The last 2 are optional, in case
 you already have container and logger (when using nuclio data bindings).
 
-Configuration is specified in a YAML or JSON format, and can be read from a file using `config.LoadConfig(path string)` 
-or can be loaded from a local buffer using `config.LoadFromData(data []byte)`. You can see details on the configuration
+Configuration is specified in a YAML or JSON format, and can be read from a file using `config.GetOrLoadFromFile(path string)` 
+or can be loaded from a local buffer using `config.GetOrLoadFromData(data []byte)`. You can see details on the configuration
 options in [config](internal/pkg/config/config.go), a minimal configuration looks like: 
 
 ```yaml
@@ -143,7 +143,7 @@ example of creating an adapter:
 
 ```go
 	// create configuration object from file
-	cfg, err := config.LoadConfig("v3io.yaml")
+	cfg, err := config.GetOrLoadFromFile("v3io.yaml")
 	if err != nil {
 		panic(err)
 	}

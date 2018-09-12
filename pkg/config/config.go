@@ -26,6 +26,7 @@ import (
 	"io/ioutil"
 	"os"
 	"strings"
+	"sync"
 )
 
 const (
@@ -37,6 +38,11 @@ const (
 	defaultNumberOfQueryWorkers  = 8
 	defaultBatchSize             = 64
 	defaultTimeoutInSeconds      = 24 * 60 * 60 // 24 hours
+)
+
+var (
+	instance *V3ioConfig
+	once     sync.Once
 )
 
 type V3ioConfig struct {
@@ -140,7 +146,31 @@ type MetricConfig struct {
 
 // TODO: add alerts config (name, match expr, for, lables, annotations)
 
-func LoadConfig(path string) (*V3ioConfig, error) {
+func GetOrDefaultConfig() (*V3ioConfig, error) {
+	return GetOrLoadFromFile("")
+}
+
+func GetOrLoadFromFile(path string) (*V3ioConfig, error) {
+	var err error
+	once.Do(func() {
+		instance, err = loadConfig(path)
+		return
+	})
+
+	return instance, err
+}
+
+func GetOrLoadFromData(data []byte) (*V3ioConfig, error) {
+	var err error
+	once.Do(func() {
+		instance, err = loadFromData(data)
+		return
+	})
+
+	return instance, err
+}
+
+func loadConfig(path string) (*V3ioConfig, error) {
 
 	var resolvedPath string
 
@@ -166,19 +196,19 @@ func LoadConfig(path string) (*V3ioConfig, error) {
 		return nil, errors.Errorf("file '%s' exists but its content is not valid", resolvedPath)
 	}
 
-	return LoadFromData(data)
+	return loadFromData(data)
 }
 
-func LoadFromData(data []byte) (*V3ioConfig, error) {
+func loadFromData(data []byte) (*V3ioConfig, error) {
 	cfg := V3ioConfig{}
 	err := yaml.Unmarshal(data, &cfg)
 
-	InitDefaults(&cfg)
+	initDefaults(&cfg)
 
 	return &cfg, err
 }
 
-func InitDefaults(cfg *V3ioConfig) {
+func initDefaults(cfg *V3ioConfig) {
 	// Initialize default number of workers
 	if cfg.Workers == 0 {
 		cfg.Workers = defaultNumberOfIngestWorkers

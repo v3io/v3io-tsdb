@@ -43,7 +43,7 @@ func LoadV3ioConfig() (*config.V3ioConfig, error) {
 	if err != nil {
 		return nil, err
 	}
-	v3ioConfig, err := config.LoadConfig(path)
+	v3ioConfig, err := config.GetOrLoadFromFile(path)
 	if err != nil {
 		return nil, errors.Wrap(err, "Failed to load test configuration.")
 	}

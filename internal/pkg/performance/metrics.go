@@ -28,7 +28,14 @@ type MetricReporter struct {
 }
 
 func DefaultReporterInstance() *MetricReporter {
-	return ReporterInstance("stderr", true, 60, true)
+	cfg, err := config.GetOrDefaultConfig()
+
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "failed to instantiate configuration.\nWill use internal configuration. Reason: %v", err)
+		return ReporterInstance("stderr", true, 60, true)
+	}
+
+	return ReporterInstanceFromConfig(cfg)
 }
 
 func ReporterInstance(writeTo string, reportPeriodically bool, reportIntervalSeconds int, reportOnShutdown bool) *MetricReporter {

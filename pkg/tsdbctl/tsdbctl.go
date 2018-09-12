@@ -101,7 +101,7 @@ func (rc *RootCommandeer) CreateMarkdown(path string) error {
 }
 
 func (rc *RootCommandeer) initialize() error {
-	cfg, err := config.LoadConfig(rc.cfgFilePath)
+	cfg, err := config.GetOrLoadFromFile(rc.cfgFilePath)
 	if err != nil {
 		// if we couldn't load the file and its not the default
 		if rc.cfgFilePath == "" {

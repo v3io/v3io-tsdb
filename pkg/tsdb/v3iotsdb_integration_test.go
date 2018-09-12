@@ -323,7 +323,7 @@ func testQueryDataCase(test *testing.T, v3ioConfig *config.V3ioConfig,
 }
 
 func TestQueryDataOverlappingWindow(t *testing.T) {
-	v3ioConfig, err := config.LoadConfig("")
+	v3ioConfig, err := config.GetOrDefaultConfig()
 	if err != nil {
 		t.Fatalf("Failed to load test configuration. reason: %s", err)
 	}
