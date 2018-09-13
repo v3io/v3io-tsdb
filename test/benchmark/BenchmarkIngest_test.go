@@ -92,7 +92,7 @@ func BenchmarkIngest(b *testing.B) {
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
 		rowsAdded, err := runTest(i, appender, timestamps, sampleTemplates, refs,
-			testConfig.AppendOneByOne, testConfig.BatchSize, testConfig.Verbose, testConfig.ValidateData)
+			testConfig.AppendOneByOne, testConfig.BatchSize, testConfig.Verbose, testConfig.ValidateRawData)
 
 		if err != nil {
 			b.Fatal(err)
@@ -124,10 +124,11 @@ func BenchmarkIngest(b *testing.B) {
 
 	tsdbtest.ValidateCountOfSamples(b, adapter, metricNamePrefix, count, testStartTimeMs, testEndTimeMs, queryStepSizeMs)
 
-	for metricName := range samplesModel {
-		tsdbtest.ValidateRawData(b, adapter, metricName, testStartTimeMs, testEndTimeMs, isValidSequence)
+	if testConfig.ValidateRawData {
+		for metricName := range samplesModel {
+			tsdbtest.ValidateRawData(b, adapter, metricName, testStartTimeMs, testEndTimeMs, isValidSequence)
+		}
 	}
-
 }
 
 func isValidSequence(prev float64, current float64) bool {

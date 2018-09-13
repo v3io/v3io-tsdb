@@ -40,4 +40,4 @@ CleanupAfterTest: true
 QueryAggregateStep: "1h"
 
 # validate raw data correctness
-ValidateData: true
+ValidateRawData: true

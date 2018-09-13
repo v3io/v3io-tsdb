@@ -73,21 +73,21 @@ func BenchmarkIngestWithNuclio(b *testing.B) {
 	testEndTimeMs := testStartTimeNano / int64(time.Millisecond)
 	testStartTimeMs := testEndTimeMs - relativeTimeOffsetMs
 
-	sampleTemplates := common.MakeSampleTemplates(
-		common.MakeSamplesModel(
-			testConfig.NamesCount,
-			testConfig.NamesDiversity,
-			testConfig.LabelsCount,
-			testConfig.LabelsDiversity,
-			testConfig.LabelValuesCount,
-			testConfig.LabelsValueDiversity))
+	samplesModel := common.MakeSamplesModel(
+		testConfig.NamesCount,
+		testConfig.NamesDiversity,
+		testConfig.LabelsCount,
+		testConfig.LabelsDiversity,
+		testConfig.LabelValuesCount,
+		testConfig.LabelsValueDiversity)
+	sampleTemplates := common.MakeSampleTemplates(samplesModel)
 	sampleTemplatesLength := len(sampleTemplates)
 
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
 		index := i % sampleTemplatesLength
 		timestamp := testStartTimeMs + int64(index*testConfig.SampleStepSize)
-		newEntries, err := runNuclioTest(tc, sampleTemplates[index], timestamp, testConfig.ValidateData)
+		newEntries, err := runNuclioTest(tc, sampleTemplates[index], timestamp, testConfig.ValidateRawData)
 		if err != nil {
 			b.Fatal(err)
 		}
@@ -110,6 +110,12 @@ func BenchmarkIngestWithNuclio(b *testing.B) {
 	}
 
 	tsdbtest.ValidateCountOfSamples(b, v3ioAdapter, metricNamePrefix, count, testStartTimeMs, testEndTimeMs, queryStepSizeMs)
+
+	if testConfig.ValidateRawData {
+		for metricName := range samplesModel {
+			tsdbtest.ValidateRawData(b, v3ioAdapter, metricName, testStartTimeMs, testEndTimeMs, isValidSequence)
+		}
+	}
 }
 
 func runNuclioTest(tc *nutest.TestContext, sampleTemplateJson string, timestamp int64, sequential bool) (int, error) {
