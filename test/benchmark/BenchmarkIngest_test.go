@@ -21,7 +21,10 @@ func BenchmarkIngest(b *testing.B) {
 	b.StopTimer()
 
 	// Measure performance
-	metricReporter := performance.DefaultReporterInstance()
+	metricReporter, err := performance.DefaultReporterInstance()
+	if err != nil {
+		b.Fatalf("unable to initialize performance metrics reporter: %v", err)
+	}
 	metricReporter.Start()
 	defer metricReporter.Stop()
 

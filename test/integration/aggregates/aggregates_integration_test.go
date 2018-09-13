@@ -53,7 +53,7 @@ type TestConfig struct {
 	ignoreReason  string
 	v3ioConfig    *config.V3ioConfig
 	logger        logger.Logger
-	setup         func() (*tsdb.V3ioAdapter, func())
+	setup         func() (*tsdb.V3ioAdapter, error, func())
 }
 
 type metricContext struct {
@@ -103,7 +103,7 @@ func t1Config(testCtx *testing.T) *TestConfig {
 		tc.expectedSum += v
 	}
 
-	tc.setup = func() (*tsdb.V3ioAdapter, func()) {
+	tc.setup = func() (*tsdb.V3ioAdapter, error, func()) {
 		return setupFunc(testCtx, tc)
 	}
 
@@ -111,14 +111,14 @@ func t1Config(testCtx *testing.T) *TestConfig {
 }
 
 // Setup for test and return tear-down function
-func setupFunc(testCtx *testing.T, testConfig *TestConfig) (*tsdb.V3ioAdapter, func()) {
+func setupFunc(testCtx *testing.T, testConfig *TestConfig) (*tsdb.V3ioAdapter, error, func()) {
 	// setup:
 	v3ioConfig, err := tsdbtest.LoadV3ioConfig()
 	if err != nil {
-		testCtx.Fatalf("Failed to read config %s", err)
+		return nil, err, func() {}
 	}
-	v3ioConfig.Path = fmt.Sprintf("%s-%d", testCtx.Name(), time.Now().Nanosecond())
 
+	v3ioConfig.Path = fmt.Sprintf("%s-%d", testCtx.Name(), time.Now().Nanosecond())
 	tsdbtest.CreateTestTSDB(testCtx, v3ioConfig)
 
 	adapter, err := tsdb.NewV3ioAdapter(v3ioConfig, nil, nil)
@@ -127,14 +127,17 @@ func setupFunc(testCtx *testing.T, testConfig *TestConfig) (*tsdb.V3ioAdapter, f
 	}
 
 	// Measure performance
-	metricReporter := performance.DefaultReporterInstance()
+	metricReporter, err := performance.DefaultReporterInstance()
+	if err != nil {
+		testCtx.Fatalf("unable to initialize performance metrics reporter: %v", err)
+	}
 	metricReporter.Start()
 
 	testConfig.logger = adapter.GetLogger(testCtx.Name())
 	// generate data and update expected result
 	testConfig.expectedCount, testConfig.expectedSum = generateData(testCtx, testConfig, adapter, testConfig.logger)
 
-	return adapter, func() {
+	return adapter, nil, func() {
 		// Tear down:
 		defer metricReporter.Stop()
 		// Don't delete the table if the test has failed
@@ -146,8 +149,12 @@ func setupFunc(testCtx *testing.T, testConfig *TestConfig) (*tsdb.V3ioAdapter, f
 
 func testAggregatesCase(t *testing.T, testConfig *TestConfig) {
 	// Setup & TearDown
-	adapter, tearDown := testConfig.setup()
+	adapter, err, tearDown := testConfig.setup()
 	defer tearDown()
+
+	if err != nil {
+		t.Fatalf("unable to load configuration. Error: %v", err)
+	}
 
 	startBefore := testConfig.testStartTime - testConfig.queryStep
 

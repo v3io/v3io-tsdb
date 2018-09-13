@@ -56,7 +56,10 @@ func SetUp(t testing.TB, v3ioConfig *config.V3ioConfig) func() {
 	CreateTestTSDB(t, v3ioConfig)
 
 	// Measure performance
-	metricReporter := performance.DefaultReporterInstance()
+	metricReporter, err := performance.DefaultReporterInstance()
+	if err != nil {
+		t.Fatalf("unable to initialize performance metrics reporter. Reason: %v", err)
+	}
 	metricReporter.Start()
 
 	return func() {
@@ -82,7 +85,10 @@ func SetUpWithDBConfig(t *testing.T, v3ioConfig *config.V3ioConfig, schema *conf
 	}
 
 	// Measure performance
-	metricReporter := performance.DefaultReporterInstance()
+	metricReporter, err := performance.DefaultReporterInstance()
+	if err != nil {
+		t.Fatalf("unable to initialize performance metrics reporter. Error: %v", err)
+	}
 	metricReporter.Start()
 
 	return func() {

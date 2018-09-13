@@ -172,7 +172,13 @@ func (p *PartitionManager) createAndUpdatePartition(t int64) (*DBPartition, erro
 }
 
 func (p *PartitionManager) updateSchema() (err error) {
-	timer, err := performance.DefaultReporterInstance().NewTimer("UpdateSchemaTimer")
+	metricReporter, err := performance.DefaultReporterInstance()
+	if err != nil {
+		err = errors.Wrap(err, "unable to initialize performance metrics reporter")
+		return
+	}
+
+	timer, err := metricReporter.NewTimer("UpdateSchemaTimer")
 
 	if err != nil {
 		err = errors.Wrap(err, "failed to create timer: UpdateSchemaTimer")
@@ -216,7 +222,13 @@ func (p *PartitionManager) DeletePartitionsFromSchema(partitionsToDelete []*DBPa
 }
 
 func (p *PartitionManager) ReadAndUpdateSchema() (err error) {
-	timer, err := performance.DefaultReporterInstance().NewTimer("ReadAndUpdateSchemaTimer")
+	metricReporter, err := performance.DefaultReporterInstance()
+	if err != nil {
+		err = errors.Wrap(err, "unable to initialize performance metrics reporter")
+		return
+	}
+
+	timer, err := metricReporter.NewTimer("ReadAndUpdateSchemaTimer")
 
 	if err != nil {
 		err = errors.Wrap(err, "failed to create timer: ReadAndUpdateSchemaTimer")

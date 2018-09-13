@@ -23,6 +23,7 @@ such restriction.
 package tsdbctl
 
 import (
+	"github.com/pkg/errors"
 	"github.com/stretchr/testify/suite"
 	"github.com/v3io/v3io-tsdb/internal/pkg/performance"
 	"github.com/v3io/v3io-tsdb/pkg/config"
@@ -40,11 +41,19 @@ func (suite *testTsdbctlSuite) TestPopulateConfigWithTenant() {
 	}
 
 	err := rc.populateConfig(cfg)
+	suite.Require().Nil(err)
+
+	metricReporter, err := performance.DefaultReporterInstance()
+	if err != nil {
+		err = errors.Wrap(err, "unable to initialize performance metrics reporter")
+		return
+	}
+	suite.Require().Nil(err)
 
 	expectedRc := RootCommandeer{
 		v3iocfg:  cfg,
 		v3ioPath: "localhost:80123/123",
-		Reporter: performance.DefaultReporterInstance(),
+		Reporter: metricReporter,
 	}
 	expectedCfg := &config.V3ioConfig{
 		V3ioUrl:              "localhost:80123",
@@ -58,7 +67,6 @@ func (suite *testTsdbctlSuite) TestPopulateConfigWithTenant() {
 		MaximumPartitionSize: defaultMaximumPartitionSize,
 	}
 
-	suite.Require().Nil(err)
 	suite.Require().Equal(expectedCfg, rc.v3iocfg)
 	suite.Require().Equal(expectedRc, rc)
 }

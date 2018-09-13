@@ -12,6 +12,9 @@ import (
 
 func TestQueryIntegration(t *testing.T) {
 	v3ioConfig, err := tsdbtest.LoadV3ioConfig()
+	if err != nil {
+		t.Fatalf("unable to load configuration. Error: %v", err)
+	}
 	defer tsdbtest.SetUp(t, v3ioConfig)()
 	tsdbConfig = fmt.Sprintf(`path: "%v"`, v3ioConfig.Path)
 

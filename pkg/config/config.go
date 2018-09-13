@@ -43,7 +43,16 @@ const (
 var (
 	instance *V3ioConfig
 	once     sync.Once
+	failure  error
 )
+
+func Error() error {
+	return failure
+}
+
+func hasError() bool {
+	return failure != nil
+}
 
 type V3ioConfig struct {
 	// V3IO Connection details: Url, Data container, relative path for this dataset, credentials
@@ -150,24 +159,26 @@ func GetOrDefaultConfig() (*V3ioConfig, error) {
 	return GetOrLoadFromFile("")
 }
 
-func GetOrLoadFromFile(path string) (*V3ioConfig, error) {
-	var err error
+func GetOrLoadFromFile(path string) (cfg *V3ioConfig, err error) {
 	once.Do(func() {
-		instance, err = loadConfig(path)
+		instance, failure = loadConfig(path)
 		return
 	})
 
-	return instance, err
+	cfg = instance
+	err = failure
+
+	return
 }
 
-func GetOrLoadFromData(data []byte) (*V3ioConfig, error) {
-	var err error
+func GetOrLoadFromData(data []byte) (cfg *V3ioConfig, err error) {
 	once.Do(func() {
 		instance, err = loadFromData(data)
 		return
 	})
 
-	return instance, err
+	cfg = instance
+	return
 }
 
 func loadConfig(path string) (*V3ioConfig, error) {

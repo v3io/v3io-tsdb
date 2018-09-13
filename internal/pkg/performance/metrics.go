@@ -27,15 +27,19 @@ type MetricReporter struct {
 	reportOnShutdown      bool
 }
 
-func DefaultReporterInstance() *MetricReporter {
+func DefaultReporterInstance() (reporter *MetricReporter, err error) {
 	cfg, err := config.GetOrDefaultConfig()
 
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "failed to instantiate configuration.\nWill use internal configuration. Reason: %v", err)
-		return ReporterInstance("stderr", true, 60, true)
+		// DO NOT return the error to prevent failures of unit tests
+		fmt.Fprintf(os.Stderr, "unable to load configuration. Reason: %v\n"+
+			"Will use default reporter configuration instead.", err)
+		reporter = ReporterInstance("stdout", true, 60, true)
+	} else {
+		reporter = ReporterInstanceFromConfig(cfg)
 	}
 
-	return ReporterInstanceFromConfig(cfg)
+	return reporter, nil
 }
 
 func ReporterInstance(writeTo string, reportPeriodically bool, reportIntervalSeconds int, reportOnShutdown bool) *MetricReporter {

@@ -200,7 +200,13 @@ func (cs *chunkStore) processGetResp(mc *MetricsCache, metric *MetricState, resp
 
 // Append data to the right chunk and table based on the time and state
 func (cs *chunkStore) Append(t int64, v interface{}) {
-	appendTimer, err := performance.DefaultReporterInstance().NewTimer("AppendTimer")
+	metricReporter, err := performance.DefaultReporterInstance()
+	if err != nil {
+		err = errors.Wrap(err, "unable to initialize performance metrics reporter")
+		return
+	}
+
+	appendTimer, err := metricReporter.NewTimer("AppendTimer")
 
 	if err != nil {
 		// TODO: need to have a logger in context to report errors
@@ -261,7 +267,13 @@ func (cs *chunkStore) chunkByTime(t int64) *attrAppender {
 // write all pending samples to DB chunks and aggregators
 func (cs *chunkStore) writeChunks(mc *MetricsCache, metric *MetricState) (hasPendingUpdates bool, err error) {
 
-	writeChunksTimer, err := performance.DefaultReporterInstance().NewTimer("WriteChunksTimer")
+	metricReporter, err := performance.DefaultReporterInstance()
+	if err != nil {
+		err = errors.Wrap(err, "unable to initialize performance metrics reporter")
+		return
+	}
+
+	writeChunksTimer, err := metricReporter.NewTimer("WriteChunksTimer")
 	if err != nil {
 		return hasPendingUpdates, errors.Wrap(err, "failed to obtain timer object for [LabelValuesTimer]")
 	}

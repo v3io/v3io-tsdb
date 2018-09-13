@@ -1,6 +1,7 @@
 package tsdbtest
 
 import (
+	"fmt"
 	"github.com/pkg/errors"
 	"github.com/v3io/v3io-tsdb/pkg/config"
 	"os"
@@ -45,7 +46,7 @@ func LoadV3ioConfig() (*config.V3ioConfig, error) {
 	}
 	v3ioConfig, err := config.GetOrLoadFromFile(path)
 	if err != nil {
-		return nil, errors.Wrap(err, "Failed to load test configuration.")
+		return nil, errors.Wrap(err, fmt.Sprintf("unable to load test configuration from '%s'", path))
 	}
 	return v3ioConfig, nil
 }
