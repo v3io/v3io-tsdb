@@ -23,8 +23,8 @@ func CreateSchema(t testing.TB, agg string) config.Schema {
 		Version:             0,
 		RollupLayers:        []config.Rollup{defaultRollup},
 		ShardingBuckets:     8,
-		PartitionerInterval: "340h",
-		ChunckerInterval:    "10h",
+		PartitionerInterval: "48h",
+		ChunckerInterval:    "1h",
 	}
 
 	fields, err := aggregate.SchemaFieldFromString(rollups, "v")
