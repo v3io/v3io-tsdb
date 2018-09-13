@@ -7,8 +7,11 @@ import (
 	"github.com/pkg/errors"
 	"github.com/v3io/v3io-tsdb/pkg/tsdb/tsdbtest"
 	"math/rand"
+	"sync/atomic"
 	"time"
 )
+
+var lastValue int64 = 0
 
 func MakeSamplesModel(namesCount, namesDiversity, labelsCount, labelDiversity, labelValueCount,
 	labelValueDiversity int) map[string]map[string][]string {
@@ -99,7 +102,15 @@ func MakeNamesRange(prefix string, count, minIndex, maxIndex int) ([]string, err
 	return slice, nil
 }
 
-func MakeRandomFloat64() float64 {
+func NextValue(sequential bool) float64 {
+	if sequential {
+		return float64(atomic.AddInt64(&lastValue, 1))
+	} else {
+		return makeRandomFloat64()
+	}
+}
+
+func makeRandomFloat64() float64 {
 	rand.Seed(time.Now().UnixNano())
 	return rand.Float64() * 100
 }

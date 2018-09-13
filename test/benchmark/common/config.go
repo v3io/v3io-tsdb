@@ -28,6 +28,7 @@ type BenchmarkIngestConfig struct {
 	BatchSize            int    `json:"BatchSize,omitempty" yaml:"BatchSize"`
 	CleanupAfterTest     bool   `json:"CleanupAfterTest,omitempty" yaml:"CleanupAfterTest"`
 	QueryAggregateStep   string `json:"QueryAggregateStep,omitempty" yaml:"QueryAggregateStep"`
+	ValidateData         bool   `json:"ValidateData,omitempty" yaml:"ValidateData"`
 }
 
 func LoadBenchmarkIngestConfigs() (*BenchmarkIngestConfig, *config.V3ioConfig, error) {

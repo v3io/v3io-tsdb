@@ -75,14 +75,15 @@ func BenchmarkIngest(b *testing.B) {
 		timestamps[i] = testStartTimeMs + int64(i*testConfig.SampleStepSize)
 	}
 
-	sampleTemplates := common.MakeSampleTemplates(
-		common.MakeSamplesModel(
-			testConfig.NamesCount,
-			testConfig.NamesDiversity,
-			testConfig.LabelsCount,
-			testConfig.LabelsDiversity,
-			testConfig.LabelValuesCount,
-			testConfig.LabelsValueDiversity))
+	samplesModel := common.MakeSamplesModel(
+		testConfig.NamesCount,
+		testConfig.NamesDiversity,
+		testConfig.LabelsCount,
+		testConfig.LabelsDiversity,
+		testConfig.LabelValuesCount,
+		testConfig.LabelsValueDiversity)
+
+	sampleTemplates := common.MakeSampleTemplates(samplesModel)
 
 	samplesCount := len(sampleTemplates)
 	refs := make([]uint64, samplesCount)
@@ -91,7 +92,7 @@ func BenchmarkIngest(b *testing.B) {
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
 		rowsAdded, err := runTest(i, appender, timestamps, sampleTemplates, refs,
-			testConfig.AppendOneByOne, testConfig.BatchSize, testConfig.Verbose)
+			testConfig.AppendOneByOne, testConfig.BatchSize, testConfig.Verbose, testConfig.ValidateData)
 
 		if err != nil {
 			b.Fatal(err)
@@ -122,6 +123,15 @@ func BenchmarkIngest(b *testing.B) {
 	}
 
 	tsdbtest.ValidateCountOfSamples(b, adapter, metricNamePrefix, count, testStartTimeMs, testEndTimeMs, queryStepSizeMs)
+
+	for metricName := range samplesModel {
+		tsdbtest.ValidateRawData(b, adapter, metricName, testStartTimeMs, testEndTimeMs, isValidSequence)
+	}
+
+}
+
+func isValidSequence(prev float64, current float64) bool {
+	return current-prev == 1
 }
 
 func runTest(
@@ -132,7 +142,8 @@ func runTest(
 	refs []uint64,
 	appendOneByOne bool,
 	batchSize int,
-	verbose bool) (int, error) {
+	verbose bool,
+	sequential bool) (int, error) {
 
 	samplesCount := len(sampleTemplates)
 	tsCount := len(timestamps)
@@ -146,14 +157,14 @@ func runTest(
 			if startFromIndex < tsCount {
 				batchOfTimestamps := timestamps[startFromIndex:endIndex]
 				count, err = appendSingle(index%samplesCount, index/samplesCount, appender, sampleTemplates[index%samplesCount],
-					batchOfTimestamps, refs)
+					batchOfTimestamps, refs, sequential)
 			} else {
 				// Test complete - filled the given time interval with samples
 				fmt.Printf("Breaking the loop with %d enties in range [%d:%d]", endIndex-startFromIndex, startFromIndex, endIndex)
 				return count, nil
 			}
 		} else {
-			count, err = appendAll(appender, sampleTemplates, timestamps, refs, batchSize, verbose)
+			count, err = appendAll(appender, sampleTemplates, timestamps, refs, batchSize, verbose, sequential)
 		}
 	} else {
 		err = errors.Errorf("insufficient input. "+
@@ -170,10 +181,10 @@ func min(left, right int) int {
 }
 
 func appendSingle(refIndex, cycleId int, appender tsdb.Appender, sampleTemplateJson string,
-	timestamps []int64, refs []uint64) (int, error) {
+	timestamps []int64, refs []uint64, sequential bool) (int, error) {
 
 	timestampIndex := 0
-	sample, err := common.JsonTemplate2Sample(sampleTemplateJson, timestamps[timestampIndex], common.MakeRandomFloat64())
+	sample, err := common.JsonTemplate2Sample(sampleTemplateJson, timestamps[timestampIndex], 0)
 	if err != nil {
 		return 0, errors.Wrap(err, fmt.Sprintf("unable to unmarshall sample: %s", sampleTemplateJson))
 	}
@@ -182,13 +193,13 @@ func appendSingle(refIndex, cycleId int, appender tsdb.Appender, sampleTemplateJ
 		if cycleId == 0 && timestampIndex == 0 {
 			// initialize refIds
 			// Add first & get reference
-			ref, err := appender.Add(sample.Lset, timestamps[timestampIndex], sample.Value)
+			ref, err := appender.Add(sample.Lset, timestamps[timestampIndex], common.NextValue(sequential))
 			if err != nil {
 				return 0, errors.Wrap(err, "Add request has failed!")
 			}
 			refs[refIndex] = ref
 		} else {
-			err := appender.AddFast(sample.Lset, refs[refIndex], timestamps[timestampIndex], sample.Value)
+			err := appender.AddFast(sample.Lset, refs[refIndex], timestamps[timestampIndex], common.NextValue(sequential))
 			if err != nil {
 				return 0, errors.Wrap(err, fmt.Sprintf("AddFast request has failed!\nSample:%v", sample))
 			}
@@ -199,14 +210,14 @@ func appendSingle(refIndex, cycleId int, appender tsdb.Appender, sampleTemplateJ
 }
 
 func appendAll(appender tsdb.Appender, sampleTemplates []string, timestamps []int64,
-	refs []uint64, batchSize int, verbose bool) (int, error) {
+	refs []uint64, batchSize int, verbose bool, sequential bool) (int, error) {
 	count := 0
 
 	// First pass - populate references for add fast
 	initialTimeStamp := timestamps[0]
 	for i, sampleTemplateJson := range sampleTemplates {
 		// Add first & get reference
-		sample, err := common.JsonTemplate2Sample(sampleTemplateJson, initialTimeStamp, common.MakeRandomFloat64())
+		sample, err := common.JsonTemplate2Sample(sampleTemplateJson, initialTimeStamp, common.NextValue(sequential))
 		if err != nil {
 			return count, errors.Wrap(err, fmt.Sprintf("unable to unmarshall sample: %s", sampleTemplateJson))
 		}
@@ -226,7 +237,7 @@ func appendAll(appender tsdb.Appender, sampleTemplates []string, timestamps []in
 
 		for refIndex, sampleTemplateJson := range sampleTemplates {
 			for i := 0; i < actualBatchSize; i++ {
-				sample, err := common.JsonTemplate2Sample(sampleTemplateJson, timestamps[dataPointStartIndex+i], common.MakeRandomFloat64())
+				sample, err := common.JsonTemplate2Sample(sampleTemplateJson, timestamps[dataPointStartIndex+i], common.NextValue(sequential))
 				if err != nil {
 					return count, err
 				}

@@ -132,7 +132,7 @@ func ValidateCountOfSamples(t testing.TB, adapter *V3ioAdapter, metricName strin
 
 	set, err := qry.Select("", "count", stepSize, fmt.Sprintf("starts(__name__, '%v')", metricName))
 
-	var actual int
+	var actualCount int
 	for set.Next() {
 		if set.Err() != nil {
 			t.Fatal(set.Err(), "failed to get next element from result set")
@@ -145,7 +145,7 @@ func ValidateCountOfSamples(t testing.TB, adapter *V3ioAdapter, metricName strin
 				t.Fatal(set.Err(), "failed to get next time-value pair from iterator")
 			}
 			_, v := iter.At()
-			actual += int(v)
+			actualCount += int(v)
 		}
 	}
 
@@ -153,8 +153,48 @@ func ValidateCountOfSamples(t testing.TB, adapter *V3ioAdapter, metricName strin
 		t.Fatal(set.Err())
 	}
 
-	if expected != actual {
-		t.Fatalf("Check failed: actual result is not as expected [%d(actual) != %d(expected)]", actual, expected)
+	if expected != actualCount {
+		t.Fatalf("Check failed: actualCount result is not as expected [%d(actualCount) != %d(expected)]", actualCount, expected)
+	}
+}
+
+func ValidateRawData(t testing.TB, adapter *V3ioAdapter, metricName string, startTimeMs, endTimeMs int64, isValid func(float64, float64) bool) {
+
+	qry, err := adapter.Querier(nil, startTimeMs, endTimeMs)
+	if err != nil {
+		t.Fatal(err, "failed to create Querier instance.")
+	}
+
+	set, err := qry.Select(metricName, "", 0, "")
+
+	for set.Next() {
+		// start over for each label set
+		var lastValue float64 = -1.0
+
+		if set.Err() != nil {
+			t.Fatal(set.Err(), "failed to get next element from result set")
+		}
+
+		series := set.At()
+		iter := series.Iterator()
+		for iter.Next() {
+			if iter.Err() != nil {
+				t.Fatal(set.Err(), "failed to get next time-value pair from iterator")
+			}
+			_, currentValue := iter.At()
+
+			if lastValue >= 0 {
+				if !isValid(lastValue, currentValue) {
+					t.Fatalf("Check for consistency of the raw data has failed: metric name: '%s'\n\tisValid(%.1f, %.1f) = false",
+						metricName, lastValue, currentValue)
+				}
+			}
+			lastValue = currentValue
+		}
+	}
+
+	if set.Err() != nil {
+		t.Fatal(set.Err())
 	}
 }
 

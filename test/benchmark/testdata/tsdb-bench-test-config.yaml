@@ -34,7 +34,10 @@ AppendOneByOne: true
 BatchSize: 64
 
 # Cleanup the data after each test
-CleanupAfterTest: true
+CleanupAfterTest: false
 
 # aggregate query step size - used by validators
 QueryAggregateStep: "1h"
+
+# validate raw data correctness
+ValidateData: true
