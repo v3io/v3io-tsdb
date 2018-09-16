@@ -154,27 +154,99 @@ func (q *V3ioQuerier) queryNumericPartition(
 }
 
 // return the current metric names
-func (q *V3ioQuerier) LabelValues(name string) ([]string, error) {
-
-	list := []string{}
-	input := v3io.GetItemsInput{Path: q.cfg.Path + "/names/", AttributeNames: []string{"__name"}, Filter: ""}
-	iter, err := utils.NewAsyncItemsCursor(q.container, &input, q.cfg.QryWorkers, []string{}, q.logger)
-	q.logger.DebugWith("GetItems to read names", "input", input, "err", err)
-	if err != nil {
-		return list, err
+func (q *V3ioQuerier) LabelValues(labelKey string) ([]string, error) {
+	if labelKey == "__name__" {
+		return q.getMetricNames()
+	} else {
+		return q.getLabelValues(labelKey)
 	}
-
-	for iter.Next() {
-		name := iter.GetField("__name").(string)
-		list = append(list, name)
-	}
-
-	if iter.Err() != nil {
-		q.logger.InfoWith("Failed to read names, assume empty list", "err", iter.Err().Error())
-	}
-	return list, nil
 }
 
 func (q *V3ioQuerier) Close() error {
 	return nil
+}
+
+func (q *V3ioQuerier) getMetricNames() ([]string, error) {
+	input := v3io.GetItemsInput{
+		Path:           q.cfg.Path + "/names/",
+		AttributeNames: []string{"__name"},
+	}
+
+	iter, err := utils.NewAsyncItemsCursor(q.container, &input, q.cfg.QryWorkers, []string{}, q.logger)
+	if err != nil {
+		return nil, err
+	}
+
+	var metricNames []string
+
+	for iter.Next() {
+		metricNames = append(metricNames, iter.GetField("__name").(string))
+	}
+
+	if iter.Err() != nil {
+		q.logger.InfoWith("Failed to read metric names, returning empty list", "err", iter.Err().Error())
+	}
+
+	return metricNames, nil
+}
+
+func (q *V3ioQuerier) getLabelValues(labelKey string) ([]string, error) {
+
+	// sync partition manager (hack)
+	err := q.partitionMngr.ReadAndUpdateSchema()
+	if err != nil {
+		return nil, err
+	}
+
+	partitionPaths := q.partitionMngr.GetPartitionsPaths()
+
+	// if no partitions yet - there are no labels
+	if len(partitionPaths) == 0 {
+		return nil, nil
+	}
+
+	labelValuesMap := map[string]struct{}{}
+
+	// get all labelsets
+	input := v3io.GetItemsInput{
+		Path:           partitionPaths[0],
+		AttributeNames: []string{"_lset"},
+	}
+
+	iter, err := utils.NewAsyncItemsCursor(q.container, &input, q.cfg.QryWorkers, []string{}, q.logger)
+	if err != nil {
+		return nil, err
+	}
+
+	// iterate over the results
+	for iter.Next() {
+		labelSet := iter.GetField("_lset").(string)
+
+		// the labelSet will be k1=v1,k2=v2, k2=v3. Assuming labelKey is "k2", we want to convert
+		// that to [v2, v3]
+
+		// split at "," to get k=v pairs
+		for _, label := range strings.Split(labelSet, ",") {
+
+			// split at "=" to get label key and label value
+			splitLabel := strings.SplitN(label, "=", 2)
+
+			// if we got two elements and the first element (the key) is equal to what we're looking
+			// for, save the label value in the map. use a map to prevent duplications
+			if len(splitLabel) == 2 && splitLabel[0] == labelKey {
+				labelValuesMap[splitLabel[1]] = struct{}{}
+			}
+		}
+	}
+
+	if iter.Err() != nil {
+		q.logger.InfoWith("Failed to read label values, returning empty list", "err", iter.Err().Error())
+	}
+
+	var labelValues []string
+	for labelValue, _ := range labelValuesMap {
+		labelValues = append(labelValues, labelValue)
+	}
+
+	return labelValues, nil
 }

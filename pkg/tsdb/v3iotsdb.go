@@ -59,14 +59,17 @@ func CreateTSDB(v3iocfg *config.V3ioConfig, schema *config.Schema) error {
 		return errors.Wrap(err, "Failed to Marshal schema file")
 	}
 
+	path := pathUtil.Join(v3iocfg.Path, config.SCHEMA_CONFIG)
 	// check if the config file already exist, abort if it does
-	_, err = container.Sync.GetObject(&v3io.GetObjectInput{Path: pathUtil.Join(v3iocfg.Path, config.SCHEMA_CONFIG)})
+	_, err = container.Sync.GetObject(&v3io.GetObjectInput{Path: path})
 	if err == nil {
 		return fmt.Errorf("TSDB already exist in path: " + v3iocfg.Path)
 	}
 
-	err = container.Sync.PutObject(&v3io.PutObjectInput{Path: pathUtil.Join(v3iocfg.Path, config.SCHEMA_CONFIG), Body: data})
-
+	err = container.Sync.PutObject(&v3io.PutObjectInput{Path: path, Body: data})
+	if err != nil {
+		return errors.Wrap(err, "Failed create schema at path "+pathUtil.Join(v3iocfg.V3ioUrl, v3iocfg.Container, path))
+	}
 	return err
 }
 
