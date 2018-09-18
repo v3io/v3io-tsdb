@@ -136,7 +136,7 @@ func isValidSequence(prev float64, current float64) bool {
 }
 
 func runTest(
-	index int,
+	cycleId int,
 	appender tsdb.Appender,
 	timestamps []int64,
 	sampleTemplates []string,
@@ -148,20 +148,25 @@ func runTest(
 
 	samplesCount := len(sampleTemplates)
 	tsCount := len(timestamps)
+	testLimit := tsCount * samplesCount
 
 	count := 0
 	var err error
 	if samplesCount > 0 && tsCount > 0 {
 		if appendOneByOne {
-			startFromIndex := (index / samplesCount) * batchSize
-			endIndex := min(startFromIndex+batchSize, tsCount)
-			if startFromIndex < tsCount {
-				batchOfTimestamps := timestamps[startFromIndex:endIndex]
-				count, err = appendSingle(index%samplesCount, index/samplesCount, appender, sampleTemplates[index%samplesCount],
+			startTimestampIndex := (cycleId * batchSize) % tsCount
+			endTimestampIndex := min(startTimestampIndex+batchSize, tsCount)
+			if cycleId < testLimit {
+				batchOfTimestamps := timestamps[startTimestampIndex:endTimestampIndex]
+
+				sampleIndex := (cycleId * batchSize) % tsCount
+				refIndex := (cycleId * batchSize) / tsCount
+
+				count, err = appendSingle(refIndex, sampleIndex, appender, sampleTemplates[refIndex],
 					batchOfTimestamps, refs, sequential)
 			} else {
 				// Test complete - filled the given time interval with samples
-				fmt.Printf("Breaking the loop with %d enties in range [%d:%d]", endIndex-startFromIndex, startFromIndex, endIndex)
+				fmt.Printf("Breaking the loop with %d enties in range [%d:%d]", endTimestampIndex-startTimestampIndex, startTimestampIndex, endTimestampIndex)
 				return count, nil
 			}
 		} else {
@@ -191,18 +196,20 @@ func appendSingle(refIndex, cycleId int, appender tsdb.Appender, sampleTemplateJ
 	}
 
 	for ; timestampIndex < len(timestamps); timestampIndex++ {
+		nextValue := common.NextValue(sequential)
+
 		if cycleId == 0 && timestampIndex == 0 {
 			// initialize refIds
 			// Add first & get reference
-			ref, err := appender.Add(sample.Lset, timestamps[timestampIndex], common.NextValue(sequential))
+			ref, err := appender.Add(sample.Lset, timestamps[timestampIndex], nextValue)
 			if err != nil {
 				return 0, errors.Wrap(err, "Add request has failed!")
 			}
 			refs[refIndex] = ref
 		} else {
-			err := appender.AddFast(sample.Lset, refs[refIndex], timestamps[timestampIndex], common.NextValue(sequential))
+			err := appender.AddFast(sample.Lset, refs[refIndex], timestamps[timestampIndex], nextValue)
 			if err != nil {
-				return 0, errors.Wrap(err, fmt.Sprintf("AddFast request has failed!\nSample:%v", sample))
+				return 0, errors.Wrapf(err, "AddFast request has failed!\nSample:%v\nrefIndex: %d\ntimestampIndex: %d", sample, refIndex, timestampIndex)
 			}
 		}
 	}
