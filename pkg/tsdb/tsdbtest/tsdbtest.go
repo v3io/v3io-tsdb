@@ -158,7 +158,7 @@ func ValidateCountOfSamples(t testing.TB, adapter *V3ioAdapter, metricName strin
 	}
 }
 
-func ValidateRawData(t testing.TB, adapter *V3ioAdapter, metricName string, startTimeMs, endTimeMs int64, isValid func(float64, float64) bool) {
+func ValidateRawData(t testing.TB, adapter *V3ioAdapter, metricName string, startTimeMs, endTimeMs int64, isValid func(int64, int64) bool) {
 
 	qry, err := adapter.Querier(nil, startTimeMs, endTimeMs)
 	if err != nil {
@@ -184,7 +184,7 @@ func ValidateRawData(t testing.TB, adapter *V3ioAdapter, metricName string, star
 			_, currentValue := iter.At()
 
 			if lastValue >= 0 {
-				if !isValid(lastValue, currentValue) {
+				if !isValid(int64(lastValue), int64(currentValue)) {
 					t.Fatalf("Check for consistency of the raw data has failed: metric name: '%s'\n\tisValid(%.1f, %.1f) = false",
 						metricName, lastValue, currentValue)
 				}

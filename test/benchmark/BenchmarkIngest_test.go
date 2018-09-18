@@ -131,7 +131,7 @@ func BenchmarkIngest(b *testing.B) {
 	}
 }
 
-func isValidSequence(prev float64, current float64) bool {
+func isValidSequence(prev, current int64) bool {
 	return current-prev == 1
 }
 
