@@ -215,31 +215,26 @@ func (ac *addCommandeer) appendMetrics(append tsdb.Appender, lset utils.Labels) 
 }
 
 func (ac *addCommandeer) appendMetric(
-	append tsdb.Appender, lset utils.Labels, tarray []int64, varray []float64, print bool) (ref uint64, err error) {
+	append tsdb.Appender, lset utils.Labels, tarray []int64, varray []float64, print bool) (uint64, error) {
 
-	if err != nil {
-		return
-	}
 	ac.rootCommandeer.logger.DebugWith("adding value to metric", "lset", lset, "t", tarray, "v", varray)
 
 	if print {
 		fmt.Println("add:", lset, tarray, varray)
 	}
-	ref, e1 := append.Add(lset, tarray[0], varray[0])
-	if e1 != nil {
-		ref, err = 0, errors.Wrap(e1, "failed to Add")
-		return
+	ref, err := append.Add(lset, tarray[0], varray[0])
+	if err != nil {
+		return 0, errors.Wrap(err, "failed to Add")
 	}
 
 	for i := 1; i < len(varray); i++ {
-		e2 := append.AddFast(lset, ref, tarray[i], varray[i])
-		if e2 != nil {
-			ref, err = 0, errors.Wrap(err, "failed to AddFast")
-			return
+		err := append.AddFast(lset, ref, tarray[i], varray[i])
+		if err != nil {
+			return 0, errors.Wrap(err, "failed to AddFast")
 		}
 	}
 
-	return
+	return ref, nil
 }
 
 func strToLabels(name, lbls string) (utils.Labels, error) {

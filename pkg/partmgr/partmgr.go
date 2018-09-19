@@ -178,7 +178,7 @@ func (p *PartitionManager) updateSchema() (err error) {
 		return
 	}
 
-	timer, err := metricReporter.NewTimer("UpdateSchemaTimer")
+	timer, err := metricReporter.GetTimer("UpdateSchemaTimer")
 
 	if err != nil {
 		err = errors.Wrap(err, "failed to create timer: UpdateSchemaTimer")
@@ -228,7 +228,7 @@ func (p *PartitionManager) ReadAndUpdateSchema() (err error) {
 		return
 	}
 
-	timer, err := metricReporter.NewTimer("ReadAndUpdateSchemaTimer")
+	timer, err := metricReporter.GetTimer("ReadAndUpdateSchemaTimer")
 
 	if err != nil {
 		err = errors.Wrap(err, "failed to create timer: ReadAndUpdateSchemaTimer")

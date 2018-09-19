@@ -17,6 +17,11 @@ import (
 var instance *MetricReporter
 var once sync.Once
 
+const (
+	STDOUT = "stdout"
+	STDERR = "stderr"
+)
+
 type MetricReporter struct {
 	lock                  sync.Mutex
 	running               bool
@@ -34,7 +39,7 @@ func DefaultReporterInstance() (reporter *MetricReporter, err error) {
 		// DO NOT return the error to prevent failures of unit tests
 		fmt.Fprintf(os.Stderr, "unable to load configuration. Reason: %v\n"+
 			"Will use default reporter configuration instead.", err)
-		reporter = ReporterInstance("stdout", true, 60, true)
+		reporter = ReporterInstance(STDOUT, true, 60, true)
 	} else {
 		reporter = ReporterInstanceFromConfig(cfg)
 	}
@@ -46,12 +51,12 @@ func ReporterInstance(writeTo string, reportPeriodically bool, reportIntervalSec
 	once.Do(func() {
 		var writer io.Writer
 		switch writeTo {
-		case "stdout":
+		case STDOUT:
 			writer = os.Stdout
-		case "stderr":
+		case STDERR:
 			writer = os.Stderr
 		default:
-			writer = os.Stderr
+			writer = os.Stdout
 		}
 
 		instance = newMetricReporter(writer, reportPeriodically, reportIntervalSeconds, reportOnShutdown)
@@ -98,45 +103,37 @@ func (mr *MetricReporter) Stop() error {
 	return nil
 }
 
-func (mr *MetricReporter) NewTimer(name string) (metrics.Timer, error) {
-	var timer metrics.Timer
+func (mr *MetricReporter) GetTimer(name string) (metrics.Timer, error) {
 	if mr.running {
-		timer = metrics.GetOrRegisterTimer(name, mr.registry)
+		return metrics.GetOrRegisterTimer(name, mr.registry), nil
 	} else {
 		return nil, errors.Errorf("failed to create timer '%s'. Reason: metric reporter in not running", name)
 	}
-	return timer, nil
 }
 
-func (mr *MetricReporter) NewCounter(name string) (metrics.Counter, error) {
-	var counter metrics.Counter
+func (mr *MetricReporter) GetCounter(name string) (metrics.Counter, error) {
 	if mr.running {
-		counter = metrics.GetOrRegisterCounter(name, mr.registry)
+		return metrics.GetOrRegisterCounter(name, mr.registry), nil
 	} else {
 		return nil, errors.Errorf("failed to create counter '%s'. Reason: metric reporter in not running", name)
 	}
-	return counter, nil
 }
 
-func (mr *MetricReporter) NewMeter(name string) (metrics.Meter, error) {
-	var meter metrics.Meter
+func (mr *MetricReporter) GetMeter(name string) (metrics.Meter, error) {
 	if mr.running {
-		meter = metrics.GetOrRegisterMeter(name, mr.registry)
+		return metrics.GetOrRegisterMeter(name, mr.registry), nil
 	} else {
 		return nil, errors.Errorf("failed to create meter '%s'. Reason: metric reporter in not running", name)
 	}
-	return meter, nil
 }
 
-func (mr *MetricReporter) NewHistogram(name string, reservoirSize int) (metrics.Histogram, error) {
-	var histogram metrics.Histogram
+func (mr *MetricReporter) GetHistogram(name string, reservoirSize int) (metrics.Histogram, error) {
 	if mr.running {
 		sample := metrics.NewUniformSample(reservoirSize)
-		histogram = metrics.GetOrRegisterHistogram(name, mr.registry, sample)
+		return metrics.GetOrRegisterHistogram(name, mr.registry, sample), nil
 	} else {
 		return nil, errors.Errorf("failed to create histogram '%s'. Reason: metric reporter in not running", name)
 	}
-	return histogram, nil
 }
 
 // Listen to the SIGINT and SIGTERM

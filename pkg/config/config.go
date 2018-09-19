@@ -50,10 +50,6 @@ func Error() error {
 	return failure
 }
 
-func hasError() bool {
-	return failure != nil
-}
-
 type V3ioConfig struct {
 	// V3IO Connection details: Url, Data container, relative path for this dataset, credentials
 	V3ioUrl   string `json:"v3ioUrl"`
@@ -159,26 +155,22 @@ func GetOrDefaultConfig() (*V3ioConfig, error) {
 	return GetOrLoadFromFile("")
 }
 
-func GetOrLoadFromFile(path string) (cfg *V3ioConfig, err error) {
+func GetOrLoadFromFile(path string) (*V3ioConfig, error) {
 	once.Do(func() {
 		instance, failure = loadConfig(path)
 		return
 	})
 
-	cfg = instance
-	err = failure
-
-	return
+	return instance, failure
 }
 
-func GetOrLoadFromData(data []byte) (cfg *V3ioConfig, err error) {
+func GetOrLoadFromData(data []byte) (*V3ioConfig, error) {
 	once.Do(func() {
-		instance, err = loadFromData(data)
+		instance, failure = loadFromData(data)
 		return
 	})
 
-	cfg = instance
-	return
+	return instance, failure
 }
 
 func loadConfig(path string) (*V3ioConfig, error) {
@@ -213,6 +205,10 @@ func loadConfig(path string) (*V3ioConfig, error) {
 func loadFromData(data []byte) (*V3ioConfig, error) {
 	cfg := V3ioConfig{}
 	err := yaml.Unmarshal(data, &cfg)
+
+	if err != nil {
+		return nil, err
+	}
 
 	initDefaults(&cfg)
 

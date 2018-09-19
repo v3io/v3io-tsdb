@@ -74,7 +74,7 @@ func (q *V3ioQuerier) selectQry(name, functions string, step int64, windows []in
 		return nullSeriesSet{}, errors.Wrap(err, "failed to read/update schema")
 	}
 
-	queryTimer, err := performance.ReporterInstanceFromConfig(q.cfg).NewTimer("QueryTimer")
+	queryTimer, err := performance.ReporterInstanceFromConfig(q.cfg).GetTimer("QueryTimer")
 
 	if err != nil {
 		return nullSeriesSet{}, errors.Wrap(err, "failed to create performance metric [QueryTimer]")
@@ -177,7 +177,7 @@ func (q *V3ioQuerier) queryNumericPartition(
 
 // return the current metric names
 func (q *V3ioQuerier) LabelValues(labelKey string) (result []string, err error) {
-	labelValuesTimer, err := performance.ReporterInstanceFromConfig(q.cfg).NewTimer("LabelValuesTimer")
+	labelValuesTimer, err := performance.ReporterInstanceFromConfig(q.cfg).GetTimer("LabelValuesTimer")
 	if err != nil {
 		return result, errors.Wrap(err, "failed to obtain timer object for [LabelValuesTimer]")
 	}

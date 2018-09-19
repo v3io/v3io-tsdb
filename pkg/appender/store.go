@@ -163,7 +163,7 @@ func (cs *chunkStore) processGetResp(mc *MetricsCache, metric *MetricState, resp
 			request, err := mc.container.PutItem(&putInput, metric, mc.nameUpdateChan)
 			if err != nil {
 				// Count errors
-				if counter, ok := performance.ReporterInstanceFromConfig(mc.cfg).NewCounter("PutNameError"); ok != nil {
+				if counter, ok := performance.ReporterInstanceFromConfig(mc.cfg).GetCounter("PutNameError"); ok != nil {
 					counter.Inc(1)
 				}
 				mc.logger.ErrorWith("Update name putItem Failed", "metric", metric.key, "err", err)
@@ -206,7 +206,7 @@ func (cs *chunkStore) Append(t int64, v interface{}) {
 		return
 	}
 
-	appendTimer, err := metricReporter.NewTimer("AppendTimer")
+	appendTimer, err := metricReporter.GetTimer("AppendTimer")
 
 	if err != nil {
 		// TODO: need to have a logger in context to report errors
@@ -273,7 +273,7 @@ func (cs *chunkStore) writeChunks(mc *MetricsCache, metric *MetricState) (hasPen
 		return
 	}
 
-	writeChunksTimer, err := metricReporter.NewTimer("WriteChunksTimer")
+	writeChunksTimer, err := metricReporter.GetTimer("WriteChunksTimer")
 	if err != nil {
 		return hasPendingUpdates, errors.Wrap(err, "failed to obtain timer object for [LabelValuesTimer]")
 	}

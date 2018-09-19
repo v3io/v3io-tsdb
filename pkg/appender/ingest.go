@@ -224,7 +224,7 @@ func (mc *MetricsCache) postMetricUpdates(metric *MetricState) {
 		sent, err = metric.store.getChunksState(mc, metric)
 		if err != nil {
 			// Count errors
-			if counter, ok := performance.ReporterInstanceFromConfig(mc.cfg).NewCounter("GetChunksStateError"); ok != nil {
+			if counter, ok := performance.ReporterInstanceFromConfig(mc.cfg).GetCounter("GetChunksStateError"); ok != nil {
 				counter.Inc(1)
 			}
 
@@ -238,7 +238,7 @@ func (mc *MetricsCache) postMetricUpdates(metric *MetricState) {
 		sent, err = metric.store.writeChunks(mc, metric)
 		if err != nil {
 			// Count errors
-			if counter, ok := performance.ReporterInstanceFromConfig(mc.cfg).NewCounter("WriteChunksError"); ok != nil {
+			if counter, ok := performance.ReporterInstanceFromConfig(mc.cfg).GetCounter("WriteChunksError"); ok != nil {
 				counter.Inc(1)
 			}
 
@@ -294,7 +294,7 @@ func (mc *MetricsCache) handleResponse(metric *MetricState, resp *v3io.Response,
 			}
 
 			// Count retries
-			if chunkUpdateRetriesCounter, err := performance.ReporterInstanceFromConfig(mc.cfg).NewCounter("ChunkUpdateRetries"); err == nil {
+			if chunkUpdateRetriesCounter, err := performance.ReporterInstanceFromConfig(mc.cfg).GetCounter("ChunkUpdateRetries"); err == nil {
 				chunkUpdateRetriesCounter.Inc(1)
 			}
 
@@ -311,7 +311,7 @@ func (mc *MetricsCache) handleResponse(metric *MetricState, resp *v3io.Response,
 				clear()
 
 				// Count errors
-				if chunkUpdateRetryExceededCounter, err := performance.ReporterInstanceFromConfig(mc.cfg).NewCounter("ChunkUpdateRetryExceededError"); err != nil {
+				if chunkUpdateRetryExceededCounter, err := performance.ReporterInstanceFromConfig(mc.cfg).GetCounter("ChunkUpdateRetryExceededError"); err != nil {
 					chunkUpdateRetryExceededCounter.Inc(1)
 				}
 				return false
@@ -328,7 +328,7 @@ func (mc *MetricsCache) handleResponse(metric *MetricState, resp *v3io.Response,
 		sent, err = metric.store.writeChunks(mc, metric)
 		if err != nil {
 			// Count errors
-			if counter, ok := performance.ReporterInstanceFromConfig(mc.cfg).NewCounter("WriteChunksError"); ok != nil {
+			if counter, ok := performance.ReporterInstanceFromConfig(mc.cfg).GetCounter("WriteChunksError"); ok != nil {
 				counter.Inc(1)
 			}
 
@@ -360,7 +360,7 @@ func (mc *MetricsCache) nameUpdateRespLoop() {
 				metric.Lock()
 				if resp.Error != nil {
 					// Count errors
-					if counter, ok := performance.ReporterInstanceFromConfig(mc.cfg).NewCounter("UpdateNameError"); ok != nil {
+					if counter, ok := performance.ReporterInstanceFromConfig(mc.cfg).GetCounter("UpdateNameError"); ok != nil {
 						counter.Inc(1)
 					}
 
