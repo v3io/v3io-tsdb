@@ -21,7 +21,6 @@ such restriction.
 package tsdbctl
 
 import (
-	"fmt"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/v3io/v3io-tsdb/pkg/formatter"
@@ -129,8 +128,6 @@ func (qc *queryCommandeer) query() error {
 	qc.rootCommandeer.logger.DebugWith("Query", "from", from, "to", to, "name", qc.name,
 		"filter", qc.filter, "functions", qc.functions, "step", qc.step)
 
-	startTime := time.Now()
-
 	qry, err := qc.rootCommandeer.adapter.Querier(nil, from, to)
 	if err != nil {
 		return errors.Wrap(err, "Failed to initialize Querier")
@@ -169,10 +166,6 @@ func (qc *queryCommandeer) query() error {
 	}
 
 	err = f.Write(qc.cmd.OutOrStdout(), set)
-	if err == nil {
-		fmt.Println("Query done, took ", time.Since(startTime))
-	}
 
 	return err
-
 }
