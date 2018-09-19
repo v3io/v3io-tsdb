@@ -154,15 +154,15 @@ func runTest(
 	var err error
 	if samplesCount > 0 && tsCount > 0 {
 		if appendOneByOne {
-			startTimestampIndex := (cycleId * batchSize) % tsCount
+			targetSamplesIndex := cycleId * batchSize
+			startTimestampIndex := targetSamplesIndex % tsCount
 			endTimestampIndex := min(startTimestampIndex+batchSize, tsCount)
-			if cycleId < testLimit {
+
+			if endTimestampIndex < testLimit {
 				batchOfTimestamps := timestamps[startTimestampIndex:endTimestampIndex]
+				refIndex := targetSamplesIndex / tsCount
 
-				sampleIndex := (cycleId * batchSize) % tsCount
-				refIndex := (cycleId * batchSize) / tsCount
-
-				count, err = appendSingle(refIndex, sampleIndex, appender, sampleTemplates[refIndex],
+				count, err = appendSingle(refIndex, startTimestampIndex, appender, sampleTemplates[refIndex],
 					batchOfTimestamps, refs, sequential)
 			} else {
 				// Test complete - filled the given time interval with samples
