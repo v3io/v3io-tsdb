@@ -10,11 +10,17 @@ import (
 	"github.com/v3io/v3io-tsdb/test/benchmark/common"
 	"io/ioutil"
 	"log"
+	"sync/atomic"
 	"testing"
 	"time"
 )
 
 const metricNamePrefix = "Name_"
+
+type RefId struct {
+	id     uint64
+	nextId int64
+}
 
 func BenchmarkIngest(b *testing.B) {
 	b.StopTimer()
@@ -86,7 +92,7 @@ func BenchmarkIngest(b *testing.B) {
 	sampleTemplates := common.MakeSampleTemplates(samplesModel)
 
 	samplesCount := len(sampleTemplates)
-	refs := make([]uint64, samplesCount)
+	refs := make([]RefId, samplesCount)
 	testLimit := samplesCount * int(timestampsCount)
 
 	b.StartTimer()
@@ -114,7 +120,7 @@ func BenchmarkIngest(b *testing.B) {
 		b.Fatalf("Test timed out. Error: %v. Exit code: %d", err, ec)
 	}
 
-	b.Logf("\nTest complete. %d samples added to %s\n", count, tsdbPath)
+	//b.Logf("\nTest complete. %d samples added to %s\n", count, tsdbPath)
 
 	queryStepSizeMs, err := utils.Str2duration(testConfig.QueryAggregateStep)
 	if err != nil {
@@ -128,6 +134,7 @@ func BenchmarkIngest(b *testing.B) {
 		for metricName := range samplesModel {
 			tsdbtest.ValidateRawData(b, adapter, metricName, testStartTimeMs, testEndTimeMs, isValidSequence)
 		}
+		b.Logf("PASS: data consistency test for n=%d", b.N)
 	}
 }
 
@@ -140,7 +147,7 @@ func runTest(
 	appender tsdb.Appender,
 	timestamps []int64,
 	sampleTemplates []string,
-	refs []uint64,
+	refs []RefId,
 	appendOneByOne bool,
 	batchSize int,
 	verbose bool,
@@ -148,25 +155,22 @@ func runTest(
 
 	samplesCount := len(sampleTemplates)
 	tsCount := len(timestamps)
-	testLimit := tsCount * samplesCount
 
 	count := 0
 	var err error
 	if samplesCount > 0 && tsCount > 0 {
 		if appendOneByOne {
-			targetSamplesIndex := cycleId * batchSize
-			startTimestampIndex := targetSamplesIndex % tsCount
-			endTimestampIndex := min(startTimestampIndex+batchSize, tsCount)
+			startFromIndex := (cycleId / samplesCount) * batchSize
+			endIndex := min(startFromIndex+batchSize, tsCount)
+			refIndex := cycleId % samplesCount
 
-			if targetSamplesIndex < testLimit {
-				batchOfTimestamps := timestamps[startTimestampIndex:endTimestampIndex]
-				refIndex := targetSamplesIndex / tsCount
-
-				count, err = appendSingle(refIndex, startTimestampIndex, appender, sampleTemplates[refIndex],
+			if startFromIndex < tsCount {
+				batchOfTimestamps := timestamps[startFromIndex:endIndex]
+				count, err = appendSingle(refIndex, cycleId/samplesCount, appender, sampleTemplates[refIndex],
 					batchOfTimestamps, refs, sequential)
 			} else {
 				// Test complete - filled the given time interval with samples
-				fmt.Printf("Breaking the loop with %d enties in range [%d:%d]", endTimestampIndex-startTimestampIndex, startTimestampIndex, endTimestampIndex)
+				fmt.Printf("Breaking the loop with %d enties in range [%d:%d]", endIndex-startFromIndex, startFromIndex, endIndex)
 				return count, nil
 			}
 		} else {
@@ -187,7 +191,7 @@ func min(left, right int) int {
 }
 
 func appendSingle(refIndex, cycleId int, appender tsdb.Appender, sampleTemplateJson string,
-	timestamps []int64, refs []uint64, sequential bool) (int, error) {
+	timestamps []int64, refs []RefId, sequential bool) (int, error) {
 
 	timestampIndex := 0
 	sample, err := common.JsonTemplate2Sample(sampleTemplateJson, timestamps[timestampIndex], 0)
@@ -195,8 +199,13 @@ func appendSingle(refIndex, cycleId int, appender tsdb.Appender, sampleTemplateJ
 		return 0, errors.Wrap(err, fmt.Sprintf("unable to unmarshall sample: %s", sampleTemplateJson))
 	}
 
+	var nextValue float64
 	for ; timestampIndex < len(timestamps); timestampIndex++ {
-		nextValue := common.NextValue(sequential)
+		if sequential {
+			nextValue = float64(atomic.AddInt64(&refs[refIndex].nextId, 1))
+		} else {
+			nextValue = common.MakeRandomFloat64()
+		}
 
 		if cycleId == 0 && timestampIndex == 0 {
 			// initialize refIds
@@ -205,11 +214,13 @@ func appendSingle(refIndex, cycleId int, appender tsdb.Appender, sampleTemplateJ
 			if err != nil {
 				return 0, errors.Wrap(err, "Add request has failed!")
 			}
-			refs[refIndex] = ref
+			refs[refIndex].id = ref
 		} else {
-			err := appender.AddFast(sample.Lset, refs[refIndex], timestamps[timestampIndex], nextValue)
+			err := appender.AddFast(sample.Lset, refs[refIndex].id, timestamps[timestampIndex], nextValue)
 			if err != nil {
-				return 0, errors.Wrapf(err, "AddFast request has failed!\nSample:%v\nrefIndex: %d\ntimestampIndex: %d", sample, refIndex, timestampIndex)
+				return 0, errors.Wrapf(err,
+					"AddFast request has failed!\nSample:%v\ncycleId: %d\nrefIndex: %d\ntimestampIndex: %d\nnext Id: %d\n",
+					sample, cycleId, refIndex, timestampIndex, refs[refIndex].nextId)
 			}
 		}
 	}
@@ -218,14 +229,21 @@ func appendSingle(refIndex, cycleId int, appender tsdb.Appender, sampleTemplateJ
 }
 
 func appendAll(appender tsdb.Appender, sampleTemplates []string, timestamps []int64,
-	refs []uint64, batchSize int, verbose bool, sequential bool) (int, error) {
+	refs []RefId, batchSize int, verbose bool, sequential bool) (int, error) {
 	count := 0
 
 	// First pass - populate references for add fast
 	initialTimeStamp := timestamps[0]
+	var nextValue float64
+
 	for i, sampleTemplateJson := range sampleTemplates {
+		if sequential {
+			nextValue = float64(atomic.AddInt64(&refs[i].nextId, 1))
+		} else {
+			nextValue = common.MakeRandomFloat64()
+		}
 		// Add first & get reference
-		sample, err := common.JsonTemplate2Sample(sampleTemplateJson, initialTimeStamp, common.NextValue(sequential))
+		sample, err := common.JsonTemplate2Sample(sampleTemplateJson, initialTimeStamp, nextValue)
 		if err != nil {
 			return count, errors.Wrap(err, fmt.Sprintf("unable to unmarshall sample: %s", sampleTemplateJson))
 		}
@@ -233,7 +251,7 @@ func appendAll(appender tsdb.Appender, sampleTemplates []string, timestamps []in
 		if err != nil {
 			return count, errors.Wrap(err, "Add request has failed!")
 		}
-		refs[i] = ref
+		refs[i].id = ref
 		count++
 	}
 
@@ -249,7 +267,7 @@ func appendAll(appender tsdb.Appender, sampleTemplates []string, timestamps []in
 				if err != nil {
 					return count, err
 				}
-				err = appender.AddFast(sample.Lset, refs[refIndex], timestamps[dataPointStartIndex], sample.Value)
+				err = appender.AddFast(sample.Lset, refs[refIndex].id, timestamps[dataPointStartIndex], sample.Value)
 				if err != nil {
 					return count, errors.Wrap(err, fmt.Sprintf("AddFast request has failed! Sample:%v", sample))
 				}

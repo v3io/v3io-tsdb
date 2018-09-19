@@ -156,6 +156,8 @@ func ValidateCountOfSamples(t testing.TB, adapter *V3ioAdapter, metricName strin
 	if expected != actualCount {
 		t.Fatalf("Check failed: actualCount result is not as expected [%d(actualCount) != %d(expected)]", actualCount, expected)
 	}
+
+	t.Logf("PASS: total count of samples, i.e. [%d(actualCount) != %d(expected)]", actualCount, expected)
 }
 
 func ValidateRawData(t testing.TB, adapter *V3ioAdapter, metricName string, startTimeMs, endTimeMs int64, isValid func(int64, int64) bool) {
@@ -169,7 +171,7 @@ func ValidateRawData(t testing.TB, adapter *V3ioAdapter, metricName string, star
 
 	for set.Next() {
 		// start over for each label set
-		var lastValue float64 = -1.0
+		var lastValue = -1.0
 
 		if set.Err() != nil {
 			t.Fatal(set.Err(), "failed to get next element from result set")

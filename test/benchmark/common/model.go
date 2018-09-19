@@ -106,11 +106,11 @@ func NextValue(sequential bool) float64 {
 	if sequential {
 		return float64(atomic.AddInt64(&lastValue, 1))
 	} else {
-		return makeRandomFloat64()
+		return MakeRandomFloat64()
 	}
 }
 
-func makeRandomFloat64() float64 {
+func MakeRandomFloat64() float64 {
 	rand.Seed(time.Now().UnixNano())
 	return rand.Float64() * 100
 }
