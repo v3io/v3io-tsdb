@@ -158,7 +158,7 @@ func runTest(
 			startTimestampIndex := targetSamplesIndex % tsCount
 			endTimestampIndex := min(startTimestampIndex+batchSize, tsCount)
 
-			if endTimestampIndex < testLimit {
+			if targetSamplesIndex < testLimit {
 				batchOfTimestamps := timestamps[startTimestampIndex:endTimestampIndex]
 				refIndex := targetSamplesIndex / tsCount
 
