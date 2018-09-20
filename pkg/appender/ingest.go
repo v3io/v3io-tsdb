@@ -223,7 +223,7 @@ func (mc *MetricsCache) postMetricUpdates(metric *MetricState) {
 		sent, err = metric.store.GetChunksState(mc, metric)
 		if err != nil {
 			mc.logger.ErrorWith("Get item request failed", "metric", metric.Lset, "err", err)
-			metric.setError(err)
+			setError(mc, metric, err)
 		} else {
 			metric.setState(storeStateGet)
 		}
@@ -232,7 +232,7 @@ func (mc *MetricsCache) postMetricUpdates(metric *MetricState) {
 		sent, err = metric.store.WriteChunks(mc, metric)
 		if err != nil {
 			mc.logger.ErrorWith("Submit failed", "metric", metric.Lset, "err", err)
-			metric.setError(errors.Wrap(err, "chunk write submit failed"))
+			setError(mc, metric, errors.Wrap(err, "chunk write submit failed"))
 		} else if sent {
 			metric.setState(storeStateUpdate)
 		}
@@ -285,12 +285,12 @@ func (mc *MetricsCache) handleResponse(metric *MetricState, resp *v3io.Response,
 			metric.retryCount++
 			if e, hasStatusCode := resp.Error.(v3io.ErrorWithStatusCode); hasStatusCode && e.StatusCode() != http.StatusServiceUnavailable {
 				mc.logger.ErrorWith(fmt.Sprintf("Chunk update failed with status code %d", e.StatusCode()))
-				metric.setError(errors.Wrap(resp.Error, fmt.Sprintf("chunk update failed due to status code %d", e.StatusCode())))
+				setError(mc, metric, errors.Wrap(resp.Error, fmt.Sprintf("chunk update failed due to status code %d", e.StatusCode())))
 				clear()
 				return false
 			} else if metric.retryCount == maxRetriesOnWrite {
 				mc.logger.ErrorWith(fmt.Sprintf("Chunk update failed - exceeded %d retries", maxRetriesOnWrite), "metric", metric.Lset)
-				metric.setError(errors.Wrap(resp.Error, fmt.Sprintf("chunk update failed after %d retries", maxRetriesOnWrite)))
+				setError(mc, metric, errors.Wrap(resp.Error, fmt.Sprintf("chunk update failed after %d retries", maxRetriesOnWrite)))
 				clear()
 				return false
 			}
@@ -307,7 +307,7 @@ func (mc *MetricsCache) handleResponse(metric *MetricState, resp *v3io.Response,
 		sent, err = metric.store.WriteChunks(mc, metric)
 		if err != nil {
 			mc.logger.ErrorWith("Submit failed", "metric", metric.Lset, "err", err)
-			metric.setError(errors.Wrap(err, "chunk write submit failed"))
+			setError(mc, metric, errors.Wrap(err, "chunk write submit failed"))
 		} else if sent {
 			metric.setState(storeStateUpdate)
 			mc.updatesInFlight++
@@ -343,4 +343,9 @@ func (mc *MetricsCache) nameUpdateRespLoop() {
 			resp.Release()
 		}
 	}()
+}
+
+func setError(mc *MetricsCache, metric *MetricState, err error) {
+	metric.setError(err)
+	mc.lastError = err
 }
