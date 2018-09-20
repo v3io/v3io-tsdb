@@ -80,7 +80,7 @@ func Handler(context *nuclio.Context, event nuclio.Event) (interface{}, error) {
 
 // InitContext runs only once when the function runtime starts
 func InitContext(context *nuclio.Context) error {
-	cfg, _ := config.LoadFromData([]byte(tsdbConfig))
+	cfg, _ := config.GetOrLoadFromData([]byte(tsdbConfig))
 	data := context.DataBinding["db0"].(*v3io.Container)
 	adapter, err := tsdb.NewV3ioAdapter(cfg, data, context.Logger)
 	if err != nil {

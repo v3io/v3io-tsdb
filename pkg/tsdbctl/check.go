@@ -129,10 +129,8 @@ func (cc *checkCommandeer) check() error {
 				}
 				fmt.Printf("Total Size: %d, Count: %d. Compression ratio: %f\n",
 					len(bytes), count, compressionRatio)
-
 			}
 		}
-
 	}
 
 	return nil

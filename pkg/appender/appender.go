@@ -115,6 +115,8 @@ type MetricsCache struct {
 	cacheRefMap    map[uint64]*MetricState // TODO: maybe turn to list + free list, periodically delete old matrics
 
 	NameLabelMap map[string]bool // temp store all lable names
+
+	lastError error
 }
 
 func NewMetricsCache(container *v3io.Container, logger logger.Logger, cfg *config.V3ioConfig,
@@ -194,7 +196,6 @@ func (mc *MetricsCache) appendTV(metric *MetricState, t int64, v interface{}) {
 func (mc *MetricsCache) Add(lset utils.LabelsIfc, t int64, v interface{}) (uint64, error) {
 
 	name, key, hash := lset.GetKey()
-	//hash := lset.Hash()
 	metric, ok := mc.getMetric(hash)
 
 	if !ok {
@@ -245,7 +246,9 @@ func (mc *MetricsCache) WaitForCompletion(timeout time.Duration) (int, error) {
 
 	select {
 	case res := <-waitChan:
-		return res, nil
+		lastError := mc.lastError
+		mc.lastError = nil
+		return res, lastError
 	case <-time.After(maxWaitTime):
 		return 0, errors.Errorf("the operation was timed out after %.2f seconds", maxWaitTime.Seconds())
 	}

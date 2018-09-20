@@ -28,6 +28,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/cobra/doc"
+	"github.com/v3io/v3io-tsdb/internal/pkg/performance"
 	"github.com/v3io/v3io-tsdb/pkg/config"
 	"github.com/v3io/v3io-tsdb/pkg/tsdb"
 	"strings"
@@ -47,6 +48,7 @@ type RootCommandeer struct {
 	cfgFilePath string
 	verbose     string
 	container   string
+	Reporter    *performance.MetricReporter
 }
 
 func NewRootCommandeer() *RootCommandeer {
@@ -99,19 +101,23 @@ func (rc *RootCommandeer) CreateMarkdown(path string) error {
 }
 
 func (rc *RootCommandeer) initialize() error {
-	cfg, err := config.LoadConfig(rc.cfgFilePath)
+	cfg, err := config.GetOrLoadFromFile(rc.cfgFilePath)
 	if err != nil {
 		// if we couldn't load the file and its not the default
-		if rc.cfgFilePath != "" {
-			return errors.Wrap(err, "Failed to load config from file "+rc.cfgFilePath)
+		if rc.cfgFilePath == "" {
+			return errors.Wrap(err, "Failed to load configuration")
+		} else {
+			return errors.Wrap(err, fmt.Sprintf("Failed to load config from '%s'", rc.cfgFilePath))
 		}
-		cfg = &config.V3ioConfig{} // initialize struct, will try and set it from individual flags
-		config.InitDefaults(cfg)
 	}
 	return rc.populateConfig(cfg)
 }
 
 func (rc *RootCommandeer) populateConfig(cfg *config.V3ioConfig) error {
+	// Initialize performance monitoring
+	// TODO: support custom report writers (file, syslog, prometheus, etc.)
+	rc.Reporter = performance.ReporterInstanceFromConfig(cfg)
+
 	if rc.v3ioPath != "" {
 		// read username and password
 		if i := strings.LastIndex(rc.v3ioPath, "@"); i > 0 {
