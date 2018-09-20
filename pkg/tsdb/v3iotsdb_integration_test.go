@@ -32,7 +32,6 @@ import (
 	"github.com/v3io/v3io-tsdb/pkg/tsdb/tsdbtest"
 	"github.com/v3io/v3io-tsdb/pkg/tsdb/tsdbtest/testutils"
 	"github.com/v3io/v3io-tsdb/pkg/utils"
-	"path/filepath"
 	"sort"
 	"testing"
 )
@@ -42,7 +41,7 @@ const defaultStepMs = 5 * 60 * 1000 // 5 minutes
 func TestIngestData(t *testing.T) {
 	v3ioConfig, err := tsdbtest.LoadV3ioConfig()
 	if err != nil {
-		t.Fatalf("Failed to load test configuration. reason: %s", err)
+		t.Fatalf("unable to load configuration. Error: %v", err)
 	}
 
 	testCases := []struct {
@@ -123,7 +122,7 @@ func testIngestDataCase(t *testing.T, v3ioConfig *config.V3ioConfig,
 func TestQueryData(t *testing.T) {
 	v3ioConfig, err := tsdbtest.LoadV3ioConfig()
 	if err != nil {
-		t.Fatalf("Failed to load test configuration. reason: %s", err)
+		t.Fatalf("unable to load configuration. Error: %v", err)
 	}
 
 	testCases := []struct {
@@ -324,9 +323,9 @@ func testQueryDataCase(test *testing.T, v3ioConfig *config.V3ioConfig,
 }
 
 func TestQueryDataOverlappingWindow(t *testing.T) {
-	v3ioConfig, err := config.LoadConfig(filepath.Join("..", "..", config.DefaultConfigurationFileName))
+	v3ioConfig, err := config.GetOrDefaultConfig()
 	if err != nil {
-		t.Fatalf("Failed to load test configuration. reason: %s", err)
+		t.Fatalf("unable to load configuration. Error: %v", err)
 	}
 
 	testCases := []struct {
@@ -446,7 +445,7 @@ func testQueryDataOverlappingWindowCase(test *testing.T, v3ioConfig *config.V3io
 func TestCreateTSDB(t *testing.T) {
 	v3ioConfig, err := tsdbtest.LoadV3ioConfig()
 	if err != nil {
-		t.Fatalf("Failed to load test configuration. reason: %s", err)
+		t.Fatalf("unable to load configuration. Error: %v", err)
 	}
 
 	testCases := []struct {
@@ -485,7 +484,7 @@ func testCreateTSDBcase(t *testing.T, v3ioConfig *config.V3ioConfig, dbConfig co
 func TestDeleteTSDB(t *testing.T) {
 	v3ioConfig, err := tsdbtest.LoadV3ioConfig()
 	if err != nil {
-		t.Fatalf("Failed to load test configuration. reason: %s", err)
+		t.Fatalf("unable to load configuration. Error: %v", err)
 	}
 
 	schema := testutils.CreateSchema(t, "count,sum")

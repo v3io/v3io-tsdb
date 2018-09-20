@@ -122,12 +122,9 @@ func (cc *checkCommandeer) check() error {
 				if iter.Err() != nil {
 					return errors.Wrap(iter.Err(), "failed to read iterator")
 				}
-
 				fmt.Printf("Total Size: %d, Count: %d\n", len(bytes), count)
-
 			}
 		}
-
 	}
 
 	return nil
