@@ -127,7 +127,8 @@ func (cc *checkCommandeer) check() error {
 				if count > 0 {
 					compressionRatio = float64(len(bytes)) /  float64(count)
 				}
-				fmt.Printf("Total Size: %d, Count: %d. Compression ratio: %f\n", len(bytes), count, compressionRatio)
+				fmt.Printf("Total Size: %d, Count: %d. Compression ratio: %f\n",
+					len(bytes), count, compressionRatio)
 
 			}
 		}
