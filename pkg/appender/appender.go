@@ -196,7 +196,6 @@ func (mc *MetricsCache) appendTV(metric *MetricState, t int64, v interface{}) {
 func (mc *MetricsCache) Add(lset utils.LabelsIfc, t int64, v interface{}) (uint64, error) {
 
 	name, key, hash := lset.GetKey()
-	//hash := lset.Hash()
 	metric, ok := mc.getMetric(hash)
 
 	if !ok {

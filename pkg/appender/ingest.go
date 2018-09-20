@@ -24,6 +24,7 @@ import (
 	"fmt"
 	"github.com/pkg/errors"
 	"github.com/v3io/v3io-go-http"
+	"github.com/v3io/v3io-tsdb/internal/pkg/performance"
 	"net/http"
 	"reflect"
 	"time"
@@ -220,17 +221,33 @@ func (mc *MetricsCache) postMetricUpdates(metric *MetricState) {
 	var err error
 
 	if metric.getState() == storeStatePreGet {
-		sent, err = metric.store.GetChunksState(mc, metric)
+		sent, err = metric.store.getChunksState(mc, metric)
 		if err != nil {
-			mc.logger.ErrorWith("Get item request failed", "metric", metric.Lset, "err", err)
+			// Count errors
+			counter, err := performance.ReporterInstanceFromConfig(mc.cfg).GetCounter("GetChunksStateError")
+			if err != nil {
+				mc.logger.Error("failed to create performance counter for GetChunksStateError. Error: %v", err)
+			} else {
+				counter.Inc(1)
+			}
+
+			mc.logger.ErrorWith("failed to get item state", "metric", metric.Lset, "err", err)
 			setError(mc, metric, err)
 		} else {
 			metric.setState(storeStateGet)
 		}
 
 	} else {
-		sent, err = metric.store.WriteChunks(mc, metric)
+		sent, err = metric.store.writeChunks(mc, metric)
 		if err != nil {
+			// Count errors
+			counter, err := performance.ReporterInstanceFromConfig(mc.cfg).GetCounter("WriteChunksError")
+			if err != nil {
+				mc.logger.Error("failed to create performance counter for WriteChunksError. Error: %v", err)
+			} else {
+				counter.Inc(1)
+			}
+
 			mc.logger.ErrorWith("Submit failed", "metric", metric.Lset, "err", err)
 			setError(mc, metric, errors.Wrap(err, "chunk write submit failed"))
 		} else if sent {
@@ -248,6 +265,7 @@ func (mc *MetricsCache) postMetricUpdates(metric *MetricState) {
 
 // handle DB responses, if the backlog queue is empty and have data to send write more chunks to DB
 func (mc *MetricsCache) handleResponse(metric *MetricState, resp *v3io.Response, canWrite bool) bool {
+	defer resp.Release()
 	metric.Lock()
 	defer metric.Unlock()
 
@@ -265,7 +283,7 @@ func (mc *MetricsCache) handleResponse(metric *MetricState, resp *v3io.Response,
 
 	if metric.getState() == storeStateGet {
 		// Handle Get response, sync metric state with the DB
-		metric.store.ProcessGetResp(mc, metric, resp)
+		metric.store.processGetResp(mc, metric, resp)
 
 	} else {
 		// Handle Update Expression responses
@@ -281,6 +299,14 @@ func (mc *MetricsCache) handleResponse(metric *MetricState, resp *v3io.Response,
 				metric.setState(storeStateInit)
 			}
 
+			// Count errors
+			counter, err := performance.ReporterInstanceFromConfig(mc.cfg).GetCounter("ChunkUpdateRetries")
+			if err != nil {
+				mc.logger.Error("failed to create performance counter for ChunkUpdateRetries. Error: %v", err)
+			} else {
+				counter.Inc(1)
+			}
+
 			// Metrics with too many update errors go into Error state
 			metric.retryCount++
 			if e, hasStatusCode := resp.Error.(v3io.ErrorWithStatusCode); hasStatusCode && e.StatusCode() != http.StatusServiceUnavailable {
@@ -292,20 +318,35 @@ func (mc *MetricsCache) handleResponse(metric *MetricState, resp *v3io.Response,
 				mc.logger.ErrorWith(fmt.Sprintf("Chunk update failed - exceeded %d retries", maxRetriesOnWrite), "metric", metric.Lset)
 				setError(mc, metric, errors.Wrap(resp.Error, fmt.Sprintf("chunk update failed after %d retries", maxRetriesOnWrite)))
 				clear()
+
+				// Count errors
+				counter, err := performance.ReporterInstanceFromConfig(mc.cfg).GetCounter("ChunkUpdateRetryExceededError")
+				if err != nil {
+					mc.logger.Error("failed to create performance counter for ChunkUpdateRetryExceededError. Error: %v", err)
+				} else {
+					counter.Inc(1)
+				}
 				return false
 			}
 		}
 	}
 
-	resp.Release()
 	metric.setState(storeStateReady)
 
 	var sent bool
 	var err error
 
 	if canWrite {
-		sent, err = metric.store.WriteChunks(mc, metric)
+		sent, err = metric.store.writeChunks(mc, metric)
 		if err != nil {
+			// Count errors
+			counter, err := performance.ReporterInstanceFromConfig(mc.cfg).GetCounter("WriteChunksError")
+			if err != nil {
+				mc.logger.Error("failed to create performance counter for WriteChunksError. Error: %v", err)
+			} else {
+				counter.Inc(1)
+			}
+
 			mc.logger.ErrorWith("Submit failed", "metric", metric.Lset, "err", err)
 			setError(mc, metric, errors.Wrap(err, "chunk write submit failed"))
 		} else if sent {
@@ -333,6 +374,14 @@ func (mc *MetricsCache) nameUpdateRespLoop() {
 			if ok {
 				metric.Lock()
 				if resp.Error != nil {
+					// Count errors
+					counter, err := performance.ReporterInstanceFromConfig(mc.cfg).GetCounter("UpdateNameError")
+					if err != nil {
+						mc.logger.Error("failed to create performance counter for UpdateNameError. Error: %v", err)
+					} else {
+						counter.Inc(1)
+					}
+
 					mc.logger.ErrorWith("Process Update name failed", "id", resp.ID, "name", metric.name)
 				} else {
 					mc.logger.DebugWith("Process Update name resp", "id", resp.ID, "name", metric.name)

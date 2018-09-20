@@ -22,8 +22,11 @@ package config
 
 import (
 	"github.com/ghodss/yaml"
+	"github.com/pkg/errors"
 	"io/ioutil"
 	"os"
+	"strings"
+	"sync"
 )
 
 const (
@@ -36,6 +39,16 @@ const (
 	defaultBatchSize             = 64
 	defaultTimeoutInSeconds      = 24 * 60 * 60 // 24 hours
 )
+
+var (
+	instance *V3ioConfig
+	once     sync.Once
+	failure  error
+)
+
+func Error() error {
+	return failure
+}
 
 type V3ioConfig struct {
 	// V3IO Connection details: Url, Data container, relative path for this dataset, credentials
@@ -68,6 +81,16 @@ type V3ioConfig struct {
 	// Size of chunk in bytes for worst an best compression scenarios
 	MinimumChunkSize int `json:"minimumChunkSize,omitempty"`
 	MaximumChunkSize int `json:"maximumChunkSize,omitempty"`
+
+	// Metrics reporter configuration
+	MetricsReporter MetricsReporterConfig `json:"performance,omitempty"`
+}
+
+type MetricsReporterConfig struct {
+	ReportOnShutdown   bool   `json:"reportOnShutdown,omitempty"`
+	Output             string `json:"output"` // stdout, stderr, syslog, etc.
+	ReportPeriodically bool   `json:"reportPeriodically,omitempty"`
+	RepotInterval      int    `json:"reportInterval"` // interval between consequence reports (in Seconds)
 }
 
 type Rollup struct {
@@ -128,35 +151,71 @@ type MetricConfig struct {
 
 // TODO: add alerts config (name, match expr, for, lables, annotations)
 
-func LoadConfig(path string) (*V3ioConfig, error) {
+func GetOrDefaultConfig() (*V3ioConfig, error) {
+	return GetOrLoadFromFile("")
+}
 
-	envpath := os.Getenv(V3ioConfigEnvironmentVariable)
-	if envpath != "" {
-		path = envpath
+func GetOrLoadFromFile(path string) (*V3ioConfig, error) {
+	once.Do(func() {
+		instance, failure = loadConfig(path)
+		return
+	})
+
+	return instance, failure
+}
+
+func GetOrLoadFromData(data []byte) (*V3ioConfig, error) {
+	once.Do(func() {
+		instance, failure = loadFromData(data)
+		return
+	})
+
+	return instance, failure
+}
+
+func loadConfig(path string) (*V3ioConfig, error) {
+
+	var resolvedPath string
+
+	if strings.TrimSpace(path) != "" {
+		resolvedPath = path
+	} else {
+		envPath := os.Getenv(V3ioConfigEnvironmentVariable)
+		if envPath != "" {
+			resolvedPath = envPath
+		}
 	}
 
-	if path == "" {
-		path = DefaultConfigurationFileName
+	if resolvedPath == "" {
+		resolvedPath = DefaultConfigurationFileName
 	}
 
-	data, err := ioutil.ReadFile(path)
+	data, err := ioutil.ReadFile(resolvedPath)
 	if err != nil {
 		return nil, err
 	}
 
-	return LoadFromData(data)
+	if len(data) == 0 {
+		return nil, errors.Errorf("file '%s' exists but its content is not valid", resolvedPath)
+	}
+
+	return loadFromData(data)
 }
 
-func LoadFromData(data []byte) (*V3ioConfig, error) {
+func loadFromData(data []byte) (*V3ioConfig, error) {
 	cfg := V3ioConfig{}
 	err := yaml.Unmarshal(data, &cfg)
 
-	InitDefaults(&cfg)
+	if err != nil {
+		return nil, err
+	}
+
+	initDefaults(&cfg)
 
 	return &cfg, err
 }
 
-func InitDefaults(cfg *V3ioConfig) {
+func initDefaults(cfg *V3ioConfig) {
 	// Initialize default number of workers
 	if cfg.Workers == 0 {
 		cfg.Workers = defaultNumberOfIngestWorkers

@@ -3,6 +3,7 @@ package tsdbtest
 import (
 	json2 "encoding/json"
 	"fmt"
+	"github.com/v3io/v3io-tsdb/internal/pkg/performance"
 	"github.com/v3io/v3io-tsdb/pkg/config"
 	. "github.com/v3io/v3io-tsdb/pkg/tsdb"
 	"github.com/v3io/v3io-tsdb/pkg/tsdb/tsdbtest/testutils"
@@ -54,7 +55,15 @@ func SetUp(t testing.TB, v3ioConfig *config.V3ioConfig) func() {
 	v3ioConfig.Path = fmt.Sprintf("%s-%d", t.Name(), time.Now().Nanosecond())
 	CreateTestTSDB(t, v3ioConfig)
 
+	// Measure performance
+	metricReporter, err := performance.DefaultReporterInstance()
+	if err != nil {
+		t.Fatalf("unable to initialize performance metrics reporter. Reason: %v", err)
+	}
+	metricReporter.Start()
+
 	return func() {
+		defer metricReporter.Stop()
 		// Don't delete the table if the test has failed
 		if !t.Failed() {
 			DeleteTSDB(t, v3ioConfig)
@@ -75,7 +84,15 @@ func SetUpWithDBConfig(t *testing.T, v3ioConfig *config.V3ioConfig, schema *conf
 		t.Fatalf("Failed to create TSDB. Reason: %s\nConfiguration:\n%s", err, string(v3ioConfigAsJson))
 	}
 
+	// Measure performance
+	metricReporter, err := performance.DefaultReporterInstance()
+	if err != nil {
+		t.Fatalf("unable to initialize performance metrics reporter. Error: %v", err)
+	}
+	metricReporter.Start()
+
 	return func() {
+		defer metricReporter.Stop()
 		// Don't delete the table if the test has failed
 		if !t.Failed() {
 			DeleteTSDB(t, v3ioConfig)
