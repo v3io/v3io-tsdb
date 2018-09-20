@@ -157,10 +157,10 @@ func ValidateCountOfSamples(t testing.TB, adapter *V3ioAdapter, metricName strin
 		t.Fatalf("Check failed: actualCount result is not as expected [%d(actualCount) != %d(expected)]", actualCount, expected)
 	}
 
-	t.Logf("PASS: total count of samples, i.e. [%d(actualCount) != %d(expected)]", actualCount, expected)
+	t.Logf("PASS: total count of samples, i.e. [%d(actualCount) == %d(expected)]", actualCount, expected)
 }
 
-func ValidateRawData(t testing.TB, adapter *V3ioAdapter, metricName string, startTimeMs, endTimeMs int64, isValid func(int64, int64) bool) {
+func ValidateRawData(t testing.TB, adapter *V3ioAdapter, metricName string, startTimeMs, endTimeMs int64, isValid func(*DataPoint, *DataPoint) bool) {
 
 	qry, err := adapter.Querier(nil, startTimeMs, endTimeMs)
 	if err != nil {
@@ -171,7 +171,7 @@ func ValidateRawData(t testing.TB, adapter *V3ioAdapter, metricName string, star
 
 	for set.Next() {
 		// start over for each label set
-		var lastValue = -1.0
+		var lastDataPoint = &DataPoint{Time: -1, Value: -1.0}
 
 		if set.Err() != nil {
 			t.Fatal(set.Err(), "failed to get next element from result set")
@@ -183,15 +183,17 @@ func ValidateRawData(t testing.TB, adapter *V3ioAdapter, metricName string, star
 			if iter.Err() != nil {
 				t.Fatal(set.Err(), "failed to get next time-value pair from iterator")
 			}
-			_, currentValue := iter.At()
+			currentTime, currentValue := iter.At()
+			currentDataPoint := &DataPoint{Time: currentTime, Value: currentValue}
 
-			if lastValue >= 0 {
-				if !isValid(int64(lastValue), int64(currentValue)) {
-					t.Fatalf("Check for consistency of the raw data has failed: metric name: '%s'\n\tisValid(%.1f, %.1f) = false",
-						metricName, lastValue, currentValue)
+			if lastDataPoint.Value >= 0 {
+				// Note, we cast float to integer to eliminate the risk of precision error
+				if !isValid(lastDataPoint, currentDataPoint) {
+					t.Fatalf("Check for consistency of the raw data has failed: metric name: '%s'\n\tisValid(%v, %v) == false",
+						metricName, lastDataPoint, currentDataPoint)
 				}
 			}
-			lastValue = currentValue
+			lastDataPoint = currentDataPoint
 		}
 	}
 

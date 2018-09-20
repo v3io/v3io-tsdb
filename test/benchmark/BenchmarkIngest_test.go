@@ -132,14 +132,14 @@ func BenchmarkIngest(b *testing.B) {
 
 	if testConfig.ValidateRawData {
 		for metricName := range samplesModel {
-			tsdbtest.ValidateRawData(b, adapter, metricName, testStartTimeMs, testEndTimeMs, isValidSequence)
+			tsdbtest.ValidateRawData(b, adapter, metricName, testStartTimeMs, testEndTimeMs, isValidDataPoint)
 		}
-		b.Logf("PASS: data consistency test for n=%d", b.N)
+		b.Logf("PASS: data consistency check for n=%d", b.N)
 	}
 }
 
-func isValidSequence(prev, current int64) bool {
-	return current-prev == 1
+func isValidDataPoint(prev, current *tsdbtest.DataPoint) bool {
+	return int64(current.Value)-int64(prev.Value) == 1 && current.Time > prev.Time
 }
 
 func runTest(

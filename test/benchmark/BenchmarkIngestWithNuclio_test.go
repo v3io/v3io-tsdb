@@ -113,7 +113,7 @@ func BenchmarkIngestWithNuclio(b *testing.B) {
 
 	if testConfig.ValidateRawData {
 		for metricName := range samplesModel {
-			tsdbtest.ValidateRawData(b, v3ioAdapter, metricName, testStartTimeMs, testEndTimeMs, isValidSequence)
+			tsdbtest.ValidateRawData(b, v3ioAdapter, metricName, testStartTimeMs, testEndTimeMs, isValidDataPoint)
 		}
 	}
 }
