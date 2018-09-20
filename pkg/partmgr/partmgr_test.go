@@ -73,7 +73,9 @@ func TestCreateNewPartition(tst *testing.T) {
 
 func getPartitionManager(tst *testing.T) *PartitionManager {
 	schema := testutils.CreateSchema(tst, "*")
-	v3ioConfig, err := config.GetOrDefaultConfig()
+
+	const dummyConfig = `path: "/test"`
+	v3ioConfig, err := config.GetOrLoadFromData([]byte(dummyConfig))
 	if err != nil {
 		tst.Fatalf("failed to obtain v3io configuration. Error: %v", err)
 	}
