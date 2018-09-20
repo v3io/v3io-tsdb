@@ -14,7 +14,7 @@ func TestStore(t *testing.T) {
 	//lset := labels.Labels{labels.Label{Name: "__name__", Value: "http_req"},
 	//	labels.Label{Name: "method", Value: "post"}}
 
-	//exp, tid := store.WriteChunks(lset)
+	//exp, tid := store.writeChunks(lset)
 	//println(exp, tid)
 	//store.ProcessWriteResp()
 }

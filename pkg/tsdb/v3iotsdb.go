@@ -47,9 +47,9 @@ type V3ioAdapter struct {
 
 func CreateTSDB(v3iocfg *config.V3ioConfig, schema *config.Schema) error {
 
-	logger, _ := utils.NewLogger(v3iocfg.Verbose)
+	lgr, _ := utils.NewLogger(v3iocfg.Verbose)
 	container, err := utils.CreateContainer(
-		logger, v3iocfg.V3ioUrl, v3iocfg.Container, v3iocfg.Username, v3iocfg.Password, v3iocfg.Workers)
+		lgr, v3iocfg.V3ioUrl, v3iocfg.Container, v3iocfg.Username, v3iocfg.Password, v3iocfg.Workers)
 	if err != nil {
 		return errors.Wrap(err, "Failed to create data container")
 	}
@@ -130,7 +130,7 @@ func (a *V3ioAdapter) connect() error {
 		return errors.Wrap(err, "Failed to Unmarshal schema at path: "+fullpath)
 	}
 
-	a.partitionMngr, err = partmgr.NewPartitionMngr(&schema, a.cfg.Path, a.container)
+	a.partitionMngr, err = partmgr.NewPartitionMngr(&schema, a.container, a.cfg)
 	if err != nil {
 		return errors.Wrap(err, "Failed to init DB partition manager at path: "+fullpath)
 	}
@@ -154,7 +154,7 @@ func (a *V3ioAdapter) InitAppenderCache() error {
 	return nil
 }
 
-// Create an appender interface, for writing metrics
+// Create an appender interface, for writing performance
 func (a *V3ioAdapter) Appender() (Appender, error) {
 	err := a.InitAppenderCache()
 	if err != nil {

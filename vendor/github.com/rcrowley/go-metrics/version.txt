@@ -1,0 +1,3 @@
+SHA: e2704e165165ec55d062f5919b4b29494e9fa790
+Branch: master
+URL: https://github.com/rcrowley/go-metrics/commit/e2704e165165ec55d062f5919b4b29494e9fa790
