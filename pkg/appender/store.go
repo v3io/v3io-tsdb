@@ -163,7 +163,10 @@ func (cs *chunkStore) processGetResp(mc *MetricsCache, metric *MetricState, resp
 			request, err := mc.container.PutItem(&putInput, metric, mc.nameUpdateChan)
 			if err != nil {
 				// Count errors
-				if counter, ok := performance.ReporterInstanceFromConfig(mc.cfg).GetCounter("PutNameError"); ok != nil {
+				counter, err := performance.ReporterInstanceFromConfig(mc.cfg).GetCounter("PutNameError")
+				if err != nil {
+					mc.logger.Error("failed to create performance counter for PutNameError. Error: %v", err)
+				} else {
 					counter.Inc(1)
 				}
 				mc.logger.ErrorWith("Update name putItem Failed", "metric", metric.key, "err", err)
@@ -200,26 +203,17 @@ func (cs *chunkStore) processGetResp(mc *MetricsCache, metric *MetricState, resp
 
 // Append data to the right chunk and table based on the time and state
 func (cs *chunkStore) Append(t int64, v interface{}) {
-	metricReporter, err := performance.DefaultReporterInstance()
-	if err != nil {
-		err = errors.Wrap(err, "unable to initialize performance metrics reporter")
-		return
-	}
-
-	appendTimer, err := metricReporter.GetTimer("AppendTimer")
-
-	if err != nil {
-		// TODO: need to have a logger in context to report errors
-		return
-	}
-
-	appendTimer.Time(func() {
-		cs.pending = append(cs.pending, pendingData{t: t, v: v})
-		// if the new time is older than previous times, sort the list
-		if len(cs.pending) > 1 && cs.pending[len(cs.pending)-2].t < t {
-			sort.Sort(cs.pending)
+	if metricReporter, err := performance.DefaultReporterInstance(); err == nil {
+		if counter, err := metricReporter.GetCounter("AppendCounter"); err == nil {
+			counter.Inc(1)
 		}
-	})
+	}
+
+	cs.pending = append(cs.pending, pendingData{t: t, v: v})
+	// if the new time is older than previous times, sort the list
+	if len(cs.pending) > 1 && cs.pending[len(cs.pending)-2].t < t {
+		sort.Sort(cs.pending)
+	}
 }
 
 // return current, previous, or create new  chunk based on sample time
@@ -267,12 +261,7 @@ func (cs *chunkStore) chunkByTime(t int64) *attrAppender {
 // write all pending samples to DB chunks and aggregators
 func (cs *chunkStore) writeChunks(mc *MetricsCache, metric *MetricState) (hasPendingUpdates bool, err error) {
 
-	metricReporter, err := performance.DefaultReporterInstance()
-	if err != nil {
-		err = errors.Wrap(err, "unable to initialize performance metrics reporter")
-		return
-	}
-
+	metricReporter := performance.ReporterInstanceFromConfig(mc.cfg)
 	writeChunksTimer, err := metricReporter.GetTimer("WriteChunksTimer")
 	if err != nil {
 		return hasPendingUpdates, errors.Wrap(err, "failed to obtain timer object for [LabelValuesTimer]")
