@@ -38,3 +38,6 @@ CleanupAfterTest: true
 
 # aggregate query step size - used by validators
 QueryAggregateStep: "1h"
+
+# validate raw data correctness
+ValidateRawData: true
