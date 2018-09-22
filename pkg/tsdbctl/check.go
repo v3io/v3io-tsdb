@@ -122,7 +122,14 @@ func (cc *checkCommandeer) check() error {
 				if iter.Err() != nil {
 					return errors.Wrap(iter.Err(), "failed to read iterator")
 				}
-				fmt.Printf("Total Size: %d, Count: %d\n", len(bytes), count)
+
+				compressionRatio := 0.0
+				bytesCount := len(bytes)
+				if count > 0 {
+					compressionRatio = float64(bytesCount) / float64(count)
+				}
+				fmt.Printf("Total Size: %d, Count: %d. Compression ratio: %.2f\n",
+					bytesCount, count, compressionRatio)
 			}
 		}
 	}
