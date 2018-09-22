@@ -6,12 +6,8 @@
 # V3IO container ID or Name
 #container: "<CONTAINER_ID>"
 
-# Table path in the container
-#path: "<TABLE_PATH>"
-
-
 # Logging level. Valid values: debug,info,warn,error (Default: info)
-verbose: "info"
+#verbose: "info"
 
 # Authentication for nginx
 #username: "<USER>"
