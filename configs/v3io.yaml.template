@@ -1,0 +1,24 @@
+# File: v3io.yaml
+
+# NGINX server address:PORT
+#v3ioUrl: "<IP>:8081"
+
+# V3IO container ID or Name
+#container: "<CONTAINER_ID>"
+
+# Table path in the container
+#path: "<TABLE_PATH>"
+
+
+# Logging level. Valid values: debug,info,warn,error (Default: info)
+verbose: "info"
+
+# Authentication for nginx
+#username: "<USER>"
+#password: "<PASSWORD>"
+
+# Num of workers for handling the REST requests to nginx
+#workers: 1
+
+# Timeout for nginx requests
+#timeout: 10
