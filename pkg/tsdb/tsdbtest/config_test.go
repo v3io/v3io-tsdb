@@ -5,6 +5,7 @@ package tsdbtest
 import (
 	"github.com/stretchr/testify/assert"
 	"github.com/v3io/v3io-tsdb/pkg/config"
+	"go/build"
 	"os"
 	"path/filepath"
 	"strings"
@@ -30,7 +31,11 @@ func deleteTestConfig(t *testing.T, path string) {
 }
 
 func TestGetV3ioConfigPath(t *testing.T) {
-	firstGoPath := strings.Split(os.Getenv("GOPATH"), string(os.PathListSeparator))[0]
+	gopath := os.Getenv("GOPATH")
+	if gopath == "" {
+		gopath = build.Default.GOPATH
+	}
+	firstGoPath := strings.Split(gopath, string(os.PathListSeparator))[0]
 	projectHome := filepath.Join(firstGoPath, relativeProjectPath)
 	testCases := []struct {
 		description  string
