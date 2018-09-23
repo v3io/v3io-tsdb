@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/pkg/errors"
 	"github.com/v3io/v3io-tsdb/pkg/config"
+	"go/build"
 	"os"
 	"path/filepath"
 	"strings"
@@ -28,15 +29,19 @@ func GetV3ioConfigPath() (string, error) {
 		return localConfigFile, nil
 	}
 
-	gopath := strings.Split(os.Getenv("GOPATH"), string(os.PathListSeparator))
-	for _, path := range gopath {
+	gopath := os.Getenv("GOPATH")
+	if gopath == "" {
+		gopath = build.Default.GOPATH
+	}
+	gopaths := strings.Split(gopath, string(os.PathListSeparator))
+	for _, path := range gopaths {
 		gopathConfig := filepath.Join(path, relativeProjectPath, config.DefaultConfigurationFileName)
 		if _, err := os.Stat(gopathConfig); !os.IsNotExist(err) {
 			return gopathConfig, nil
 		}
 	}
 
-	return "", errors.New("config file is not specified")
+	return "", errors.Errorf("config file is not specified and could not be found in GOPATH=%v", gopath)
 }
 
 func LoadV3ioConfig() (*config.V3ioConfig, error) {
