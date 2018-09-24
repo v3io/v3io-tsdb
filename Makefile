@@ -27,7 +27,7 @@ integration: get
 
 .PHONY: bench
 bench: get
-	go test -run=XXX -bench='^BenchmarkIngest$$' -benchtime 10s -timeout 1m ./test/benchmark/...
+	go test -run=XXX -bench='^BenchmarkIngest$$' -benchtime 10s -timeout 5m ./test/benchmark/...
 
 .PHONY: build
 build: get

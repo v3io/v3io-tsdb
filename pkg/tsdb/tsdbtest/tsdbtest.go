@@ -38,7 +38,8 @@ func DeleteTSDB(t testing.TB, v3ioConfig *config.V3ioConfig) {
 		t.Fatalf("Failed to create adapter. reason: %s", err)
 	}
 
-	if err := adapter.DeleteDB(true, true, 0, 0); err != nil {
+	now := time.Now().Unix() * 1000 // now time in millis
+	if err := adapter.DeleteDB(true, true, 0, now); err != nil {
 		t.Fatalf("Failed to delete DB on teardown. reason: %s", err)
 	}
 }
