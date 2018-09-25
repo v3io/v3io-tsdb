@@ -34,6 +34,7 @@ import (
 	"github.com/v3io/v3io-tsdb/pkg/utils"
 	"sort"
 	"testing"
+	"time"
 )
 
 const defaultStepMs = 5 * 60 * 1000 // 5 minutes
@@ -505,7 +506,8 @@ func TestDeleteTSDB(t *testing.T) {
 		t.Fatal("Failed to create TSDB")
 	}
 
-	if err := adapter.DeleteDB(true, true, 0, 0); err != nil {
+	now := time.Now().Unix() * 1000 // now time in millis
+	if err := adapter.DeleteDB(true, true, 0, now); err != nil {
 		t.Fatalf("Failed to delete DB on teardown. reason: %s", err)
 	}
 
