@@ -174,9 +174,14 @@ func GetOrLoadFromData(data []byte) (*V3ioConfig, error) {
 }
 
 // update defaults when using config struct
-func GetOrLoadFromStruct(cfg *V3ioConfig) error {
-	initDefaults(cfg)
-	return nil
+func GetOrLoadFromStruct(cfg *V3ioConfig) (*V3ioConfig, error) {
+	once.Do(func() {
+		initDefaults(cfg)
+		instance = cfg
+		return
+	})
+
+	return instance, nil
 }
 
 func loadConfig(path string) (*V3ioConfig, error) {
