@@ -72,6 +72,10 @@ var aggrToSchemaField = map[string]config.SchemaField{
 	"stdvar": {Name: "stdvar", Type: "array", Nullable: true, Items: "double"},
 }
 
+func (a AggrType) HasAverage() bool {
+	return (a & aggrTypeAvg) == aggrTypeAvg
+}
+
 func SchemaFieldFromString(aggregators []string, col string) ([]config.SchemaField, error) {
 	fieldList := make([]config.SchemaField, 0, len(aggregators))
 	for _, s := range aggregators {

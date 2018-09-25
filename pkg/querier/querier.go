@@ -144,6 +144,13 @@ func (q *V3ioQuerier) queryNumericPartition(
 
 	newSet := &V3ioSeriesSet{mint: mint, maxt: maxt, partition: partition, logger: q.logger}
 
+	// if there is no aggregation function and the step size is grater than the stored aggregate use Average aggr
+	// TODO: in non Prometheus we may want avg aggregator for any step>0
+	// in Prom range vectors use seek and it would be inefficient to do avg aggregator
+	if functions == "" && step > 0 && step >= partition.RollupTime() && partition.AggrType().HasAverage() {
+		functions = "avg"
+	}
+
 	// if there are aggregations to be made
 	if functions != "" {
 
