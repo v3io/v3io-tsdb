@@ -32,7 +32,7 @@ import (
 const (
 	V3ioConfigEnvironmentVariable = "V3IO_CONF"
 	DefaultConfigurationFileName  = "v3io.yaml"
-	SCHEMA_CONFIG                 = ".schema"
+	SchemaConfigFileName                 = ".schema"
 
 	defaultNumberOfIngestWorkers = 1
 	defaultNumberOfQueryWorkers  = 8
@@ -55,8 +55,8 @@ type V3ioConfig struct {
 	V3ioUrl   string `json:"v3ioUrl"`
 	Container string `json:"container"`
 	Path      string `json:"path"`
-	Username  string `json:"username"`
-	Password  string `json:"password"`
+	Username  string `json:"username,omitempty"`
+	Password  string `json:"password,omitempty"`
 
 	// Disable is use in Prometheus to disable v3io and work with the internal TSDB
 	Disabled bool `json:"disabled,omitempty"`
@@ -190,13 +190,22 @@ func loadConfig(path string) (*V3ioConfig, error) {
 		resolvedPath = DefaultConfigurationFileName
 	}
 
-	data, err := ioutil.ReadFile(resolvedPath)
-	if err != nil {
-		return nil, err
-	}
+	var data []byte
+	if _, err := os.Stat(resolvedPath); err != nil {
+		if os.IsNotExist(err) {
+			data = []byte{}
+		} else {
+			return nil, errors.Wrap(err, "failed to read configuration")
+		}
+	} else {
+		data, err := ioutil.ReadFile(resolvedPath)
+		if err != nil {
+			return nil, err
+		}
 
-	if len(data) == 0 {
-		return nil, errors.Errorf("file '%s' exists but its content is not valid", resolvedPath)
+		if len(data) == 0 {
+			return nil, errors.Errorf("file '%s' exists but its content is not valid", resolvedPath)
+		}
 	}
 
 	return loadFromData(data)

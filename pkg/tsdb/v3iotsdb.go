@@ -59,7 +59,7 @@ func CreateTSDB(v3iocfg *config.V3ioConfig, schema *config.Schema) error {
 		return errors.Wrap(err, "Failed to Marshal schema file")
 	}
 
-	path := pathUtil.Join(v3iocfg.Path, config.SCHEMA_CONFIG)
+	path := pathUtil.Join(v3iocfg.Path, config.SchemaConfigFileName)
 	// check if the config file already exist, abort if it does
 	_, err = container.Sync.GetObject(&v3io.GetObjectInput{Path: path})
 	if err == nil {
@@ -119,7 +119,7 @@ func (a *V3ioAdapter) GetContainer() (*v3io.Container, string) {
 func (a *V3ioAdapter) connect() error {
 
 	fullpath := pathUtil.Join(a.cfg.V3ioUrl, a.cfg.Container, a.cfg.Path)
-	resp, err := a.container.Sync.GetObject(&v3io.GetObjectInput{Path: pathUtil.Join(a.cfg.Path, config.SCHEMA_CONFIG)})
+	resp, err := a.container.Sync.GetObject(&v3io.GetObjectInput{Path: pathUtil.Join(a.cfg.Path, config.SchemaConfigFileName)})
 	if err != nil {
 		return errors.Wrap(err, "Failed to read schema at path: "+fullpath)
 	}
@@ -212,7 +212,7 @@ func (a *V3ioAdapter) DeleteDB(configExists bool, force bool, fromTime int64, to
 		}
 	}
 	if configExists {
-		schemaPath := pathUtil.Join(a.cfg.Path, config.SCHEMA_CONFIG)
+		schemaPath := pathUtil.Join(a.cfg.Path, config.SchemaConfigFileName)
 		a.logger.Info("Delete TSDB config in path %s", schemaPath)
 		err := a.container.Sync.DeleteObject(&v3io.DeleteObjectInput{Path: schemaPath})
 		if err != nil && !force {
