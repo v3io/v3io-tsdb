@@ -33,13 +33,14 @@ import (
 )
 
 const (
-	schemaVersion               = 0
-	defaultStorageClass         = "local"
-	defaultIngestionRate        = ""
-	defaultRollupInterval       = "1h"
-	defaultShardingBuckets      = 8
-	defaultSampleRetentionHours = 0
-	defaultLayerRetentionTime   = "1y"
+	schemaVersion          = 0
+	defaultStorageClass    = "local"
+	defaultIngestionRate   = ""
+	defaultRollupInterval  = "1h"
+	defaultShardingBuckets = 8
+	// TODO: enable sample-retention when supported
+	// defaultSampleRetentionHours = 0
+	defaultLayerRetentionTime = "1y"
 )
 
 type createCommandeer struct {
@@ -73,7 +74,8 @@ func newCreateCommandeer(rootCommandeer *RootCommandeer) *createCommandeer {
 		"Default aggregation rollups, comma seperated: count,avg,sum,min,max,stddev")
 	cmd.Flags().StringVarP(&commandeer.rollupInterval, "rollup-interval", "i", defaultRollupInterval, "aggregation interval")
 	cmd.Flags().IntVarP(&commandeer.shardingBuckets, "sharding-buckets", "b", defaultShardingBuckets, "number of buckets to split key")
-	cmd.Flags().IntVarP(&commandeer.sampleRetention, "sample-retention", "a", defaultSampleRetentionHours, "sample retention in hours")
+	// TODO: enable sample-retention when supported
+	// cmd.Flags().IntVarP(&commandeer.sampleRetention, "sample-retention", "a", defaultSampleRetentionHours, "sample retention in hours")
 	cmd.Flags().StringVar(&commandeer.sampleRate, "rate", defaultIngestionRate, "sample rate")
 
 	commandeer.cmd = cmd
