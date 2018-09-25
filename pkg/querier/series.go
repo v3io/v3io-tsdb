@@ -91,8 +91,7 @@ func (s *V3ioSeries) initSeriesIter() {
 	}
 
 	newIterator := v3ioSeriesIterator{
-		mint: s.set.mint, maxt: maxt, chunkTime: s.set.partition.TimePerChunk(),
-		isCyclic: s.set.partition.IsCyclic()}
+		mint: s.set.mint, maxt: maxt, chunkTime: s.set.partition.TimePerChunk()}
 	newIterator.chunks = []chunkenc.Chunk{}
 
 	// create and init chunk encoder per chunk blob
@@ -124,7 +123,6 @@ func (s *V3ioSeries) initSeriesIter() {
 type v3ioSeriesIterator struct {
 	mint, maxt int64 // TBD per block
 	err        error
-	isCyclic   bool
 
 	chunks     []chunkenc.Chunk
 	chunkIndex int
@@ -148,7 +146,7 @@ func (it *v3ioSeriesIterator) Seek(t int64) bool {
 	for {
 		if it.iter.Next() {
 			t0, _ := it.At()
-			if (t > t0+int64(it.chunkTime)) || (t0 >= it.maxt && it.isCyclic) {
+			if (t > t0+int64(it.chunkTime)) || (t0 >= it.maxt) {
 				// this chunk is too far behind, move to next
 				if it.chunkIndex == len(it.chunks)-1 {
 					return false
@@ -185,9 +183,7 @@ func (it *v3ioSeriesIterator) Next() bool {
 		if t <= it.maxt {
 			return true
 		}
-		if !it.isCyclic {
-			return false
-		}
+		return false
 	}
 
 	if err := it.iter.Err(); err != nil {

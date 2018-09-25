@@ -98,10 +98,6 @@ func (p *PartitionManager) Path() string {
 	return p.v3ioConfig.Path
 }
 
-func (p *PartitionManager) IsCyclic() bool {
-	return p.cyclic
-}
-
 func (p *PartitionManager) GetPartitionsPaths() []string {
 	var paths []string
 	for _, part := range p.partitions {
