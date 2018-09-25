@@ -104,7 +104,7 @@ func (mr *MetricReporter) Stop() error {
 }
 
 func (mr *MetricReporter) GetTimer(name string) (metrics.Timer, error) {
-	if mr.running {
+	if mr.isRunning() {
 		return metrics.GetOrRegisterTimer(name, mr.registry), nil
 	} else {
 		return nil, errors.Errorf("failed to create timer '%s'. Reason: metric reporter in not running", name)
@@ -112,7 +112,7 @@ func (mr *MetricReporter) GetTimer(name string) (metrics.Timer, error) {
 }
 
 func (mr *MetricReporter) GetCounter(name string) (metrics.Counter, error) {
-	if mr.running {
+	if mr.isRunning() {
 		return metrics.GetOrRegisterCounter(name, mr.registry), nil
 	} else {
 		return nil, errors.Errorf("failed to create counter '%s'. Reason: metric reporter in not running", name)
@@ -120,7 +120,7 @@ func (mr *MetricReporter) GetCounter(name string) (metrics.Counter, error) {
 }
 
 func (mr *MetricReporter) GetMeter(name string) (metrics.Meter, error) {
-	if mr.running {
+	if mr.isRunning() {
 		return metrics.GetOrRegisterMeter(name, mr.registry), nil
 	} else {
 		return nil, errors.Errorf("failed to create meter '%s'. Reason: metric reporter in not running", name)
@@ -128,7 +128,7 @@ func (mr *MetricReporter) GetMeter(name string) (metrics.Meter, error) {
 }
 
 func (mr *MetricReporter) GetHistogram(name string, reservoirSize int) (metrics.Histogram, error) {
-	if mr.running {
+	if mr.isRunning() {
 		sample := metrics.NewUniformSample(reservoirSize)
 		return metrics.GetOrRegisterHistogram(name, mr.registry, sample), nil
 	} else {
@@ -181,4 +181,11 @@ func newMetricReporter(outputWriter io.Writer, reportPeriodically bool, reportIn
 	}
 
 	return &reporter
+}
+
+func (mr *MetricReporter) isRunning() bool {
+	mr.lock.Lock()
+	defer mr.lock.Unlock()
+
+	return mr.running
 }
