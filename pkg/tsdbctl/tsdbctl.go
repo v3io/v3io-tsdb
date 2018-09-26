@@ -66,12 +66,12 @@ func NewRootCommandeer() *RootCommandeer {
 
 	cmd.PersistentFlags().StringVarP(&commandeer.verbose, "verbose", "v", "", "Verbose output")
 	cmd.PersistentFlags().Lookup("verbose").NoOptDefVal = "debug"
-	cmd.PersistentFlags().StringVarP(&commandeer.dbPath, "dbpath", "p", "", "sub path for the TSDB, inside the container")
-	cmd.PersistentFlags().StringVarP(&commandeer.v3ioPath, "server", "s", defaultV3ioServer, "V3IO Service URL - username:password@ip:port")
+	cmd.PersistentFlags().StringVarP(&commandeer.dbPath, "table-path", "t", "", "sub path for the TSDB, inside the container")
+	cmd.PersistentFlags().StringVarP(&commandeer.v3ioPath, "server", "s", defaultV3ioServer, "V3IO Service URL - ip:port")
 	cmd.PersistentFlags().StringVarP(&commandeer.cfgFilePath, "config", "g", "", "path to yaml config file")
 	cmd.PersistentFlags().StringVarP(&commandeer.container, "container", "c", "", "container to use")
 	cmd.PersistentFlags().StringVarP(&commandeer.username, "username", "u", "", "user name")
-	cmd.PersistentFlags().StringVarP(&commandeer.password, "password", "w", "", "password")
+	cmd.PersistentFlags().StringVarP(&commandeer.password, "password", "p", "", "password")
 
 	// add children
 	cmd.AddCommand(

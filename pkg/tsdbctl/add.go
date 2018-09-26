@@ -82,7 +82,7 @@ func newAddCommandeer(rootCommandeer *RootCommandeer) *addCommandeer {
 		},
 	}
 
-	cmd.Flags().StringVarP(&commandeer.tArr, "times", "t", "", "time array, comma separated")
+	cmd.Flags().StringVarP(&commandeer.tArr, "times", "m", "", "time array, comma separated")
 	cmd.Flags().StringVarP(&commandeer.vArr, "values", "d", "", "values array, comma separated")
 	cmd.Flags().StringVarP(&commandeer.inFile, "file", "f", "", "CSV input file")
 	cmd.Flags().BoolVar(&commandeer.stdin, "stdin", false, "read from standard input")
