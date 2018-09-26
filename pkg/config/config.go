@@ -198,7 +198,7 @@ func loadConfig(path string) (*V3ioConfig, error) {
 			return nil, errors.Wrap(err, "failed to read configuration")
 		}
 	} else {
-		data, err := ioutil.ReadFile(resolvedPath)
+		data, err = ioutil.ReadFile(resolvedPath)
 		if err != nil {
 			return nil, err
 		}

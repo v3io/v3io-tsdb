@@ -161,10 +161,10 @@ func (rc *RootCommandeer) populateConfig(cfg *config.V3ioConfig) error {
 		if slash == -1 || len(rc.v3ioPath) <= slash+1 {
 			if rc.container != "" {
 				cfg.Container = rc.container
-				cfg.V3ioUrl = rc.v3ioPath
-			} else {
+			} else if cfg.Container == "" {
 				return fmt.Errorf("missing container name in V3IO URL")
 			}
+			cfg.V3ioUrl = rc.v3ioPath
 		} else {
 			cfg.V3ioUrl = rc.v3ioPath[0:slash]
 			cfg.Container = rc.v3ioPath[slash+1:]
