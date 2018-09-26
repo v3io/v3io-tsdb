@@ -61,7 +61,10 @@ func BenchmarkIngest(b *testing.B) {
 	}
 
 	if testConfig.CleanupAfterTest {
-		defer adapter.DeleteDB(true, true, 0, 0)
+		// Don't delete the table if the test has failed
+		if !b.Failed() {
+			defer tsdbtest.DeleteTSDB(b, v3ioConfig)
+		}
 	}
 
 	appender, err := adapter.Appender()
