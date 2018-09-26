@@ -76,7 +76,7 @@ func newCreateCommandeer(rootCommandeer *RootCommandeer) *createCommandeer {
 	cmd.Flags().IntVarP(&commandeer.shardingBuckets, "sharding-buckets", "b", defaultShardingBuckets, "number of buckets to split key")
 	// TODO: enable sample-retention when supported
 	// cmd.Flags().IntVarP(&commandeer.sampleRetention, "sample-retention", "r", defaultSampleRetentionHours, "sample retention in hours")
-	cmd.Flags().StringVar(&commandeer.sampleRate, "rate", defaultIngestionRate, "sample rate")
+	cmd.Flags().StringVarP(&commandeer.sampleRate, "rate", "r", defaultIngestionRate, "sample rate")
 
 	commandeer.cmd = cmd
 
