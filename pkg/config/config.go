@@ -32,7 +32,7 @@ import (
 const (
 	V3ioConfigEnvironmentVariable = "V3IO_CONF"
 	DefaultConfigurationFileName  = "v3io.yaml"
-	SchemaConfigFileName                 = ".schema"
+	SchemaConfigFileName          = ".schema"
 
 	defaultNumberOfIngestWorkers = 1
 	defaultNumberOfQueryWorkers  = 8

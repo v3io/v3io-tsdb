@@ -70,12 +70,12 @@ func newCreateCommandeer(rootCommandeer *RootCommandeer) *createCommandeer {
 		},
 	}
 
-	cmd.Flags().StringVarP(&commandeer.defaultRollups, "rollups", "r", "",
+	cmd.Flags().StringVarP(&commandeer.defaultRollups, "aggregates", "a", "",
 		"Default aggregation rollups, comma seperated: count,avg,sum,min,max,stddev")
-	cmd.Flags().StringVarP(&commandeer.rollupInterval, "rollup-interval", "i", defaultRollupInterval, "aggregation interval")
+	cmd.Flags().StringVarP(&commandeer.rollupInterval, "aggregation-granularity", "i", defaultRollupInterval, "aggregation interval")
 	cmd.Flags().IntVarP(&commandeer.shardingBuckets, "sharding-buckets", "b", defaultShardingBuckets, "number of buckets to split key")
 	// TODO: enable sample-retention when supported
-	// cmd.Flags().IntVarP(&commandeer.sampleRetention, "sample-retention", "a", defaultSampleRetentionHours, "sample retention in hours")
+	// cmd.Flags().IntVarP(&commandeer.sampleRetention, "sample-retention", "r", defaultSampleRetentionHours, "sample retention in hours")
 	cmd.Flags().StringVar(&commandeer.sampleRate, "rate", defaultIngestionRate, "sample rate")
 
 	commandeer.cmd = cmd

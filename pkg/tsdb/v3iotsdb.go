@@ -182,18 +182,24 @@ func (a *V3ioAdapter) Querier(_ context.Context, mint, maxt int64) (*querier.V3i
 	return querier.NewV3ioQuerier(a.container, a.logger, mint, maxt, a.cfg, a.partitionMngr), nil
 }
 
-func (a *V3ioAdapter) DeleteDB(configExists bool, force bool, fromTime int64, toTime int64) error {
+func (a *V3ioAdapter) DeleteDB(deleteAll bool, ignoreErrors bool, fromTime int64, toTime int64) error {
+	if deleteAll {
+		// Ignore time boundaries
+		fromTime = 0
+		toTime = time.Now().Unix() * 1000
+	}
+
 	partitions := a.partitionMngr.PartsForRange(fromTime, toTime)
 	for _, part := range partitions {
 		a.logger.Info("Delete partition %s", part.GetTablePath())
 		err := utils.DeleteTable(a.logger, a.container, part.GetTablePath(), "", a.cfg.QryWorkers)
-		if err != nil && !force {
-			return errors.Wrap(err, "Failed to delete partition "+part.GetTablePath())
+		if err != nil && !ignoreErrors {
+			return errors.Wrapf(err, "Failed to delete partition '%s'", part.GetTablePath())
 		}
 		// delete the Directory object
 		err = a.container.Sync.DeleteObject(&v3io.DeleteObjectInput{Path: part.GetTablePath()})
-		if err != nil && !force {
-			return errors.Wrap(err, "Failed to delete partition object "+part.GetTablePath())
+		if err != nil && !ignoreErrors {
+			return errors.Wrapf(err, "Failed to delete partition object '%s'", part.GetTablePath())
 		}
 	}
 	a.partitionMngr.DeletePartitionsFromSchema(partitions)
@@ -202,25 +208,25 @@ func (a *V3ioAdapter) DeleteDB(configExists bool, force bool, fromTime int64, to
 		path := a.cfg.Path + "/names/"
 		a.logger.Info("Delete metric names in path %s", path)
 		err := utils.DeleteTable(a.logger, a.container, path, "", a.cfg.QryWorkers)
-		if err != nil && !force {
+		if err != nil && !ignoreErrors {
 			return errors.Wrap(err, "Failed to delete names table")
 		}
 		// delete the Directory object
 		err = a.container.Sync.DeleteObject(&v3io.DeleteObjectInput{Path: path})
-		if err != nil && !force {
+		if err != nil && !ignoreErrors {
 			return errors.Wrap(err, "Failed to delete table object")
 		}
 	}
-	if configExists {
+	if deleteAll {
 		schemaPath := pathUtil.Join(a.cfg.Path, config.SchemaConfigFileName)
 		a.logger.Info("Delete TSDB config in path %s", schemaPath)
 		err := a.container.Sync.DeleteObject(&v3io.DeleteObjectInput{Path: schemaPath})
-		if err != nil && !force {
+		if err != nil && !ignoreErrors {
 			return errors.New("Cant delete config or not found in " + schemaPath)
 		}
 		// delete the Directory object
 		err = a.container.Sync.DeleteObject(&v3io.DeleteObjectInput{Path: a.cfg.Path + "/"})
-		if err != nil && !force {
+		if err != nil && !ignoreErrors {
 			return errors.Wrap(err, "Failed to delete table object")
 		}
 	}
