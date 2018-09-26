@@ -409,13 +409,15 @@ func (p *DBPartition) ChunkID2Attr(col string, id int) string {
 }
 
 // Return the attributes that need to be retrieved for a given time range
-func (p *DBPartition) Range2Attrs(col string, mint, maxt int64) ([]string, []int) {
+func (p *DBPartition) Range2Attrs(col string, mint, maxt int64) ([]string, int64) {
 	list := p.Range2Cids(mint, maxt)
 	var strList []string
 	for _, id := range list {
 		strList = append(strList, p.ChunkID2Attr(col, id))
 	}
-	return strList, list
+
+	firstAttrTime := p.startTime + ((mint-p.startTime)/p.chunkInterval)*p.chunkInterval
+	return strList, firstAttrTime
 }
 
 // All the chunk IDs which match the time range

@@ -56,15 +56,21 @@ type V3ioPromQuerier struct {
 // Select returns a set of series that matches the given label matchers.
 func (q *V3ioPromQuerier) Select(params *storage.SelectParams, oms ...*labels.Matcher) (storage.SeriesSet, error) {
 	name, filter, functions := match2filter(oms)
+	noAggr := false
+
 	if params.Func != "" {
 		// only pass xx_over_time functions (just the xx part)
 		// TODO: support count/stdxx, require changes in Prometheus: promql/functions.go, not calc aggregate twice
 		f := params.Func
-		if strings.HasSuffix(f, "_over_time") && (f[0:3] == "min" || f[0:3] == "max" || f[0:3] == "sum" || f[0:3] == "avg") {
-			functions = f[0:3]
+		if strings.HasSuffix(f, "_over_time") {
+			if params.Step == 0 && (f[0:3] == "min" || f[0:3] == "max" || f[0:3] == "sum" || f[0:3] == "avg") {
+				functions = f[0:3]
+			} else {
+				noAggr = true
+			}
 		}
 	}
-	set, err := q.q.Select(name, functions, params.Step, filter)
+	set, err := q.q.SelectProm(name, functions, params.Step, filter, noAggr)
 	return &V3ioPromSeriesSet{s: set}, err
 }
 

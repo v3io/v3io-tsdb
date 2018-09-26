@@ -71,7 +71,7 @@ func (as *AggregateSeries) CanAggregate(partitionAggr AggrType) bool {
 	// make sure the DB has all the aggregators we need (on bits in the mask)
 	// and that the requested interval is greater/eq to aggregator resolution and is an even divisor
 	return ((aggrMask & partitionAggr) == aggrMask) &&
-		as.interval >= as.rollupTime && (as.interval%as.rollupTime == 0)
+		as.interval >= as.rollupTime && (as.interval%as.rollupTime == 0 || as.interval/as.rollupTime > 3)
 }
 
 func (as *AggregateSeries) GetAggrMask() AggrType {
