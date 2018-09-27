@@ -62,7 +62,11 @@ func newCreateCommandeer(rootCommandeer *RootCommandeer) *createCommandeer {
 
 	cmd := &cobra.Command{
 		Use:   "create",
-		Short: "create a new TSDB in the specifies path",
+		Short: "Create a new TSDB instance",
+		Long:  `Create a new TSDB instance (table) according to the provided configuration.`,
+        Example: `- tsdbctl create -s 192.168.1.100:8081 -c mycontainer -u myuser -p mypassword --rate 1/s
+- tsdbctl create -g ~/my_tsdb_cfg.yaml -c bigdata -u johnl -p "P@ssNoW!" --rate "100/h"
+  (where ~/my_tsdb_cfg.yaml has a "v3ioUrl" key that sets the endpoint of the web service)`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 
 			return commandeer.create()
@@ -71,12 +75,16 @@ func newCreateCommandeer(rootCommandeer *RootCommandeer) *createCommandeer {
 	}
 
 	cmd.Flags().StringVarP(&commandeer.defaultRollups, "aggregates", "a", "",
-		"Default aggregation rollups, comma seperated: count,avg,sum,min,max,stddev")
-	cmd.Flags().StringVarP(&commandeer.rollupInterval, "aggregation-granularity", "i", defaultRollupInterval, "aggregation interval")
-	cmd.Flags().IntVarP(&commandeer.shardingBuckets, "sharding-buckets", "b", defaultShardingBuckets, "number of buckets to split key")
-	// TODO: enable sample-retention when supported
-	// cmd.Flags().IntVarP(&commandeer.sampleRetention, "sample-retention", "r", defaultSampleRetentionHours, "sample retention in hours")
-	cmd.Flags().StringVarP(&commandeer.sampleRate, "rate", "r", defaultIngestionRate, "sample rate")
+		"Default aggregates to calculate in real time during\nthe samples ingestion, as a comma-separated list of\nsupported aggregation functions - count | avg | sum |\nmin | max | stddev | stdvar | last | rate.\nExample: \"sum,avg,max\".")
+	cmd.Flags().StringVarP(&commandeer.rollupInterval, "aggregation-granularity", "i", defaultRollupInterval,
+		"Aggregation granularity - a time interval for applying\nthe aggregation functions (if  configured - see the\n-a|--aggregates flag), of the format \"[0-9]+[mh]\"\n(where 'm' = minutes and 'h' = hours).\nExamples: \"1h\"; \"90m\".")
+	cmd.Flags().IntVarP(&commandeer.shardingBuckets, "sharding-buckets", "b", defaultShardingBuckets,
+		"Number of storage buckets across which to split the\ndata of a single metric to optimize storage of\nnon-uniform data. Example: 10.")
+	// TODO: enable sample-retention when supported:
+	// cmd.Flags().IntVarP(&commandeer.sampleRetention, "sample-retention", "r", defaultSampleRetentionHours,
+	//	"Metric-samples retention period, in hours. Example: 1 (retain samples for 1 hour).")
+	cmd.Flags().StringVarP(&commandeer.sampleRate, "rate", "r", defaultIngestionRate,
+		"[Required] Metric-samples ingestion rate - the maximum\ningestion rate for a single metric (calculated\naccording to the slowest expecetd ingestion rate) -\nof the format \"[0-9]+/[mhd]\" (where 'm' = minutes,\n'h' = hours, and 'd' = days). Examples: \"12/m\" (12\nsamples per minute); \"1s\" (one sample per second).")
 
 	commandeer.cmd = cmd
 
@@ -91,16 +99,16 @@ func (cc *createCommandeer) create() error {
 	}
 
 	if err := cc.validateRollupInterval(); err != nil {
-		return errors.Wrap(err, "failed to parse rollup interval")
+		return errors.Wrap(err, "Failed to parse the aggregation granularity.")
 	}
 
 	rollups, err := aggregate.AggregatorsToStringList(cc.defaultRollups)
 	if err != nil {
-		return errors.Wrap(err, "failed to parse default rollups")
+		return errors.Wrap(err, "Failed to parse the default-aggregates list.")
 	}
 
 	if cc.sampleRate == "" {
-		return errors.New(`sample rate not provided! Please provide sample rate with --rate flag in the format of [0-9]+/[hms]. Example: 12/m`)
+		return errors.New(`Sample rate not provided. Use the --rate flag to provide a sample rate in the format of "[0-9]+/[mhd]". For example, "12/m".`)
 	}
 	rateInHours, err := rateToHours(cc.sampleRate)
 	if err != nil {
@@ -130,7 +138,7 @@ func (cc *createCommandeer) create() error {
 
 	fields, err := aggregate.SchemaFieldFromString(rollups, "v")
 	if err != nil {
-		return errors.Wrap(err, "failed to create aggregators list")
+		return errors.Wrap(err, "Failed to create an aggregates list.")
 	}
 	fields = append(fields, config.SchemaField{Name: "_name", Type: "string", Nullable: false, Items: ""})
 
@@ -198,7 +206,7 @@ func (cc *createCommandeer) calculatePartitionAndChunkInterval(rateInHours int) 
 }
 
 func rateToHours(sampleRate string) (int, error) {
-	parsingError := errors.New(`not a valid rate. Accepted pattern: [0-9]+/[hms]. Example: 12/m`)
+	parsingError := errors.New(`Invalid rate. The sample rate must be of the format "[0-9]+/[mhd]". For example, "12/m".`)
 
 	if len(sampleRate) < 3 {
 		return 0, parsingError
