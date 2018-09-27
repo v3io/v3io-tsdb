@@ -51,56 +51,65 @@ func Error() error {
 }
 
 type V3ioConfig struct {
-	// V3IO Connection details: Url, Data container, relative path for this dataset, credentials
+	// V3IO TSDB connection information - web-gateway service endpoint,
+	// TSDB data container, relative TSDB table path within the container, and
+	// login credentials
 	V3ioUrl   string `json:"v3ioUrl"`
 	Container string `json:"container"`
 	Path      string `json:"path"`
 	Username  string `json:"username,omitempty"`
 	Password  string `json:"password,omitempty"`
 
-	// Disable is use in Prometheus to disable v3io and work with the internal TSDB
+	// Disabled = true disables the V3IO TSDB configuration in Prometheus and
+	// enables the internal Prometheus TSDB instead
 	Disabled bool `json:"disabled,omitempty"`
-	// Set logging level: debug | info | warn | error (info by default)
+	// Logging verbosity level - "debug" | "info" | "warn" | "error"
 	Verbose string `json:"verbose,omitempty"`
 	// Number of parallel V3IO worker routines
 	Workers int `json:"workers"`
-	// Number of parallel V3IO worker routines for queries (default is min between 8 and Workers)
+	// Number of parallel V3IO worker routines for queries;
+	// default = the minimum value between 8 and Workers
 	QryWorkers int `json:"qryWorkers"`
 	// Max uncommitted (delayed) samples allowed per metric
 	MaxBehind int `json:"maxBehind"`
-	// Override last chunk (by default on restart it will append from the last point if possible)
+	// Override last chunk; by default, an append from the last point is attempted upon restart
 	OverrideOld bool `json:"overrideOld"`
-	// Default timeout duration in Seconds (if not set, 1 Hour timeout will be used )
+	// Default timeout duration, in seconds; default = 3,600 seconds (1 hour)
 	DefaultTimeoutInSeconds int `json:"timeout,omitempty"`
-	// The size of batch to use during ingestion
+	// Size of the samples batch to use during ingestion
 	BatchSize int `json:"batchSize,omitempty"`
-	// Sample size in bytes in worst compression scenario
+	// Maximum sample size, in bytes (for the worst compression scenario)
 	MaximumSampleSize int `json:"maximumSampleSize,omitempty"`
-	// Max size of a partition object
+	// Maximum size of a partition object
 	MaximumPartitionSize int `json:"maximumPartitionSize,omitempty"`
-	// Size of chunk in bytes for worst an best compression scenarios
+	// Minimum chunk size, in bytes (for the best compression scenario)
 	MinimumChunkSize int `json:"minimumChunkSize,omitempty"`
+	// Maximum chunk size, in bytes (for the worst compression scenario)
 	MaximumChunkSize int `json:"maximumChunkSize,omitempty"`
-
-	// Metrics reporter configuration
+	// Metrics-reporter configuration
 	MetricsReporter MetricsReporterConfig `json:"performance,omitempty"`
 }
 
 type MetricsReporterConfig struct {
+	// Report on shutdown (Boolean)
 	ReportOnShutdown   bool   `json:"reportOnShutdown,omitempty"`
-	Output             string `json:"output"` // stdout, stderr, syslog, etc.
+	// Output destination - "stdout", "stderr", "syslog", etc.
+	Output             string `json:"output"`
+	// Report periodically (Boolean)
 	ReportPeriodically bool   `json:"reportPeriodically,omitempty"`
-	RepotInterval      int    `json:"reportInterval"` // interval between consequence reports (in Seconds)
+	// Interval between consequence reports (in seconds)
+	RepotInterval      int    `json:"reportInterval"`
 }
 
 type Rollup struct {
 	Aggregators            []string `json:"aggregators"`
 	AggregatorsGranularity string   `json:"aggregatorsGranularity"`
-	//["cloud","local"] for the aggregators and sample chunks
+	// Storage class for the aggregates and sample chunks - "cloud" | "local"
 	StorageClass string `json:"storageClass"`
-	//in hours. 0  means no need to save samples
+	// [FUTURE] Sample retention period, in hours. 0 means no need to save samples.
 	SampleRetention int `json:"sampleRetention"`
-	// format : 1m, 7d, 3h . Possible intervals: m/d/h
+	// Layer retention time, in months ('m'), days ('d'), or hours ('h').
+	// Format: "[0-9]+[hmd]". For example: "3h", "7d", "1m"
 	LayerRetentionTime string `json:"layerRetentionTime"`
 }
 
@@ -173,7 +182,7 @@ func GetOrLoadFromData(data []byte) (*V3ioConfig, error) {
 	return instance, failure
 }
 
-// update defaults when using config struct
+// Update the defaults when using a configuration structure
 func GetOrLoadFromStruct(cfg *V3ioConfig) (*V3ioConfig, error) {
 	once.Do(func() {
 		initDefaults(cfg)
@@ -206,7 +215,7 @@ func loadConfig(path string) (*V3ioConfig, error) {
 		if os.IsNotExist(err) {
 			data = []byte{}
 		} else {
-			return nil, errors.Wrap(err, "failed to read configuration")
+			return nil, errors.Wrap(err, "Failed to read the TSDB configuration.")
 		}
 	} else {
 		data, err = ioutil.ReadFile(resolvedPath)
@@ -215,7 +224,7 @@ func loadConfig(path string) (*V3ioConfig, error) {
 		}
 
 		if len(data) == 0 {
-			return nil, errors.Errorf("file '%s' exists but its content is not valid", resolvedPath)
+			return nil, errors.Errorf("Configuration file '%s' exists but its content is invalid.", resolvedPath)
 		}
 	}
 
