@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/signal"
 	"sync"
+	"sync/atomic"
 	"syscall"
 	"time"
 )
@@ -20,11 +21,13 @@ var once sync.Once
 const (
 	STDOUT = "stdout"
 	STDERR = "stderr"
+
+	notRuningState = 0
+	runningState   = 1
 )
 
 type MetricReporter struct {
-	lock                  sync.Mutex
-	running               bool
+	state                 int64
 	registry              metrics.Registry
 	logWriter             io.Writer
 	reportPeriodically    bool
@@ -73,12 +76,8 @@ func ReporterInstanceFromConfig(config *config.V3ioConfig) *MetricReporter {
 }
 
 func (mr *MetricReporter) Start() error {
-	mr.lock.Lock()
-	defer mr.lock.Unlock()
 
-	if !mr.running {
-		mr.running = true
-	} else {
+	if !atomic.CompareAndSwapInt64(&mr.state, notRuningState, runningState) {
 		return errors.Errorf("metric reporter is already running.")
 	}
 
@@ -86,11 +85,7 @@ func (mr *MetricReporter) Start() error {
 }
 
 func (mr *MetricReporter) Stop() error {
-	mr.lock.Lock()
-	defer mr.lock.Unlock()
-
-	if mr.running {
-		mr.running = false
+	if atomic.CompareAndSwapInt64(&mr.state, runningState, notRuningState) {
 		if mr.reportOnShutdown {
 			time.Sleep(300 * time.Millisecond) // postpone performance report on shutdown to avoid mixing with other log messages
 			metrics.WriteOnce(mr.registry, mr.logWriter)
@@ -163,7 +158,7 @@ func newMetricReporter(outputWriter io.Writer, reportPeriodically bool, reportIn
 	reporter := MetricReporter{
 		registry:              metrics.NewPrefixedRegistry("v3io-tsdb -> "),
 		logWriter:             writer,
-		running:               true,
+		state:                 runningState,
 		reportPeriodically:    reportPeriodically,
 		reportIntervalSeconds: reportIntervalSeconds,
 		reportOnShutdown:      reportOnShutdown,
@@ -184,8 +179,5 @@ func newMetricReporter(outputWriter io.Writer, reportPeriodically bool, reportIn
 }
 
 func (mr *MetricReporter) isRunning() bool {
-	mr.lock.Lock()
-	defer mr.lock.Unlock()
-
-	return mr.running
+	return atomic.LoadInt64(&mr.state) == runningState
 }
