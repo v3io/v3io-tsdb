@@ -57,12 +57,12 @@ type V3ioQuerier struct {
 	disableAllAggr    bool
 }
 
-// Prometheus Time Series Query, return a set of series which match the condition
+//  Standard Time Series Query, return a set of series which match the condition
 func (q *V3ioQuerier) Select(name, functions string, step int64, filter string) (SeriesSet, error) {
 	return q.selectQry(name, functions, step, nil, filter)
 }
 
-// Standard Time Series Query, return a set of series which match the condition
+// Prometheus Time Series Query, return a set of series which match the condition
 func (q *V3ioQuerier) SelectProm(name, functions string, step int64, filter string, noAggr bool) (SeriesSet, error) {
 	q.disableClientAggr = true
 	q.disableAllAggr = noAggr
