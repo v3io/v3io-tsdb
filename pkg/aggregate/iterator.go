@@ -116,6 +116,7 @@ func (as *AggregateSeries) NewSetFromAttrs(
 	}
 
 	for _, aggr := range rawAggregators {
+		// Always have count aggregator by default
 		if aggr&as.aggrMask != 0 || aggr&aggrTypeCount != 0 {
 			attrBlob, ok := (*attrs)[as.toAttrName(aggr)]
 			if !ok {
@@ -175,6 +176,7 @@ func (as *AggregateSeries) NewSetFromChunks(length int) *AggregateSet {
 	dataArrays := map[AggrType][]float64{}
 
 	for _, aggr := range rawAggregators {
+		// Always have count aggregator by default
 		if aggr&as.aggrMask != 0 || aggr&aggrTypeCount != 0 {
 			dataArrays[aggr] = make([]float64, length, length) // TODO: len/capacity & reuse (pool)
 			if aggr == aggrTypeMax || aggr == aggrTypeMin || aggr == aggrTypeLast {
