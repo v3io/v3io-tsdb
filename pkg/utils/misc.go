@@ -2,7 +2,9 @@ package utils
 
 import (
 	"fmt"
+	"github.com/v3io/v3io-go-http"
 	"math"
+	"net/http"
 	"strings"
 )
 
@@ -19,4 +21,17 @@ func FloatToNormalizedScientificStr(val float64) string {
 		return fmt.Sprintf("%f", val)
 	}
 	return strings.Replace(fmt.Sprintf("%e", val), "+", "", 1)
+}
+
+func IsNotExistsError(err error) bool {
+	errorWithStatusCode, ok := err.(v3io.ErrorWithStatusCode)
+	if !ok {
+		// error of different type
+		return false
+	}
+	// Ignore 404s
+	if errorWithStatusCode.StatusCode() == http.StatusNotFound {
+		return true
+	}
+	return false
 }

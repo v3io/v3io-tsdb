@@ -72,9 +72,9 @@ func newQueryCommandeer(rootCommandeer *RootCommandeer) *queryCommandeer {
 	cmd.Flags().StringVarP(&commandeer.filter, "filter", "f", "", "v3io query filter e.g. method=='get'")
 	cmd.Flags().StringVarP(&commandeer.last, "last", "l", "", "last min/hours/days e.g. 15m")
 	cmd.Flags().StringVarP(&commandeer.windows, "windows", "w", "", "comma separated list of overlapping windows")
-	cmd.Flags().StringVarP(&commandeer.functions, "aggregators", "a", "",
+	cmd.Flags().StringVarP(&commandeer.functions, "aggregates", "a", "",
 		"comma separated list of aggregation functions, e.g. count,avg,sum,min,max,stddev,stdvar,last,rate")
-	cmd.Flags().StringVarP(&commandeer.step, "step", "i", "", "interval step for aggregation functions")
+	cmd.Flags().StringVarP(&commandeer.step, "aggregation-interval", "i", "", "interval step for aggregation functions")
 
 	commandeer.cmd = cmd
 

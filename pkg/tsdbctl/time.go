@@ -65,6 +65,7 @@ func newTimeCommandeer(rootCommandeer *RootCommandeer) *timeCommandeer {
 
 		},
 	}
+	cmd.Hidden = true
 
 	commandeer.cmd = cmd
 
