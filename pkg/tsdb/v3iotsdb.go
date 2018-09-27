@@ -218,7 +218,7 @@ func (a *V3ioAdapter) DeleteDB(deleteAll bool, ignoreErrors bool, fromTime int64
 		}
 		// delete the Directory object
 		err = a.container.Sync.DeleteObject(&v3io.DeleteObjectInput{Path: path})
-		if err != nil || !ignoreErrors {
+		if err != nil && !ignoreErrors {
 			if !utils.IsNotExistsError(err) {
 				return errors.Wrapf(err, "Failed to delete table object '%s'", path)
 			}
@@ -234,7 +234,7 @@ func (a *V3ioAdapter) DeleteDB(deleteAll bool, ignoreErrors bool, fromTime int64
 		// delete the Directory object
 		path := a.cfg.Path + "/"
 		err = a.container.Sync.DeleteObject(&v3io.DeleteObjectInput{Path: path})
-		if err != nil || !ignoreErrors {
+		if err != nil && !ignoreErrors {
 			if !utils.IsNotExistsError(err) {
 				return errors.Wrapf(err, "Failed to delete table object '%s'", path)
 			}
