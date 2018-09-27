@@ -56,7 +56,7 @@ func newAddCommandeer(rootCommandeer *RootCommandeer) *addCommandeer {
 
 	cmd := &cobra.Command{
 		Use:     "add <metric> [labels] [flags]",
-		Aliases: []string{"append"},
+		Aliases: []string{"append", "ingest"},
 		Short:   "add samples to metric. e.g. add http_req method=get -d 99.9",
 		RunE: func(cmd *cobra.Command, args []string) error {
 
@@ -82,11 +82,13 @@ func newAddCommandeer(rootCommandeer *RootCommandeer) *addCommandeer {
 		},
 	}
 
-	cmd.Flags().StringVarP(&commandeer.tArr, "times", "t", "", "time array, comma separated")
+	cmd.Flags().StringVarP(&commandeer.tArr, "times", "m", "", "time array, comma separated")
 	cmd.Flags().StringVarP(&commandeer.vArr, "values", "d", "", "values array, comma separated")
 	cmd.Flags().StringVarP(&commandeer.inFile, "file", "f", "", "CSV input file")
 	cmd.Flags().BoolVar(&commandeer.stdin, "stdin", false, "read from standard input")
+	cmd.Flags().Lookup("stdin").Hidden = true
 	cmd.Flags().IntVar(&commandeer.delay, "delay", 0, "Add delay per insert batch in milisec")
+	cmd.Flags().Lookup("delay").Hidden = true
 
 	commandeer.cmd = cmd
 
