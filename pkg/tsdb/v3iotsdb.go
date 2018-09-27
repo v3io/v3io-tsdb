@@ -49,7 +49,7 @@ func CreateTSDB(v3iocfg *config.V3ioConfig, schema *config.Schema) error {
 
 	lgr, _ := utils.NewLogger(v3iocfg.Verbose)
 	container, err := utils.CreateContainer(
-		lgr, v3iocfg.V3ioUrl, v3iocfg.Container, v3iocfg.Username, v3iocfg.Password, v3iocfg.Workers)
+		lgr, v3iocfg.WebApiEndpoint, v3iocfg.Container, v3iocfg.Username, v3iocfg.Password, v3iocfg.Workers)
 	if err != nil {
 		return errors.Wrap(err, "Failed to create data container")
 	}
@@ -59,17 +59,17 @@ func CreateTSDB(v3iocfg *config.V3ioConfig, schema *config.Schema) error {
 		return errors.Wrap(err, "Failed to Marshal schema file")
 	}
 
-	path := pathUtil.Join(v3iocfg.Path, config.SchemaConfigFileName)
+	path := pathUtil.Join(v3iocfg.TablePath, config.SchemaConfigFileName)
 	// check if the config file already exist, abort if it does
 	_, err = container.Sync.GetObject(&v3io.GetObjectInput{Path: path})
 	if err == nil {
-		return fmt.Errorf("TSDB already exist in path: " + v3iocfg.Path)
+		return fmt.Errorf("TSDB already exist in path: " + v3iocfg.TablePath)
 	}
 
 	err = container.Sync.PutObject(&v3io.PutObjectInput{Path: path, Body: data})
 	if err != nil {
 		return errors.Wrapf(err, "Failed create schema at path %s",
-			pathUtil.Join(v3iocfg.V3ioUrl, v3iocfg.Container, path))
+			pathUtil.Join(v3iocfg.WebApiEndpoint, v3iocfg.Container, path))
 	}
 	return err
 }
@@ -94,7 +94,7 @@ func NewV3ioAdapter(cfg *config.V3ioConfig, container *v3io.Container, logger lo
 		newV3ioAdapter.container = container
 	} else {
 		newV3ioAdapter.container, err = utils.CreateContainer(newV3ioAdapter.logger,
-			cfg.V3ioUrl, cfg.Container, cfg.Username, cfg.Password, cfg.Workers)
+			cfg.WebApiEndpoint, cfg.Container, cfg.Username, cfg.Password, cfg.Workers)
 		if err != nil {
 			return nil, errors.Wrap(err, "Failed to create V3IO data container")
 		}
@@ -114,13 +114,13 @@ func (a *V3ioAdapter) GetLogger(child string) logger.Logger {
 }
 
 func (a *V3ioAdapter) GetContainer() (*v3io.Container, string) {
-	return a.container, a.cfg.Path
+	return a.container, a.cfg.TablePath
 }
 
 func (a *V3ioAdapter) connect() error {
 
-	fullpath := pathUtil.Join(a.cfg.V3ioUrl, a.cfg.Container, a.cfg.Path)
-	resp, err := a.container.Sync.GetObject(&v3io.GetObjectInput{Path: pathUtil.Join(a.cfg.Path, config.SchemaConfigFileName)})
+	fullpath := pathUtil.Join(a.cfg.WebApiEndpoint, a.cfg.Container, a.cfg.TablePath)
+	resp, err := a.container.Sync.GetObject(&v3io.GetObjectInput{Path: pathUtil.Join(a.cfg.TablePath, config.SchemaConfigFileName)})
 	if err != nil {
 		if utils.IsNotExistsError(err) {
 			return errors.Errorf("No schema file found at: %s", fullpath)
@@ -210,7 +210,7 @@ func (a *V3ioAdapter) DeleteDB(deleteAll bool, ignoreErrors bool, fromTime int64
 	a.partitionMngr.DeletePartitionsFromSchema(partitions)
 
 	if len(a.partitionMngr.GetPartitionsPaths()) == 0 {
-		path := a.cfg.Path + "/names/"
+		path := a.cfg.TablePath + "/names/"
 		a.logger.Info("Delete metric names in path %s", path)
 		err := utils.DeleteTable(a.logger, a.container, path, "", a.cfg.QryWorkers)
 		if err != nil && !ignoreErrors {
@@ -225,14 +225,14 @@ func (a *V3ioAdapter) DeleteDB(deleteAll bool, ignoreErrors bool, fromTime int64
 		}
 	}
 	if deleteAll {
-		schemaPath := pathUtil.Join(a.cfg.Path, config.SchemaConfigFileName)
+		schemaPath := pathUtil.Join(a.cfg.TablePath, config.SchemaConfigFileName)
 		a.logger.Info("Delete TSDB config in path %s", schemaPath)
 		err := a.container.Sync.DeleteObject(&v3io.DeleteObjectInput{Path: schemaPath})
 		if err != nil && !ignoreErrors {
 			return errors.New("Cant delete config or not found in " + schemaPath)
 		}
 		// delete the Directory object
-		path := a.cfg.Path + "/"
+		path := a.cfg.TablePath + "/"
 		err = a.container.Sync.DeleteObject(&v3io.DeleteObjectInput{Path: path})
 		if err != nil && !ignoreErrors {
 			if !utils.IsNotExistsError(err) {

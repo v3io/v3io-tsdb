@@ -95,7 +95,7 @@ func (ic *delCommandeer) delete() error {
 
 	if !ic.force {
 		confirmedByUser, err := getConfirmation(
-			fmt.Sprintf("You are about to delete the '%s' table. Are you sure?", ic.rootCommandeer.v3iocfg.Path))
+			fmt.Sprintf("You are about to delete the '%s' table. Are you sure?", ic.rootCommandeer.v3iocfg.TablePath))
 		if err != nil {
 			return err
 		}
@@ -107,9 +107,9 @@ func (ic *delCommandeer) delete() error {
 
 	err = ic.rootCommandeer.adapter.DeleteDB(ic.deleteAll, ic.ignoreErrors, from, to)
 	if err != nil {
-		return errors.Wrapf(err, "Failed to delete table '%s'", ic.rootCommandeer.v3iocfg.Path)
+		return errors.Wrapf(err, "Failed to delete table '%s'", ic.rootCommandeer.v3iocfg.TablePath)
 	}
-	fmt.Printf("Table '%s' has been deleted\n", ic.rootCommandeer.v3iocfg.Path)
+	fmt.Printf("Table '%s' has been deleted\n", ic.rootCommandeer.v3iocfg.TablePath)
 
 	return nil
 }
