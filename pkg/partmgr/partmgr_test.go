@@ -25,7 +25,7 @@ package partmgr
 import (
 	"github.com/stretchr/testify/assert"
 	"github.com/v3io/v3io-tsdb/pkg/config"
-	"github.com/v3io/v3io-tsdb/pkg/tsdb/tsdbtest/testutils"
+	"github.com/v3io/v3io-tsdb/pkg/tsdb/schema"
 	"testing"
 )
 
@@ -72,14 +72,18 @@ func TestCreateNewPartition(tst *testing.T) {
 }
 
 func getPartitionManager(tst *testing.T) *PartitionManager {
-	schema := testutils.CreateSchema(tst, "*")
+	schm, err := schema.NewSchema([]string{"*"})
+	if err != nil {
+		tst.Fatalf("failed to create schema. Error: %v", err)
+	}
 
 	const dummyConfig = `path: "/test"`
 	v3ioConfig, err := config.GetOrLoadFromData([]byte(dummyConfig))
 	if err != nil {
 		tst.Fatalf("failed to obtain v3io configuration. Error: %v", err)
 	}
-	manager, err := NewPartitionMngr(&schema, nil, v3ioConfig)
+
+	manager, err := NewPartitionMngr(schm, nil, v3ioConfig)
 	if err != nil {
 		tst.Fatalf("failed to create partition manager. Error: %v", err)
 	}

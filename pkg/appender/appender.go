@@ -38,8 +38,8 @@ const channelSize = 4048
 const maxSamplesBatchSize = 16
 const queueStallTime = 1 * time.Millisecond
 
-const minimalUnixTime = 20000000 // year 1970
-const maxUnixTime = 13569465600  // year 2400
+const minimalUnixTime = 0       // year 1970
+const maxUnixTime = 13569465600 // year 2400
 
 // to add, rollups policy (cnt, sum, min/max, sum^2) + interval , or policy in per name label
 type MetricState struct {

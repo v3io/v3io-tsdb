@@ -27,20 +27,10 @@ import (
 	"github.com/v3io/v3io-tsdb/pkg/aggregate"
 	"github.com/v3io/v3io-tsdb/pkg/config"
 	"github.com/v3io/v3io-tsdb/pkg/tsdb"
+	"github.com/v3io/v3io-tsdb/pkg/tsdb/schema"
 	"github.com/v3io/v3io-tsdb/pkg/utils"
 	"strconv"
 	"time"
-)
-
-const (
-	schemaVersion          = 0
-	defaultStorageClass    = "local"
-	defaultIngestionRate   = ""
-	defaultRollupInterval  = "1h"
-	defaultShardingBuckets = 8
-	// TODO: enable sample-retention when supported
-	// defaultSampleRetentionHours = 0
-	defaultLayerRetentionTime = "1y"
 )
 
 type createCommandeer struct {
@@ -72,11 +62,9 @@ func newCreateCommandeer(rootCommandeer *RootCommandeer) *createCommandeer {
 
 	cmd.Flags().StringVarP(&commandeer.defaultRollups, "aggregates", "a", "",
 		"Default aggregation rollups, comma seperated: count,avg,sum,min,max,stddev")
-	cmd.Flags().StringVarP(&commandeer.rollupInterval, "aggregation-granularity", "i", defaultRollupInterval, "aggregation interval")
-	cmd.Flags().IntVarP(&commandeer.shardingBuckets, "sharding-buckets", "b", defaultShardingBuckets, "number of buckets to split key")
-	// TODO: enable sample-retention when supported
-	// cmd.Flags().IntVarP(&commandeer.sampleRetention, "sample-retention", "r", defaultSampleRetentionHours, "sample retention in hours")
-	cmd.Flags().StringVarP(&commandeer.sampleRate, "rate", "r", defaultIngestionRate, "sample rate")
+	cmd.Flags().StringVarP(&commandeer.rollupInterval, "aggregation-granularity", "i", schema.DefaultAggregationGranularity, "aggregation interval")
+	cmd.Flags().IntVarP(&commandeer.shardingBuckets, "sharding-buckets", "b", schema.DefaultShardingBuckets, "number of buckets to split key")
+	cmd.Flags().StringVarP(&commandeer.sampleRate, "rate", "r", schema.DefaultIngestionRate, "sample rate")
 
 	commandeer.cmd = cmd
 
@@ -115,13 +103,13 @@ func (cc *createCommandeer) create() error {
 	defaultRollup := config.Rollup{
 		Aggregators:            rollups,
 		AggregatorsGranularity: cc.rollupInterval,
-		StorageClass:           defaultStorageClass,
+		StorageClass:           schema.DefaultStorageClass,
 		SampleRetention:        cc.sampleRetention,
-		LayerRetentionTime:     defaultLayerRetentionTime, //TODO: make configurable
+		LayerRetentionTime:     schema.DefaultLayerRetentionTime, //TODO: make configurable
 	}
 
 	tableSchema := config.TableSchema{
-		Version:             schemaVersion,
+		Version:             schema.SchemaVersion,
 		RollupLayers:        []config.Rollup{defaultRollup},
 		ShardingBuckets:     cc.shardingBuckets,
 		PartitionerInterval: partitionInterval,
@@ -138,20 +126,20 @@ func (cc *createCommandeer) create() error {
 		Version:                tableSchema.Version,
 		Aggregators:            rollups,
 		AggregatorsGranularity: cc.rollupInterval,
-		StorageClass:           defaultStorageClass,
+		StorageClass:           schema.DefaultStorageClass,
 		SampleRetention:        cc.sampleRetention,
 		ChunckerInterval:       tableSchema.ChunckerInterval,
 		PartitionerInterval:    tableSchema.PartitionerInterval,
 	}
 
-	schema := config.Schema{
+	schm := config.Schema{
 		TableSchemaInfo:     tableSchema,
 		PartitionSchemaInfo: partitionSchema,
 		Partitions:          []*config.Partition{},
 		Fields:              fields,
 	}
 
-	return tsdb.CreateTSDB(cc.rootCommandeer.v3iocfg, &schema)
+	return tsdb.CreateTSDB(cc.rootCommandeer.v3iocfg, &schm)
 }
 
 func (cc *createCommandeer) validateRollupInterval() error {
