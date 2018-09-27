@@ -37,6 +37,7 @@ import (
 const defaultMaximumSampleSize = 8                                  // bytes
 const defaultMaximumPartitionSize = 1700000                         // 1.7MB
 const defaultMinimumChunkSize, defaultMaximumChunkSize = 200, 32000 // bytes
+const defaultVerbosityLevel = "debug"
 
 type RootCommandeer struct {
 	adapter     *tsdb.V3ioAdapter
@@ -65,7 +66,7 @@ func NewRootCommandeer() *RootCommandeer {
 	defaultV3ioServer := os.Getenv("V3IO_SERVICE_URL")
 
 	cmd.PersistentFlags().StringVarP(&commandeer.verbose, "verbose", "v", "", "Verbose output")
-	cmd.PersistentFlags().Lookup("verbose").NoOptDefVal = "debug"
+	cmd.PersistentFlags().Lookup("verbose").NoOptDefVal = defaultVerbosityLevel
 	cmd.PersistentFlags().StringVarP(&commandeer.dbPath, "table-path", "t", "", "sub path for the TSDB, inside the container")
 	cmd.PersistentFlags().StringVarP(&commandeer.v3ioPath, "server", "s", defaultV3ioServer, "V3IO Service URL - ip:port")
 	cmd.PersistentFlags().StringVarP(&commandeer.cfgFilePath, "config", "g", "", "path to yaml config file")
