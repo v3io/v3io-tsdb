@@ -37,7 +37,8 @@ import (
 	"time"
 )
 
-const defaultStepMs = 5 * 60 * 1000 // 5 minutes
+const minuteInMillis = 60 * 1000
+const defaultStepMs = 5 * minuteInMillis // 5 minutes
 
 func TestIngestData(t *testing.T) {
 	v3ioConfig, err := tsdbtest.LoadV3ioConfig()
@@ -261,6 +262,32 @@ func TestQueryData(t *testing.T) {
 			to:       1532940510 + 1,
 			step:     defaultStepMs,
 			expected: map[string][]tsdbtest.DataPoint{}},
+
+		{desc: "Should ingest and query multiple aggregators with empty bucket", metricName: "cpu",
+			labels: utils.FromStrings("os", "linux", "iguaz", "yesplease"),
+			data: []tsdbtest.DataPoint{{Time: 1537972278402, Value: 300.3},
+				{Time: 1537972278402 + 8*minuteInMillis, Value: 300.3},
+				{Time: 1537972278402 + 9*minuteInMillis, Value: 100.4}},
+			from:        1537972278402 - 5*minuteInMillis,
+			to:          1537972278402 + 10*minuteInMillis,
+			step:        defaultStepMs,
+			aggregators: "count",
+			expected: map[string][]tsdbtest.DataPoint{
+				"count": {{Time: 1537972278402, Value: 1},
+					{Time: 1537972578402, Value: 2}}}},
+
+		{desc: "Should ingest and query multiple aggregators with few empty buckets in a row", metricName: "cpu",
+			labels: utils.FromStrings("os", "linux", "iguaz", "yesplease"),
+			data: []tsdbtest.DataPoint{{Time: 1537972278402, Value: 300.3},
+				{Time: 1537972278402 + 16*minuteInMillis, Value: 300.3},
+				{Time: 1537972278402 + 17*minuteInMillis, Value: 100.4}},
+			from:        1537972278402 - 5*minuteInMillis,
+			to:          1537972278402 + 18*minuteInMillis,
+			step:        defaultStepMs,
+			aggregators: "count",
+			expected: map[string][]tsdbtest.DataPoint{
+				"count": {{Time: 1537972158402, Value: 1},
+					{Time: 1537973058402, Value: 2}}}},
 	}
 
 	for _, test := range testCases {

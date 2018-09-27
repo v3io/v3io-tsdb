@@ -257,8 +257,18 @@ func (s *aggrSeriesIterator) Seek(t int64) bool {
 
 // advance to the next time interval/bucket
 func (s *aggrSeriesIterator) Next() bool {
+
 	if s.index >= s.aggrSet.GetMaxCell() {
 		return false
+	}
+
+	nextIndex := s.index + 1
+	if nextIndex >= 0 && !s.aggrSet.DoesCellHaveData(nextIndex) {
+		for nextIndex >= 0 && nextIndex <= s.aggrSet.GetMaxCell() && !s.aggrSet.DoesCellHaveData(nextIndex) {
+			nextIndex = nextIndex + 1
+		}
+		s.index = nextIndex
+		return s.index <= s.aggrSet.GetMaxCell()
 	}
 
 	s.index++
