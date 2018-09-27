@@ -10,7 +10,6 @@ import (
 	"os"
 	"os/signal"
 	"sync"
-	"sync/atomic"
 	"syscall"
 	"time"
 )
@@ -21,13 +20,11 @@ var once sync.Once
 const (
 	STDOUT = "stdout"
 	STDERR = "stderr"
-
-	notRuningState = 0
-	runningState   = 1
 )
 
 type MetricReporter struct {
-	state                 int64
+	lock                  sync.Mutex
+	running               bool
 	registry              metrics.Registry
 	logWriter             io.Writer
 	reportPeriodically    bool
@@ -76,8 +73,12 @@ func ReporterInstanceFromConfig(config *config.V3ioConfig) *MetricReporter {
 }
 
 func (mr *MetricReporter) Start() error {
+	mr.lock.Lock()
+	defer mr.lock.Unlock()
 
-	if !atomic.CompareAndSwapInt64(&mr.state, notRuningState, runningState) {
+	if !mr.running {
+		mr.running = true
+	} else {
 		return errors.Errorf("metric reporter is already running.")
 	}
 
@@ -85,7 +86,11 @@ func (mr *MetricReporter) Start() error {
 }
 
 func (mr *MetricReporter) Stop() error {
-	if atomic.CompareAndSwapInt64(&mr.state, runningState, notRuningState) {
+	mr.lock.Lock()
+	defer mr.lock.Unlock()
+
+	if mr.running {
+		mr.running = false
 		if mr.reportOnShutdown {
 			time.Sleep(300 * time.Millisecond) // postpone performance report on shutdown to avoid mixing with other log messages
 			metrics.WriteOnce(mr.registry, mr.logWriter)
@@ -99,7 +104,7 @@ func (mr *MetricReporter) Stop() error {
 }
 
 func (mr *MetricReporter) GetTimer(name string) (metrics.Timer, error) {
-	if mr.isRunning() {
+	if mr.running {
 		return metrics.GetOrRegisterTimer(name, mr.registry), nil
 	} else {
 		return nil, errors.Errorf("failed to create timer '%s'. Reason: metric reporter in not running", name)
@@ -107,7 +112,7 @@ func (mr *MetricReporter) GetTimer(name string) (metrics.Timer, error) {
 }
 
 func (mr *MetricReporter) GetCounter(name string) (metrics.Counter, error) {
-	if mr.isRunning() {
+	if mr.running {
 		return metrics.GetOrRegisterCounter(name, mr.registry), nil
 	} else {
 		return nil, errors.Errorf("failed to create counter '%s'. Reason: metric reporter in not running", name)
@@ -115,7 +120,7 @@ func (mr *MetricReporter) GetCounter(name string) (metrics.Counter, error) {
 }
 
 func (mr *MetricReporter) GetMeter(name string) (metrics.Meter, error) {
-	if mr.isRunning() {
+	if mr.running {
 		return metrics.GetOrRegisterMeter(name, mr.registry), nil
 	} else {
 		return nil, errors.Errorf("failed to create meter '%s'. Reason: metric reporter in not running", name)
@@ -123,7 +128,7 @@ func (mr *MetricReporter) GetMeter(name string) (metrics.Meter, error) {
 }
 
 func (mr *MetricReporter) GetHistogram(name string, reservoirSize int) (metrics.Histogram, error) {
-	if mr.isRunning() {
+	if mr.running {
 		sample := metrics.NewUniformSample(reservoirSize)
 		return metrics.GetOrRegisterHistogram(name, mr.registry, sample), nil
 	} else {
@@ -158,7 +163,7 @@ func newMetricReporter(outputWriter io.Writer, reportPeriodically bool, reportIn
 	reporter := MetricReporter{
 		registry:              metrics.NewPrefixedRegistry("v3io-tsdb -> "),
 		logWriter:             writer,
-		state:                 runningState,
+		running:               true,
 		reportPeriodically:    reportPeriodically,
 		reportIntervalSeconds: reportIntervalSeconds,
 		reportOnShutdown:      reportOnShutdown,
@@ -176,8 +181,4 @@ func newMetricReporter(outputWriter io.Writer, reportPeriodically bool, reportIn
 	}
 
 	return &reporter
-}
-
-func (mr *MetricReporter) isRunning() bool {
-	return atomic.LoadInt64(&mr.state) == runningState
 }
