@@ -38,8 +38,8 @@ const channelSize = 4048
 const maxSamplesBatchSize = 16
 const queueStallTime = 1 * time.Millisecond
 
-const minimalUnixTime = 20000000 // year 1970
-const maxUnixTime = 13569465600  // year 2400
+const minimalUnixTimeMs = 0          // year 1970
+const maxUnixTimeMs = 13569465600000 // year 2400
 
 // to add, rollups policy (cnt, sum, min/max, sum^2) + interval , or policy in per name label
 type MetricState struct {
@@ -243,8 +243,8 @@ func (mc *MetricsCache) AddFast(ref uint64, t int64, v interface{}) error {
 }
 
 func verifyTimeValid(t int64) error {
-	if t > maxUnixTime*1000 || t < minimalUnixTime*1000 {
-		return fmt.Errorf("time seems invalid (in unix milisec time), must be between year 2400-1970 - %d", t)
+	if t > maxUnixTimeMs || t < minimalUnixTimeMs {
+		return fmt.Errorf("time seems invalid (in unix milisec time), must be between years 1970-2400 - %d", t)
 	}
 	return nil
 }

@@ -187,11 +187,6 @@ func (qc *queryCommandeer) query() error {
 		return errors.Wrap(err, "The query selection failed.")
 	}
 
-	if qc.output == "png" {
-		qc.rootCommandeer.logger.Debug("Drawing output in PNG format.")
-		return formatter.MakePlot(set, "plot.png")
-	}
-
 	f, err := formatter.NewFormatter(qc.output, nil)
 	if err != nil {
 		return errors.Wrap(err, "Failed to start formatter '" + qc.output + "'.")
