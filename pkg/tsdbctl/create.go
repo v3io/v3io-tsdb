@@ -64,8 +64,9 @@ func newCreateCommandeer(rootCommandeer *RootCommandeer) *createCommandeer {
 		Use:   "create",
 		Short: "Create a new TSDB instance",
 		Long:  `Create a new TSDB instance (table) according to the provided configuration.`,
-        Example: `- tsdbctl create -s 192.168.1.100:8081 -c mycontainer -u myuser -p mypassword --rate 1/s
-- tsdbctl create -g ~/my_tsdb_cfg.yaml -c bigdata -u johnl -p "P@ssNoW!" --rate "100/h"
+        Example: `- tsdbctl create -s 192.168.1.100:8081 -u myuser -p mypassword -c mycontainer -t mytsdb --rate 1/s
+- tsdbctl create -s 192.168.204.14:8081 -u janed -p OpenSesame -c bigdata -t metrics_table --rate 60/m -a "min,avg,stddev" -i 3h
+- tsdbctl create -g ~/my_tsdb_cfg.yaml -u johnl -p "P@ssNoW!" -c admin_container -t perf_metrics --rate "100/h"
   (where ~/my_tsdb_cfg.yaml has a "v3ioUrl" key that sets the endpoint of the web service)`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 
@@ -77,7 +78,7 @@ func newCreateCommandeer(rootCommandeer *RootCommandeer) *createCommandeer {
 	cmd.Flags().StringVarP(&commandeer.defaultRollups, "aggregates", "a", "",
 		"Default aggregates to calculate in real time during\nthe samples ingestion, as a comma-separated list of\nsupported aggregation functions - count | avg | sum |\nmin | max | stddev | stdvar | last | rate.\nExample: \"sum,avg,max\".")
 	cmd.Flags().StringVarP(&commandeer.rollupInterval, "aggregation-granularity", "i", defaultRollupInterval,
-		"Aggregation granularity - a time interval for applying\nthe aggregation functions (if  configured - see the\n-a|--aggregates flag), of the format \"[0-9]+[mh]\"\n(where 'm' = minutes and 'h' = hours).\nExamples: \"1h\"; \"90m\".")
+		"Aggregation granularity - a time interval for applying\nthe aggregation functions (if  configured - see the\n-a|--aggregates flag), of the format \"[0-9]+[mh]\"\n(where 'm' = minutes and 'h' = hours).\nExamples: \"2h\"; \"90m\".")
 	cmd.Flags().IntVarP(&commandeer.shardingBuckets, "sharding-buckets", "b", defaultShardingBuckets,
 		"Number of storage buckets across which to split the\ndata of a single metric to optimize storage of\nnon-uniform data. Example: 10.")
 	// TODO: enable sample-retention when supported:
