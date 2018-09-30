@@ -112,7 +112,7 @@ such as partitioning strategy, retention, aggregators, etc. this can be done via
 	}
 
 	// Specify the default DB configuration (can be modified per partition)
-	schema, err := schema.NewSchema([]string{"count,avg,min,max"})
+	schema, err := schema.NewDefaultSchema("count,avg,min,max")
 	if err != nil {
 		// TODO: handle error
 	}
