@@ -71,19 +71,23 @@ func Str2duration(duration string) (int64, error) {
 // convert time string to time (unix milisecond)
 func Str2unixTime(timeString string) (int64, error) {
 	if strings.HasPrefix(timeString, "now") {
-		sign := timeString[3:4]
-		duration := timeString[4:]
+		if len(timeString) > 3 {
+			sign := timeString[3:4]
+			duration := timeString[4:]
 
-		t, err := Str2duration(duration)
-		if err != nil {
-			return 0, errors.Wrap(err, "could not parse pattern following 'now-'")
-		}
-		if sign == "-" {
-			return CurrentTimeInMillis() - int64(t), nil
-		} else if sign == "+" {
-			return CurrentTimeInMillis() + int64(t), nil
+			t, err := Str2duration(duration)
+			if err != nil {
+				return 0, errors.Wrap(err, "could not parse pattern following 'now-'")
+			}
+			if sign == "-" {
+				return CurrentTimeInMillis() - int64(t), nil
+			} else if sign == "+" {
+				return CurrentTimeInMillis() + int64(t), nil
+			} else {
+				return 0, errors.Wrapf(err, "Unsupported time format:", timeString)
+			}
 		} else {
-			return 0, errors.Wrapf(err, "Unsupported time format:", timeString)
+			return CurrentTimeInMillis(), nil
 		}
 	}
 

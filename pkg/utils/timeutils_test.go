@@ -69,11 +69,41 @@ func (suite *testTimeSuite) TestStr2durationBadFormat() {
 func (suite *testTimeSuite) TestStr2unixTime() {
 	expectedDuration, err := Str2duration("2m")
 	suite.Require().Nil(err)
-	x, err := Str2unixTime("now+1m")
+	endTime, err := Str2unixTime("now+1m")
 	suite.Require().Nil(err)
-	y, err := Str2unixTime("now-1m")
+	startTime, err := Str2unixTime("now-1m")
 	suite.Require().Nil(err)
-	suite.Require().Equal(expectedDuration, x-y)
+	suite.Require().Equal(expectedDuration, endTime-startTime)
+}
+
+func (suite *testTimeSuite) TestStr2unixTimeWithNow() {
+	expectedDuration, err := Str2duration("1m")
+	suite.Require().Nil(err)
+	endTime, err := Str2unixTime("now")
+	suite.Require().Nil(err)
+	startTime, err := Str2unixTime("now-1m")
+	suite.Require().Nil(err)
+	suite.Require().Equal(expectedDuration, endTime-startTime)
+}
+
+func (suite *testTimeSuite) TestStr2unixTimeWithNowPlus() {
+	expectedDuration, err := Str2duration("1m")
+	suite.Require().Nil(err)
+	endTime, err := Str2unixTime("now+")
+	suite.Require().Nil(err)
+	startTime, err := Str2unixTime("now-1m")
+	suite.Require().Nil(err)
+	suite.Require().Equal(expectedDuration, endTime-startTime)
+}
+
+func (suite *testTimeSuite) TestStr2unixTimeWithNowPlusMinus() {
+	expectedDuration, err := Str2duration("0m")
+	suite.Require().Nil(err)
+	endTime, err := Str2unixTime("now+")
+	suite.Require().Nil(err)
+	startTime, err := Str2unixTime("now-")
+	suite.Require().Nil(err)
+	suite.Require().Equal(expectedDuration, endTime-startTime)
 }
 
 func TestTimeSuite(t *testing.T) {
