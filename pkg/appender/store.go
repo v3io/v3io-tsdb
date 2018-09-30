@@ -157,7 +157,7 @@ func (cs *chunkStore) processGetResp(mc *MetricsCache, metric *MetricState, resp
 		// assume the item not found   TODO: check error code
 
 		if metric.newName {
-			path := mc.cfg.Path + "/names/" + metric.name
+			path := mc.cfg.TablePath + "/names/" + metric.name
 			putInput := v3io.PutItemInput{Path: path, Attributes: map[string]interface{}{}}
 
 			request, err := mc.container.PutItem(&putInput, metric, mc.nameUpdateChan)

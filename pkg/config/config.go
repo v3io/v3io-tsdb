@@ -52,11 +52,11 @@ func Error() error {
 
 type V3ioConfig struct {
 	// V3IO Connection details: Url, Data container, relative path for this dataset, credentials
-	V3ioUrl   string `json:"v3ioUrl"`
-	Container string `json:"container"`
-	Path      string `json:"path"`
-	Username  string `json:"username,omitempty"`
-	Password  string `json:"password,omitempty"`
+	WebApiEndpoint string `json:"webApiEndpoint"`
+	Container      string `json:"container"`
+	TablePath      string `json:"tablePath"`
+	Username       string `json:"username,omitempty"`
+	Password       string `json:"password,omitempty"`
 
 	// Disable is use in Prometheus to disable v3io and work with the internal TSDB
 	Disabled bool `json:"disabled,omitempty"`

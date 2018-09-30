@@ -118,7 +118,7 @@ func setupFunc(testCtx *testing.T, testConfig *TestConfig) (*tsdb.V3ioAdapter, e
 		return nil, err, func() {}
 	}
 
-	v3ioConfig.Path = fmt.Sprintf("%s-%d", testCtx.Name(), time.Now().Nanosecond())
+	v3ioConfig.TablePath = fmt.Sprintf("%s-%d", testCtx.Name(), time.Now().Nanosecond())
 	tsdbtest.CreateTestTSDB(testCtx, v3ioConfig)
 
 	adapter, err := tsdb.NewV3ioAdapter(v3ioConfig, nil, nil)

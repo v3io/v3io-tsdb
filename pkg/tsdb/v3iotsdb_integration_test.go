@@ -489,7 +489,7 @@ func TestDeleteTSDB(t *testing.T) {
 	}
 
 	schema := testutils.CreateSchema(t, "count,sum")
-	v3ioConfig.Path = t.Name()
+	v3ioConfig.TablePath = t.Name()
 	if err := CreateTSDB(v3ioConfig, &schema); err != nil {
 		v3ioConfigAsJson, _ := json.MarshalIndent(v3ioConfig, "", "  ")
 		t.Fatalf("Failed to create TSDB. Reason: %s\nConfiguration:\n%s", err, string(v3ioConfigAsJson))
@@ -501,7 +501,7 @@ func TestDeleteTSDB(t *testing.T) {
 	}
 	responseChan := make(chan *v3io.Response)
 	container, _ := adapter.GetContainer()
-	container.ListBucket(&v3io.ListBucketInput{Path: v3ioConfig.Path}, 30, responseChan)
+	container.ListBucket(&v3io.ListBucketInput{Path: v3ioConfig.TablePath}, 30, responseChan)
 	if res := <-responseChan; res.Error != nil {
 		t.Fatal("Failed to create TSDB")
 	}
@@ -511,7 +511,7 @@ func TestDeleteTSDB(t *testing.T) {
 		t.Fatalf("Failed to delete DB on teardown. reason: %s", err)
 	}
 
-	container.ListBucket(&v3io.ListBucketInput{Path: v3ioConfig.Path}, 30, responseChan)
+	container.ListBucket(&v3io.ListBucketInput{Path: v3ioConfig.TablePath}, 30, responseChan)
 	if res := <-responseChan; res.Error == nil {
 		t.Fatal("Did not delete TSDB properly")
 	}

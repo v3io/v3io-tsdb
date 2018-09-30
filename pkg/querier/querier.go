@@ -198,7 +198,7 @@ func (q *V3ioQuerier) Close() error {
 
 func (q *V3ioQuerier) getMetricNames() ([]string, error) {
 	input := v3io.GetItemsInput{
-		Path:           q.cfg.Path + "/names/",
+		Path:           q.cfg.TablePath + "/names/",
 		AttributeNames: []string{"__name"},
 	}
 
