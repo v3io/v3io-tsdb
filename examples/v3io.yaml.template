@@ -1,14 +1,26 @@
-# File: v3io.yaml.template
+# File:         v3io.yaml.template
+# Description:  Template of a V3IO TSDB Configuration File
 
-# V3IO Web API
-webApiEndpoint: "<IP>:8081"
+# TODO: In your configuration file, delete the configuration keys that you
+#       don't need and replace the "<...>" placeholders.
 
-# V3IO container ID or Name
-container: "<CONTAINER_ID>"
+# Endpoint of an Iguazio Continuous Data Platform web-gateway (web-API) service,
+# consisting of an IP address or resolvable host domain name, and a port number
+# (currently, always port 8081)
+# Example: "192.168.1.100:8081"
+webApiEndpoint: "<IP address/host name>:8081"
 
-# Logging level. Valid values: debug,info,warn,error
-verbose: "info"
+# Name of an Iguazio Continuous Data Platform container for storing the TSDB table
+# Example: "bigdata"
+container: "<container name>"
 
-# Authentication V3IO Web API
-username: "<USER>"
-password: "<PASSWORD>"
+# Logging verbosity level
+# Valid values: "debug" | "info" | "warn" | "error"
+# Default value: "debug"
+verbose: "warn"
+
+# Authentication credentials for the web-API service
+# Username
+username: "<username>"
+# Password
+password: "<password>"
