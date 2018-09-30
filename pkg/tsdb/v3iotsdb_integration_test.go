@@ -263,7 +263,7 @@ func TestQueryData(t *testing.T) {
 			step:     defaultStepMs,
 			expected: map[string][]tsdbtest.DataPoint{}},
 
-		{desc: "Should ingest and query multiple aggregators with empty bucket", metricName: "cpu",
+		{desc: "Should ingest and query aggregators with empty bucket", metricName: "cpu",
 			labels: utils.FromStrings("os", "linux", "iguaz", "yesplease"),
 			data: []tsdbtest.DataPoint{{Time: 1537972278402, Value: 300.3},
 				{Time: 1537972278402 + 8*minuteInMillis, Value: 300.3},
@@ -276,7 +276,7 @@ func TestQueryData(t *testing.T) {
 				"count": {{Time: 1537972278402, Value: 1},
 					{Time: 1537972578402, Value: 2}}}},
 
-		{desc: "Should ingest and query multiple aggregators with few empty buckets in a row", metricName: "cpu",
+		{desc: "Should ingest and query aggregators with few empty buckets in a row", metricName: "cpu",
 			labels: utils.FromStrings("os", "linux", "iguaz", "yesplease"),
 			data: []tsdbtest.DataPoint{{Time: 1537972278402, Value: 300.3},
 				{Time: 1537972278402 + 16*minuteInMillis, Value: 300.3},
