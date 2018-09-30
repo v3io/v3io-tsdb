@@ -66,6 +66,16 @@ func (suite *testTimeSuite) TestStr2durationBadFormat() {
 	suite.Require().Error(err)
 }
 
+func (suite *testTimeSuite) TestStr2unixTime() {
+	expectedDuration, err := Str2duration("2m")
+	suite.Require().Nil(err)
+	x, err := Str2unixTime("now+1m")
+	suite.Require().Nil(err)
+	y, err := Str2unixTime("now-1m")
+	suite.Require().Nil(err)
+	suite.Require().Equal(expectedDuration, x-y)
+}
+
 func TestTimeSuite(t *testing.T) {
 	suite.Run(t, new(testTimeSuite))
 }
