@@ -52,6 +52,11 @@ func NewAggregateSeries(functions, col string, buckets int, interval, rollupTime
 		aggrList = append(aggrList, aggr)
 	}
 
+	// Always have count Aggregator by default
+	if aggrMask != 0 {
+		aggrMask |= aggrTypeCount
+	}
+
 	newAggregateSeries := AggregateSeries{
 		aggrMask:       aggrMask,
 		functions:      aggrList,
@@ -116,8 +121,7 @@ func (as *AggregateSeries) NewSetFromAttrs(
 	}
 
 	for _, aggr := range rawAggregators {
-		// Always have count aggregator by default
-		if aggr&as.aggrMask != 0 || aggr&aggrTypeCount != 0 {
+		if aggr&as.aggrMask != 0 {
 			attrBlob, ok := (*attrs)[as.toAttrName(aggr)]
 			if !ok {
 				return nil, fmt.Errorf("aggregation attribute %s was not found", as.toAttrName(aggr))
@@ -176,8 +180,7 @@ func (as *AggregateSeries) NewSetFromChunks(length int) *AggregateSet {
 	dataArrays := map[AggrType][]float64{}
 
 	for _, aggr := range rawAggregators {
-		// Always have count aggregator by default
-		if aggr&as.aggrMask != 0 || aggr&aggrTypeCount != 0 {
+		if aggr&as.aggrMask != 0 {
 			dataArrays[aggr] = make([]float64, length, length) // TODO: len/capacity & reuse (pool)
 			if aggr == aggrTypeMax || aggr == aggrTypeMin || aggr == aggrTypeLast {
 				for i := 0; i < length; i++ {
