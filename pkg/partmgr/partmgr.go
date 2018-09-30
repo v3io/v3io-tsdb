@@ -191,7 +191,7 @@ func (p *PartitionManager) updateSchema() (err error) {
 			return
 		}
 		if p.container != nil { //tests use case only
-			err = p.container.Sync.PutObject(&v3io.PutObjectInput{Path: path.Join(p.Path(), config.SCHEMA_CONFIG), Body: data})
+			err = p.container.Sync.PutObject(&v3io.PutObjectInput{Path: path.Join(p.Path(), config.SchemaConfigFileName), Body: data})
 		}
 	})
 
@@ -235,7 +235,7 @@ func (p *PartitionManager) ReadAndUpdateSchema() (err error) {
 	}
 
 	timer.Time(func() {
-		fullPath := path.Join(p.Path(), config.SCHEMA_CONFIG)
+		fullPath := path.Join(p.Path(), config.SchemaConfigFileName)
 		resp, err := p.container.Sync.GetObject(&v3io.GetObjectInput{Path: fullPath})
 		if err != nil {
 			err = errors.Wrap(err, "Failed to read schema at path: "+fullPath)
