@@ -163,6 +163,11 @@ func (a *xorAppender) Append(t int64, v float64) {
 	var tDelta uint64
 	num := *a.samples
 
+	// Do not append if sample is too old.
+	if t < a.t {
+		return
+	}
+
 	if num == 0 {
 		// add a signature 11111 to indicate start of cseries in case we put few in the same chunk (append to existing)
 		a.b.writeBits(0x1f, 5)
