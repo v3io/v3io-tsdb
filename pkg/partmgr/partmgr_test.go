@@ -72,7 +72,7 @@ func TestCreateNewPartition(tst *testing.T) {
 }
 
 func getPartitionManager(tst *testing.T) *PartitionManager {
-	schm, err := schema.NewSchema([]string{"*"})
+	schm, err := schema.NewDefaultSchema("*")
 	if err != nil {
 		tst.Fatalf("failed to create schema. Error: %v", err)
 	}

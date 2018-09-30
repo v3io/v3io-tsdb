@@ -1,14 +1,23 @@
 package schema
 
 import (
+	"fmt"
 	"github.com/pkg/errors"
 	"github.com/v3io/v3io-tsdb/pkg/aggregate"
 	"github.com/v3io/v3io-tsdb/pkg/config"
+	"github.com/v3io/v3io-tsdb/pkg/utils"
+	"strconv"
 	"strings"
+	"time"
 )
 
 const (
-	SchemaVersion                 = 0
+	DefaultMaximumSampleSize    = 8       // bytes
+	DefaultMaximumPartitionSize = 1700000 // 1.7MB
+	DefaultMinimumChunkSize     = 200     // bytes
+	DefaultMaximumChunkSize     = 32000   // bytes
+
+	Version                       = 0
 	DefaultStorageClass           = "local"
 	DefaultIngestionRate          = ""
 	DefaultAggregates             = "" // no aggregates by default
@@ -16,25 +25,42 @@ const (
 	DefaultShardingBuckets        = 8
 	DefaultLayerRetentionTime     = "1y"
 	DefaultSampleRetentionTime    = 0
-	DefaultPartitionInterval      = "48h"
-	DefaultChunkInterval          = "1h"
 )
 
-func NewSchema(aggregates []string) (*config.Schema, error) {
+func NewSchema(sampleRate, aggregatorGranularity, aggregatesList string, minChunkSize, maxChunkSize, maxSampleSize, maxPartitionSize, sampleRetention, shardingBuckets int) (*config.Schema, error) {
+	rateInHours, err := rateToHours(sampleRate)
+	if err != nil {
+		return nil, errors.Wrap(err, "invalid sample race")
+	}
+
+	if err := validateAggregatorGranularity(aggregatorGranularity); err != nil {
+		return nil, errors.Wrap(err, "failed to parse aggregator granularity")
+	}
+
+	chunkInterval, partitionInterval, err := calculatePartitionAndChunkInterval(rateInHours, minChunkSize, maxChunkSize, maxSampleSize, maxPartitionSize)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to calculate chunk interval")
+	}
+
+	aggregates, err := aggregate.AggregatorsToStringList(aggregatesList)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to parse list of aggregates")
+	}
+
 	defaultRollup := config.Rollup{
 		Aggregators:            []string{},
-		AggregatorsGranularity: "1h",
+		AggregatorsGranularity: aggregatorGranularity,
 		StorageClass:           DefaultStorageClass,
-		SampleRetention:        DefaultSampleRetentionTime, //TODO: make configurable
-		LayerRetentionTime:     DefaultLayerRetentionTime,  //TODO: make configurable
+		SampleRetention:        sampleRetention,           //TODO: make configurable
+		LayerRetentionTime:     DefaultLayerRetentionTime, //TODO: make configurable
 	}
 
 	tableSchema := config.TableSchema{
-		Version:             SchemaVersion,
+		Version:             Version,
 		RollupLayers:        []config.Rollup{defaultRollup},
-		ShardingBuckets:     DefaultShardingBuckets,
-		PartitionerInterval: DefaultPartitionInterval,
-		ChunckerInterval:    DefaultChunkInterval,
+		ShardingBuckets:     shardingBuckets,
+		PartitionerInterval: partitionInterval,
+		ChunckerInterval:    chunkInterval,
 	}
 
 	if len(aggregates) == 0 {
@@ -65,4 +91,92 @@ func NewSchema(aggregates []string) (*config.Schema, error) {
 	}
 
 	return schema, nil
+}
+
+func NewDefaultSchema(aggregatesList string) (*config.Schema, error) {
+	return NewSchema(
+		"1/s",
+		DefaultAggregationGranularity,
+		aggregatesList,
+		DefaultMinimumChunkSize,
+		DefaultMaximumChunkSize,
+		DefaultMaximumSampleSize,
+		DefaultMaximumPartitionSize,
+		DefaultSampleRetentionTime,
+		DefaultShardingBuckets)
+}
+
+func calculatePartitionAndChunkInterval(rateInHours, minChunkSize, maxChunkSize, maxSampleSize, maxPartitionSize int) (string, string, error) {
+	maxNumberOfEventsPerChunk := maxChunkSize / maxSampleSize
+	minNumberOfEventsPerChunk := minChunkSize / maxSampleSize
+
+	chunkInterval := maxNumberOfEventsPerChunk / rateInHours
+	if chunkInterval == 0 {
+		return "", "", errors.New("sample rate is too high")
+	}
+
+	// Make sure the expected chunk size is greater then the supported minimum.
+	if chunkInterval < minNumberOfEventsPerChunk/rateInHours {
+		return "", "", fmt.Errorf(
+			"calculated chunk size is less than minimum, rate - %v/h, calculated chunk interval - %v, minimum size - %v",
+			rateInHours, chunkInterval, minChunkSize)
+	}
+
+	actualCapacityOfChunk := chunkInterval * rateInHours * maxSampleSize
+	numberOfChunksInPartition := 0
+
+	for (numberOfChunksInPartition+24)*actualCapacityOfChunk < maxPartitionSize {
+		numberOfChunksInPartition += 24
+	}
+	if numberOfChunksInPartition == 0 {
+		return "", "", errors.Errorf("given rate is too high, can not fit a partition in a day interval with the calculated chunk size %vh", chunkInterval)
+	}
+
+	partitionInterval := numberOfChunksInPartition * chunkInterval
+	return strconv.Itoa(chunkInterval) + "h", strconv.Itoa(partitionInterval) + "h", nil
+}
+
+func rateToHours(sampleRate string) (int, error) {
+	parsingError := errors.New(`not a valid rate. Accepted pattern: [0-9]+/[hms]. Example: 12/m`)
+
+	if len(sampleRate) < 3 {
+		return 0, parsingError
+	}
+	if sampleRate[len(sampleRate)-2] != '/' {
+		return 0, parsingError
+	}
+
+	last := sampleRate[len(sampleRate)-1]
+	// get the number ignoring slash and time unit
+	sampleRate = sampleRate[:len(sampleRate)-2]
+	i, err := strconv.Atoi(sampleRate)
+	if err != nil {
+		return 0, errors.Wrap(err, parsingError.Error())
+	}
+	if i <= 0 {
+		return 0, errors.New("rate should be a positive number")
+	}
+	switch last {
+	case 's':
+		return i * 60 * 60, nil
+	case 'm':
+		return i * 60, nil
+	case 'h':
+		return i, nil
+	default:
+		return 0, parsingError
+	}
+}
+
+func validateAggregatorGranularity(aggregatorGranularity string) error {
+	dayMillis := 24 * int64(time.Hour/time.Millisecond)
+	duration, err := utils.Str2duration(aggregatorGranularity)
+	if err != nil {
+		return err
+	}
+
+	if dayMillis%duration != 0 && duration%dayMillis != 0 {
+		return errors.New("rollup interval should be a divisor or a dividend of 1 day. Example: 10m, 30m, 2h, etc.")
+	}
+	return nil
 }

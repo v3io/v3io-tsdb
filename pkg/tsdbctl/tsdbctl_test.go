@@ -27,6 +27,7 @@ import (
 	"github.com/stretchr/testify/suite"
 	"github.com/v3io/v3io-tsdb/internal/pkg/performance"
 	"github.com/v3io/v3io-tsdb/pkg/config"
+	"github.com/v3io/v3io-tsdb/pkg/tsdb/schema"
 	"testing"
 )
 
@@ -61,10 +62,10 @@ func (suite *testTsdbctlSuite) TestPopulateConfigWithTenant() {
 		Path:                 "/x/y/z",
 		Username:             "Vel@Odar",
 		Password:             "p455w0rd",
-		MaximumSampleSize:    defaultMaximumSampleSize,
-		MinimumChunkSize:     defaultMinimumChunkSize,
-		MaximumChunkSize:     defaultMaximumChunkSize,
-		MaximumPartitionSize: defaultMaximumPartitionSize,
+		MaximumSampleSize:    schema.DefaultMaximumSampleSize,
+		MinimumChunkSize:     schema.DefaultMinimumChunkSize,
+		MaximumChunkSize:     schema.DefaultMaximumChunkSize,
+		MaximumPartitionSize: schema.DefaultMaximumPartitionSize,
 	}
 
 	suite.Require().Equal(expectedCfg, rc.v3iocfg)
@@ -84,10 +85,10 @@ func (suite *testTsdbctlSuite) TestContainerConfig() {
 		Path:                 "/x/y/z",
 		Username:             "Vel@Odar",
 		Password:             "p455w0rd",
-		MaximumSampleSize:    defaultMaximumSampleSize,
-		MinimumChunkSize:     defaultMinimumChunkSize,
-		MaximumChunkSize:     defaultMaximumChunkSize,
-		MaximumPartitionSize: defaultMaximumPartitionSize,
+		MaximumSampleSize:    schema.DefaultMaximumSampleSize,
+		MinimumChunkSize:     schema.DefaultMinimumChunkSize,
+		MaximumChunkSize:     schema.DefaultMaximumChunkSize,
+		MaximumPartitionSize: schema.DefaultMaximumPartitionSize,
 	}
 
 	suite.Require().Nil(err)
