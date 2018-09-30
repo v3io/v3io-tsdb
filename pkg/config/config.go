@@ -84,6 +84,8 @@ type V3ioConfig struct {
 
 	// Metrics reporter configuration
 	MetricsReporter MetricsReporterConfig `json:"performance,omitempty"`
+	// dont aggregate from raw chuncks, for use when working as Prometheus TSDB lib
+	DisableClientAggr bool `json:"disableClientAggr,omitempty"`
 }
 
 type MetricsReporterConfig struct {
