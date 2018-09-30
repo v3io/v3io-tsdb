@@ -38,6 +38,9 @@ const channelSize = 4048
 const maxSamplesBatchSize = 16
 const queueStallTime = 1 * time.Millisecond
 
+const minimalUnixTimeMs = 0          // year 1970
+const maxUnixTimeMs = 13569465600000 // year 2400
+
 // to add, rollups policy (cnt, sum, min/max, sum^2) + interval , or policy in per name label
 type MetricState struct {
 	sync.RWMutex
@@ -195,6 +198,11 @@ func (mc *MetricsCache) appendTV(metric *MetricState, t int64, v interface{}) {
 // First time add time & value to metric (by label set)
 func (mc *MetricsCache) Add(lset utils.LabelsIfc, t int64, v interface{}) (uint64, error) {
 
+	err := verifyTimeValid(t)
+	if err != nil {
+		return 0, err
+	}
+
 	name, key, hash := lset.GetKey()
 	metric, ok := mc.getMetric(hash)
 
@@ -204,7 +212,7 @@ func (mc *MetricsCache) Add(lset utils.LabelsIfc, t int64, v interface{}) (uint6
 		mc.addMetric(hash, name, metric)
 	}
 
-	err := metric.error()
+	err = metric.error()
 	metric.setError(nil)
 
 	mc.appendTV(metric, t, v)
@@ -215,18 +223,30 @@ func (mc *MetricsCache) Add(lset utils.LabelsIfc, t int64, v interface{}) (uint6
 // fast Add to metric (by refId)
 func (mc *MetricsCache) AddFast(ref uint64, t int64, v interface{}) error {
 
+	err := verifyTimeValid(t)
+	if err != nil {
+		return err
+	}
+
 	metric, ok := mc.getMetricByRef(ref)
 	if !ok {
 		mc.logger.ErrorWith("Ref not found", "ref", ref)
 		return fmt.Errorf("ref not found")
 	}
 
-	err := metric.error()
+	err = metric.error()
 	metric.setError(nil)
 
 	mc.appendTV(metric, t, v)
 
 	return err
+}
+
+func verifyTimeValid(t int64) error {
+	if t > maxUnixTimeMs || t < minimalUnixTimeMs {
+		return fmt.Errorf("time seems invalid (in unix milisec time), must be between years 1970-2400 - %d", t)
+	}
+	return nil
 }
 
 func (mc *MetricsCache) WaitForCompletion(timeout time.Duration) (int, error) {
