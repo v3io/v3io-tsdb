@@ -121,9 +121,9 @@ func (rc *RootCommandeer) initialize() error {
 	if err != nil {
 		// Display an error if we fail to load a configuration file
 		if rc.cfgFilePath == "" {
-			return errors.Wrap(err, "Failed to load configuration")
+			return errors.Wrap(err, "Failed to load the TSDB configuration.")
 		} else {
-			return errors.Wrap(err, fmt.Sprintf("Failed to load config from '%s'", rc.cfgFilePath))
+			return errors.Wrap(err, fmt.Sprintf("Failed to load the TSDB configuration from '%s'.", rc.cfgFilePath))
 		}
 	}
 	return rc.populateConfig(cfg)
