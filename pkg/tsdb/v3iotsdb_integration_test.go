@@ -37,7 +37,8 @@ import (
 	"time"
 )
 
-const defaultStepMs = 5 * 60 * 1000 // 5 minutes
+const minuteInMillis = 60 * 1000
+const defaultStepMs = 5 * minuteInMillis // 5 minutes
 
 func TestIngestData(t *testing.T) {
 	v3ioConfig, err := tsdbtest.LoadV3ioConfig()
@@ -261,6 +262,32 @@ func TestQueryData(t *testing.T) {
 			to:       1532940510 + 1,
 			step:     defaultStepMs,
 			expected: map[string][]tsdbtest.DataPoint{}},
+
+		{desc: "Should ingest and query aggregators with empty bucket", metricName: "cpu",
+			labels: utils.FromStrings("os", "linux", "iguaz", "yesplease"),
+			data: []tsdbtest.DataPoint{{Time: 1537972278402, Value: 300.3},
+				{Time: 1537972278402 + 8*minuteInMillis, Value: 300.3},
+				{Time: 1537972278402 + 9*minuteInMillis, Value: 100.4}},
+			from:        1537972278402 - 5*minuteInMillis,
+			to:          1537972278402 + 10*minuteInMillis,
+			step:        defaultStepMs,
+			aggregators: "count",
+			expected: map[string][]tsdbtest.DataPoint{
+				"count": {{Time: 1537972278402, Value: 1},
+					{Time: 1537972578402, Value: 2}}}},
+
+		{desc: "Should ingest and query aggregators with few empty buckets in a row", metricName: "cpu",
+			labels: utils.FromStrings("os", "linux", "iguaz", "yesplease"),
+			data: []tsdbtest.DataPoint{{Time: 1537972278402, Value: 300.3},
+				{Time: 1537972278402 + 16*minuteInMillis, Value: 300.3},
+				{Time: 1537972278402 + 17*minuteInMillis, Value: 100.4}},
+			from:        1537972278402 - 5*minuteInMillis,
+			to:          1537972278402 + 18*minuteInMillis,
+			step:        defaultStepMs,
+			aggregators: "count",
+			expected: map[string][]tsdbtest.DataPoint{
+				"count": {{Time: 1537972158402, Value: 1},
+					{Time: 1537973058402, Value: 2}}}},
 	}
 
 	for _, test := range testCases {
@@ -488,7 +515,7 @@ func TestDeleteTSDB(t *testing.T) {
 	}
 
 	schema := testutils.CreateSchema(t, "count,sum")
-	v3ioConfig.Path = t.Name()
+	v3ioConfig.TablePath = t.Name()
 	if err := CreateTSDB(v3ioConfig, schema); err != nil {
 		v3ioConfigAsJson, _ := json.MarshalIndent(v3ioConfig, "", "  ")
 		t.Fatalf("Failed to create TSDB. Reason: %s\nConfiguration:\n%s", err, string(v3ioConfigAsJson))
@@ -500,7 +527,7 @@ func TestDeleteTSDB(t *testing.T) {
 	}
 	responseChan := make(chan *v3io.Response)
 	container, _ := adapter.GetContainer()
-	container.ListBucket(&v3io.ListBucketInput{Path: v3ioConfig.Path}, 30, responseChan)
+	container.ListBucket(&v3io.ListBucketInput{Path: v3ioConfig.TablePath}, 30, responseChan)
 	if res := <-responseChan; res.Error != nil {
 		t.Fatal("Failed to create TSDB")
 	}
@@ -510,7 +537,7 @@ func TestDeleteTSDB(t *testing.T) {
 		t.Fatalf("Failed to delete DB on teardown. reason: %s", err)
 	}
 
-	container.ListBucket(&v3io.ListBucketInput{Path: v3ioConfig.Path}, 30, responseChan)
+	container.ListBucket(&v3io.ListBucketInput{Path: v3ioConfig.TablePath}, 30, responseChan)
 	if res := <-responseChan; res.Error == nil {
 		t.Fatal("Did not delete TSDB properly")
 	}

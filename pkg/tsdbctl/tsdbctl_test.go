@@ -38,7 +38,7 @@ type testTsdbctlSuite struct {
 func (suite *testTsdbctlSuite) TestPopulateConfigWithTenant() {
 	rc := RootCommandeer{v3ioPath: "Vel@Odar:p455w0rd@localhost:80123/123"}
 	cfg := &config.V3ioConfig{
-		Path: "/x/y/z",
+		TablePath: "/x/y/z",
 	}
 
 	err := rc.populateConfig(cfg)
@@ -57,9 +57,9 @@ func (suite *testTsdbctlSuite) TestPopulateConfigWithTenant() {
 		Reporter: metricReporter,
 	}
 	expectedCfg := &config.V3ioConfig{
-		V3ioUrl:              "localhost:80123",
+		WebApiEndpoint:       "localhost:80123",
 		Container:            "123",
-		Path:                 "/x/y/z",
+		TablePath:            "/x/y/z",
 		Username:             "Vel@Odar",
 		Password:             "p455w0rd",
 		MaximumSampleSize:    schema.DefaultMaximumSampleSize,
@@ -75,14 +75,14 @@ func (suite *testTsdbctlSuite) TestPopulateConfigWithTenant() {
 func (suite *testTsdbctlSuite) TestContainerConfig() {
 	rc := RootCommandeer{v3ioPath: "Vel@Odar:p455w0rd@localhost:80123/123", container: "test"}
 	cfg := &config.V3ioConfig{
-		Path: "/x/y/z",
+		TablePath: "/x/y/z",
 	}
 
 	err := rc.populateConfig(cfg)
 	expectedCfg := &config.V3ioConfig{
-		V3ioUrl:              "localhost:80123",
+		WebApiEndpoint:       "localhost:80123",
 		Container:            "test",
-		Path:                 "/x/y/z",
+		TablePath:            "/x/y/z",
 		Username:             "Vel@Odar",
 		Password:             "p455w0rd",
 		MaximumSampleSize:    schema.DefaultMaximumSampleSize,

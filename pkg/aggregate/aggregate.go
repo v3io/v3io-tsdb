@@ -122,6 +122,7 @@ func AggregatorsToStringList(aggregators string) ([]string, error) {
 // convert comma separated string to aggregator mask
 func AggrsFromString(split []string) (AggrType, error) {
 	var aggrList AggrType
+	var hasAggregators bool
 	for _, s := range split {
 		trimmed := strings.TrimSpace(s)
 		if trimmed != "" {
@@ -129,8 +130,13 @@ func AggrsFromString(split []string) (AggrType, error) {
 			if !ok {
 				return aggrList, fmt.Errorf("invalid aggragator type '%s'", s)
 			}
+			hasAggregators = true
 			aggrList = aggrList | aggr
 		}
+	}
+	// Always have count aggregator by default
+	if hasAggregators {
+		aggrList = aggrList | aggrTypeCount
 	}
 	return aggrList, nil
 }

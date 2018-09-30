@@ -49,7 +49,7 @@ func BenchmarkIngest(b *testing.B) {
 	tsdbPath := tsdbtest.NormalizePath(fmt.Sprintf("tsdb-%s-%d-%s", b.Name(), b.N, time.Now().Format(time.RFC3339)))
 
 	// Update TSDB instance path for this test
-	v3ioConfig.Path = tsdbPath
+	v3ioConfig.TablePath = tsdbPath
 	schema := testutils.CreateSchema(b, "*")
 	if err := tsdb.CreateTSDB(v3ioConfig, schema); err != nil {
 		b.Fatal("Failed to create TSDB", err)

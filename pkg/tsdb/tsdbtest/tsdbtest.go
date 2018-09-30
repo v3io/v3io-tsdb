@@ -53,7 +53,7 @@ func CreateTestTSDB(t testing.TB, v3ioConfig *config.V3ioConfig) {
 }
 
 func SetUp(t testing.TB, v3ioConfig *config.V3ioConfig) func() {
-	v3ioConfig.Path = fmt.Sprintf("%s-%d", t.Name(), time.Now().Nanosecond())
+	v3ioConfig.TablePath = fmt.Sprintf("%s-%d", t.Name(), time.Now().Nanosecond())
 	CreateTestTSDB(t, v3ioConfig)
 
 	// Measure performance
@@ -79,7 +79,7 @@ func SetUpWithData(t *testing.T, v3ioConfig *config.V3ioConfig, metricName strin
 }
 
 func SetUpWithDBConfig(t *testing.T, v3ioConfig *config.V3ioConfig, schema *config.Schema) func() {
-	v3ioConfig.Path = fmt.Sprintf("%s-%d", t.Name(), time.Now().Nanosecond())
+	v3ioConfig.TablePath = fmt.Sprintf("%s-%d", t.Name(), time.Now().Nanosecond())
 	if err := CreateTSDB(v3ioConfig, schema); err != nil {
 		v3ioConfigAsJson, _ := json2.MarshalIndent(v3ioConfig, "", "  ")
 		t.Fatalf("Failed to create TSDB. Reason: %s\nConfiguration:\n%s", err, string(v3ioConfigAsJson))
