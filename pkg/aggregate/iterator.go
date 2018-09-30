@@ -70,6 +70,8 @@ func (as *AggregateSeries) CanAggregate(partitionAggr AggrType) bool {
 	aggrMask := 0x7f & as.aggrMask
 	// make sure the DB has all the aggregators we need (on bits in the mask)
 	// and that the requested interval is greater/eq to aggregator resolution and is an even divisor
+	// if interval and rollup are not even divisors we need higher resolution (3x) to smooth the graph
+	// when we add linear/spline graph projection we can reduce back to 1x
 	return ((aggrMask & partitionAggr) == aggrMask) &&
 		as.interval >= as.rollupTime && (as.interval%as.rollupTime == 0 || as.interval/as.rollupTime > 3)
 }
