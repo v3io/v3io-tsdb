@@ -55,9 +55,9 @@ func newDeleteCommandeer(rootCommandeer *RootCommandeer) *delCommandeer {
         Example: `The examples assume that the endpoint of the web-gateway service, the login credentails, and
 the name of the data container are configured in the default configuration file (` + config.DefaultConfigurationFileName + `)
 instead of using the -s|--server, -u|--username, -p|--password, and -c|--container flags.
-- tsdbctl delete -p metrics_tsdb -a
-- tsdbctl delete -p perfstats -f
-- tsdbctl delete -b testtsdb -b 0 -e now-7d -i
+- tsdbctl delete -t metrics_tsdb -a
+- tsdbctl delete -t perfstats -f
+- tsdbctl delete -t my_tsdb -b 0 -e now-7d -i
 
 Notes:
 - When deleting content within a specific time range (see the -b|--begin and -e|--end flags and
