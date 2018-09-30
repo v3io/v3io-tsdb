@@ -62,7 +62,7 @@ instead of using the -s|--server, -u|--username, -p|--password, and -c|--contain
 - tsdbctl query -p mytsdb temperature
 - tsdbctl query -p performance filter="starts(__name__, 'cpu') AND os=='win'"
 - tsdbctl query -p pmertics -b 0 -e now-1h -a "sum,avg" -i 20m
-- tsdbctl query -p mytsdb -f "LabelA==8.1" -l 1d
+- tsdbctl query -p mytsdb -f "LabelA==8.1" -l 1d -o json
 
 Notes:
 - You must set the mertic-name argument (<metric>) and/or the query-filter flag (-f|--filter).
