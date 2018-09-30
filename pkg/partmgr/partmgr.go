@@ -287,7 +287,7 @@ type DBPartition struct {
 	startTime         int64              // Start from time/date
 	partitionInterval int64              // Number of millis stored in the partition
 	chunkInterval     int64              // number of millis stored in each chunk
-	prefix            string             // TablePath prefix
+	prefix            string             // path prefix
 	retentionDays     int                // Keep samples for N hours
 	defaultRollups    aggregate.AggrType // Default Aggregation functions to apply on sample update
 	rollupTime        int64              // Time range per aggregation bucket
