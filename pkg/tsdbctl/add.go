@@ -56,12 +56,20 @@ func newAddCommandeer(rootCommandeer *RootCommandeer) *addCommandeer {
 	}
 
 	cmd := &cobra.Command{
-		Use:     "add [<metric>] [<labels>] [flags]",
 		Aliases: []string{"append"},
+		Use:     "add [<metric>] [<labels>] [flags]",
 		Short:   "Add metric samples to a TSDB instance",
-		Long:    `Add (ingest) metric samples into a TSDB instance (table).
+		Long:    `Add (ingest) metric samples into a TSDB instance (table).`,
+        Example: `The examples assume that the endpoint of the web-gateway service, the login credentails, and
+the name of the data container are configured in the default configuration file (` + config.DefaultConfigurationFileName + `)
+instead of using the -s|--server, -u|--username, -p|--password, and -c|--container flags.
+- tsdbctl -t mytsdb add temperature -d 28 -m now-2h
+- tsdbctl -t mytsdb add http_req method=get -d 99.9
+- tsdbctl -t metrics-table add cpu "host=A,os=win" -d "73.2,45.1" -m "1533026403000,now-1d"
+- tsdbctl -t perfstats add -f ~/tsdb/tsdb_input.csv
 
-NOTE: The command requires a metric name and one or more sample values. You can provide this
+Notes:
+The command requires a metric name and one or more sample values. You can provide this
 information either by using the <metric> argument and the -d|--values flag, or by using the
 -f|--file flag to point to a CSV file that contains the required information.
 
@@ -74,13 +82,6 @@ Arguments:
                     This argument is applicable only when setting the <metric> argument.
                     You can also optionally define labels to add to specific metrics in a
                     CSV file that is specified with the -f|--file command.`,
-        Example: `The examples assume that the endpoint of the web-gateway service, the login credentails, and
-the name of the data container are configured in the default configuration file (` + config.DefaultConfigurationFileName + `)
-instead of using the -s|--server, -u|--username, -p|--password, and -c|--container flags.
-- tsdbctl -t mytsdb add temperature -d 28 -m now-2h
-- tsdbctl -t mytsdb add http_req method=get -d 99.9
-- tsdbctl -t metrics-table add cpu "host=A,os=win" -d "73.2,45.1" -m "1533026403000,now-1d"
-- tsdbctl -t perfstats add -f ~/tsdb/tsdb_input.csv`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 
 			if commandeer.inFile != "" && commandeer.stdin {
@@ -106,7 +107,7 @@ instead of using the -s|--server, -u|--username, -p|--password, and -c|--contain
 	}
 
 	cmd.Flags().StringVarP(&commandeer.tArr, "times", "m", "",
-		"An array of metric-sample times, as a comma-separated list of times\nspecified as Unix timestamps in milliseconds or as relative times.\nExample: \"1537971020000,now,now-2d,now-95m\".\nThe default sample time is the current time (\"now\").")
+		"An array of metric-sample times, as a comma-separated list of times\nspecified as Unix timestamps in milliseconds or as relative times of the\nformat \"now\" or \"now-[0-9]+[mhd]\" (where 'm' = minutes, 'h' = hours,\nand 'd' = \"days\"). Example: \"1537971020000,now,now-2d,now-95m\".\nThe default sample time is the current time (\"now\").")
 	cmd.Flags().StringVarP(&commandeer.vArr, "values", "d", "",
     "An array of metric-sample data values, as a comma-separated list of\ninteger or float values. Example: \"99.3,82.12,25.87,100\".\nThe command requires at least one metric value, which can be provided\nwith this flag or in a CSV file that is set with the -f|--file flag.")
 	cmd.Flags().StringVarP(&commandeer.inFile, "file", "f", "",
@@ -337,7 +338,7 @@ func strToTV(tarr, varr string) ([]int64, []float64, error) {
 			} else {
 				t, err := strconv.Atoi(tlist[i])
 				if err != nil {
-					return nil, nil, errors.Wrap(err, "Invalid time format. Supported time formats are Unix timesamps in milliseconds and relative times such as 'now-2h'.) time")
+					return nil, nil, errors.Wrap(err, "Invalid time format. Supported formats are Unix timesamps in milliseconds and relative times of the format 'now' or 'now-[0-9]+[mdh]' (such as 'now-2h').")
 				}
 				tarray = append(tarray, int64(t))
 			}
