@@ -146,6 +146,7 @@ func (a *V3ioAdapter) connect() error {
 	}
 
 	a.logger.Info("Starting V3IO TSDB client, server is at %s", fullpath)
+	a.logger.Debug("Running with configuration: %+v\n", a.cfg)
 
 	return nil
 }
