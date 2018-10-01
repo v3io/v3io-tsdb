@@ -56,7 +56,7 @@ func newDeleteCommandeer(rootCommandeer *RootCommandeer) *delCommandeer {
 the name of the data container are configured in the default configuration file (` + config.DefaultConfigurationFileName + `)
 instead of using the -s|--server, -u|--username, -p|--password, and -c|--container flags.
 - tsdbctl delete -t metrics_tsdb -a
-- tsdbctl delete -t perfstats -f
+- tsdbctl delete -t dbs/perfstats -f
 - tsdbctl delete -t my_tsdb -b 0 -e now-7d -i
 
 Notes:

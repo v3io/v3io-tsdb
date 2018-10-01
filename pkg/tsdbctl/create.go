@@ -65,7 +65,7 @@ func newCreateCommandeer(rootCommandeer *RootCommandeer) *createCommandeer {
 		Short: "Create a new TSDB instance",
 		Long:  `Create a new TSDB instance (table) according to the provided configuration.`,
         Example: `- tsdbctl create -s 192.168.1.100:8081 -u myuser -p mypassword -c mycontainer -t my_tsdb --rate 1/s
-- tsdbctl create -s 192.168.204.14:8081 -u janed -p OpenSesame -c bigdata -t metrics_table --rate 60/m -a "min,avg,stddev" -i 3h
+- tsdbctl create -s 192.168.204.14:8081 -u janed -p OpenSesame -c bigdata -t my_dbs/metrics_table --rate 60/m -a "min,avg,stddev" -i 3h
 - tsdbctl create -g ~/my_tsdb_cfg.yaml -u johnl -p "P@ssNoW!" -c admin_container -t perf_metrics --rate "100/h"
   (where ~/my_tsdb_cfg.yaml has a "v3ioUrl" key that sets the endpoint of the web service)`,
 		RunE: func(cmd *cobra.Command, args []string) error {
