@@ -48,7 +48,7 @@ type V3ioSeriesSet struct {
 	baseTime   int64
 }
 
-// Get relevant items & attributes from the DB, and create an iterator
+// Get relevant items and attributes from the TSDB and create an iterator
 // TODO: get items per partition + merge, per partition calc attrs
 func (s *V3ioSeriesSet) getItems(partition *partmgr.DBPartition, name, filter string, container *v3io.Container, workers int) error {
 
@@ -78,10 +78,10 @@ func (s *V3ioSeriesSet) getItems(partition *partmgr.DBPartition, name, filter st
 
 }
 
-// advance to the next series
+// Advance to the next series
 func (s *V3ioSeriesSet) Next() bool {
 
-	// create raw chunks series (not aggregated)
+	// Create a raw-chunks series (not aggregated)
 	if s.aggrSeries == nil {
 		if s.iter.Next() {
 			s.currSeries = NewSeries(s)
@@ -90,10 +90,10 @@ func (s *V3ioSeriesSet) Next() bool {
 		return false
 	}
 
-	// create multiple aggregation series (one per aggregation function)
-	// the index is initialized as numfunc-1 (so the first +1 and modulo will be eq 0)
+	// Create multiple aggregation series (one per aggregation function).
+	// The index is initialized as numfunc-1 (so the first +1 and modulo will equal 0).
 	if s.aggrIdx == s.aggrSeries.NumFunctions()-1 {
-		// if no more items (from GetItems cursor), return with EOF
+		// If there are no more items (from GetItems cursor), return with EOF
 		if !s.iter.Next() {
 			return false
 		}
@@ -102,7 +102,8 @@ func (s *V3ioSeriesSet) Next() bool {
 
 		if s.aggrSeries.CanAggregate(s.partition.AggrType()) && s.maxt-s.mint >= s.interval {
 
-			// create series from aggregation arrays (in DB) if the partition stored the desired aggregates
+			// Create a series from aggregation arrays (in the TSDB table) if
+			// the partition stores the desired aggregates
 			maxtUpdate := s.maxt
 			maxTime := s.iter.GetField("_maxtime")
 			if maxTime != nil && int64(maxTime.(int)) < s.maxt {
@@ -112,7 +113,7 @@ func (s *V3ioSeriesSet) Next() bool {
 			start := s.partition.Time2Bucket(s.mint)
 			end := s.partition.Time2Bucket(s.maxt+s.interval) + 1
 
-			// len of the returned array, time-range / interval + 2
+            // Calculate the length of the returned array: time-range/interval + 2
 			length := int((maxtUpdate-s.mint)/s.interval) + 2
 
 			if s.overlapWin != nil {
@@ -136,10 +137,10 @@ func (s *V3ioSeriesSet) Next() bool {
 
 		} else {
 
-			// create series from raw chunks
+			// Create a series from raw chunks
 			s.currSeries = NewSeries(s)
 
-			// the number of cells is equal to divisor of (maxt-mint) and interval.
+            // Calculate the number of cells: (maxt-mint)/interval + 1
 			numCells := (s.maxt-s.mint)/s.interval + 1
 
 			s.aggrSet = s.aggrSeries.NewSetFromChunks(int(numCells))
@@ -156,7 +157,7 @@ func (s *V3ioSeriesSet) Next() bool {
 	return true
 }
 
-// convert raw chunks to fixed interval aggregator
+// Convert raw chunks to a fixed-interval aggregate
 func (s *V3ioSeriesSet) chunks2IntervalAggregates() {
 
 	iter := s.currSeries.Iterator()
@@ -179,7 +180,7 @@ func (s *V3ioSeriesSet) chunks2IntervalAggregates() {
 	}
 }
 
-// convert chunks to overlapping windows aggregator
+// Convert chunks to an overlapping-windows aggregate
 func (s *V3ioSeriesSet) chunks2WindowedAggregates() {
 
 	maxAligned := (s.maxt / s.interval) * s.interval
@@ -213,7 +214,7 @@ func (s *V3ioSeriesSet) chunks2WindowedAggregates() {
 	}
 }
 
-// return current error
+// Return the current error
 func (s *V3ioSeriesSet) Err() error {
 	if s.iter.Err() != nil {
 		return s.iter.Err()
@@ -221,7 +222,7 @@ func (s *V3ioSeriesSet) Err() error {
 	return s.err
 }
 
-// return a series iterator
+// Return a series iterator
 func (s *V3ioSeriesSet) At() Series {
 	if s.aggrSeries == nil {
 		return s.currSeries
@@ -230,7 +231,7 @@ func (s *V3ioSeriesSet) At() Series {
 	return NewAggrSeries(s, s.aggrSeries.GetFunctions()[s.aggrIdx])
 }
 
-// empty series set
+// Null-series set
 type nullSeriesSet struct {
 	err error
 }

@@ -46,20 +46,19 @@ type Series interface {
 	// Iterator returns a new iterator of the data of the series.
 	Iterator() SeriesIterator
 
-	// unique key for sorting
+	// Unique key for sorting
 	GetKey() uint64
 }
 
 // SeriesIterator iterates over the data of a time series.
 type SeriesIterator interface {
 	// Seek advances the iterator forward to the given timestamp.
-	// If there's no value exactly at t, it advances to the first value
-	// after t.
+	// If there's no value exactly at t, it advances to the first value after t.
 	Seek(t int64) bool
 	// At returns the current timestamp/value pair.
 	At() (t int64, v float64)
 	// Next advances the iterator by one.
 	Next() bool
-	// error returns the current error.
+	// Err returns the current error.
 	Err() error
 }

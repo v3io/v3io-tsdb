@@ -62,7 +62,7 @@ func (q *V3ioQuerier) SelectOverlap(name, functions string, step int64, windows 
 	return q.selectQry(name, functions, step, windows, filter)
 }
 
-// base query function
+// Base query function
 func (q *V3ioQuerier) selectQry(name, functions string, step int64, windows []int, filter string) (set SeriesSet, err error) {
 	set = nullSeriesSet{}
 
@@ -71,13 +71,13 @@ func (q *V3ioQuerier) selectQry(name, functions string, step int64, windows []in
 	err = q.partitionMngr.ReadAndUpdateSchema()
 
 	if err != nil {
-		return nullSeriesSet{}, errors.Wrap(err, "failed to read/update schema")
+		return nullSeriesSet{}, errors.Wrap(err, "Failed to read/update the TSDB schema.")
 	}
 
 	queryTimer, err := performance.ReporterInstanceFromConfig(q.cfg).GetTimer("QueryTimer")
 
 	if err != nil {
-		return nullSeriesSet{}, errors.Wrap(err, "failed to create performance metric [QueryTimer]")
+		return nullSeriesSet{}, errors.Wrap(err, "Failed to create a performance metric [QueryTimer].")
 	}
 
 	queryTimer.Time(func() {
@@ -104,7 +104,7 @@ func (q *V3ioQuerier) selectQry(name, functions string, step int64, windows []in
 			sets[i] = set
 		}
 
-		// sort each partition when not using range scan
+		// Sort each partition when not using range scan
 		if name == "" {
 			for i := 0; i < len(sets); i++ {
 				// TODO make it a Go routine per part
@@ -124,7 +124,7 @@ func (q *V3ioQuerier) selectQry(name, functions string, step int64, windows []in
 	return
 }
 
-// Query a single partition (with numeric/float values)
+// Query a single partition (with integer or float values)
 func (q *V3ioQuerier) queryNumericPartition(
 	partition *partmgr.DBPartition, name, functions string, step int64, windows []int, filter string) (SeriesSet, error) {
 
@@ -137,18 +137,19 @@ func (q *V3ioQuerier) queryNumericPartition(
 	if q.mint > mint {
 		mint = q.mint
 		if step != 0 && step < (maxt-mint) {
-			// temporary Aggregation fix: if mint is not aligned with steps, move it to the next step tick
+			// Temporary aggregation fix: if mint isn't aligned with the step,
+			// move it to the next step tick
 			mint += (maxt - mint) % step
 		}
 	}
 
 	newSet := &V3ioSeriesSet{mint: mint, maxt: maxt, partition: partition, logger: q.logger}
 
-	// if there are aggregations to be made
+	// Check whether there are aggregations to add
 	if functions != "" {
 
-		// if step isn't passed (e.g. when using the console) - the step is the difference between max
-		// and min times (e.g. 5 minutes)
+		// If step isn't passed (e.g., when using the console), the step is the
+		// difference between the end (maxt) and start (mint) times (e.g., 5 minutes)
 		if step == 0 {
 			step = maxt - mint
 		}
@@ -175,11 +176,11 @@ func (q *V3ioQuerier) queryNumericPartition(
 	return newSet, err
 }
 
-// return the current metric names
+// Return the current metric names
 func (q *V3ioQuerier) LabelValues(labelKey string) (result []string, err error) {
 	labelValuesTimer, err := performance.ReporterInstanceFromConfig(q.cfg).GetTimer("LabelValuesTimer")
 	if err != nil {
-		return result, errors.Wrap(err, "failed to obtain timer object for [LabelValuesTimer]")
+		return result, errors.Wrap(err, "Failed to obtain a timer object for timer LabelValuesTimer.")
 	}
 
 	labelValuesTimer.Time(func() {
@@ -214,7 +215,7 @@ func (q *V3ioQuerier) getMetricNames() ([]string, error) {
 	}
 
 	if iter.Err() != nil {
-		q.logger.InfoWith("Failed to read metric names, returning empty list", "err", iter.Err().Error())
+		q.logger.InfoWith("Failed to read metric names; returning an empty list.", "err", iter.Err().Error())
 	}
 
 	return metricNames, nil
@@ -222,7 +223,7 @@ func (q *V3ioQuerier) getMetricNames() ([]string, error) {
 
 func (q *V3ioQuerier) getLabelValues(labelKey string) ([]string, error) {
 
-	// sync partition manager (hack)
+	// Sync partition manager (hack)
 	err := q.partitionMngr.ReadAndUpdateSchema()
 	if err != nil {
 		return nil, err
@@ -230,14 +231,14 @@ func (q *V3ioQuerier) getLabelValues(labelKey string) ([]string, error) {
 
 	partitionPaths := q.partitionMngr.GetPartitionsPaths()
 
-	// if no partitions yet - there are no labels
+	// If there are no partitions yet, there are no labels
 	if len(partitionPaths) == 0 {
 		return nil, nil
 	}
 
 	labelValuesMap := map[string]struct{}{}
 
-	// get all labelsets
+	// Get all label sets
 	input := v3io.GetItemsInput{
 		Path:           partitionPaths[0],
 		AttributeNames: []string{"_lset"},
@@ -248,21 +249,22 @@ func (q *V3ioQuerier) getLabelValues(labelKey string) ([]string, error) {
 		return nil, err
 	}
 
-	// iterate over the results
+	// Iterate over the results
 	for iter.Next() {
 		labelSet := iter.GetField("_lset").(string)
 
-		// the labelSet will be k1=v1,k2=v2, k2=v3. Assuming labelKey is "k2", we want to convert
-		// that to [v2, v3]
+		// For a label set of k1=v1,k2=v2, k2=v3, for labelKey "k2", for example,
+		// we want to convert the set to [v2, v3]
 
-		// split at "," to get k=v pairs
+		// Split at "," to get k=v pairs
 		for _, label := range strings.Split(labelSet, ",") {
 
-			// split at "=" to get label key and label value
+			// Split at "=" to get the label key and label value
 			splitLabel := strings.SplitN(label, "=", 2)
 
-			// if we got two elements and the first element (the key) is equal to what we're looking
-			// for, save the label value in the map. use a map to prevent duplications
+			// If we have two elements and the first element (the key) is equal
+			// to what we're looking for, save the label value in the map.
+			// Use a map to prevent duplicates.
 			if len(splitLabel) == 2 && splitLabel[0] == labelKey {
 				labelValuesMap[splitLabel[1]] = struct{}{}
 			}

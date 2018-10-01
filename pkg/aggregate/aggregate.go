@@ -29,7 +29,7 @@ import (
 
 type AggrType uint16
 
-// aggregation functions
+// Aggregation functions
 const (
 	aggrTypeCount AggrType = 1
 	aggrTypeSum   AggrType = 2
@@ -38,7 +38,7 @@ const (
 	aggrTypeMin   AggrType = 16
 	aggrTypeLast  AggrType = 32
 
-	// derived aggregators
+	// Derived aggregates
 	aggrTypeAvg    AggrType = aggrTypeCount | aggrTypeSum
 	aggrTypeRate   AggrType = aggrTypeLast | 0x8000
 	aggrTypeStddev AggrType = aggrTypeCount | aggrTypeSum | aggrTypeSqr
@@ -119,7 +119,7 @@ func AggregatorsToStringList(aggregators string) ([]string, error) {
 	return list, nil
 }
 
-// convert comma separated string to aggregator mask
+// Convert a comma-separated aggregation-functions string to an aggregates mask
 func AggrsFromString(split []string) (AggrType, error) {
 	var aggrList AggrType
 	for _, s := range split {
@@ -127,7 +127,7 @@ func AggrsFromString(split []string) (AggrType, error) {
 		if trimmed != "" {
 			aggr, ok := aggrTypeString[trimmed]
 			if !ok {
-				return aggrList, fmt.Errorf("invalid aggragator type '%s'", s)
+                return aggrList, fmt.Errorf("Invalid aggragate type: '%s'", s)
 			}
 			aggrList = aggrList | aggr
 		}
@@ -135,7 +135,7 @@ func AggrsFromString(split []string) (AggrType, error) {
 	return aggrList, nil
 }
 
-// create list of aggregator objects from aggregator mask
+// Create a list of aggregate objects from an aggregates mask
 func NewAggregatorList(aggrType AggrType) *AggregatorList {
 	list := AggregatorList{}
 	if (aggrType & aggrTypeCount) != 0 {
@@ -159,10 +159,10 @@ func NewAggregatorList(aggrType AggrType) *AggregatorList {
 	return &list
 }
 
-// list of aggregators
+// List of aggregates
 type AggregatorList []Aggregator
 
-// append value to all aggregators
+// Append a value to all aggregates
 func (a AggregatorList) Aggregate(t int64, val interface{}) {
 	v := val.(float64)
 	for _, aggr := range a {
@@ -170,7 +170,7 @@ func (a AggregatorList) Aggregate(t int64, val interface{}) {
 	}
 }
 
-// return update expression for aggregators
+// Return an update expression for the aggregates in the given aggregates list
 func (a AggregatorList) UpdateExpr(col string, bucket int) string {
 	expr := ""
 	for _, aggr := range a {
@@ -179,7 +179,7 @@ func (a AggregatorList) UpdateExpr(col string, bucket int) string {
 	return expr
 }
 
-// return set (first value) or update expression for aggregators
+// Return an aggregates set expression (first value) or update expression
 func (a AggregatorList) SetOrUpdateExpr(col string, bucket int, isNew bool) string {
 	if isNew {
 		return a.SetExpr(col, bucket)
@@ -195,7 +195,7 @@ func (a AggregatorList) SetExpr(col string, bucket int) string {
 	return expr
 }
 
-// return array init expression
+// Return an aggregates array-initialization expression
 func (a AggregatorList) InitExpr(col string, buckets int) string {
 	expr := ""
 	for _, aggr := range a {
@@ -204,7 +204,7 @@ func (a AggregatorList) InitExpr(col string, buckets int) string {
 	return expr
 }
 
-// clear all aggregators
+// Clear all aggregates
 func (a AggregatorList) Clear() {
 	for _, aggr := range a {
 		aggr.Clear()

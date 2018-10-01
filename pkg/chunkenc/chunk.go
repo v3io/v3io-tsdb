@@ -33,7 +33,7 @@ import (
 	"fmt"
 )
 
-// Encoding is the identifier for a chunk encoding.
+// Encoding is the identifier for chunk encoding.
 type Encoding uint8
 
 func (e Encoding) String() string {
@@ -46,7 +46,7 @@ func (e Encoding) String() string {
 	return "<unknown>"
 }
 
-// The different available chunk encodings.
+// Available chunk encodings
 const (
 	EncNone Encoding = 0
 	EncXOR  Encoding = 1
@@ -67,7 +67,7 @@ func FromData(e Encoding, d []byte, samples uint16) (Chunk, error) {
 	case EncXOR:
 		return &XORChunk{b: &bstream{count: 0, stream: d}, samples: samples}, nil
 	}
-	return nil, fmt.Errorf("unknown chunk encoding: %d", e)
+	return nil, fmt.Errorf("Unknown chunk encoding: %d", e)
 }
 
 func ToUint64(bytes []byte) []uint64 {
@@ -89,7 +89,7 @@ func ToUint64(bytes []byte) []uint64 {
 
 }
 
-// Appender adds sample pairs to a chunk.
+// Appender adds metric-sample pairs to a chunk.
 type Appender interface {
 	Append(int64, float64)
 	Chunk() Chunk
@@ -102,7 +102,7 @@ type Iterator interface {
 	Next() bool
 }
 
-// NewNopIterator returns a new chunk iterator that does not hold any data.
+// NewNopIterator returns a new chunk iterator that doesn't hold any data.
 func NewNopIterator() Iterator {
 	return nopIterator{}
 }
