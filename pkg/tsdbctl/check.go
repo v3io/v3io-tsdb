@@ -26,8 +26,8 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/v3io/v3io-go-http"
 	"github.com/v3io/v3io-tsdb/pkg/chunkenc"
-    "github.com/v3io/v3io-tsdb/pkg/utils"
-    "github.com/v3io/v3io-tsdb/pkg/config"
+	"github.com/v3io/v3io-tsdb/pkg/utils"
+	"github.com/v3io/v3io-tsdb/pkg/config"
 	"time"
 )
 
@@ -48,7 +48,7 @@ func newCheckCommandeer(rootCommandeer *RootCommandeer) *checkCommandeer {
 		Hidden:  true,
 		Short:   "Get information about a TSDB metric item",
 		Long:    `Get information about a TSDB metric item.`,
-        Example: `The examples assume that the endpoint of the web-gateway service, the login credentails, and
+		Example: `The examples assume that the endpoint of the web-gateway service, the login credentails, and
 the name of the data container are configured in the default configuration file (` + config.DefaultConfigurationFileName + `)
 - tsdbctl -t mytsdb 1537920000/cpu
 
@@ -63,7 +63,7 @@ Arguments:
 
 			commandeer.objPath = args[0]
 
-            // Initialize parameters
+			// Initialize parameters
 			return commandeer.check()
 		},
 	}

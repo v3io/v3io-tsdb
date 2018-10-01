@@ -52,6 +52,11 @@ func NewAggregateSeries(functions, col string, buckets int, interval, rollupTime
 		aggrList = append(aggrList, aggr)
 	}
 
+	// Always have count Aggregator by default
+	if aggrMask != 0 {
+		aggrMask |= aggrTypeCount
+	}
+
 	newAggregateSeries := AggregateSeries{
 		aggrMask:       aggrMask,
 		functions:      aggrList,
@@ -70,8 +75,10 @@ func (as *AggregateSeries) CanAggregate(partitionAggr AggrType) bool {
 	aggrMask := 0x7f & as.aggrMask
 	// make sure the DB has all the aggregators we need (on bits in the mask)
 	// and that the requested interval is greater/eq to aggregator resolution and is an even divisor
+	// if interval and rollup are not even divisors we need higher resolution (3x) to smooth the graph
+	// when we add linear/spline graph projection we can reduce back to 1x
 	return ((aggrMask & partitionAggr) == aggrMask) &&
-		as.interval >= as.rollupTime && (as.interval%as.rollupTime == 0)
+		as.interval >= as.rollupTime && (as.interval%as.rollupTime == 0 || as.interval/as.rollupTime > 3)
 }
 
 func (as *AggregateSeries) GetAggrMask() AggrType {
@@ -343,4 +350,8 @@ func (as *AggregateSet) Clear() {
 	for aggr := range as.dataArrays {
 		as.dataArrays[aggr] = as.dataArrays[aggr][:0]
 	}
+}
+
+func (as *AggregateSet) DoesCellHaveData(cell int) bool {
+	return as.dataArrays[aggrTypeCount][cell] > 0
 }

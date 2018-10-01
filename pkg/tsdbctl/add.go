@@ -60,7 +60,7 @@ func newAddCommandeer(rootCommandeer *RootCommandeer) *addCommandeer {
 		Use:     "add [<metric>] [<labels>] [flags]",
 		Short:   "Add metric samples to a TSDB instance",
 		Long:    `Add (ingest) metric samples into a TSDB instance (table).`,
-        Example: `The examples assume that the endpoint of the web-gateway service, the login credentails, and
+		Example: `The examples assume that the endpoint of the web-gateway service, the login credentails, and
 the name of the data container are configured in the default configuration file (` + config.DefaultConfigurationFileName + `)
 instead of using the -s|--server, -u|--username, -p|--password, and -c|--container flags.
 - tsdbctl -t mytsdb add temperature -d 28 -m now-2h
@@ -109,7 +109,7 @@ Arguments:
 	cmd.Flags().StringVarP(&commandeer.tArr, "times", "m", "",
 		"An array of metric-sample times, as a comma-separated list of times\nspecified as Unix timestamps in milliseconds or as relative times of the\nformat \"now\" or \"now-[0-9]+[mhd]\" (where 'm' = minutes, 'h' = hours,\nand 'd' = \"days\"). Example: \"1537971020000,now,now-2d,now-95m\".\nThe default sample time is the current time (\"now\").")
 	cmd.Flags().StringVarP(&commandeer.vArr, "values", "d", "",
-    "An array of metric-sample data values, as a comma-separated list of\ninteger or float values. Example: \"99.3,82.12,25.87,100\".\nThe command requires at least one metric value, which can be provided\nwith this flag or in a CSV file that is set with the -f|--file flag.")
+		"An array of metric-sample data values, as a comma-separated list of\ninteger or float values. Example: \"99.3,82.12,25.87,100\".\nThe command requires at least one metric value, which can be provided\nwith this flag or in a CSV file that is set with the -f|--file flag.")
 	cmd.Flags().StringVarP(&commandeer.inFile, "file", "f", "",
 		"Path to a CSV metric-samples input file with rows of this format:\n  <metric name>,[<labels>],<sample data value>[,<sample time>]\nNote that all rows must have the same number of columns.\nExamples: \"~/tests/tsdb_samples.csv\" where the file has this content:\n  temp,degree=cel,28,1529659800000\n  cpu,\"os=win,id=82\",78.5,now-1h\n  volume,,6104.02,\n\"my_metrics.csv\" where the file has this content (no time column):\n  noise,,50\n  cpu2,\"os=linux,id=2\",95")
 	cmd.Flags().BoolVar(&commandeer.stdin, "stdin", false,

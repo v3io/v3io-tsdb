@@ -52,7 +52,7 @@ func newDeleteCommandeer(rootCommandeer *RootCommandeer) *delCommandeer {
 		Use:     "del",
 		Short:   "Delete a TSDB instance or its content",
 		Long:    `Delete a TSDB instance (table) or delete content from the table.`,
-        Example: `The examples assume that the endpoint of the web-gateway service, the login credentails, and
+		Example: `The examples assume that the endpoint of the web-gateway service, the login credentails, and
 the name of the data container are configured in the default configuration file (` + config.DefaultConfigurationFileName + `)
 instead of using the -s|--server, -u|--username, -p|--password, and -c|--container flags.
 - tsdbctl delete -t metrics_tsdb -a
@@ -65,7 +65,7 @@ Notes:
   metric items with older or newer times. Use the info command to view the partitioning interval.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 
-            // Initialize parameters
+			// Initialize parameters
 			return commandeer.delete()
 		},
 	}
@@ -103,8 +103,8 @@ func (dc *delCommandeer) delete() error {
 			return err
 		}
 	}
-    from := to - 1000*3600 // Default start time = one hour before the end time
-if dc.fromTime != "" {
+	from := to - 1000*3600 // Default start time = one hour before the end time
+	if dc.fromTime != "" {
 		from, err = utils.Str2unixTime(dc.fromTime)
 		if err != nil {
 			return err
@@ -113,7 +113,7 @@ if dc.fromTime != "" {
 
 	if !dc.force {
 		confirmedByUser, err := getConfirmation(
-			fmt.Sprintf("You are about to delete the TSDB table '%s' table. Are you sure?", dc.rootCommandeer.v3iocfg.Path))
+			fmt.Sprintf("You are about to delete TSDB table '%s' in container '%s'. Are you sure?", dc.rootCommandeer.v3iocfg.TablePath, dc.rootCommandeer.v3iocfg.Container))
 		if err != nil {
 			return err
 		}
@@ -125,9 +125,9 @@ if dc.fromTime != "" {
 
 	err = dc.rootCommandeer.adapter.DeleteDB(dc.deleteAll, dc.ignoreErrors, from, to)
 	if err != nil {
-		return errors.Wrapf(err, "Failed to delete TSDB table '%s'.", dc.rootCommandeer.v3iocfg.Path)
+		return errors.Wrapf(err, "Failed to delete TSDB table '%s' in container '%s'.", dc.rootCommandeer.v3iocfg.TablePath, dc.rootCommandeer.v3iocfg.Container)
 	}
-	fmt.Printf("Successfully deleted TSDB table '%s'.\n", dc.rootCommandeer.v3iocfg.Path)
+	fmt.Printf("Successfully deleted TSDB table '%s' from container '%s'.\n", dc.rootCommandeer.v3iocfg.TablePath, dc.rootCommandeer.v3iocfg.Container)
 
 	return nil
 }

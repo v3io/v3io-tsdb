@@ -69,11 +69,11 @@ func NewRootCommandeer() *RootCommandeer {
 		"verbose", "v", "", "Verbose output")
 	cmd.PersistentFlags().Lookup("verbose").NoOptDefVal = defaultVerbosityLevel
 	cmd.PersistentFlags().StringVarP(&commandeer.dbPath, "table-path", "t", "",
-    "[Required] Path to the TSDB table within the configured\ndata container. Examples: \"mytsdb\"; \"/my_tsdbs/tsdbd1\".")
-        // We don't enforce this flag (cmd.MarkFlagRequired("table-path")),
-        // although it's documented as Required, because this flag isn't
-        // required for the hidden `time` command + during internal tests we
-        // might want to configure the table path in a configuration file.
+		"[Required] Path to the TSDB table within the configured\ndata container. Examples: \"mytsdb\"; \"/my_tsdbs/tsdbd1\".")
+		// We don't enforce this flag (cmd.MarkFlagRequired("table-path")),
+		// although it's documented as Required, because this flag isn't
+		// required for the hidden `time` command + during internal tests we
+		// might want to configure the table path in a configuration file.
 	cmd.PersistentFlags().StringVarP(&commandeer.v3ioPath, "server", "s", defaultV3ioServer,
 		"Web-gateway (web-APIs) service endpoint of an instance of\nthe Iguazio Continuous Data Platfrom, of the format\n\"<IP address>:<port number=8081>\". Examples: \"localhost:8081\"\n(when running on the target platform); \"192.168.1.100:8081\".")
 	cmd.PersistentFlags().StringVarP(&commandeer.cfgFilePath, "config", "g", "",
@@ -179,9 +179,9 @@ func (rc *RootCommandeer) populateConfig(cfg *config.V3ioConfig) error {
 			} else if cfg.Container == "" {
 				return fmt.Errorf("Missing the name of the TSDB's parent data container.")
 			}
-			cfg.V3ioUrl = rc.v3ioPath
+			cfg.WebApiEndpoint = rc.v3ioPath
 		} else {
-			cfg.V3ioUrl = rc.v3ioPath[0:slash]
+			cfg.WebApiEndpoint = rc.v3ioPath[0:slash]
 			cfg.Container = rc.v3ioPath[slash+1:]
 		}
 	}
@@ -189,10 +189,10 @@ func (rc *RootCommandeer) populateConfig(cfg *config.V3ioConfig) error {
 		cfg.Container = rc.container
 	}
 	if rc.dbPath != "" {
-		cfg.Path = rc.dbPath
+		cfg.TablePath = rc.dbPath
 	}
-	if cfg.V3ioUrl == "" || cfg.Container == "" || cfg.Path == "" {
-		return fmt.Errorf("Not all required configuration information was provided. The endpoint of the web-gateway service, related username and password login credentials, the name of the TSDB parent data container, and the path to the TSDB table within the container, must be defined as part of the CLI command or in a configuration file.")
+	if cfg.WebApiEndpoint == "" || cfg.Container == "" || cfg.TablePath == "" {
+		return fmt.Errorf("Not all required configuration information was provided. The endpoint of the web-gateway service, related username and password authentication credentials, the name of the TSDB parent data container, and the path to the TSDB table within the container, must be defined as part of the CLI command or in a configuration file.")
 	}
 	if rc.verbose != "" {
 		cfg.Verbose = rc.verbose

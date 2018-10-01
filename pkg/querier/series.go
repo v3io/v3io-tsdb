@@ -91,12 +91,12 @@ func (s *V3ioSeries) initSeriesIter() {
 	}
 
 	newIterator := v3ioSeriesIterator{
-		mint: s.set.mint, maxt: maxt, chunkTime: s.set.partition.TimePerChunk(),
-		isCyclic: s.set.partition.IsCyclic()}
+		mint: s.set.mint, maxt: maxt}
 	newIterator.chunks = []chunkenc.Chunk{}
+	newIterator.chunksMax = []int64{}
 
 	// Create and initialize a chunk encoder per chunk blob
-	for _, attr := range s.set.attrs {
+	for i, attr := range s.set.attrs {
 		values := s.set.iter.GetField(attr)
 
 		if values != nil {
@@ -106,6 +106,8 @@ func (s *V3ioSeries) initSeriesIter() {
 				s.set.logger.ErrorWith("Error reading chunk buffer", "Lset", s.lset, "err", err)
 			} else {
 				newIterator.chunks = append(newIterator.chunks, chunk)
+				newIterator.chunksMax = append(newIterator.chunksMax,
+					s.set.chunk0Time+int64(i+1)*s.set.partition.TimePerChunk()-1)
 			}
 		}
 
@@ -124,11 +126,11 @@ func (s *V3ioSeries) initSeriesIter() {
 type v3ioSeriesIterator struct {
 	mint, maxt int64 // TBD per block
 	err        error
-	isCyclic   bool
 
-	chunks     []chunkenc.Chunk
+	chunks []chunkenc.Chunk
+
 	chunkIndex int
-	chunkTime  int64
+	chunksMax  []int64
 	iter       chunkenc.Iterator
 }
 
@@ -148,15 +150,19 @@ func (it *v3ioSeriesIterator) Seek(t int64) bool {
 	for {
 		if it.iter.Next() {
 			t0, _ := it.At()
-			if (t > t0+int64(it.chunkTime)) || (t0 >= it.maxt && it.isCyclic) {
-				// This chunk is too far behind; move to the next chunk
+			if t0 > it.maxt {
+				return false
+			}
+			if t > it.chunksMax[it.chunkIndex] {
+				// This chunk is too far behind; move to the next chunk or
+				// Return false if it's the last chunk
 				if it.chunkIndex == len(it.chunks)-1 {
 					return false
 				}
 				it.chunkIndex++
 				it.iter = it.chunks[it.chunkIndex].Iterator()
 			} else if t <= t0 {
-				// this chunk contains data on or after t
+				// The cursor (t0) is either on t or just passed t
 				return true
 			}
 		} else {
@@ -185,9 +191,7 @@ func (it *v3ioSeriesIterator) Next() bool {
 		if t <= it.maxt {
 			return true
 		}
-		if !it.isCyclic {
-			return false
-		}
+		return false
 	}
 
 	if err := it.iter.Err(); err != nil {
@@ -211,7 +215,10 @@ func (it *v3ioSeriesIterator) Err() error { return it.iter.Err() }
 
 func NewAggrSeries(set *V3ioSeriesSet, aggr aggregate.AggrType) *V3ioSeries {
 	newSeries := V3ioSeries{set: set}
-	lset := append(initLabels(set), utils.Label{Name: "Aggregator", Value: aggr.String()})
+	lset := initLabels(set)
+	if !set.noAggrLbl {
+		lset = append(lset, utils.Label{Name: "Aggregator", Value: aggr.String()})
+	}
 	newSeries.lset = lset
 
 	if set.nullSeries {
@@ -258,12 +265,13 @@ func (s *aggrSeriesIterator) Seek(t int64) bool {
 
 // Advance an iterator to the next time interval/bucket
 func (s *aggrSeriesIterator) Next() bool {
-	if s.index >= s.aggrSet.GetMaxCell() {
-		return false
+	// Advance the index to the next non-empty cell
+	var nextIndex int
+	for nextIndex = s.index + 1; nextIndex <= s.aggrSet.GetMaxCell() && !s.aggrSet.DoesCellHaveData(nextIndex); nextIndex++ {
 	}
 
-	s.index++
-	return true
+	s.index = nextIndex
+	return s.index <= s.aggrSet.GetMaxCell()
 }
 
 // Return the time and value at the current bucket

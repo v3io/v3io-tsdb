@@ -64,10 +64,10 @@ func newCreateCommandeer(rootCommandeer *RootCommandeer) *createCommandeer {
 		Use:   "create",
 		Short: "Create a new TSDB instance",
 		Long:  `Create a new TSDB instance (table) according to the provided configuration.`,
-        Example: `- tsdbctl create -s 192.168.1.100:8081 -u myuser -p mypassword -c mycontainer -t my_tsdb --rate 1/s
+		Example: `- tsdbctl create -s 192.168.1.100:8081 -u myuser -p mypassword -c mycontainer -t my_tsdb --rate 1/s
 - tsdbctl create -s 192.168.204.14:8081 -u janed -p OpenSesame -c bigdata -t my_dbs/metrics_table --rate 60/m -a "min,avg,stddev" -i 3h
 - tsdbctl create -g ~/my_tsdb_cfg.yaml -u johnl -p "P@ssNoW!" -c admin_container -t perf_metrics --rate "100/h"
-  (where ~/my_tsdb_cfg.yaml has a "v3ioUrl" key that sets the endpoint of the web service)`,
+  (where ~/my_tsdb_cfg.yaml sets "webApiEndpoint" to the endpoint of the web-gateway service)`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 
 			return commandeer.create()
@@ -162,7 +162,7 @@ func (cc *createCommandeer) create() error {
 
 	err = tsdb.CreateTSDB(cc.rootCommandeer.v3iocfg, &schema)
 	if err == nil {
-		fmt.Printf("Successfully created TSDB table '%s' in container '%s' of web-API endpoint '%s'.\n", cc.rootCommandeer.v3iocfg.Path, cc.rootCommandeer.v3iocfg.Container, cc.rootCommandeer.v3iocfg.V3ioUrl)
+		fmt.Printf("Successfully created TSDB table '%s' in container '%s' of web-API endpoint '%s'.\n", cc.rootCommandeer.v3iocfg.TablePath, cc.rootCommandeer.v3iocfg.Container, cc.rootCommandeer.v3iocfg.WebApiEndpoint)
 	}
 	return err
 }

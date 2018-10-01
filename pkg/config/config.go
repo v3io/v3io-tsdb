@@ -53,12 +53,12 @@ func Error() error {
 type V3ioConfig struct {
 	// V3IO TSDB connection information - web-gateway service endpoint,
 	// TSDB data container, relative TSDB table path within the container, and
-	// login credentials
-	V3ioUrl   string `json:"v3ioUrl"`
-	Container string `json:"container"`
-	Path      string `json:"path"`
-	Username  string `json:"username,omitempty"`
-	Password  string `json:"password,omitempty"`
+	// authentication credentials for the web-gateway service
+	WebApiEndpoint string `json:"webApiEndpoint"`
+	Container      string `json:"container"`
+	TablePath      string `json:"tablePath"`
+	Username       string `json:"username,omitempty"`
+	Password       string `json:"password,omitempty"`
 
 	// Disabled = true disables the V3IO TSDB configuration in Prometheus and
 	// enables the internal Prometheus TSDB instead
@@ -88,6 +88,9 @@ type V3ioConfig struct {
 	MaximumChunkSize int `json:"maximumChunkSize,omitempty"`
 	// Metrics-reporter configuration
 	MetricsReporter MetricsReporterConfig `json:"performance,omitempty"`
+	// Don't aggregate from raw chunks, for use when working as a Prometheus
+	// TSDB library
+	DisableClientAggr bool `json:"disableClientAggr,omitempty"`
 }
 
 type MetricsReporterConfig struct {

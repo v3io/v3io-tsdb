@@ -36,18 +36,25 @@ import (
 // Create a new Querier interface
 func NewV3ioQuerier(container *v3io.Container, logger logger.Logger, mint, maxt int64,
 	cfg *config.V3ioConfig, partMngr *partmgr.PartitionManager) *V3ioQuerier {
-	newQuerier := V3ioQuerier{container: container, mint: mint, maxt: maxt,
-		logger: logger.GetChild("Querier"), cfg: cfg}
+	newQuerier := V3ioQuerier{
+		container: container,
+		mint:      mint, maxt: maxt,
+		logger:            logger.GetChild("Querier"),
+		cfg:               cfg,
+		disableClientAggr: cfg.DisableClientAggr,
+	}
 	newQuerier.partitionMngr = partMngr
 	return &newQuerier
 }
 
 type V3ioQuerier struct {
-	logger        logger.Logger
-	container     *v3io.Container
-	cfg           *config.V3ioConfig
-	mint, maxt    int64
-	partitionMngr *partmgr.PartitionManager
+	logger            logger.Logger
+	container         *v3io.Container
+	cfg               *config.V3ioConfig
+	mint, maxt        int64
+	partitionMngr     *partmgr.PartitionManager
+	disableClientAggr bool
+	disableAllAggr    bool
 }
 
 // Standard Time Series Query, return a set of series which match the condition
@@ -55,15 +62,28 @@ func (q *V3ioQuerier) Select(name, functions string, step int64, filter string) 
 	return q.selectQry(name, functions, step, nil, filter)
 }
 
-// Overlapping windows Time Series Query, return a set of series each with a list of aggregated results per window
-// e.g. get the last 1hr, 6hr, 24hr stats per metric (specify a 1hr step of 3600*1000, 1,6,24 windows, and max time)
+// Prometheus time-series query - return a set of time series that match the
+// specified conditions
+func (q *V3ioQuerier) SelectProm(name, functions string, step int64, filter string, noAggr bool) (SeriesSet, error) {
+	q.disableClientAggr = true
+	q.disableAllAggr = noAggr
+	return q.selectQry(name, functions, step, nil, filter)
+}
+
+// Overlapping windows time-series query - return a set of series each with a
+// list of aggregated results per window
+// For example, get the last 1h, 6h, and 24h stats per metric (specify a 1h
+// aggregation interval (step) of 3600*1000 (=1h), windows 1, 6, and 24, and an
+// end (max) time).
 func (q *V3ioQuerier) SelectOverlap(name, functions string, step int64, windows []int, filter string) (SeriesSet, error) {
 	sort.Sort(sort.Reverse(sort.IntSlice(windows)))
 	return q.selectQry(name, functions, step, windows, filter)
 }
 
 // Base query function
-func (q *V3ioQuerier) selectQry(name, functions string, step int64, windows []int, filter string) (set SeriesSet, err error) {
+func (q *V3ioQuerier) selectQry(
+	name, functions string, step int64, windows []int, filter string) (set SeriesSet, err error) {
+
 	set = nullSeriesSet{}
 
 	filter = strings.Replace(filter, "__name__", "_name", -1)
@@ -145,13 +165,26 @@ func (q *V3ioQuerier) queryNumericPartition(
 
 	newSet := &V3ioSeriesSet{mint: mint, maxt: maxt, partition: partition, logger: q.logger}
 
-	// Check whether there are aggregations to add
-	if functions != "" {
+	// If there are no aggregation functions and the aggregation-interval (step)
+	// size is greater than the stored aggregate, use the Average aggregate.
+	// TODO: When not using the Prometheus TSDB, we may want an avg aggregate
+	// for any step>0 in the Prometheus range vectors using seek, and it would
+	// be inefficient to use an avg aggregate.
+	if functions == "" && step > 0 && step >= partition.RollupTime() && partition.AggrType().HasAverage() {
+		functions = "avg"
+	}
+
+    // Check whether there are aggregations to add and aggregates aren't disabled
+	if functions != "" && !q.disableAllAggr {
 
 		// If step isn't passed (e.g., when using the console), the step is the
 		// difference between the end (maxt) and start (mint) times (e.g., 5 minutes)
 		if step == 0 {
 			step = maxt - mint
+		}
+
+		if step > partition.RollupTime() && q.disableClientAggr {
+			step = partition.RollupTime()
 		}
 
 		newAggrSeries, err := aggregate.NewAggregateSeries(functions,
@@ -165,10 +198,16 @@ func (q *V3ioQuerier) queryNumericPartition(
 			return nil, err
 		}
 
-		newSet.aggrSeries = newAggrSeries
-		newSet.interval = step
-		newSet.aggrIdx = newAggrSeries.NumFunctions() - 1
-		newSet.overlapWin = windows
+		// Use aggregates if possible on the TSDB side or if client aggregation
+		// is enabled (Prometheus is disabled on the client side)
+		newSet.canAggregate = newAggrSeries.CanAggregate(partition.AggrType())
+		if newSet.canAggregate || !q.disableClientAggr {
+			newSet.aggrSeries = newAggrSeries
+			newSet.interval = step
+			newSet.aggrIdx = newAggrSeries.NumFunctions() - 1
+			newSet.overlapWin = windows
+			newSet.noAggrLbl = q.disableClientAggr // Don't add an "Aggregator" label in Prometheus
+		}
 	}
 
 	err := newSet.getItems(partition, name, filter, q.container, q.cfg.QryWorkers)
@@ -199,7 +238,7 @@ func (q *V3ioQuerier) Close() error {
 
 func (q *V3ioQuerier) getMetricNames() ([]string, error) {
 	input := v3io.GetItemsInput{
-		Path:           q.cfg.Path + "/names/",
+		Path:           q.cfg.TablePath + "/names/",
 		AttributeNames: []string{"__name"},
 	}
 
@@ -223,7 +262,7 @@ func (q *V3ioQuerier) getMetricNames() ([]string, error) {
 
 func (q *V3ioQuerier) getLabelValues(labelKey string) ([]string, error) {
 
-	// Sync partition manager (hack)
+	// Sync the partition manager (hack)
 	err := q.partitionMngr.ReadAndUpdateSchema()
 	if err != nil {
 		return nil, err

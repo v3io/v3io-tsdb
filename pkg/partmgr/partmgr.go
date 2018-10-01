@@ -95,11 +95,7 @@ type PartitionManager struct {
 }
 
 func (p *PartitionManager) Path() string {
-	return p.v3ioConfig.Path
-}
-
-func (p *PartitionManager) IsCyclic() bool {
-	return p.cyclic
+	return p.v3ioConfig.TablePath
 }
 
 func (p *PartitionManager) GetPartitionsPaths() []string {
@@ -414,13 +410,15 @@ func (p *DBPartition) ChunkID2Attr(col string, id int) string {
 }
 
 // Return the attributes that need to be retrieved for the specified time range
-func (p *DBPartition) Range2Attrs(col string, mint, maxt int64) ([]string, []int) {
+func (p *DBPartition) Range2Attrs(col string, mint, maxt int64) ([]string, int64) {
 	list := p.Range2Cids(mint, maxt)
 	var strList []string
 	for _, id := range list {
 		strList = append(strList, p.ChunkID2Attr(col, id))
 	}
-	return strList, list
+
+	firstAttrTime := p.startTime + ((mint-p.startTime)/p.chunkInterval)*p.chunkInterval
+	return strList, firstAttrTime
 }
 
 // Return a list of all the chunk IDs that match the specified time range

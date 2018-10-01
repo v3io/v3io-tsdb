@@ -78,7 +78,7 @@ func (ic *infoCommandeer) info() error {
 		return errors.Wrap(err, "Failed to get TSDB configuration.")
 	}
 
-	fmt.Printf("TSDB configuration for table '%s':\n", ic.rootCommandeer.v3iocfg.Path)
+	fmt.Printf("TSDB configuration for table '%s':\n", ic.rootCommandeer.v3iocfg.TablePath)
 	fmt.Println(string(info))
 
 	if ic.getNames {
