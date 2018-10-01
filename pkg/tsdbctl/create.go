@@ -160,7 +160,11 @@ func (cc *createCommandeer) create() error {
 		Fields:              fields,
 	}
 
-	return tsdb.CreateTSDB(cc.rootCommandeer.v3iocfg, &schema)
+	err = tsdb.CreateTSDB(cc.rootCommandeer.v3iocfg, &schema)
+	if err == nil {
+		fmt.Printf("Successfully created TSDB table '%s' in container '%s' of web-API endpoint '%s'.\n", cc.rootCommandeer.v3iocfg.Path, cc.rootCommandeer.v3iocfg.Container, cc.rootCommandeer.v3iocfg.V3ioUrl)
+	}
+	return err
 }
 
 func (cc *createCommandeer) validateRollupInterval() error {
