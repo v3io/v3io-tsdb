@@ -86,6 +86,8 @@ func NewDBPartition(pmgr *PartitionManager, startTime int64, path string) (*DBPa
 type PartitionManager struct {
 	mtx                      sync.RWMutex
 	schemaConfig             *config.Schema
+	schemaMtimeSecs          int
+	schemaMtimeNanosecs      int
 	headPartition            *DBPartition
 	partitions               []*DBPartition
 	cyclic                   bool
@@ -225,27 +227,45 @@ func (p *PartitionManager) ReadAndUpdateSchema() (err error) {
 
 	timer, err := metricReporter.GetTimer("ReadAndUpdateSchemaTimer")
 
+	fullPath := path.Join(p.Path(), config.SchemaConfigFileName)
 	if err != nil {
 		err = errors.Wrap(err, "Failed to create timer ReadAndUpdateSchemaTimer.")
 		return
 	}
+	schemaInfoResp, err := p.container.Sync.GetItem(&v3io.GetItemInput{Path: fullPath, AttributeNames: []string{"__mtime_secs", "__mtime_nsecs"}})
+	if err != nil {
+		err = errors.Wrapf(err, "Failed to read schema at path '%s'.", fullPath)
+	}
+	mtimeSecs, err := schemaInfoResp.Output.(*v3io.GetItemOutput).Item.GetFieldInt("__mtime_secs")
+	if err != nil {
+		err = errors.Wrapf(err, "Failed to get start time (mtime) in seconds from the schema at '%s'.", fullPath)
+	}
+	mtimeNsecs, err := schemaInfoResp.Output.(*v3io.GetItemOutput).Item.GetFieldInt("__mtime_nsecs")
+	if err != nil {
+		err = errors.Wrapf(err, "Failed to get start time (mtime) in nanoseconds from the schema at '%s'.", fullPath)
+	}
 
-	timer.Time(func() {
-		fullPath := path.Join(p.Path(), config.SchemaConfigFileName)
-		resp, err := p.container.Sync.GetObject(&v3io.GetObjectInput{Path: fullPath})
-		if err != nil {
-			err = errors.Wrap(err, "Failed to read schema at path '"+fullPath+"'.")
-		}
+	// Get schema only if the schema has changed
+	if mtimeSecs > p.schemaMtimeSecs || (mtimeSecs == p.schemaMtimeSecs && mtimeNsecs > p.schemaMtimeNanosecs) {
+		p.schemaMtimeSecs = mtimeSecs
+		p.schemaMtimeNanosecs = mtimeNsecs
 
-		schema := &config.Schema{}
-		err = json.Unmarshal(resp.Body(), schema)
-		if err != nil {
-			err = errors.Wrap(err, "Failed to unmarshal schema at path '"+fullPath+"'.")
-		}
-		p.schemaConfig = schema
-		p.updatePartitionsFromSchema(schema)
-	})
+		timer.Time(func() {
+			resp, err := p.container.Sync.GetObject(&v3io.GetObjectInput{Path: fullPath})
+			if err != nil {
+				err = errors.Wrapf(err, "Failed to read schema at path '%s'.", fullPath)
+			}
 
+			schema := &config.Schema{}
+			err = json.Unmarshal(resp.Body(), schema)
+			if err != nil {
+				err = errors.Wrapf(err, "Failed to unmarshal schema at path '%s'.", fullPath)
+			}
+			p.schemaConfig = schema
+			p.updatePartitionsFromSchema(schema)
+
+		})
+	}
 	return
 }
 
