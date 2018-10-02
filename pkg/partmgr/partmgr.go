@@ -87,7 +87,7 @@ type PartitionManager struct {
 	mtx                      sync.RWMutex
 	schemaConfig             *config.Schema
 	schemaMtimeSecs          int
-	schemaMtimeNanoSecs      int
+	schemaMtimeNanosecs      int
 	headPartition            *DBPartition
 	partitions               []*DBPartition
 	cyclic                   bool
@@ -245,10 +245,10 @@ func (p *PartitionManager) ReadAndUpdateSchema() (err error) {
 		err = errors.Wrap(err, "Failed to get mtime nanoseconds for: "+fullPath)
 	}
 
-	// Get schema only if the schema hsa changed
-	if mtimeSecs > p.schemaMtimeSecs || (mtimeSecs == p.schemaMtimeSecs && mtimeNsecs > p.schemaMtimeNanoSecs) {
+	// Get schema only if the schema has changed
+	if mtimeSecs > p.schemaMtimeSecs || (mtimeSecs == p.schemaMtimeSecs && mtimeNsecs > p.schemaMtimeNanosecs) {
 		p.schemaMtimeSecs = mtimeSecs
-		p.schemaMtimeNanoSecs = mtimeNsecs
+		p.schemaMtimeNanosecs = mtimeNsecs
 
 		timer.Time(func() {
 			resp, err := p.container.Sync.GetObject(&v3io.GetObjectInput{Path: fullPath})
