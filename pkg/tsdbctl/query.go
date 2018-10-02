@@ -189,7 +189,7 @@ func (qc *queryCommandeer) query() error {
 
 	f, err := formatter.NewFormatter(qc.output, nil)
 	if err != nil {
-		return errors.Wrap(err, "Failed to start formatter '"+qc.output+"'.")
+		return errors.Wrapf(err, "Failed to start formatter '%s'.", qc.output)
 	}
 
 	err = f.Write(qc.cmd.OutOrStdout(), set)
