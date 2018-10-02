@@ -1,6 +1,6 @@
 // +build unit
 
-package tsdbctl
+package schema
 
 import "testing"
 

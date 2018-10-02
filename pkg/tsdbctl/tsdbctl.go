@@ -34,11 +34,6 @@ import (
 	"strings"
 )
 
-const defaultMaximumSampleSize = 8                                  // bytes
-const defaultMaximumPartitionSize = 1700000                         // 1.7MB
-const defaultMinimumChunkSize, defaultMaximumChunkSize = 200, 32000 // bytes
-const defaultVerbosityLevel = "debug"
-
 type RootCommandeer struct {
 	adapter     *tsdb.V3ioAdapter
 	logger      logger.Logger
@@ -67,7 +62,7 @@ func NewRootCommandeer() *RootCommandeer {
 
 	cmd.PersistentFlags().StringVarP(&commandeer.verbose,
 		"verbose", "v", "", "Verbose output")
-	cmd.PersistentFlags().Lookup("verbose").NoOptDefVal = defaultVerbosityLevel
+	cmd.PersistentFlags().Lookup("verbose").NoOptDefVal = config.DefaultLoggingLevel
 	cmd.PersistentFlags().StringVarP(&commandeer.dbPath, "table-path", "t", "",
 		"[Required] Path to the TSDB table within the configured\ndata container. Examples: \"mytsdb\"; \"/my_tsdbs/tsdbd1\".")
 	// We don't enforce this flag (cmd.MarkFlagRequired("table-path")),
@@ -197,18 +192,7 @@ func (rc *RootCommandeer) populateConfig(cfg *config.V3ioConfig) error {
 	if rc.verbose != "" {
 		cfg.Verbose = rc.verbose
 	}
-	if cfg.MaximumChunkSize == 0 {
-		cfg.MaximumChunkSize = defaultMaximumChunkSize
-	}
-	if cfg.MinimumChunkSize == 0 {
-		cfg.MinimumChunkSize = defaultMinimumChunkSize
-	}
-	if cfg.MaximumSampleSize == 0 {
-		cfg.MaximumSampleSize = defaultMaximumSampleSize
-	}
-	if cfg.MaximumPartitionSize == 0 {
-		cfg.MaximumPartitionSize = defaultMaximumPartitionSize
-	}
+
 	rc.v3iocfg = cfg
 	return nil
 }

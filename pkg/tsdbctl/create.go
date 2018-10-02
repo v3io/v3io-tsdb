@@ -21,26 +21,11 @@ such restriction.
 package tsdbctl
 
 import (
-	"fmt"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
-	"github.com/v3io/v3io-tsdb/pkg/aggregate"
 	"github.com/v3io/v3io-tsdb/pkg/config"
 	"github.com/v3io/v3io-tsdb/pkg/tsdb"
-	"github.com/v3io/v3io-tsdb/pkg/utils"
-	"strconv"
-	"time"
-)
-
-const (
-	schemaVersion                 = 0
-	defaultStorageClass           = "local"
-	defaultIngestionRate          = ""
-	defaultAggregationGranularity = "1h"
-	defaultShardingBuckets        = 8
-	// TODO: enable sample-retention when supported
-	// defaultSampleRetentionHours = 0
-	defaultLayerRetentionTime = "1y"
+	"github.com/v3io/v3io-tsdb/pkg/tsdb/schema"
 )
 
 type createCommandeer struct {
@@ -64,9 +49,9 @@ func newCreateCommandeer(rootCommandeer *RootCommandeer) *createCommandeer {
 		Use:   "create",
 		Short: "Create a new TSDB instance",
 		Long:  `Create a new TSDB instance (table) according to the provided configuration.`,
-		Example: `- tsdbctl create -s 192.168.1.100:8081 -u myuser -p mypassword -c mycontainer -t my_tsdb --rate 1/s
-- tsdbctl create -s 192.168.204.14:8081 -u janed -p OpenSesame -c bigdata -t my_dbs/metrics_table --rate 60/m -a "min,avg,stddev" -i 3h
-- tsdbctl create -g ~/my_tsdb_cfg.yaml -u johnl -p "P@ssNoW!" -c admin_container -t perf_metrics --rate "100/h"
+		Example: `- tsdbctl create -s 192.168.1.100:8081 -u myuser -p mypassword -c mycontainer -t my_tsdb -r 1/s
+- tsdbctl create -s 192.168.204.14:8081 -u janed -p OpenSesame -c bigdata -t my_dbs/metrics_table -r 60/m -a "min,avg,stddev" -i 3h
+- tsdbctl create -g ~/my_tsdb_cfg.yaml -u johnl -p "P@ssNoW!" -c admin_container -t perf_metrics -r "100/h"
   (where ~/my_tsdb_cfg.yaml sets "webApiEndpoint" to the endpoint of the web-gateway service)`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 
@@ -77,14 +62,14 @@ func newCreateCommandeer(rootCommandeer *RootCommandeer) *createCommandeer {
 
 	cmd.Flags().StringVarP(&commandeer.defaultRollups, "aggregates", "a", "",
 		"Default aggregates to calculate in real time during\nthe samples ingestion, as a comma-separated list of\nsupported aggregation functions - count | avg | sum |\nmin | max | stddev | stdvar | last | rate.\nExample: \"sum,avg,max\".")
-	cmd.Flags().StringVarP(&commandeer.aggregationGranularity, "aggregation-granularity", "i", defaultAggregationGranularity,
+	cmd.Flags().StringVarP(&commandeer.aggregationGranularity, "aggregation-granularity", "i", config.DefaultAggregationGranularity,
 		"Aggregation granularity - a time interval for applying\nthe aggregation functions (if  configured - see the\n-a|--aggregates flag), of the format \"[0-9]+[mh]\"\n(where 'm' = minutes and 'h' = hours).\nExamples: \"2h\"; \"90m\".")
-	cmd.Flags().IntVarP(&commandeer.shardingBuckets, "sharding-buckets", "b", defaultShardingBuckets,
+	cmd.Flags().IntVarP(&commandeer.shardingBuckets, "sharding-buckets", "b", config.DefaultShardingBuckets,
 		"Number of storage buckets across which to split the\ndata of a single metric to optimize storage of\nnon-uniform data. Example: 10.")
 	// TODO: enable sample-retention when supported:
-	// cmd.Flags().IntVarP(&commandeer.sampleRetention, "sample-retention", "r", defaultSampleRetentionHours,
+	// cmd.Flags().IntVarP(&commandeer.sampleRetention, "sample-retention", "r", config.DefaultSampleRetentionHours,
 	//	"Metric-samples retention period, in hours. Example: 1 (retain samples for 1 hour).")
-	cmd.Flags().StringVarP(&commandeer.samplesIngestionRate, "rate", "r", defaultIngestionRate,
+	cmd.Flags().StringVarP(&commandeer.samplesIngestionRate, "ingestion-rate", "r", config.DefaultIngestionRate,
 		"[Required] Metric-samples ingestion rate - the maximum\ningestion rate for a single metric (calculated\naccording to the slowest expecetd ingestion rate) -\nof the format \"[0-9]+/[mhd]\" (where 'm' = minutes,\n'h' = hours, and 'd' = days). Examples: \"12/m\" (12\nsamples per minute); \"1s\" (one sample per second).")
 
 	commandeer.cmd = cmd
@@ -94,150 +79,20 @@ func newCreateCommandeer(rootCommandeer *RootCommandeer) *createCommandeer {
 
 func (cc *createCommandeer) create() error {
 
-	// initialize params
+	// Initialize parameters
 	if err := cc.rootCommandeer.initialize(); err != nil {
 		return err
 	}
 
-	if err := cc.validateAggregationGranularity(); err != nil {
-		return errors.Wrap(err, "Failed to parse the aggregation granularity.")
-	}
+	dbSchema, err := schema.NewSchema(
+		cc.rootCommandeer.v3iocfg,
+		cc.samplesIngestionRate,
+		cc.aggregationGranularity,
+		cc.defaultRollups)
 
-	rollups, err := aggregate.AggregatorsToStringList(cc.defaultRollups)
 	if err != nil {
-		return errors.Wrap(err, "Failed to parse the default-aggregates list.")
+		return errors.Wrap(err, "failed to create TSDB schema")
 	}
 
-	if cc.samplesIngestionRate == "" {
-		return errors.New(`Use the --rate flag to provide a metric-samples ingestion rate in the format of "[0-9]+/[mhd]". For example, "12/m".`)
-	}
-	rateInHours, err := rateToHours(cc.samplesIngestionRate)
-	if err != nil {
-		return errors.Wrap(err, "Failed to parse the samples ingestion rate.")
-	}
-
-	chunkInterval, partitionInterval, err := cc.calculatePartitionAndChunkInterval(rateInHours)
-	if err != nil {
-		return errors.Wrap(err, "Failed to calculate the chunk interval.")
-	}
-
-	defaultRollup := config.Rollup{
-		Aggregators:            rollups,
-		AggregatorsGranularity: cc.aggregationGranularity,
-		StorageClass:           defaultStorageClass,
-		SampleRetention:        cc.sampleRetention,
-		LayerRetentionTime:     defaultLayerRetentionTime, //TODO: make configurable
-	}
-
-	tableSchema := config.TableSchema{
-		Version:             schemaVersion,
-		RollupLayers:        []config.Rollup{defaultRollup},
-		ShardingBuckets:     cc.shardingBuckets,
-		PartitionerInterval: partitionInterval,
-		ChunckerInterval:    chunkInterval,
-	}
-
-	fields, err := aggregate.SchemaFieldFromString(rollups, "v")
-	if err != nil {
-		return errors.Wrap(err, "Failed to create an aggregates list.")
-	}
-	fields = append(fields, config.SchemaField{Name: "_name", Type: "string", Nullable: false, Items: ""})
-
-	partitionSchema := config.PartitionSchema{
-		Version:                tableSchema.Version,
-		Aggregators:            rollups,
-		AggregatorsGranularity: cc.aggregationGranularity,
-		StorageClass:           defaultStorageClass,
-		SampleRetention:        cc.sampleRetention,
-		ChunckerInterval:       tableSchema.ChunckerInterval,
-		PartitionerInterval:    tableSchema.PartitionerInterval,
-	}
-
-	schema := config.Schema{
-		TableSchemaInfo:     tableSchema,
-		PartitionSchemaInfo: partitionSchema,
-		Partitions:          []*config.Partition{},
-		Fields:              fields,
-	}
-
-	err = tsdb.CreateTSDB(cc.rootCommandeer.v3iocfg, &schema)
-	if err == nil {
-		fmt.Printf("Successfully created TSDB table '%s' in container '%s' of web-API endpoint '%s'.\n", cc.rootCommandeer.v3iocfg.TablePath, cc.rootCommandeer.v3iocfg.Container, cc.rootCommandeer.v3iocfg.WebApiEndpoint)
-	}
-	return err
-}
-
-func (cc *createCommandeer) validateAggregationGranularity() error {
-	dayMillis := 24 * int64(time.Hour/time.Millisecond)
-	duration, err := utils.Str2duration(cc.aggregationGranularity)
-	if err != nil {
-		return err
-	}
-
-	if dayMillis%duration != 0 && duration%dayMillis != 0 {
-		return errors.New("The aggregation granularity should be a divisor or a dividend of 1 day. Examples: \"10m\"; \"30m\"; \"2h\".")
-	}
-	return nil
-}
-
-func (cc *createCommandeer) calculatePartitionAndChunkInterval(rateInHours int) (string, string, error) {
-	maxNumberOfEventsPerChunk := cc.rootCommandeer.v3iocfg.MaximumChunkSize / cc.rootCommandeer.v3iocfg.MaximumSampleSize
-	minNumberOfEventsPerChunk := cc.rootCommandeer.v3iocfg.MinimumChunkSize / cc.rootCommandeer.v3iocfg.MaximumSampleSize
-
-	chunkInterval := maxNumberOfEventsPerChunk / rateInHours
-	if chunkInterval == 0 {
-		return "", "", fmt.Errorf("The samples ingestion rate (%v/h) is too high.", rateInHours)
-	}
-
-	// Make sure the expected chunk size is greater then the supported minimum.
-	if chunkInterval < minNumberOfEventsPerChunk/rateInHours {
-		return "", "", fmt.Errorf(
-			"The calculated chunk size is smaller than the minimum: samples ingestion rate = %v/h, calculated chunk interval = %v, minimum size = %v",
-			rateInHours, chunkInterval, cc.rootCommandeer.v3iocfg.MinimumChunkSize)
-	}
-
-	actualCapacityOfChunk := chunkInterval * rateInHours * cc.rootCommandeer.v3iocfg.MaximumSampleSize
-	numberOfChunksInPartition := 0
-
-	for (numberOfChunksInPartition+24)*actualCapacityOfChunk < cc.rootCommandeer.v3iocfg.MaximumPartitionSize {
-		numberOfChunksInPartition += 24
-	}
-	if numberOfChunksInPartition == 0 {
-		return "", "", errors.Errorf("The samples ingestion rate (%v/h) is too high - cannot fit a partition in a day interval with the calculated chunk size (%v).", rateInHours, chunkInterval)
-	}
-
-	partitionInterval := numberOfChunksInPartition * chunkInterval
-	return strconv.Itoa(chunkInterval) + "h", strconv.Itoa(partitionInterval) + "h", nil
-}
-
-func rateToHours(samplesIngestionRate string) (int, error) {
-	parsingError := errors.New(`Invalid samples ingestion rate. The rate must be of the format "[0-9]+/[mhd]". For example, "12/m".`)
-
-	if len(samplesIngestionRate) < 3 {
-		return 0, parsingError
-	}
-	if samplesIngestionRate[len(samplesIngestionRate)-2] != '/' {
-		return 0, parsingError
-	}
-
-	last := samplesIngestionRate[len(samplesIngestionRate)-1]
-	// Get the ingestion-rate samples number, ignoring the slash and time unit
-	samplesIngestionRate = samplesIngestionRate[:len(samplesIngestionRate)-2]
-	i, err := strconv.Atoi(samplesIngestionRate)
-	if err != nil {
-		return 0, errors.Wrap(err, parsingError.Error())
-	}
-	if i <= 0 {
-		return 0, fmt.Errorf("Invalid samples ingestion rate (%s). The rate cannot have a negative number of samples.", samplesIngestionRate)
-	}
-	switch last {
-	case 's':
-		return i * 60 * 60, nil
-	case 'm':
-		return i * 60, nil
-	case 'h':
-		return i, nil
-	default:
-		return 0, parsingError
-	}
+	return tsdb.CreateTSDB(cc.rootCommandeer.v3iocfg, dbSchema)
 }

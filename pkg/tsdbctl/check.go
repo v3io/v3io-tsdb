@@ -116,7 +116,7 @@ func (cc *checkCommandeer) check() error {
 
 		if values != nil {
 			bytes := values.([]byte)
-			chunk, err := chunkenc.FromData(chunkenc.EncXOR, bytes, 0)
+			chunk, err := chunkenc.FromData(cc.rootCommandeer.logger, chunkenc.EncXOR, bytes, 0)
 			if err != nil {
 				cc.rootCommandeer.logger.ErrorWith("Error reading chunk buffer.", "Lset", lset, "err", err)
 				return err
