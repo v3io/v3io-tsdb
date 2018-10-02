@@ -61,7 +61,7 @@ func NewRootCommandeer() *RootCommandeer {
 	defaultV3ioServer := os.Getenv("V3IO_SERVICE_URL")
 
 	cmd.PersistentFlags().StringVarP(&commandeer.logLevel, "log-level", "v", "", "Logging level")
-	cmd.PersistentFlags().Lookup("log-level").NoOptDefVal = "debug"
+	cmd.PersistentFlags().Lookup("log-level").NoOptDefVal = "info"
 	cmd.PersistentFlags().StringVarP(&commandeer.dbPath, "table-path", "t", "", "sub path for the TSDB, inside the container")
 	cmd.PersistentFlags().StringVarP(&commandeer.v3ioPath, "server", "s", defaultV3ioServer, "V3IO Service URL - ip:port")
 	cmd.PersistentFlags().StringVarP(&commandeer.cfgFilePath, "config", "g", "", "path to yaml config file")
