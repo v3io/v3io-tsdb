@@ -68,7 +68,7 @@ Notes:
 - You must set the mertic-name argument (<metric>) and/or the query-filter flag (-f|--filter).
 - Queries that set the mertic-name argument (<metric>) use range scan and are therefore faster.
   But you can't use such queries to scan multiple mertics.
-- To query the full TSDB content, set the -f|--flag to a query filter that always evaluates
+- To query the full TSDB content, set the -f|--filter to a query filter that always evaluates
   to true (such as "1==1"), don't set the <metric> argument, and set the -b|--begin flag to 0.
 
 Arguments:
