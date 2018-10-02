@@ -38,6 +38,11 @@ const (
 	defaultNumberOfQueryWorkers  = 8
 	defaultBatchSize             = 64
 	defaultTimeoutInSeconds      = 24 * 60 * 60 // 24 hours
+
+	DefaultMaximumSampleSize    = 8       // bytes
+	DefaultMaximumPartitionSize = 1700000 // 1.7MB
+	DefaultMinimumChunkSize     = 200     // bytes
+	DefaultMaximumChunkSize     = 32000   // bytes
 )
 
 var (
@@ -81,7 +86,7 @@ type V3ioConfig struct {
 	// Size of chunk in bytes for worst an best compression scenarios
 	MinimumChunkSize int `json:"minimumChunkSize,omitempty"`
 	MaximumChunkSize int `json:"maximumChunkSize,omitempty"`
-
+	ShardingBuckets  int `json:"shardingBuckets,omitempty"`
 	// Metrics reporter configuration
 	MetricsReporter MetricsReporterConfig `json:"performance,omitempty"`
 	// dont aggregate from raw chuncks, for use when working as Prometheus TSDB lib
@@ -259,5 +264,21 @@ func initDefaults(cfg *V3ioConfig) {
 
 	if cfg.DefaultTimeoutInSeconds == 0 {
 		cfg.DefaultTimeoutInSeconds = int(defaultTimeoutInSeconds)
+	}
+
+	if cfg.MaximumChunkSize == 0 {
+		cfg.MaximumChunkSize = DefaultMaximumChunkSize
+	}
+
+	if cfg.MinimumChunkSize == 0 {
+		cfg.MinimumChunkSize = DefaultMinimumChunkSize
+	}
+
+	if cfg.MaximumSampleSize == 0 {
+		cfg.MaximumSampleSize = DefaultMaximumSampleSize
+	}
+
+	if cfg.MaximumPartitionSize == 0 {
+		cfg.MaximumPartitionSize = DefaultMaximumPartitionSize
 	}
 }

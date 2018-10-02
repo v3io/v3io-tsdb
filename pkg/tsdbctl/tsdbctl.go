@@ -21,7 +21,6 @@ such restriction.
 package tsdbctl
 
 import (
-	"github.com/v3io/v3io-tsdb/pkg/tsdb/schema"
 	"os"
 
 	"fmt"
@@ -179,18 +178,7 @@ func (rc *RootCommandeer) populateConfig(cfg *config.V3ioConfig) error {
 	if rc.verbose != "" {
 		cfg.Verbose = rc.verbose
 	}
-	if cfg.MaximumChunkSize == 0 {
-		cfg.MaximumChunkSize = schema.DefaultMaximumChunkSize
-	}
-	if cfg.MinimumChunkSize == 0 {
-		cfg.MinimumChunkSize = schema.DefaultMinimumChunkSize
-	}
-	if cfg.MaximumSampleSize == 0 {
-		cfg.MaximumSampleSize = schema.DefaultMaximumSampleSize
-	}
-	if cfg.MaximumPartitionSize == 0 {
-		cfg.MaximumPartitionSize = schema.DefaultMaximumPartitionSize
-	}
+
 	rc.v3iocfg = cfg
 	return nil
 }

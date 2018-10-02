@@ -73,15 +73,10 @@ func (cc *createCommandeer) create() error {
 	}
 
 	dbSchema, err := schema.NewSchema(
+		cc.rootCommandeer.v3iocfg,
 		cc.sampleRate,
 		cc.rollupInterval,
-		cc.defaultRollups,
-		cc.rootCommandeer.v3iocfg.MinimumChunkSize,
-		cc.rootCommandeer.v3iocfg.MaximumChunkSize,
-		cc.rootCommandeer.v3iocfg.MaximumSampleSize,
-		cc.rootCommandeer.v3iocfg.MaximumPartitionSize,
-		cc.sampleRetention,
-		cc.shardingBuckets)
+		cc.defaultRollups)
 
 	if err != nil {
 		return errors.Wrap(err, "failed to create TSDB schema")

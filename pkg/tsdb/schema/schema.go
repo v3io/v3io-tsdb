@@ -12,11 +12,6 @@ import (
 )
 
 const (
-	DefaultMaximumSampleSize    = 8       // bytes
-	DefaultMaximumPartitionSize = 1700000 // 1.7MB
-	DefaultMinimumChunkSize     = 200     // bytes
-	DefaultMaximumChunkSize     = 32000   // bytes
-
 	Version                       = 0
 	DefaultStorageClass           = "local"
 	DefaultIngestionRate          = ""
@@ -27,7 +22,20 @@ const (
 	DefaultSampleRetentionTime    = 0
 )
 
-func NewSchema(sampleRate, aggregatorGranularity, aggregatesList string, minChunkSize, maxChunkSize, maxSampleSize, maxPartitionSize, sampleRetention, shardingBuckets int) (*config.Schema, error) {
+func NewSchema(v3ioCfg *config.V3ioConfig, sampleRate, aggregatorGranularity, aggregatesList string) (*config.Schema, error) {
+	return newSchema(
+		sampleRate,
+		aggregatorGranularity,
+		aggregatesList,
+		v3ioCfg.MinimumChunkSize,
+		v3ioCfg.MaximumChunkSize,
+		v3ioCfg.MaximumSampleSize,
+		v3ioCfg.MaximumPartitionSize,
+		DefaultSampleRetentionTime,
+		v3ioCfg.ShardingBuckets)
+}
+
+func newSchema(sampleRate, aggregatorGranularity, aggregatesList string, minChunkSize, maxChunkSize, maxSampleSize, maxPartitionSize, sampleRetention, shardingBuckets int) (*config.Schema, error) {
 	rateInHours, err := rateToHours(sampleRate)
 	if err != nil {
 		return nil, errors.Wrap(err, "invalid sample race")
@@ -94,14 +102,14 @@ func NewSchema(sampleRate, aggregatorGranularity, aggregatesList string, minChun
 }
 
 func NewDefaultSchema(aggregatesList string) (*config.Schema, error) {
-	return NewSchema(
+	return newSchema(
 		"1/s",
 		DefaultAggregationGranularity,
 		aggregatesList,
-		DefaultMinimumChunkSize,
-		DefaultMaximumChunkSize,
-		DefaultMaximumSampleSize,
-		DefaultMaximumPartitionSize,
+		config.DefaultMinimumChunkSize,
+		config.DefaultMaximumChunkSize,
+		config.DefaultMaximumSampleSize,
+		config.DefaultMaximumPartitionSize,
 		DefaultSampleRetentionTime,
 		DefaultShardingBuckets)
 }
