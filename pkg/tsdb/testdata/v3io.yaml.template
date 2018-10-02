@@ -10,7 +10,7 @@ container: <v3io container>
 path: <tsdb path>
 
 # Logging level. Valid values: debug,info,warn,error (Default: info)
-verbose: "warn"
+logLevel: "warn"
 
 # Default timeout 10 seconds
 timeout: 10
