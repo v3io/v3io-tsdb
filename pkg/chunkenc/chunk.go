@@ -31,6 +31,7 @@ package chunkenc
 import (
 	"encoding/binary"
 	"fmt"
+	"github.com/nuclio/logger"
 )
 
 // Encoding is the identifier for a chunk encoding.
@@ -62,10 +63,10 @@ type Chunk interface {
 }
 
 // FromData returns a chunk from a byte slice of chunk data.
-func FromData(e Encoding, d []byte, samples uint16) (Chunk, error) {
+func FromData(logger logger.Logger, e Encoding, d []byte, samples uint16) (Chunk, error) {
 	switch e {
 	case EncXOR:
-		return &XORChunk{b: &bstream{count: 0, stream: d}, samples: samples}, nil
+		return &XORChunk{logger: logger, b: &bstream{count: 0, stream: d}, samples: samples}, nil
 	}
 	return nil, fmt.Errorf("unknown chunk encoding: %d", e)
 }
