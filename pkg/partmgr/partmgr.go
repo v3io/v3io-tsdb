@@ -95,11 +95,7 @@ type PartitionManager struct {
 }
 
 func (p *PartitionManager) Path() string {
-	return p.v3ioConfig.Path
-}
-
-func (p *PartitionManager) IsCyclic() bool {
-	return p.cyclic
+	return p.v3ioConfig.TablePath
 }
 
 func (p *PartitionManager) GetPartitionsPaths() []string {
@@ -287,7 +283,7 @@ type DBPartition struct {
 	startTime         int64              // Start from time/date
 	partitionInterval int64              // Number of millis stored in the partition
 	chunkInterval     int64              // number of millis stored in each chunk
-	prefix            string             // Path prefix
+	prefix            string             // path prefix
 	retentionDays     int                // Keep samples for N hours
 	defaultRollups    aggregate.AggrType // Default Aggregation functions to apply on sample update
 	rollupTime        int64              // Time range per aggregation bucket
@@ -413,13 +409,15 @@ func (p *DBPartition) ChunkID2Attr(col string, id int) string {
 }
 
 // Return the attributes that need to be retrieved for a given time range
-func (p *DBPartition) Range2Attrs(col string, mint, maxt int64) ([]string, []int) {
+func (p *DBPartition) Range2Attrs(col string, mint, maxt int64) ([]string, int64) {
 	list := p.Range2Cids(mint, maxt)
 	var strList []string
 	for _, id := range list {
 		strList = append(strList, p.ChunkID2Attr(col, id))
 	}
-	return strList, list
+
+	firstAttrTime := p.startTime + ((mint-p.startTime)/p.chunkInterval)*p.chunkInterval
+	return strList, firstAttrTime
 }
 
 // All the chunk IDs which match the time range

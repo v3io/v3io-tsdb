@@ -36,22 +36,36 @@ import (
 // Create a new Querier interface
 func NewV3ioQuerier(container *v3io.Container, logger logger.Logger, mint, maxt int64,
 	cfg *config.V3ioConfig, partMngr *partmgr.PartitionManager) *V3ioQuerier {
-	newQuerier := V3ioQuerier{container: container, mint: mint, maxt: maxt,
-		logger: logger.GetChild("Querier"), cfg: cfg}
+	newQuerier := V3ioQuerier{
+		container: container,
+		mint:      mint, maxt: maxt,
+		logger:            logger.GetChild("Querier"),
+		cfg:               cfg,
+		disableClientAggr: cfg.DisableClientAggr,
+	}
 	newQuerier.partitionMngr = partMngr
 	return &newQuerier
 }
 
 type V3ioQuerier struct {
-	logger        logger.Logger
-	container     *v3io.Container
-	cfg           *config.V3ioConfig
-	mint, maxt    int64
-	partitionMngr *partmgr.PartitionManager
+	logger            logger.Logger
+	container         *v3io.Container
+	cfg               *config.V3ioConfig
+	mint, maxt        int64
+	partitionMngr     *partmgr.PartitionManager
+	disableClientAggr bool
+	disableAllAggr    bool
 }
 
-// Standard Time Series Query, return a set of series which match the condition
+//  Standard Time Series Query, return a set of series which match the condition
 func (q *V3ioQuerier) Select(name, functions string, step int64, filter string) (SeriesSet, error) {
+	return q.selectQry(name, functions, step, nil, filter)
+}
+
+// Prometheus Time Series Query, return a set of series which match the condition
+func (q *V3ioQuerier) SelectProm(name, functions string, step int64, filter string, noAggr bool) (SeriesSet, error) {
+	q.disableClientAggr = true
+	q.disableAllAggr = noAggr
 	return q.selectQry(name, functions, step, nil, filter)
 }
 
@@ -63,7 +77,9 @@ func (q *V3ioQuerier) SelectOverlap(name, functions string, step int64, windows 
 }
 
 // base query function
-func (q *V3ioQuerier) selectQry(name, functions string, step int64, windows []int, filter string) (set SeriesSet, err error) {
+func (q *V3ioQuerier) selectQry(
+	name, functions string, step int64, windows []int, filter string) (set SeriesSet, err error) {
+
 	set = nullSeriesSet{}
 
 	filter = strings.Replace(filter, "__name__", "_name", -1)
@@ -144,13 +160,24 @@ func (q *V3ioQuerier) queryNumericPartition(
 
 	newSet := &V3ioSeriesSet{mint: mint, maxt: maxt, partition: partition, logger: q.logger}
 
-	// if there are aggregations to be made
-	if functions != "" {
+	// if there is no aggregation function and the step size is grater than the stored aggregate use Average aggr
+	// TODO: in non Prometheus we may want avg aggregator for any step>0
+	// in Prom range vectors use seek and it would be inefficient to do avg aggregator
+	if functions == "" && step > 0 && step >= partition.RollupTime() && partition.AggrType().HasAverage() {
+		functions = "avg"
+	}
+
+	// if there are aggregations to be made and its not disabled
+	if functions != "" && !q.disableAllAggr {
 
 		// if step isn't passed (e.g. when using the console) - the step is the difference between max
 		// and min times (e.g. 5 minutes)
 		if step == 0 {
 			step = maxt - mint
+		}
+
+		if step > partition.RollupTime() && q.disableClientAggr {
+			step = partition.RollupTime()
 		}
 
 		newAggrSeries, err := aggregate.NewAggregateSeries(functions,
@@ -164,10 +191,15 @@ func (q *V3ioQuerier) queryNumericPartition(
 			return nil, err
 		}
 
-		newSet.aggrSeries = newAggrSeries
-		newSet.interval = step
-		newSet.aggrIdx = newAggrSeries.NumFunctions() - 1
-		newSet.overlapWin = windows
+		// use aggregates if DB side is possible or client aggr is enabled (Prometheus disable client side)
+		newSet.canAggregate = newAggrSeries.CanAggregate(partition.AggrType())
+		if newSet.canAggregate || !q.disableClientAggr {
+			newSet.aggrSeries = newAggrSeries
+			newSet.interval = step
+			newSet.aggrIdx = newAggrSeries.NumFunctions() - 1
+			newSet.overlapWin = windows
+			newSet.noAggrLbl = q.disableClientAggr // dont add "Aggregator" label in Prometheus
+		}
 	}
 
 	err := newSet.getItems(partition, name, filter, q.container, q.cfg.QryWorkers)
@@ -198,7 +230,7 @@ func (q *V3ioQuerier) Close() error {
 
 func (q *V3ioQuerier) getMetricNames() ([]string, error) {
 	input := v3io.GetItemsInput{
-		Path:           q.cfg.Path + "/names/",
+		Path:           q.cfg.TablePath + "/names/",
 		AttributeNames: []string{"__name"},
 	}
 

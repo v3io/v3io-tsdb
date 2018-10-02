@@ -164,9 +164,9 @@ func (rc *RootCommandeer) populateConfig(cfg *config.V3ioConfig) error {
 			} else if cfg.Container == "" {
 				return fmt.Errorf("missing container name in V3IO URL")
 			}
-			cfg.V3ioUrl = rc.v3ioPath
+			cfg.WebApiEndpoint = rc.v3ioPath
 		} else {
-			cfg.V3ioUrl = rc.v3ioPath[0:slash]
+			cfg.WebApiEndpoint = rc.v3ioPath[0:slash]
 			cfg.Container = rc.v3ioPath[slash+1:]
 		}
 	}
@@ -174,9 +174,9 @@ func (rc *RootCommandeer) populateConfig(cfg *config.V3ioConfig) error {
 		cfg.Container = rc.container
 	}
 	if rc.dbPath != "" {
-		cfg.Path = rc.dbPath
+		cfg.TablePath = rc.dbPath
 	}
-	if cfg.V3ioUrl == "" || cfg.Container == "" || cfg.Path == "" {
+	if cfg.WebApiEndpoint == "" || cfg.Container == "" || cfg.TablePath == "" {
 		return fmt.Errorf("user must provide V3IO URL, container name, and table path via the config file or flags")
 	}
 	if rc.verbose != "" {

@@ -41,7 +41,7 @@ func BenchmarkIngestWithNuclio(b *testing.B) {
 	tsdbPath = tsdbtest.NormalizePath(fmt.Sprintf("tsdb-%s-%d-%s", b.Name(), b.N, time.Now().Format(time.RFC3339)))
 
 	// Update TSDB instance path for this test
-	v3ioConfig.Path = tsdbPath
+	v3ioConfig.TablePath = tsdbPath
 	schema := testutils.CreateSchema(b, "count,sum")
 	if err := tsdb.CreateTSDB(v3ioConfig, &schema); err != nil {
 		b.Fatal("Failed to create TSDB", err)
@@ -49,7 +49,7 @@ func BenchmarkIngestWithNuclio(b *testing.B) {
 
 	data := nutest.DataBind{
 		Name:      defaultDbName,
-		Url:       v3ioConfig.V3ioUrl,
+		Url:       v3ioConfig.WebApiEndpoint,
 		Container: v3ioConfig.Container,
 		User:      v3ioConfig.Username,
 		Password:  v3ioConfig.Password,
@@ -146,7 +146,7 @@ func initContext(context *nuclio.Context) error {
 	}
 
 	// Hack - update path to TSDB
-	v3ioConfig.Path = tsdbPath
+	v3ioConfig.TablePath = tsdbPath
 
 	data := context.DataBinding[defaultDbName].(*v3io.Container)
 	adapter, err := tsdb.NewV3ioAdapter(v3ioConfig, data, context.Logger)
