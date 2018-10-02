@@ -24,11 +24,11 @@ package chunkenc
 
 import (
 	"fmt"
+	"github.com/nuclio/zap"
+	"github.com/stretchr/testify/assert"
 	"testing"
 
-	"encoding/base64"
 	"math/rand"
-	"time"
 )
 
 const basetime = 1524690488000
@@ -45,9 +45,12 @@ func TestXor(tst *testing.T) {
 
 	samples := GenSamples(1000, 5, 1000, 100)
 	//samples := RealSample(1000)
-	byteArray := []byte{}
+	var byteArray []byte
 
-	ch := NewXORChunk()
+	logger, err := nucliozap.NewNuclioZapTest("test")
+	assert.Nil(tst, err)
+
+	ch := NewXORChunk(logger)
 	appender, err := ch.Appender()
 	if err != nil {
 		tst.Fatal(err)
@@ -62,7 +65,7 @@ func TestXor(tst *testing.T) {
 		ch.Clear()
 		if i == 4 {
 			fmt.Println("restarted appender")
-			ch = NewXORChunk()
+			ch = NewXORChunk(logger)
 			appender, err = ch.Appender()
 			if err != nil {
 				tst.Fatal(err)
@@ -73,7 +76,7 @@ func TestXor(tst *testing.T) {
 
 	fmt.Println("Samples:", len(samples), "byteArray:", byteArray, len(byteArray))
 
-	ch2, err := FromData(EncXOR, byteArray, 0)
+	ch2, err := FromData(logger, EncXOR, byteArray, 0)
 	if err != nil {
 		tst.Fatal(err)
 	}
@@ -125,38 +128,6 @@ func TestBstream(t *testing.T) {
 		fmt.Println(bs2.count, bs2.stream, bit)
 	}
 
-}
-
-func DecodeTest(blob string) error {
-
-	//blob := "+AFjT7+iCEBLgAAAAAAA+AFjT8A6YEBQgAAAAAAA"
-
-	data, err := base64.StdEncoding.DecodeString(blob)
-	if err != nil {
-		return err
-	}
-	fmt.Println(data)
-
-	chunk, err := FromData(EncXOR, data, 0)
-	if err != nil {
-		return err
-	}
-
-	iter := chunk.Iterator()
-	i := 0
-	for iter.Next() {
-
-		if iter.Err() != nil {
-			return iter.Err()
-		}
-
-		t, v := iter.At()
-		tstr := time.Unix(int64(t/1000), 0).Format(time.RFC3339)
-		fmt.Printf("unix=%d, t=%s, v=%.4f \n", t, tstr, v)
-		i++
-	}
-
-	return nil
 }
 
 func GenSamples(num, interval int, start, step float64) []sample {

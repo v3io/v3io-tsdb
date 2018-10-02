@@ -294,7 +294,7 @@ func (mc *MetricsCache) handleResponse(metric *MetricState, resp *v3io.Response,
 		} else {
 			clear := func() {
 				resp.Release()
-				metric.store = NewChunkStore()
+				metric.store = NewChunkStore(mc.logger)
 				metric.retryCount = 0
 				metric.setState(storeStateInit)
 			}

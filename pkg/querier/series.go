@@ -101,7 +101,7 @@ func (s *V3ioSeries) initSeriesIter() {
 
 		if values != nil {
 			bytes := values.([]byte)
-			chunk, err := chunkenc.FromData(chunkenc.EncXOR, bytes, 0)
+			chunk, err := chunkenc.FromData(s.set.logger, chunkenc.EncXOR, bytes, 0)
 			if err != nil {
 				s.set.logger.ErrorWith("Error reading chunk buffer", "Lset", s.lset, "err", err)
 			} else {

@@ -23,6 +23,7 @@ package appender
 import (
 	"encoding/base64"
 	"fmt"
+	"github.com/nuclio/logger"
 	"github.com/pkg/errors"
 	"github.com/v3io/v3io-go-http"
 	"github.com/v3io/v3io-tsdb/internal/pkg/performance"
@@ -36,8 +37,8 @@ import (
 const maxLateArrivalInterval = 59 * 60 * 1000 // max late arrival of 59min
 
 // create a chunk store with two chunks (current, previous)
-func NewChunkStore() *chunkStore {
-	store := chunkStore{}
+func NewChunkStore(logger logger.Logger) *chunkStore {
+	store := chunkStore{logger: logger}
 	store.chunks[0] = &attrAppender{}
 	store.chunks[1] = &attrAppender{}
 	return &store
@@ -45,6 +46,8 @@ func NewChunkStore() *chunkStore {
 
 // chunkStore store state & latest + previous chunk appenders
 type chunkStore struct {
+	logger logger.Logger
+
 	curChunk int
 	lastTid  int64
 	chunks   [2]*attrAppender
@@ -148,7 +151,7 @@ func (cs *chunkStore) getChunksState(mc *MetricsCache, metric *MetricState) (boo
 func (cs *chunkStore) processGetResp(mc *MetricsCache, metric *MetricState, resp *v3io.Response) {
 
 	// TODO: init based on schema, use init function, recover old state vs append based on policy
-	chunk := chunkenc.NewXORChunk()
+	chunk := chunkenc.NewXORChunk(cs.logger)
 	app, _ := chunk.Appender()
 	cs.chunks[0].appender = app
 	cs.chunks[0].state |= chunkStateFirst
@@ -231,7 +234,7 @@ func (cs *chunkStore) chunkByTime(t int64) *attrAppender {
 		part := cur.partition
 		cur = cs.chunks[cs.curChunk^1]
 
-		chunk := chunkenc.NewXORChunk() // TODO: init based on schema, use init function
+		chunk := chunkenc.NewXORChunk(cs.logger) // TODO: init based on schema, use init function
 		app, err := chunk.Appender()
 		if err != nil {
 			return nil
