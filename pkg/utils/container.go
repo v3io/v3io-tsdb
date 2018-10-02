@@ -24,33 +24,10 @@ import (
 	"encoding/binary"
 	"fmt"
 	"github.com/nuclio/logger"
-	"github.com/nuclio/zap"
 	"github.com/pkg/errors"
 	"github.com/v3io/v3io-go-http"
 	"time"
 )
-
-func NewLogger(verbose string) (logger.Logger, error) {
-	var logLevel nucliozap.Level
-	switch verbose {
-	case "debug":
-		logLevel = nucliozap.DebugLevel
-	case "info":
-		logLevel = nucliozap.InfoLevel
-	case "warn":
-		logLevel = nucliozap.WarnLevel
-	case "error":
-		logLevel = nucliozap.ErrorLevel
-	default:
-		logLevel = nucliozap.WarnLevel
-	}
-
-	log, err := nucliozap.NewNuclioZapCmd("v3io-prom", logLevel)
-	if err != nil {
-		return nil, err
-	}
-	return log, nil
-}
 
 func CreateContainer(logger logger.Logger, addr, cont, username, password string, workers int) (*v3io.Container, error) {
 	// create context
