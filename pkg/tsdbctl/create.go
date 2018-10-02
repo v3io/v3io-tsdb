@@ -23,6 +23,7 @@ package tsdbctl
 import (
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
+	"github.com/v3io/v3io-tsdb/pkg/config"
 	"github.com/v3io/v3io-tsdb/pkg/tsdb"
 	"github.com/v3io/v3io-tsdb/pkg/tsdb/schema"
 )
@@ -56,9 +57,9 @@ func newCreateCommandeer(rootCommandeer *RootCommandeer) *createCommandeer {
 
 	cmd.Flags().StringVarP(&commandeer.defaultRollups, "aggregates", "a", "",
 		"Default aggregation rollups, comma seperated: count,avg,sum,min,max,stddev")
-	cmd.Flags().StringVarP(&commandeer.rollupInterval, "aggregation-granularity", "i", schema.DefaultAggregationGranularity, "aggregation interval")
-	cmd.Flags().IntVarP(&commandeer.shardingBuckets, "sharding-buckets", "b", schema.DefaultShardingBuckets, "number of buckets to split key")
-	cmd.Flags().StringVarP(&commandeer.sampleRate, "rate", "r", schema.DefaultIngestionRate, "sample rate")
+	cmd.Flags().StringVarP(&commandeer.rollupInterval, "aggregation-granularity", "i", config.DefaultAggregationGranularity, "aggregation interval")
+	cmd.Flags().IntVarP(&commandeer.shardingBuckets, "sharding-buckets", "b", config.DefaultShardingBuckets, "number of buckets to split key")
+	cmd.Flags().StringVarP(&commandeer.sampleRate, "rate", "r", config.DefaultIngestionRate, "sample rate")
 
 	commandeer.cmd = cmd
 

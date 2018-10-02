@@ -72,15 +72,15 @@ func TestCreateNewPartition(tst *testing.T) {
 }
 
 func getPartitionManager(tst *testing.T) *PartitionManager {
-	schm, err := schema.NewDefaultSchema("*")
-	if err != nil {
-		tst.Fatalf("failed to create schema. Error: %v", err)
-	}
-
 	const dummyConfig = `path: "/test"`
 	v3ioConfig, err := config.GetOrLoadFromData([]byte(dummyConfig))
 	if err != nil {
 		tst.Fatalf("failed to obtain v3io configuration. Error: %v", err)
+	}
+
+	schm, err := schema.NewSchema(v3ioConfig, "1/s", "1h", "*")
+	if err != nil {
+		tst.Fatalf("failed to create schema. Error: %v", err)
 	}
 
 	manager, err := NewPartitionMngr(schm, nil, v3ioConfig)

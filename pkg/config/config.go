@@ -39,10 +39,18 @@ const (
 	defaultBatchSize             = 64
 	defaultTimeoutInSeconds      = 24 * 60 * 60 // 24 hours
 
-	DefaultMaximumSampleSize    = 8       // bytes
-	DefaultMaximumPartitionSize = 1700000 // 1.7MB
-	DefaultMinimumChunkSize     = 200     // bytes
-	DefaultMaximumChunkSize     = 32000   // bytes
+	defaultMaximumSampleSize    = 8       // bytes
+	defaultMaximumPartitionSize = 1700000 // 1.7MB
+	defaultMinimumChunkSize     = 200     // bytes
+	defaultMaximumChunkSize     = 32000   // bytes
+
+	DefaultShardingBuckets        = 8
+	DefaultStorageClass           = "local"
+	DefaultIngestionRate          = ""
+	DefaultAggregates             = "" // no aggregates by default
+	DefaultAggregationGranularity = "1h"
+	DefaultLayerRetentionTime     = "1y"
+	DefaultSampleRetentionTime    = 0
 )
 
 var (
@@ -267,18 +275,22 @@ func initDefaults(cfg *V3ioConfig) {
 	}
 
 	if cfg.MaximumChunkSize == 0 {
-		cfg.MaximumChunkSize = DefaultMaximumChunkSize
+		cfg.MaximumChunkSize = defaultMaximumChunkSize
 	}
 
 	if cfg.MinimumChunkSize == 0 {
-		cfg.MinimumChunkSize = DefaultMinimumChunkSize
+		cfg.MinimumChunkSize = defaultMinimumChunkSize
 	}
 
 	if cfg.MaximumSampleSize == 0 {
-		cfg.MaximumSampleSize = DefaultMaximumSampleSize
+		cfg.MaximumSampleSize = defaultMaximumSampleSize
 	}
 
 	if cfg.MaximumPartitionSize == 0 {
-		cfg.MaximumPartitionSize = DefaultMaximumPartitionSize
+		cfg.MaximumPartitionSize = defaultMaximumPartitionSize
+	}
+
+	if cfg.ShardingBuckets == 0 {
+		cfg.ShardingBuckets = DefaultShardingBuckets
 	}
 }

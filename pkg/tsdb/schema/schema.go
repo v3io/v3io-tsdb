@@ -12,14 +12,7 @@ import (
 )
 
 const (
-	Version                       = 0
-	DefaultStorageClass           = "local"
-	DefaultIngestionRate          = ""
-	DefaultAggregates             = "" // no aggregates by default
-	DefaultAggregationGranularity = "1h"
-	DefaultShardingBuckets        = 8
-	DefaultLayerRetentionTime     = "1y"
-	DefaultSampleRetentionTime    = 0
+	Version = 0
 )
 
 func NewSchema(v3ioCfg *config.V3ioConfig, sampleRate, aggregatorGranularity, aggregatesList string) (*config.Schema, error) {
@@ -31,7 +24,7 @@ func NewSchema(v3ioCfg *config.V3ioConfig, sampleRate, aggregatorGranularity, ag
 		v3ioCfg.MaximumChunkSize,
 		v3ioCfg.MaximumSampleSize,
 		v3ioCfg.MaximumPartitionSize,
-		DefaultSampleRetentionTime,
+		config.DefaultSampleRetentionTime,
 		v3ioCfg.ShardingBuckets)
 }
 
@@ -58,9 +51,9 @@ func newSchema(sampleRate, aggregatorGranularity, aggregatesList string, minChun
 	defaultRollup := config.Rollup{
 		Aggregators:            []string{},
 		AggregatorsGranularity: aggregatorGranularity,
-		StorageClass:           DefaultStorageClass,
-		SampleRetention:        sampleRetention,           //TODO: make configurable
-		LayerRetentionTime:     DefaultLayerRetentionTime, //TODO: make configurable
+		StorageClass:           config.DefaultStorageClass,
+		SampleRetention:        sampleRetention,                  //TODO: make configurable
+		LayerRetentionTime:     config.DefaultLayerRetentionTime, //TODO: make configurable
 	}
 
 	tableSchema := config.TableSchema{
@@ -72,7 +65,7 @@ func newSchema(sampleRate, aggregatorGranularity, aggregatesList string, minChun
 	}
 
 	if len(aggregates) == 0 {
-		aggregates = strings.Split(DefaultAggregates, ",")
+		aggregates = strings.Split(config.DefaultAggregates, ",")
 	}
 
 	fields, err := aggregate.SchemaFieldFromString(aggregates, "v")
@@ -84,9 +77,9 @@ func newSchema(sampleRate, aggregatorGranularity, aggregatesList string, minChun
 	partitionSchema := config.PartitionSchema{
 		Version:                tableSchema.Version,
 		Aggregators:            aggregates,
-		AggregatorsGranularity: DefaultAggregationGranularity,
-		StorageClass:           DefaultStorageClass,
-		SampleRetention:        DefaultSampleRetentionTime,
+		AggregatorsGranularity: config.DefaultAggregationGranularity,
+		StorageClass:           config.DefaultStorageClass,
+		SampleRetention:        config.DefaultSampleRetentionTime,
 		ChunckerInterval:       tableSchema.ChunckerInterval,
 		PartitionerInterval:    tableSchema.PartitionerInterval,
 	}
@@ -99,19 +92,6 @@ func newSchema(sampleRate, aggregatorGranularity, aggregatesList string, minChun
 	}
 
 	return schema, nil
-}
-
-func NewDefaultSchema(aggregatesList string) (*config.Schema, error) {
-	return newSchema(
-		"1/s",
-		DefaultAggregationGranularity,
-		aggregatesList,
-		config.DefaultMinimumChunkSize,
-		config.DefaultMaximumChunkSize,
-		config.DefaultMaximumSampleSize,
-		config.DefaultMaximumPartitionSize,
-		DefaultSampleRetentionTime,
-		DefaultShardingBuckets)
 }
 
 func calculatePartitionAndChunkInterval(rateInHours, minChunkSize, maxChunkSize, maxSampleSize, maxPartitionSize int) (string, string, error) {

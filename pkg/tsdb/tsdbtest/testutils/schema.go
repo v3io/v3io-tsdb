@@ -7,10 +7,14 @@ import (
 )
 
 func CreateSchema(t testing.TB, aggregators string) *config.Schema {
-	schm, err := schema.NewDefaultSchema(aggregators)
-
+	v3ioCfg, err := config.GetOrDefaultConfig()
 	if err != nil {
-		t.Fatal(err)
+		t.Fatalf("failed to obtain V3IO configuration. Error: %v", err)
+	}
+
+	schm, err := schema.NewSchema(v3ioCfg, "1/s", "1h", aggregators)
+	if err != nil {
+		t.Fatalf("failed to create schema. Error: %v", err)
 	}
 	return schm
 }
