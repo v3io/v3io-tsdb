@@ -42,7 +42,7 @@ type RootCommandeer struct {
 	v3ioPath    string
 	dbPath      string
 	cfgFilePath string
-	verbose     string
+	logLevel    string
 	container   string
 	username    string
 	password    string
@@ -60,8 +60,8 @@ func NewRootCommandeer() *RootCommandeer {
 
 	defaultV3ioServer := os.Getenv("V3IO_SERVICE_URL")
 
-	cmd.PersistentFlags().StringVarP(&commandeer.verbose, "verbose", "v", "", "Verbose output")
-	cmd.PersistentFlags().Lookup("verbose").NoOptDefVal = "debug"
+	cmd.PersistentFlags().StringVarP(&commandeer.logLevel, "log-level", "v", "", "Logging level")
+	cmd.PersistentFlags().Lookup("log-level").NoOptDefVal = "debug"
 	cmd.PersistentFlags().StringVarP(&commandeer.dbPath, "table-path", "t", "", "sub path for the TSDB, inside the container")
 	cmd.PersistentFlags().StringVarP(&commandeer.v3ioPath, "server", "s", defaultV3ioServer, "V3IO Service URL - ip:port")
 	cmd.PersistentFlags().StringVarP(&commandeer.cfgFilePath, "config", "g", "", "path to yaml config file")
@@ -175,8 +175,8 @@ func (rc *RootCommandeer) populateConfig(cfg *config.V3ioConfig) error {
 	if cfg.WebApiEndpoint == "" || cfg.Container == "" || cfg.TablePath == "" {
 		return fmt.Errorf("user must provide V3IO URL, container name, and table path via the config file or flags")
 	}
-	if rc.verbose != "" {
-		cfg.Verbose = rc.verbose
+	if rc.logLevel != "" {
+		cfg.LogLevel = rc.logLevel
 	}
 
 	rc.v3iocfg = cfg

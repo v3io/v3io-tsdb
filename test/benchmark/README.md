@@ -20,7 +20,7 @@
     path: "tsdb-1"
     
     # Logging level. Valid values: debug,info,warn,error (Default: info)
-    verbose: "warn"
+    logLevel: "warn"
 
     # V3IO Credentials
     username: "<user>@<tenant>"
