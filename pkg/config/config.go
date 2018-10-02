@@ -44,7 +44,7 @@ const (
 	defaultMinimumChunkSize     = 200     // bytes
 	defaultMaximumChunkSize     = 32000   // bytes
 
-	DefaultShardingBuckets        = 8
+	DefaultShardingBucketsCount   = 8
 	DefaultStorageClass           = "local"
 	DefaultIngestionRate          = ""
 	DefaultAggregates             = "" // no aggregates by default
@@ -101,7 +101,7 @@ type V3ioConfig struct {
 	// Maximum chunk size, in bytes (for the worst compression scenario)
 	MaximumChunkSize int `json:"maximumChunkSize,omitempty"`
 	// Number of sharding buckets
-	ShardingBuckets int `json:"shardingBuckets,omitempty"`
+	ShardingBucketsCount int `json:"shardingBucketsCount,omitempty"`
 	// Metrics-reporter configuration
 	MetricsReporter MetricsReporterConfig `json:"performance,omitempty"`
 	// Don't aggregate from raw chunks, for use when working as a Prometheus
@@ -133,11 +133,11 @@ type Rollup struct {
 }
 
 type TableSchema struct {
-	Version             int      `json:"version"`
-	RollupLayers        []Rollup `json:"rollupLayers"`
-	ShardingBuckets     int      `json:"shardingBuckets"`
-	PartitionerInterval string   `json:"partitionerInterval"`
-	ChunckerInterval    string   `json:"chunckerInterval"`
+	Version              int      `json:"version"`
+	RollupLayers         []Rollup `json:"rollupLayers"`
+	ShardingBucketsCount int      `json:"shardingBucketsCount"`
+	PartitionerInterval  string   `json:"partitionerInterval"`
+	ChunckerInterval     string   `json:"chunckerInterval"`
 }
 
 type PartitionSchema struct {
@@ -303,7 +303,7 @@ func initDefaults(cfg *V3ioConfig) {
 		cfg.MaximumPartitionSize = defaultMaximumPartitionSize
 	}
 
-	if cfg.ShardingBuckets == 0 {
-		cfg.ShardingBuckets = DefaultShardingBuckets
+	if cfg.ShardingBucketsCount == 0 {
+		cfg.ShardingBucketsCount = DefaultShardingBucketsCount
 	}
 }

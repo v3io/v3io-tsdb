@@ -25,10 +25,10 @@ func NewSchema(v3ioCfg *config.V3ioConfig, samplesIngestionRate, aggregationGran
 		v3ioCfg.MaximumSampleSize,
 		v3ioCfg.MaximumPartitionSize,
 		config.DefaultSampleRetentionTime,
-		v3ioCfg.ShardingBuckets)
+		v3ioCfg.ShardingBucketsCount)
 }
 
-func newSchema(samplesIngestionRate, aggregationGranularity, aggregatesList string, minChunkSize, maxChunkSize, maxSampleSize, maxPartitionSize, sampleRetention, shardingBuckets int) (*config.Schema, error) {
+func newSchema(samplesIngestionRate, aggregationGranularity, aggregatesList string, minChunkSize, maxChunkSize, maxSampleSize, maxPartitionSize, sampleRetention, shardingBucketsCount int) (*config.Schema, error) {
 	rateInHours, err := rateToHours(samplesIngestionRate)
 	if err != nil {
 		return nil, errors.Wrapf(err, "Invalid samples ingestion rate (%s).", samplesIngestionRate)
@@ -59,7 +59,7 @@ func newSchema(samplesIngestionRate, aggregationGranularity, aggregatesList stri
 	tableSchema := config.TableSchema{
 		Version:             Version,
 		RollupLayers:        []config.Rollup{defaultRollup},
-		ShardingBuckets:     shardingBuckets,
+		ShardingBucketsCount:     shardingBucketsCount,
 		PartitionerInterval: partitionInterval,
 		ChunckerInterval:    chunkInterval,
 	}

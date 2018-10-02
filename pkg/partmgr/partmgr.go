@@ -338,7 +338,7 @@ func (p *DBPartition) GetTablePath() string {
 
 // Return a list of sharding keys matching the given item name
 func (p *DBPartition) GetShardingKeys(name string) []string {
-	shardingKeysNum := p.manager.schemaConfig.TableSchemaInfo.ShardingBuckets
+	shardingKeysNum := p.manager.schemaConfig.TableSchemaInfo.ShardingBucketsCount
 	var res = make([]string, 0, shardingKeysNum)
 	for i := 0; i < shardingKeysNum; i++ {
 		// Trailing period ('.') for range-scan queries
@@ -459,7 +459,7 @@ func (p *DBPartition) Range2Cids(mint, maxt int64) []int {
 }
 
 func (p *DBPartition) GetHashingBuckets() int {
-	return p.manager.schemaConfig.TableSchemaInfo.ShardingBuckets
+	return p.manager.schemaConfig.TableSchemaInfo.ShardingBucketsCount
 }
 
 // Convert a time in milliseconds to day and hour integers
