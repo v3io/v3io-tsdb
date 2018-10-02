@@ -264,12 +264,12 @@ func loadFromData(data []byte) (*V3ioConfig, error) {
 }
 
 func initDefaults(cfg *V3ioConfig) {
-	// Initialize default number of workers
+	// Initialize the default number of workers
 	if cfg.Workers == 0 {
 		cfg.Workers = defaultNumberOfIngestWorkers
 	}
 
-	// init default number Query workers if not set to Min(8,Workers)
+	// Initialize the default number of Query workers if not set to Min(8,Workers)
 	if cfg.QryWorkers == 0 {
 		if cfg.Workers < defaultNumberOfQueryWorkers {
 			cfg.QryWorkers = cfg.Workers
@@ -278,7 +278,7 @@ func initDefaults(cfg *V3ioConfig) {
 		}
 	}
 
-	// init default batch size
+	// Initialize the default batch size
 	if cfg.BatchSize <= 0 {
 		cfg.BatchSize = defaultBatchSize
 	}
