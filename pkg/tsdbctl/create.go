@@ -33,26 +33,26 @@ import (
 )
 
 const (
-	schemaVersion          = 0
-	defaultStorageClass    = "local"
-	defaultIngestionRate   = ""
-	defaultRollupInterval  = "1h"
-	defaultShardingBuckets = 8
+	schemaVersion                 = 0
+	defaultStorageClass           = "local"
+	defaultIngestionRate          = ""
+	defaultAggregationGranularity = "1h"
+	defaultShardingBuckets        = 8
 	// TODO: enable sample-retention when supported
 	// defaultSampleRetentionHours = 0
 	defaultLayerRetentionTime = "1y"
 )
 
 type createCommandeer struct {
-	cmd                     *cobra.Command
-	rootCommandeer          *RootCommandeer
-	path                    string
-	storageClass            string
-	defaultRollups          string
-	rollupInterval          string
-	shardingBuckets         int
-	sampleRetention         int
-	samplesIngestionRate    string
+	cmd                    *cobra.Command
+	rootCommandeer         *RootCommandeer
+	path                   string
+	storageClass           string
+	defaultRollups         string
+	aggregationGranularity string
+	shardingBuckets        int
+	sampleRetention        int
+	samplesIngestionRate   string
 }
 
 func newCreateCommandeer(rootCommandeer *RootCommandeer) *createCommandeer {
@@ -77,7 +77,7 @@ func newCreateCommandeer(rootCommandeer *RootCommandeer) *createCommandeer {
 
 	cmd.Flags().StringVarP(&commandeer.defaultRollups, "aggregates", "a", "",
 		"Default aggregates to calculate in real time during\nthe samples ingestion, as a comma-separated list of\nsupported aggregation functions - count | avg | sum |\nmin | max | stddev | stdvar | last | rate.\nExample: \"sum,avg,max\".")
-	cmd.Flags().StringVarP(&commandeer.rollupInterval, "aggregation-granularity", "i", defaultRollupInterval,
+	cmd.Flags().StringVarP(&commandeer.aggregationGranularity, "aggregation-granularity", "i", defaultAggregationGranularity,
 		"Aggregation granularity - a time interval for applying\nthe aggregation functions (if  configured - see the\n-a|--aggregates flag), of the format \"[0-9]+[mh]\"\n(where 'm' = minutes and 'h' = hours).\nExamples: \"2h\"; \"90m\".")
 	cmd.Flags().IntVarP(&commandeer.shardingBuckets, "sharding-buckets", "b", defaultShardingBuckets,
 		"Number of storage buckets across which to split the\ndata of a single metric to optimize storage of\nnon-uniform data. Example: 10.")
@@ -99,7 +99,7 @@ func (cc *createCommandeer) create() error {
 		return err
 	}
 
-	if err := cc.validateRollupInterval(); err != nil {
+	if err := cc.validateAggregationGranularity(); err != nil {
 		return errors.Wrap(err, "Failed to parse the aggregation granularity.")
 	}
 
@@ -123,7 +123,7 @@ func (cc *createCommandeer) create() error {
 
 	defaultRollup := config.Rollup{
 		Aggregators:            rollups,
-		AggregatorsGranularity: cc.rollupInterval,
+		AggregatorsGranularity: cc.aggregationGranularity,
 		StorageClass:           defaultStorageClass,
 		SampleRetention:        cc.sampleRetention,
 		LayerRetentionTime:     defaultLayerRetentionTime, //TODO: make configurable
@@ -146,7 +146,7 @@ func (cc *createCommandeer) create() error {
 	partitionSchema := config.PartitionSchema{
 		Version:                tableSchema.Version,
 		Aggregators:            rollups,
-		AggregatorsGranularity: cc.rollupInterval,
+		AggregatorsGranularity: cc.aggregationGranularity,
 		StorageClass:           defaultStorageClass,
 		SampleRetention:        cc.sampleRetention,
 		ChunckerInterval:       tableSchema.ChunckerInterval,
@@ -167,15 +167,15 @@ func (cc *createCommandeer) create() error {
 	return err
 }
 
-func (cc *createCommandeer) validateRollupInterval() error {
+func (cc *createCommandeer) validateAggregationGranularity() error {
 	dayMillis := 24 * int64(time.Hour/time.Millisecond)
-	duration, err := utils.Str2duration(cc.rollupInterval)
+	duration, err := utils.Str2duration(cc.aggregationGranularity)
 	if err != nil {
 		return err
 	}
 
 	if dayMillis%duration != 0 && duration%dayMillis != 0 {
-		return errors.New("rollup interval should be a divisor or a dividend of 1 day. Example: 10m, 30m, 2h, etc.")
+		return errors.New("The aggregation granularity should be a divisor or a dividend of 1 day. Examples: \"10m\"; \"30m\"; \"2h\".")
 	}
 	return nil
 }
@@ -192,7 +192,7 @@ func (cc *createCommandeer) calculatePartitionAndChunkInterval(rateInHours int) 
 	// Make sure the expected chunk size is greater then the supported minimum.
 	if chunkInterval < minNumberOfEventsPerChunk/rateInHours {
 		return "", "", fmt.Errorf(
-            "The calculated chunk size is smaller than the minimum: samples ingestion rate = %v/h, calculated chunk interval = %v, minimum size = %v",
+			"The calculated chunk size is smaller than the minimum: samples ingestion rate = %v/h, calculated chunk interval = %v, minimum size = %v",
 			rateInHours, chunkInterval, cc.rootCommandeer.v3iocfg.MinimumChunkSize)
 	}
 
@@ -228,7 +228,7 @@ func rateToHours(samplesIngestionRate string) (int, error) {
 		return 0, errors.Wrap(err, parsingError.Error())
 	}
 	if i <= 0 {
-        return 0, fmt.Errorf("Invalid samples ingestion rate (%s). The rate cannot have a negative number of samples.", samplesIngestionRate)
+		return 0, fmt.Errorf("Invalid samples ingestion rate (%s). The rate cannot have a negative number of samples.", samplesIngestionRate)
 	}
 	switch last {
 	case 's':
