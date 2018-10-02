@@ -38,10 +38,10 @@ func newTimeCommandeer(rootCommandeer *RootCommandeer) *timeCommandeer {
 	}
 
 	cmd := &cobra.Command{
-		Use:     "time [<time>]",
-		Hidden:  true,
-		Short:   "Performs RFC3339 time/Unix timestamp conversions",
-		Long:    `Converts an RFC3339 time string to a Unix timestamp in seconds, or vice versa.
+		Use:    "time [<time>]",
+		Hidden: true,
+		Short:  "Performs RFC3339 time/Unix timestamp conversions",
+		Long: `Converts an RFC3339 time string to a Unix timestamp in seconds, or vice versa.
 By default, returns the current time as a Unix timestamp.`,
 		Example: `- tsdbctl time
 - tsdcbtl time 2016-01-02T15:34:26Z
