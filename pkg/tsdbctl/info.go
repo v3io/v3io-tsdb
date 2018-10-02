@@ -41,8 +41,8 @@ func newInfoCommandeer(rootCommandeer *RootCommandeer) *infoCommandeer {
 
 	cmd := &cobra.Command{
 		Use:   "info",
-		Short: "Return information about a TSDB instance",
-		Long:  `Return configuration and metrics information for a TSDB instance (table).`,
+		Short: "Display information about a TSDB instance",
+		Long:  `Display configuration and metrics information for a TSDB instance (table).`,
 		Example: `- tsdbctl info -s 192.168.1.100:8081 -u myuser -p mypassword -c bigdata -t mytsdb -m -n
 - tsdbctl info -s 192.168.1.100:8081 -u jerrys -p OpenSesame -c mycontainer -t my_tsdb`,
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -53,9 +53,9 @@ func newInfoCommandeer(rootCommandeer *RootCommandeer) *infoCommandeer {
 	}
 
 	cmd.Flags().BoolVarP(&commandeer.getNames, "names", "n", false,
-		"Return the names of the metrics contained in the TSDB.")
+		"Display the names of the metrics contained in the TSDB.")
 	cmd.Flags().BoolVarP(&commandeer.getCount, "performance", "m", false,
-		"Return a count of the number of metric objects containted in the TSDB.")
+		"Display a count of the number of metric objects containted in the TSDB.")
 
 	commandeer.cmd = cmd
 
