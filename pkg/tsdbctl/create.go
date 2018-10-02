@@ -91,7 +91,7 @@ func (cc *createCommandeer) create() error {
 		cc.defaultRollups)
 
 	if err != nil {
-		return errors.Wrap(err, "failed to create TSDB schema")
+		return errors.Wrap(err, "Failed to create a TSDB schema.")
 	}
 
 	return tsdb.CreateTSDB(cc.rootCommandeer.v3iocfg, dbSchema)
