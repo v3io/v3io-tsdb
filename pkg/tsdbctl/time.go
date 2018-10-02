@@ -39,7 +39,6 @@ func newTimeCommandeer(rootCommandeer *RootCommandeer) *timeCommandeer {
 
 	cmd := &cobra.Command{
 		Use:     "time [<time>]",
-		Aliases: []string{"put"},
 		Hidden:  true,
 		Short:   "Performs RFC3339 time/Unix timestamp conversions",
 		Long:    `Converts an RFC3339 time string to a Unix timestamp in seconds, or vice versa.
