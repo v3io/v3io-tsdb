@@ -29,6 +29,7 @@ import (
 	"github.com/v3io/v3io-go-http"
 	"github.com/v3io/v3io-tsdb/pkg/appender"
 	"github.com/v3io/v3io-tsdb/pkg/config"
+	"github.com/v3io/v3io-tsdb/pkg/log"
 	"github.com/v3io/v3io-tsdb/pkg/partmgr"
 	"github.com/v3io/v3io-tsdb/pkg/querier"
 	"github.com/v3io/v3io-tsdb/pkg/utils"
@@ -47,7 +48,11 @@ type V3ioAdapter struct {
 
 func CreateTSDB(v3iocfg *config.V3ioConfig, schema *config.Schema) error {
 
-	lgr, _ := utils.NewLogger(v3iocfg.Verbose)
+	lgr, err := log.GetOrCreateRootLogger(v3iocfg.Verbose)
+	if err != nil {
+		return errors.Wrap(err, "failed to get logger instance")
+	}
+
 	container, err := utils.CreateContainer(
 		lgr, v3iocfg.WebApiEndpoint, v3iocfg.Container, v3iocfg.Username, v3iocfg.Password, v3iocfg.Workers)
 	if err != nil {
@@ -84,10 +89,11 @@ func NewV3ioAdapter(cfg *config.V3ioConfig, container *v3io.Container, logger lo
 	if logger != nil {
 		newV3ioAdapter.logger = logger
 	} else {
-		newV3ioAdapter.logger, err = utils.NewLogger(cfg.Verbose)
+		logger, err = log.GetOrCreateRootLogger(cfg.Verbose)
 		if err != nil {
 			return nil, err
 		}
+		newV3ioAdapter.logger = logger
 	}
 
 	if container != nil {
