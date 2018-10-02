@@ -59,7 +59,7 @@ func newCreateCommandeer(rootCommandeer *RootCommandeer) *createCommandeer {
 		"Default aggregation rollups, comma seperated: count,avg,sum,min,max,stddev")
 	cmd.Flags().StringVarP(&commandeer.rollupInterval, "aggregation-granularity", "i", config.DefaultAggregationGranularity, "aggregation interval")
 	cmd.Flags().IntVarP(&commandeer.shardingBuckets, "sharding-buckets", "b", config.DefaultShardingBuckets, "number of buckets to split key")
-	cmd.Flags().StringVarP(&commandeer.sampleRate, "rate", "r", config.DefaultIngestionRate, "sample rate")
+	cmd.Flags().StringVarP(&commandeer.sampleRate, "ingestion-rate", "r", config.DefaultIngestionRate, "Metric-samples ingestion rate")
 
 	commandeer.cmd = cmd
 
