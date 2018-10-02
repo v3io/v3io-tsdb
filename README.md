@@ -82,7 +82,7 @@ it has built-in help, see the following add/query examples:
 
 ```
 	# create a DB with expected ingestion rate of one sample per second and some aggregates (at 30 min interval) 
-	tsdbctl create -t <table> --rate 1/s -a count,sum,max -i 30m
+	tsdbctl create -t <table> --ingestion-rate 1/s -a count,sum,max -i 30m
 
 	# display DB info with metric names (types) 
 	tsdbctl info -t <table> -n
