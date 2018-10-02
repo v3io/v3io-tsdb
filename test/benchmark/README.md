@@ -20,7 +20,7 @@
     path: "tsdb-1"
     
     # Logging level. Valid values: debug,info,warn,error (Default: info)
-    verbose: "warn"
+    logLevel: "warn"
 
     # V3IO Credentials
     username: "<user>@<tenant>"
@@ -78,7 +78,7 @@ LabelValuesCount: 1
 # Pattern: [A..Z][_[1..10]]
 LabelsValueDiversity: 10
 
-# Flush frequency - flush metrics after every N steps
+performance
 FlushFrequency: 10
 
 # Select how benchmark test will produce the data. If "AppendOneByOne=true" test will produce one sample per test cycle

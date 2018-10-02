@@ -22,7 +22,9 @@ package querier
 
 import (
 	"github.com/nuclio/logger"
+	"github.com/pkg/errors"
 	"github.com/v3io/v3io-go-http"
+	"github.com/v3io/v3io-tsdb/internal/pkg/performance"
 	"github.com/v3io/v3io-tsdb/pkg/aggregate"
 	"github.com/v3io/v3io-tsdb/pkg/config"
 	"github.com/v3io/v3io-tsdb/pkg/partmgr"
@@ -34,22 +36,36 @@ import (
 // Create a new Querier interface
 func NewV3ioQuerier(container *v3io.Container, logger logger.Logger, mint, maxt int64,
 	cfg *config.V3ioConfig, partMngr *partmgr.PartitionManager) *V3ioQuerier {
-	newQuerier := V3ioQuerier{container: container, mint: mint, maxt: maxt,
-		logger: logger.GetChild("Querier"), cfg: cfg}
+	newQuerier := V3ioQuerier{
+		container: container,
+		mint:      mint, maxt: maxt,
+		logger:            logger.GetChild("Querier"),
+		cfg:               cfg,
+		disableClientAggr: cfg.DisableClientAggr,
+	}
 	newQuerier.partitionMngr = partMngr
 	return &newQuerier
 }
 
 type V3ioQuerier struct {
-	logger        logger.Logger
-	container     *v3io.Container
-	cfg           *config.V3ioConfig
-	mint, maxt    int64
-	partitionMngr *partmgr.PartitionManager
+	logger            logger.Logger
+	container         *v3io.Container
+	cfg               *config.V3ioConfig
+	mint, maxt        int64
+	partitionMngr     *partmgr.PartitionManager
+	disableClientAggr bool
+	disableAllAggr    bool
 }
 
-// Standard Time Series Query, return a set of series which match the condition
+//  Standard Time Series Query, return a set of series which match the condition
 func (q *V3ioQuerier) Select(name, functions string, step int64, filter string) (SeriesSet, error) {
+	return q.selectQry(name, functions, step, nil, filter)
+}
+
+// Prometheus Time Series Query, return a set of series which match the condition
+func (q *V3ioQuerier) SelectProm(name, functions string, step int64, filter string, noAggr bool) (SeriesSet, error) {
+	q.disableClientAggr = true
+	q.disableAllAggr = noAggr
 	return q.selectQry(name, functions, step, nil, filter)
 }
 
@@ -61,45 +77,67 @@ func (q *V3ioQuerier) SelectOverlap(name, functions string, step int64, windows 
 }
 
 // base query function
-func (q *V3ioQuerier) selectQry(name, functions string, step int64, windows []int, filter string) (SeriesSet, error) {
+func (q *V3ioQuerier) selectQry(
+	name, functions string, step int64, windows []int, filter string) (set SeriesSet, err error) {
+
+	set = nullSeriesSet{}
 
 	filter = strings.Replace(filter, "__name__", "_name", -1)
 	q.logger.DebugWith("Select query", "func", functions, "step", step, "filter", filter, "window", windows)
-	err := q.partitionMngr.ReadAndUpdateSchema()
+	err = q.partitionMngr.ReadAndUpdateSchema()
+
 	if err != nil {
-		return nullSeriesSet{}, err
-	}
-	parts := q.partitionMngr.PartsForRange(q.mint, q.maxt)
-	if len(parts) == 0 {
-		return nullSeriesSet{}, nil
+		return nullSeriesSet{}, errors.Wrap(err, "failed to read/update schema")
 	}
 
-	if len(parts) == 1 {
-		return q.queryNumericPartition(parts[0], name, functions, step, windows, filter)
+	queryTimer, err := performance.ReporterInstanceFromConfig(q.cfg).GetTimer("QueryTimer")
+
+	if err != nil {
+		return nullSeriesSet{}, errors.Wrap(err, "failed to create performance metric [QueryTimer]")
 	}
 
-	sets := make([]SeriesSet, len(parts))
-	for i, part := range parts {
-		set, err := q.queryNumericPartition(part, name, functions, step, windows, filter)
-		if err != nil {
-			return nullSeriesSet{}, err
+	queryTimer.Time(func() {
+		filter = strings.Replace(filter, "__name__", "_name", -1)
+		q.logger.DebugWith("Select query", "func", functions, "step", step, "filter", filter, "window", windows)
+
+		parts := q.partitionMngr.PartsForRange(q.mint, q.maxt)
+		if len(parts) == 0 {
+			return
 		}
-		sets[i] = set
-	}
 
-	// sort each partition when not using range scan
-	if name == "" {
-		for i := 0; i < len(sets); i++ {
-			// TODO make it a Go routine per part
-			sort, err := NewSetSorter(sets[i])
+		if len(parts) == 1 {
+			set, err = q.queryNumericPartition(parts[0], name, functions, step, windows, filter)
+			return
+		}
+
+		sets := make([]SeriesSet, len(parts))
+		for i, part := range parts {
+			set, err := q.queryNumericPartition(part, name, functions, step, windows, filter)
 			if err != nil {
-				return nullSeriesSet{}, err
+				set = nullSeriesSet{}
+				return
 			}
-			sets[i] = sort
+			sets[i] = set
 		}
-	}
 
-	return newIterSortMerger(sets)
+		// sort each partition when not using range scan
+		if name == "" {
+			for i := 0; i < len(sets); i++ {
+				// TODO make it a Go routine per part
+				sorter, err := NewSetSorter(sets[i])
+				if err != nil {
+					set = nullSeriesSet{}
+					return
+				}
+				sets[i] = sorter
+			}
+		}
+
+		set, err = newIterSortMerger(sets)
+		return
+	})
+
+	return
 }
 
 // Query a single partition (with numeric/float values)
@@ -122,13 +160,24 @@ func (q *V3ioQuerier) queryNumericPartition(
 
 	newSet := &V3ioSeriesSet{mint: mint, maxt: maxt, partition: partition, logger: q.logger}
 
-	// if there are aggregations to be made
-	if functions != "" {
+	// if there is no aggregation function and the step size is grater than the stored aggregate use Average aggr
+	// TODO: in non Prometheus we may want avg aggregator for any step>0
+	// in Prom range vectors use seek and it would be inefficient to do avg aggregator
+	if functions == "" && step > 0 && step >= partition.RollupTime() && partition.AggrType().HasAverage() {
+		functions = "avg"
+	}
+
+	// if there are aggregations to be made and its not disabled
+	if functions != "" && !q.disableAllAggr {
 
 		// if step isn't passed (e.g. when using the console) - the step is the difference between max
 		// and min times (e.g. 5 minutes)
 		if step == 0 {
 			step = maxt - mint
+		}
+
+		if step > partition.RollupTime() && q.disableClientAggr {
+			step = partition.RollupTime()
 		}
 
 		newAggrSeries, err := aggregate.NewAggregateSeries(functions,
@@ -142,10 +191,15 @@ func (q *V3ioQuerier) queryNumericPartition(
 			return nil, err
 		}
 
-		newSet.aggrSeries = newAggrSeries
-		newSet.interval = step
-		newSet.aggrIdx = newAggrSeries.NumFunctions() - 1
-		newSet.overlapWin = windows
+		// use aggregates if DB side is possible or client aggr is enabled (Prometheus disable client side)
+		newSet.canAggregate = newAggrSeries.CanAggregate(partition.AggrType())
+		if newSet.canAggregate || !q.disableClientAggr {
+			newSet.aggrSeries = newAggrSeries
+			newSet.interval = step
+			newSet.aggrIdx = newAggrSeries.NumFunctions() - 1
+			newSet.overlapWin = windows
+			newSet.noAggrLbl = q.disableClientAggr // dont add "Aggregator" label in Prometheus
+		}
 	}
 
 	err := newSet.getItems(partition, name, filter, q.container, q.cfg.QryWorkers)
@@ -154,12 +208,20 @@ func (q *V3ioQuerier) queryNumericPartition(
 }
 
 // return the current metric names
-func (q *V3ioQuerier) LabelValues(labelKey string) ([]string, error) {
-	if labelKey == "__name__" {
-		return q.getMetricNames()
-	} else {
-		return q.getLabelValues(labelKey)
+func (q *V3ioQuerier) LabelValues(labelKey string) (result []string, err error) {
+	labelValuesTimer, err := performance.ReporterInstanceFromConfig(q.cfg).GetTimer("LabelValuesTimer")
+	if err != nil {
+		return result, errors.Wrap(err, "failed to obtain timer object for [LabelValuesTimer]")
 	}
+
+	labelValuesTimer.Time(func() {
+		if labelKey == "__name__" {
+			result, err = q.getMetricNames()
+		} else {
+			result, err = q.getLabelValues(labelKey)
+		}
+	})
+	return
 }
 
 func (q *V3ioQuerier) Close() error {
@@ -168,7 +230,7 @@ func (q *V3ioQuerier) Close() error {
 
 func (q *V3ioQuerier) getMetricNames() ([]string, error) {
 	input := v3io.GetItemsInput{
-		Path:           q.cfg.Path + "/names/",
+		Path:           q.cfg.TablePath + "/names/",
 		AttributeNames: []string{"__name"},
 	}
 
@@ -244,7 +306,7 @@ func (q *V3ioQuerier) getLabelValues(labelKey string) ([]string, error) {
 	}
 
 	var labelValues []string
-	for labelValue, _ := range labelValuesMap {
+	for labelValue := range labelValuesMap {
 		labelValues = append(labelValues, labelValue)
 	}
 

@@ -5,6 +5,7 @@ package tsdbtest
 import (
 	"github.com/stretchr/testify/assert"
 	"github.com/v3io/v3io-tsdb/pkg/config"
+	"go/build"
 	"os"
 	"path/filepath"
 	"strings"
@@ -12,14 +13,29 @@ import (
 )
 
 func createTestConfig(t *testing.T, path string) {
-	_, err := os.Create(filepath.Join(path, config.DefaultConfigurationFileName))
+	fullPath := filepath.Join(path, config.DefaultConfigurationFileName)
+	_, err := os.Create(fullPath)
 	if err != nil {
-		t.Fatalf("Failed to create file at %s", path)
+		t.Fatalf("Failed to create file at %s. Error: %v", fullPath, err)
 	}
+	t.Logf("---> Created test configuration at: %s", fullPath)
+}
+
+func deleteTestConfig(t *testing.T, path string) {
+	fullPath := filepath.Join(path, config.DefaultConfigurationFileName)
+	err := os.Remove(fullPath)
+	if err != nil && !os.IsNotExist(err) {
+		t.Errorf("Failed to remove file at %s. Error: %v", fullPath, err)
+	}
+	t.Logf("<--- Removed test configuration from: %s", fullPath)
 }
 
 func TestGetV3ioConfigPath(t *testing.T) {
-	firstGoPath := strings.Split(os.Getenv("GOPATH"), string(os.PathListSeparator))[0]
+	gopath := os.Getenv("GOPATH")
+	if gopath == "" {
+		gopath = build.Default.GOPATH
+	}
+	firstGoPath := strings.Split(gopath, string(os.PathListSeparator))[0]
 	projectHome := filepath.Join(firstGoPath, relativeProjectPath)
 	testCases := []struct {
 		description  string
@@ -39,12 +55,13 @@ func TestGetV3ioConfigPath(t *testing.T) {
 					}
 				} else {
 					path := TsdbDefaultTestConfigPath
-					if err := os.Mkdir(path, 0777); err != nil {
+					if err := os.Mkdir(path, 0777); err != nil && !os.IsExist(err) {
 						t.Fatalf("Failed to mkdir %v", err)
 					}
 					createTestConfig(t, path)
 					return func() {
 						os.Setenv(config.V3ioConfigEnvironmentVariable, configPathEnv)
+						deleteTestConfig(t, path)
 						os.RemoveAll(path)
 					}
 				}
@@ -66,6 +83,7 @@ func TestGetV3ioConfigPath(t *testing.T) {
 					createTestConfig(t, path)
 					return func() {
 						os.Setenv(config.V3ioConfigEnvironmentVariable, configPathEnv)
+						deleteTestConfig(t, path)
 						os.Remove(path)
 					}
 				}

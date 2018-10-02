@@ -24,40 +24,83 @@ package partmgr
 
 import (
 	"github.com/stretchr/testify/assert"
-	"github.com/v3io/v3io-tsdb/pkg/tsdb/tsdbtest/testutils"
+	"github.com/v3io/v3io-tsdb/pkg/config"
+	"github.com/v3io/v3io-tsdb/pkg/tsdb/schema"
 	"testing"
 )
 
 func TestCreateNewPartition(tst *testing.T) {
-	schema := testutils.CreateSchema(tst, "*")
-	manager, _ := NewPartitionMngr(&schema, "/", nil)
+	manager := getPartitionManager(tst)
 	interval := manager.currentPartitionInterval
 	startTime := interval + 1
+
 	//first partition
-	part, _ := manager.TimeToPart(startTime + interval)
+	part, err := manager.TimeToPart(startTime + interval)
+	assert.Nil(tst, err, "failed converting time to partition")
+	if err != nil {
+		tst.FailNow()
+	}
 	assert.Equal(tst, 1, len(manager.partitions))
 	assert.Equal(tst, manager.headPartition, part)
+
 	//new head
-	part, _ = manager.TimeToPart(startTime + (interval * 3))
+	part, err = manager.TimeToPart(startTime + (interval * 3))
+	assert.Nil(tst, err, "failed converting time to partition")
+	if err != nil {
+		tst.FailNow()
+	}
 	assert.Equal(tst, 3, len(manager.partitions))
 	assert.Equal(tst, manager.headPartition, part)
+
 	//add in the middle
-	part, _ = manager.TimeToPart(startTime + (interval * 2))
+	part, err = manager.TimeToPart(startTime + (interval * 2))
+	assert.Nil(tst, err, "failed converting time to partition")
+	if err != nil {
+		tst.FailNow()
+	}
 	assert.Equal(tst, 3, len(manager.partitions))
 	assert.Equal(tst, manager.partitions[1], part)
+
 	//add first
-	part, _ = manager.TimeToPart(startTime)
+	part, err = manager.TimeToPart(startTime)
+	assert.Nil(tst, err, "failed converting time to partition")
+	if err != nil {
+		tst.FailNow()
+	}
 	assert.Equal(tst, 4, len(manager.partitions))
 	assert.Equal(tst, manager.partitions[0], part)
 }
 
+func getPartitionManager(tst *testing.T) *PartitionManager {
+	const dummyConfig = `path: "/test"`
+	v3ioConfig, err := config.GetOrLoadFromData([]byte(dummyConfig))
+	if err != nil {
+		tst.Fatalf("failed to obtain v3io configuration. Error: %v", err)
+	}
+
+	schm, err := schema.NewSchema(v3ioConfig, "1/s", "1h", "*")
+	if err != nil {
+		tst.Fatalf("failed to create schema. Error: %v", err)
+	}
+
+	manager, err := NewPartitionMngr(schm, nil, v3ioConfig)
+	if err != nil {
+		tst.Fatalf("failed to create partition manager. Error: %v", err)
+	}
+
+	return manager
+}
+
 func TestPartsForRange(tst *testing.T) {
 	numPartitions := 5
-	schema := testutils.CreateSchema(tst, "*")
-	manager, _ := NewPartitionMngr(&schema, "/", nil)
+	manager := getPartitionManager(tst)
 	interval := manager.currentPartitionInterval
 	for i := 1; i <= numPartitions; i++ {
-		manager.TimeToPart(interval * int64(i))
+		_, err := manager.TimeToPart(interval * int64(i))
+		assert.Nil(tst, err, "failed converting time to partition")
+		if err != nil {
+			tst.FailNow()
+		}
 	}
 	assert.Equal(tst, numPartitions, len(manager.partitions))
 	//get all partitions
@@ -78,8 +121,7 @@ func TestPartsForRange(tst *testing.T) {
 }
 
 func TestTime2Bucket(tst *testing.T) {
-	schema := testutils.CreateSchema(tst, "*")
-	manager, _ := NewPartitionMngr(&schema, "/", nil)
+	manager := getPartitionManager(tst)
 	part, _ := manager.TimeToPart(1000000)
 	assert.Equal(tst, 0, part.Time2Bucket(100))
 	assert.Equal(tst, part.rollupBuckets-1, part.Time2Bucket(part.startTime+part.partitionInterval+1))
@@ -87,9 +129,12 @@ func TestTime2Bucket(tst *testing.T) {
 }
 
 func TestGetChunkMint(tst *testing.T) {
-	schema := testutils.CreateSchema(tst, "*")
-	manager, _ := NewPartitionMngr(&schema, "/", nil)
-	part, _ := manager.TimeToPart(manager.currentPartitionInterval)
+	manager := getPartitionManager(tst)
+	part, err := manager.TimeToPart(manager.currentPartitionInterval)
+	assert.Nil(tst, err, "failed converting time to partition")
+	if err != nil {
+		tst.FailNow()
+	}
 	assert.Equal(tst, part.startTime, part.GetChunkMint(0))
 	assert.Equal(tst, part.startTime, part.GetChunkMint(part.startTime+1))
 	assert.Equal(tst, part.startTime+part.chunkInterval, part.GetChunkMint(part.startTime+part.chunkInterval+100))
@@ -97,8 +142,7 @@ func TestGetChunkMint(tst *testing.T) {
 }
 
 func TestInRange(tst *testing.T) {
-	schema := testutils.CreateSchema(tst, "*")
-	manager, _ := NewPartitionMngr(&schema, "/", nil)
+	manager := getPartitionManager(tst)
 	part, _ := manager.TimeToPart(manager.currentPartitionInterval)
 	assert.Equal(tst, false, part.InRange(part.GetStartTime()-100))
 	assert.Equal(tst, false, part.InRange(part.GetEndTime()+100))
@@ -106,8 +150,7 @@ func TestInRange(tst *testing.T) {
 }
 
 func TestRange2Cids(tst *testing.T) {
-	schema := testutils.CreateSchema(tst, "*")
-	manager, _ := NewPartitionMngr(&schema, "/", nil)
+	manager := getPartitionManager(tst)
 	part, _ := manager.TimeToPart(manager.currentPartitionInterval)
 	numChunks := int(part.partitionInterval / part.chunkInterval)
 	var cids []int

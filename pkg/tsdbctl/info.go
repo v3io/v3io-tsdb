@@ -50,7 +50,7 @@ func newInfoCommandeer(rootCommandeer *RootCommandeer) *infoCommandeer {
 	}
 
 	cmd.Flags().BoolVarP(&commandeer.getNames, "names", "n", false, "return metric names")
-	cmd.Flags().BoolVarP(&commandeer.getCount, "metrics", "m", false, "count number metric objects")
+	cmd.Flags().BoolVarP(&commandeer.getCount, "performance", "m", false, "count number metric objects")
 
 	commandeer.cmd = cmd
 
@@ -73,7 +73,7 @@ func (ic *infoCommandeer) info() error {
 		return errors.Wrap(err, "Failed to get config")
 	}
 
-	fmt.Printf("TSDB Table %s Configuration:\n", ic.rootCommandeer.v3iocfg.Path)
+	fmt.Printf("TSDB Table %s Configuration:\n", ic.rootCommandeer.v3iocfg.TablePath)
 	fmt.Println(string(info))
 
 	if ic.getNames {

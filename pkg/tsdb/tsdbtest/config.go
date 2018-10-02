@@ -1,8 +1,10 @@
 package tsdbtest
 
 import (
+	"fmt"
 	"github.com/pkg/errors"
 	"github.com/v3io/v3io-tsdb/pkg/config"
+	"go/build"
 	"os"
 	"path/filepath"
 	"strings"
@@ -27,15 +29,19 @@ func GetV3ioConfigPath() (string, error) {
 		return localConfigFile, nil
 	}
 
-	gopath := strings.Split(os.Getenv("GOPATH"), string(os.PathListSeparator))
-	for _, path := range gopath {
+	gopath := os.Getenv("GOPATH")
+	if gopath == "" {
+		gopath = build.Default.GOPATH
+	}
+	gopaths := strings.Split(gopath, string(os.PathListSeparator))
+	for _, path := range gopaths {
 		gopathConfig := filepath.Join(path, relativeProjectPath, config.DefaultConfigurationFileName)
 		if _, err := os.Stat(gopathConfig); !os.IsNotExist(err) {
 			return gopathConfig, nil
 		}
 	}
 
-	return "", errors.New("config file is not specified")
+	return "", errors.Errorf("config file is not specified and could not be found in GOPATH=%v", gopath)
 }
 
 func LoadV3ioConfig() (*config.V3ioConfig, error) {
@@ -43,9 +49,9 @@ func LoadV3ioConfig() (*config.V3ioConfig, error) {
 	if err != nil {
 		return nil, err
 	}
-	v3ioConfig, err := config.LoadConfig(path)
+	v3ioConfig, err := config.GetOrLoadFromFile(path)
 	if err != nil {
-		return nil, errors.Wrap(err, "Failed to load test configuration.")
+		return nil, errors.Wrap(err, fmt.Sprintf("unable to load test configuration from '%s'", path))
 	}
 	return v3ioConfig, nil
 }

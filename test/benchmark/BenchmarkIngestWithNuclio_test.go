@@ -41,15 +41,15 @@ func BenchmarkIngestWithNuclio(b *testing.B) {
 	tsdbPath = tsdbtest.NormalizePath(fmt.Sprintf("tsdb-%s-%d-%s", b.Name(), b.N, time.Now().Format(time.RFC3339)))
 
 	// Update TSDB instance path for this test
-	v3ioConfig.Path = tsdbPath
+	v3ioConfig.TablePath = tsdbPath
 	schema := testutils.CreateSchema(b, "count,sum")
-	if err := tsdb.CreateTSDB(v3ioConfig, &schema); err != nil {
+	if err := tsdb.CreateTSDB(v3ioConfig, schema); err != nil {
 		b.Fatal("Failed to create TSDB", err)
 	}
 
 	data := nutest.DataBind{
 		Name:      defaultDbName,
-		Url:       v3ioConfig.V3ioUrl,
+		Url:       v3ioConfig.WebApiEndpoint,
 		Container: v3ioConfig.Container,
 		User:      v3ioConfig.Username,
 		Password:  v3ioConfig.Password,
@@ -73,21 +73,21 @@ func BenchmarkIngestWithNuclio(b *testing.B) {
 	testEndTimeMs := testStartTimeNano / int64(time.Millisecond)
 	testStartTimeMs := testEndTimeMs - relativeTimeOffsetMs
 
-	sampleTemplates := common.MakeSampleTemplates(
-		common.MakeSamplesModel(
-			testConfig.NamesCount,
-			testConfig.NamesDiversity,
-			testConfig.LabelsCount,
-			testConfig.LabelsDiversity,
-			testConfig.LabelValuesCount,
-			testConfig.LabelsValueDiversity))
+	samplesModel := common.MakeSamplesModel(
+		testConfig.NamesCount,
+		testConfig.NamesDiversity,
+		testConfig.LabelsCount,
+		testConfig.LabelsDiversity,
+		testConfig.LabelValuesCount,
+		testConfig.LabelsValueDiversity)
+	sampleTemplates := common.MakeSampleTemplates(samplesModel)
 	sampleTemplatesLength := len(sampleTemplates)
 
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
 		index := i % sampleTemplatesLength
 		timestamp := testStartTimeMs + int64(index*testConfig.SampleStepSize)
-		newEntries, err := runNuclioTest(tc, sampleTemplates[index], timestamp)
+		newEntries, err := runNuclioTest(tc, sampleTemplates[index], timestamp, testConfig.ValidateRawData)
 		if err != nil {
 			b.Fatal(err)
 		}
@@ -110,12 +110,18 @@ func BenchmarkIngestWithNuclio(b *testing.B) {
 	}
 
 	tsdbtest.ValidateCountOfSamples(b, v3ioAdapter, metricNamePrefix, count, testStartTimeMs, testEndTimeMs, queryStepSizeMs)
+
+	if testConfig.ValidateRawData {
+		for metricName := range samplesModel {
+			tsdbtest.ValidateRawData(b, v3ioAdapter, metricName, testStartTimeMs, testEndTimeMs, isValidDataPoint)
+		}
+	}
 }
 
-func runNuclioTest(tc *nutest.TestContext, sampleTemplateJson string, timestamp int64) (int, error) {
+func runNuclioTest(tc *nutest.TestContext, sampleTemplateJson string, timestamp int64, sequential bool) (int, error) {
 	count := 0
 	// Add first & get reference
-	sampleJson := fmt.Sprintf(sampleTemplateJson, timestamp, common.MakeRandomFloat64())
+	sampleJson := fmt.Sprintf(sampleTemplateJson, timestamp, common.NextValue(sequential))
 	tc.Logger.Debug("Sample data: %s", sampleJson)
 
 	testEvent := nutest.TestEvent{
@@ -140,7 +146,7 @@ func initContext(context *nuclio.Context) error {
 	}
 
 	// Hack - update path to TSDB
-	v3ioConfig.Path = tsdbPath
+	v3ioConfig.TablePath = tsdbPath
 
 	data := context.DataBinding[defaultDbName].(*v3io.Container)
 	adapter, err := tsdb.NewV3ioAdapter(v3ioConfig, data, context.Logger)

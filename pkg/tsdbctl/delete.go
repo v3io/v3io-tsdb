@@ -21,17 +21,21 @@ such restriction.
 package tsdbctl
 
 import (
+	"bufio"
 	"fmt"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/v3io/v3io-tsdb/pkg/utils"
+	"os"
+	"strings"
 	"time"
 )
 
 type delCommandeer struct {
 	cmd            *cobra.Command
 	rootCommandeer *RootCommandeer
-	delConfig      bool
+	deleteAll      bool
+	ignoreErrors   bool
 	force          bool
 	fromTime       string
 	toTime         string
@@ -53,10 +57,11 @@ func newDeleteCommandeer(rootCommandeer *RootCommandeer) *delCommandeer {
 		},
 	}
 
-	cmd.Flags().BoolVarP(&commandeer.delConfig, "del-config", "d", false, "Delete the TSDB config as well")
-	cmd.Flags().BoolVarP(&commandeer.force, "force", "f", false, "Delete all elements even if some steps fail")
-	cmd.Flags().StringVarP(&commandeer.toTime, "end", "e", "now", "to time")
-	cmd.Flags().StringVarP(&commandeer.fromTime, "begin", "b", "0", "from time")
+	cmd.Flags().BoolVarP(&commandeer.deleteAll, "all", "a", false, "Delete the TSDB table (including all content and the configuration schema file)")
+	cmd.Flags().BoolVarP(&commandeer.ignoreErrors, "ignore-errors", "i", false, "Delete all elements even if some steps fail")
+	cmd.Flags().BoolVarP(&commandeer.force, "force", "f", false, "Delete without prompt")
+	cmd.Flags().StringVarP(&commandeer.toTime, "end", "e", "now", "TO time")
+	cmd.Flags().StringVarP(&commandeer.fromTime, "begin", "b", "0", "FROM time")
 	commandeer.cmd = cmd
 
 	return commandeer
@@ -87,11 +92,45 @@ func (ic *delCommandeer) delete() error {
 			return err
 		}
 	}
-	err = ic.rootCommandeer.adapter.DeleteDB(ic.delConfig, ic.force, from, to)
-	if err != nil {
-		return errors.Wrap(err, "Failed to delete DB")
+
+	if !ic.force {
+		confirmedByUser, err := getConfirmation(
+			fmt.Sprintf("You are about to delete the '%s' table. Are you sure?", ic.rootCommandeer.v3iocfg.TablePath))
+		if err != nil {
+			return err
+		}
+
+		if !confirmedByUser {
+			return errors.New("Cancelled by user")
+		}
 	}
-	fmt.Printf("Deleted table %s succsesfuly\n", ic.rootCommandeer.v3iocfg.Path)
+
+	err = ic.rootCommandeer.adapter.DeleteDB(ic.deleteAll, ic.ignoreErrors, from, to)
+	if err != nil {
+		return errors.Wrapf(err, "Failed to delete table '%s'", ic.rootCommandeer.v3iocfg.TablePath)
+	}
+	fmt.Printf("Table '%s' has been deleted\n", ic.rootCommandeer.v3iocfg.TablePath)
 
 	return nil
+}
+
+func getConfirmation(prompt string) (bool, error) {
+	reader := bufio.NewReader(os.Stdin)
+
+	for {
+		fmt.Printf("%s [y/n]: ", prompt)
+
+		response, err := reader.ReadString('\n')
+		if err != nil {
+			errors.Wrap(err, "failed to get user input")
+		}
+
+		response = strings.ToLower(strings.TrimSpace(response))
+
+		if response == "y" || response == "yes" {
+			return true, nil
+		} else if response == "n" || response == "no" {
+			return false, nil
+		}
+	}
 }

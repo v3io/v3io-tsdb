@@ -106,7 +106,7 @@ func (cc *checkCommandeer) check() error {
 
 		if values != nil {
 			bytes := values.([]byte)
-			chunk, err := chunkenc.FromData(chunkenc.EncXOR, bytes, 0)
+			chunk, err := chunkenc.FromData(cc.rootCommandeer.logger, chunkenc.EncXOR, bytes, 0)
 			if err != nil {
 				cc.rootCommandeer.logger.ErrorWith("Error reading chunk buffer", "Lset", lset, "err", err)
 				return err
@@ -123,11 +123,15 @@ func (cc *checkCommandeer) check() error {
 					return errors.Wrap(iter.Err(), "failed to read iterator")
 				}
 
-				fmt.Printf("Total Size: %d, Count: %d\n", len(bytes), count)
-
+				compressionRatio := 0.0
+				bytesCount := len(bytes)
+				if count > 0 {
+					compressionRatio = float64(bytesCount) / float64(count)
+				}
+				fmt.Printf("Total Size: %d, Count: %d. Compression ratio: %.2f\n",
+					bytesCount, count, compressionRatio)
 			}
 		}
-
 	}
 
 	return nil

@@ -32,17 +32,18 @@ import (
 	"github.com/v3io/v3io-tsdb/pkg/tsdb/tsdbtest"
 	"github.com/v3io/v3io-tsdb/pkg/tsdb/tsdbtest/testutils"
 	"github.com/v3io/v3io-tsdb/pkg/utils"
-	"path/filepath"
 	"sort"
 	"testing"
+	"time"
 )
 
-const defaultStepMs = 5 * 60 * 1000 // 5 minutes
+const minuteInMillis = 60 * 1000
+const defaultStepMs = 5 * minuteInMillis // 5 minutes
 
 func TestIngestData(t *testing.T) {
 	v3ioConfig, err := tsdbtest.LoadV3ioConfig()
 	if err != nil {
-		t.Fatalf("Failed to load test configuration. reason: %s", err)
+		t.Fatalf("unable to load configuration. Error: %v", err)
 	}
 
 	testCases := []struct {
@@ -123,7 +124,7 @@ func testIngestDataCase(t *testing.T, v3ioConfig *config.V3ioConfig,
 func TestQueryData(t *testing.T) {
 	v3ioConfig, err := tsdbtest.LoadV3ioConfig()
 	if err != nil {
-		t.Fatalf("Failed to load test configuration. reason: %s", err)
+		t.Fatalf("unable to load configuration. Error: %v", err)
 	}
 
 	testCases := []struct {
@@ -261,6 +262,32 @@ func TestQueryData(t *testing.T) {
 			to:       1532940510 + 1,
 			step:     defaultStepMs,
 			expected: map[string][]tsdbtest.DataPoint{}},
+
+		{desc: "Should ingest and query aggregators with empty bucket", metricName: "cpu",
+			labels: utils.FromStrings("os", "linux", "iguaz", "yesplease"),
+			data: []tsdbtest.DataPoint{{Time: 1537972278402, Value: 300.3},
+				{Time: 1537972278402 + 8*minuteInMillis, Value: 300.3},
+				{Time: 1537972278402 + 9*minuteInMillis, Value: 100.4}},
+			from:        1537972278402 - 5*minuteInMillis,
+			to:          1537972278402 + 10*minuteInMillis,
+			step:        defaultStepMs,
+			aggregators: "count",
+			expected: map[string][]tsdbtest.DataPoint{
+				"count": {{Time: 1537972278402, Value: 1},
+					{Time: 1537972578402, Value: 2}}}},
+
+		{desc: "Should ingest and query aggregators with few empty buckets in a row", metricName: "cpu",
+			labels: utils.FromStrings("os", "linux", "iguaz", "yesplease"),
+			data: []tsdbtest.DataPoint{{Time: 1537972278402, Value: 300.3},
+				{Time: 1537972278402 + 16*minuteInMillis, Value: 300.3},
+				{Time: 1537972278402 + 17*minuteInMillis, Value: 100.4}},
+			from:        1537972278402 - 5*minuteInMillis,
+			to:          1537972278402 + 18*minuteInMillis,
+			step:        defaultStepMs,
+			aggregators: "count",
+			expected: map[string][]tsdbtest.DataPoint{
+				"count": {{Time: 1537972158402, Value: 1},
+					{Time: 1537973058402, Value: 2}}}},
 	}
 
 	for _, test := range testCases {
@@ -324,9 +351,9 @@ func testQueryDataCase(test *testing.T, v3ioConfig *config.V3ioConfig,
 }
 
 func TestQueryDataOverlappingWindow(t *testing.T) {
-	v3ioConfig, err := config.LoadConfig(filepath.Join("..", "..", config.DefaultConfigurationFileName))
+	v3ioConfig, err := config.GetOrDefaultConfig()
 	if err != nil {
-		t.Fatalf("Failed to load test configuration. reason: %s", err)
+		t.Fatalf("unable to load configuration. Error: %v", err)
 	}
 
 	testCases := []struct {
@@ -446,12 +473,12 @@ func testQueryDataOverlappingWindowCase(test *testing.T, v3ioConfig *config.V3io
 func TestCreateTSDB(t *testing.T) {
 	v3ioConfig, err := tsdbtest.LoadV3ioConfig()
 	if err != nil {
-		t.Fatalf("Failed to load test configuration. reason: %s", err)
+		t.Fatalf("unable to load configuration. Error: %v", err)
 	}
 
 	testCases := []struct {
 		desc         string
-		conf         config.Schema
+		conf         *config.Schema
 		ignoreReason string
 	}{
 		{desc: "Should create TSDB with standard configuration", conf: testutils.CreateSchema(t, "sum,count")},
@@ -467,30 +494,29 @@ func TestCreateTSDB(t *testing.T) {
 			testCreateTSDBcase(t, v3ioConfig, test.conf)
 		})
 	}
-
 }
 
-func testCreateTSDBcase(t *testing.T, v3ioConfig *config.V3ioConfig, dbConfig config.Schema) {
-	defer tsdbtest.SetUpWithDBConfig(t, v3ioConfig, &dbConfig)()
+func testCreateTSDBcase(t *testing.T, v3ioConfig *config.V3ioConfig, dbConfig *config.Schema) {
+	defer tsdbtest.SetUpWithDBConfig(t, v3ioConfig, dbConfig)()
 
 	adapter, err := NewV3ioAdapter(v3ioConfig, nil, nil)
 	if err != nil {
 		t.Fatalf("Failed to create adapter. reason: %s", err)
 	}
 
-	actualDbConfig := *adapter.GetSchema()
+	actualDbConfig := adapter.GetSchema()
 	assert.Equal(t, actualDbConfig, dbConfig)
 }
 
 func TestDeleteTSDB(t *testing.T) {
 	v3ioConfig, err := tsdbtest.LoadV3ioConfig()
 	if err != nil {
-		t.Fatalf("Failed to load test configuration. reason: %s", err)
+		t.Fatalf("unable to load configuration. Error: %v", err)
 	}
 
 	schema := testutils.CreateSchema(t, "count,sum")
-	v3ioConfig.Path = t.Name()
-	if err := CreateTSDB(v3ioConfig, &schema); err != nil {
+	v3ioConfig.TablePath = t.Name()
+	if err := CreateTSDB(v3ioConfig, schema); err != nil {
 		v3ioConfigAsJson, _ := json.MarshalIndent(v3ioConfig, "", "  ")
 		t.Fatalf("Failed to create TSDB. Reason: %s\nConfiguration:\n%s", err, string(v3ioConfigAsJson))
 	}
@@ -501,16 +527,17 @@ func TestDeleteTSDB(t *testing.T) {
 	}
 	responseChan := make(chan *v3io.Response)
 	container, _ := adapter.GetContainer()
-	container.ListBucket(&v3io.ListBucketInput{Path: v3ioConfig.Path}, 30, responseChan)
+	container.ListBucket(&v3io.ListBucketInput{Path: v3ioConfig.TablePath}, 30, responseChan)
 	if res := <-responseChan; res.Error != nil {
 		t.Fatal("Failed to create TSDB")
 	}
 
-	if err := adapter.DeleteDB(true, true, 0, 0); err != nil {
+	now := time.Now().Unix() * 1000 // now time in millis
+	if err := adapter.DeleteDB(true, true, 0, now); err != nil {
 		t.Fatalf("Failed to delete DB on teardown. reason: %s", err)
 	}
 
-	container.ListBucket(&v3io.ListBucketInput{Path: v3ioConfig.Path}, 30, responseChan)
+	container.ListBucket(&v3io.ListBucketInput{Path: v3ioConfig.TablePath}, 30, responseChan)
 	if res := <-responseChan; res.Error == nil {
 		t.Fatal("Did not delete TSDB properly")
 	}

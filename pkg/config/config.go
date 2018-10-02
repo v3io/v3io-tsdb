@@ -22,33 +22,59 @@ package config
 
 import (
 	"github.com/ghodss/yaml"
+	"github.com/pkg/errors"
 	"io/ioutil"
 	"os"
+	"strings"
+	"sync"
 )
 
 const (
 	V3ioConfigEnvironmentVariable = "V3IO_CONF"
 	DefaultConfigurationFileName  = "v3io.yaml"
-	SCHEMA_CONFIG                 = ".schema"
+	SchemaConfigFileName          = ".schema"
 
 	defaultNumberOfIngestWorkers = 1
 	defaultNumberOfQueryWorkers  = 8
 	defaultBatchSize             = 64
 	defaultTimeoutInSeconds      = 24 * 60 * 60 // 24 hours
+
+	defaultMaximumSampleSize    = 8       // bytes
+	defaultMaximumPartitionSize = 1700000 // 1.7MB
+	defaultMinimumChunkSize     = 200     // bytes
+	defaultMaximumChunkSize     = 32000   // bytes
+
+	DefaultShardingBuckets        = 8
+	DefaultStorageClass           = "local"
+	DefaultIngestionRate          = ""
+	DefaultAggregates             = "" // no aggregates by default
+	DefaultAggregationGranularity = "1h"
+	DefaultLayerRetentionTime     = "1y"
+	DefaultSampleRetentionTime    = 0
 )
+
+var (
+	instance *V3ioConfig
+	once     sync.Once
+	failure  error
+)
+
+func Error() error {
+	return failure
+}
 
 type V3ioConfig struct {
 	// V3IO Connection details: Url, Data container, relative path for this dataset, credentials
-	V3ioUrl   string `json:"v3ioUrl"`
-	Container string `json:"container"`
-	Path      string `json:"path"`
-	Username  string `json:"username"`
-	Password  string `json:"password"`
+	WebApiEndpoint string `json:"webApiEndpoint"`
+	Container      string `json:"container"`
+	TablePath      string `json:"tablePath"`
+	Username       string `json:"username,omitempty"`
+	Password       string `json:"password,omitempty"`
 
 	// Disable is use in Prometheus to disable v3io and work with the internal TSDB
 	Disabled bool `json:"disabled,omitempty"`
 	// Set logging level: debug | info | warn | error (info by default)
-	Verbose string `json:"verbose,omitempty"`
+	LogLevel string `json:"logLevel,omitempty"`
 	// Number of parallel V3IO worker routines
 	Workers int `json:"workers"`
 	// Number of parallel V3IO worker routines for queries (default is min between 8 and Workers)
@@ -68,6 +94,18 @@ type V3ioConfig struct {
 	// Size of chunk in bytes for worst an best compression scenarios
 	MinimumChunkSize int `json:"minimumChunkSize,omitempty"`
 	MaximumChunkSize int `json:"maximumChunkSize,omitempty"`
+	ShardingBuckets  int `json:"shardingBuckets,omitempty"`
+	// Metrics reporter configuration
+	MetricsReporter MetricsReporterConfig `json:"performance,omitempty"`
+	// dont aggregate from raw chuncks, for use when working as Prometheus TSDB lib
+	DisableClientAggr bool `json:"disableClientAggr,omitempty"`
+}
+
+type MetricsReporterConfig struct {
+	ReportOnShutdown   bool   `json:"reportOnShutdown,omitempty"`
+	Output             string `json:"output"` // stdout, stderr, syslog, etc.
+	ReportPeriodically bool   `json:"reportPeriodically,omitempty"`
+	RepotInterval      int    `json:"reportInterval"` // interval between consequence reports (in Seconds)
 }
 
 type Rollup struct {
@@ -128,35 +166,91 @@ type MetricConfig struct {
 
 // TODO: add alerts config (name, match expr, for, lables, annotations)
 
-func LoadConfig(path string) (*V3ioConfig, error) {
+func GetOrDefaultConfig() (*V3ioConfig, error) {
+	return GetOrLoadFromFile("")
+}
 
-	envpath := os.Getenv(V3ioConfigEnvironmentVariable)
-	if envpath != "" {
-		path = envpath
+func GetOrLoadFromFile(path string) (*V3ioConfig, error) {
+	once.Do(func() {
+		instance, failure = loadConfig(path)
+		return
+	})
+
+	return instance, failure
+}
+
+func GetOrLoadFromData(data []byte) (*V3ioConfig, error) {
+	once.Do(func() {
+		instance, failure = loadFromData(data)
+		return
+	})
+
+	return instance, failure
+}
+
+// update defaults when using config struct
+func GetOrLoadFromStruct(cfg *V3ioConfig) (*V3ioConfig, error) {
+	once.Do(func() {
+		initDefaults(cfg)
+		instance = cfg
+		return
+	})
+
+	return instance, nil
+}
+
+func loadConfig(path string) (*V3ioConfig, error) {
+
+	var resolvedPath string
+
+	if strings.TrimSpace(path) != "" {
+		resolvedPath = path
+	} else {
+		envPath := os.Getenv(V3ioConfigEnvironmentVariable)
+		if envPath != "" {
+			resolvedPath = envPath
+		}
 	}
 
-	if path == "" {
-		path = DefaultConfigurationFileName
+	if resolvedPath == "" {
+		resolvedPath = DefaultConfigurationFileName
 	}
 
-	data, err := ioutil.ReadFile(path)
+	var data []byte
+	if _, err := os.Stat(resolvedPath); err != nil {
+		if os.IsNotExist(err) {
+			data = []byte{}
+		} else {
+			return nil, errors.Wrap(err, "failed to read configuration")
+		}
+	} else {
+		data, err = ioutil.ReadFile(resolvedPath)
+		if err != nil {
+			return nil, err
+		}
+
+		if len(data) == 0 {
+			return nil, errors.Errorf("file '%s' exists but its content is not valid", resolvedPath)
+		}
+	}
+
+	return loadFromData(data)
+}
+
+func loadFromData(data []byte) (*V3ioConfig, error) {
+	cfg := V3ioConfig{}
+	err := yaml.Unmarshal(data, &cfg)
+
 	if err != nil {
 		return nil, err
 	}
 
-	return LoadFromData(data)
-}
-
-func LoadFromData(data []byte) (*V3ioConfig, error) {
-	cfg := V3ioConfig{}
-	err := yaml.Unmarshal(data, &cfg)
-
-	InitDefaults(&cfg)
+	initDefaults(&cfg)
 
 	return &cfg, err
 }
 
-func InitDefaults(cfg *V3ioConfig) {
+func initDefaults(cfg *V3ioConfig) {
 	// Initialize default number of workers
 	if cfg.Workers == 0 {
 		cfg.Workers = defaultNumberOfIngestWorkers
@@ -178,5 +272,25 @@ func InitDefaults(cfg *V3ioConfig) {
 
 	if cfg.DefaultTimeoutInSeconds == 0 {
 		cfg.DefaultTimeoutInSeconds = int(defaultTimeoutInSeconds)
+	}
+
+	if cfg.MaximumChunkSize == 0 {
+		cfg.MaximumChunkSize = defaultMaximumChunkSize
+	}
+
+	if cfg.MinimumChunkSize == 0 {
+		cfg.MinimumChunkSize = defaultMinimumChunkSize
+	}
+
+	if cfg.MaximumSampleSize == 0 {
+		cfg.MaximumSampleSize = defaultMaximumSampleSize
+	}
+
+	if cfg.MaximumPartitionSize == 0 {
+		cfg.MaximumPartitionSize = defaultMaximumPartitionSize
+	}
+
+	if cfg.ShardingBuckets == 0 {
+		cfg.ShardingBuckets = DefaultShardingBuckets
 	}
 }

@@ -12,12 +12,15 @@ import (
 
 func TestQueryIntegration(t *testing.T) {
 	v3ioConfig, err := tsdbtest.LoadV3ioConfig()
+	if err != nil {
+		t.Fatalf("unable to load configuration. Error: %v", err)
+	}
 	defer tsdbtest.SetUp(t, v3ioConfig)()
-	tsdbConfig = fmt.Sprintf(`path: "%v"`, v3ioConfig.Path)
+	tsdbConfig = fmt.Sprintf(`path: "%v"`, v3ioConfig.TablePath)
 
 	url := os.Getenv("V3IO_SERVICE_URL")
 	if url == "" {
-		url = v3ioConfig.V3ioUrl
+		url = v3ioConfig.WebApiEndpoint
 	}
 
 	data := nutest.DataBind{

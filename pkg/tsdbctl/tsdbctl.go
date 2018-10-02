@@ -28,14 +28,11 @@ import (
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/cobra/doc"
+	"github.com/v3io/v3io-tsdb/internal/pkg/performance"
 	"github.com/v3io/v3io-tsdb/pkg/config"
 	"github.com/v3io/v3io-tsdb/pkg/tsdb"
 	"strings"
 )
-
-const defaultMaximumSampleSize = 8                                  // bytes
-const defaultMaximumPartitionSize = 1700000                         // 1.7MB
-const defaultMinimumChunkSize, defaultMaximumChunkSize = 200, 32000 // bytes
 
 type RootCommandeer struct {
 	adapter     *tsdb.V3ioAdapter
@@ -45,8 +42,11 @@ type RootCommandeer struct {
 	v3ioPath    string
 	dbPath      string
 	cfgFilePath string
-	verbose     string
+	logLevel    string
 	container   string
+	username    string
+	password    string
+	Reporter    *performance.MetricReporter
 }
 
 func NewRootCommandeer() *RootCommandeer {
@@ -60,12 +60,14 @@ func NewRootCommandeer() *RootCommandeer {
 
 	defaultV3ioServer := os.Getenv("V3IO_SERVICE_URL")
 
-	cmd.PersistentFlags().StringVarP(&commandeer.verbose, "verbose", "v", "", "Verbose output")
-	cmd.PersistentFlags().Lookup("verbose").NoOptDefVal = "debug"
-	cmd.PersistentFlags().StringVarP(&commandeer.dbPath, "dbpath", "p", "", "sub path for the TSDB, inside the container")
-	cmd.PersistentFlags().StringVarP(&commandeer.v3ioPath, "server", "s", defaultV3ioServer, "V3IO Service URL - username:password@ip:port/container")
-	cmd.PersistentFlags().StringVarP(&commandeer.cfgFilePath, "config", "c", "", "path to yaml config file")
-	cmd.PersistentFlags().StringVarP(&commandeer.container, "container", "u", "", "container to use")
+	cmd.PersistentFlags().StringVarP(&commandeer.logLevel, "log-level", "v", "", "Logging level")
+	cmd.PersistentFlags().Lookup("log-level").NoOptDefVal = "info"
+	cmd.PersistentFlags().StringVarP(&commandeer.dbPath, "table-path", "t", "", "sub path for the TSDB, inside the container")
+	cmd.PersistentFlags().StringVarP(&commandeer.v3ioPath, "server", "s", defaultV3ioServer, "V3IO Service URL - ip:port")
+	cmd.PersistentFlags().StringVarP(&commandeer.cfgFilePath, "config", "g", "", "path to yaml config file")
+	cmd.PersistentFlags().StringVarP(&commandeer.container, "container", "c", "", "container to use")
+	cmd.PersistentFlags().StringVarP(&commandeer.username, "username", "u", "", "user name")
+	cmd.PersistentFlags().StringVarP(&commandeer.password, "password", "p", "", "password")
 
 	// add children
 	cmd.AddCommand(
@@ -99,27 +101,55 @@ func (rc *RootCommandeer) CreateMarkdown(path string) error {
 }
 
 func (rc *RootCommandeer) initialize() error {
-	cfg, err := config.LoadConfig(rc.cfgFilePath)
+	cfg, err := config.GetOrLoadFromFile(rc.cfgFilePath)
 	if err != nil {
 		// if we couldn't load the file and its not the default
-		if rc.cfgFilePath != "" {
-			return errors.Wrap(err, "Failed to load config from file "+rc.cfgFilePath)
+		if rc.cfgFilePath == "" {
+			return errors.Wrap(err, "Failed to load configuration")
+		} else {
+			return errors.Wrap(err, fmt.Sprintf("Failed to load config from '%s'", rc.cfgFilePath))
 		}
-		cfg = &config.V3ioConfig{} // initialize struct, will try and set it from individual flags
-		config.InitDefaults(cfg)
 	}
 	return rc.populateConfig(cfg)
 }
 
 func (rc *RootCommandeer) populateConfig(cfg *config.V3ioConfig) error {
+	// Initialize performance monitoring
+	// TODO: support custom report writers (file, syslog, prometheus, etc.)
+	rc.Reporter = performance.ReporterInstanceFromConfig(cfg)
+
+	if rc.username != "" {
+		cfg.Username = rc.username
+	}
+
+	if rc.password != "" {
+		cfg.Password = rc.password
+	}
+
 	if rc.v3ioPath != "" {
 		// read username and password
 		if i := strings.LastIndex(rc.v3ioPath, "@"); i > 0 {
-			cfg.Username = rc.v3ioPath[0:i]
+			usernameAndPassword := rc.v3ioPath[0:i]
 			rc.v3ioPath = rc.v3ioPath[i+1:]
-			if userpass := strings.Split(cfg.Username, ":"); len(userpass) > 1 {
-				cfg.Username = userpass[0]
-				cfg.Password = userpass[1]
+			if userpass := strings.Split(usernameAndPassword, ":"); len(userpass) > 1 {
+				fmt.Printf("Debug: up0=%s up1=%s u=%s p=%s\n", userpass[0], userpass[1], rc.username, rc.password)
+				if userpass[0] != "" && rc.username != "" {
+					return fmt.Errorf("username should only be defined once")
+				} else {
+					cfg.Username = userpass[0]
+				}
+
+				if userpass[1] != "" && rc.password != "" {
+					return fmt.Errorf("password should only be defined once")
+				} else {
+					cfg.Password = userpass[1]
+				}
+			} else {
+				if usernameAndPassword != "" && rc.username != "" {
+					return fmt.Errorf("username should only be defined once")
+				} else {
+					cfg.Username = usernameAndPassword
+				}
 			}
 		}
 
@@ -127,12 +157,12 @@ func (rc *RootCommandeer) populateConfig(cfg *config.V3ioConfig) error {
 		if slash == -1 || len(rc.v3ioPath) <= slash+1 {
 			if rc.container != "" {
 				cfg.Container = rc.container
-				cfg.V3ioUrl = rc.v3ioPath
-			} else {
+			} else if cfg.Container == "" {
 				return fmt.Errorf("missing container name in V3IO URL")
 			}
+			cfg.WebApiEndpoint = rc.v3ioPath
 		} else {
-			cfg.V3ioUrl = rc.v3ioPath[0:slash]
+			cfg.WebApiEndpoint = rc.v3ioPath[0:slash]
 			cfg.Container = rc.v3ioPath[slash+1:]
 		}
 	}
@@ -140,26 +170,15 @@ func (rc *RootCommandeer) populateConfig(cfg *config.V3ioConfig) error {
 		cfg.Container = rc.container
 	}
 	if rc.dbPath != "" {
-		cfg.Path = rc.dbPath
+		cfg.TablePath = rc.dbPath
 	}
-	if cfg.V3ioUrl == "" || cfg.Container == "" || cfg.Path == "" {
+	if cfg.WebApiEndpoint == "" || cfg.Container == "" || cfg.TablePath == "" {
 		return fmt.Errorf("user must provide V3IO URL, container name, and table path via the config file or flags")
 	}
-	if rc.verbose != "" {
-		cfg.Verbose = rc.verbose
+	if rc.logLevel != "" {
+		cfg.LogLevel = rc.logLevel
 	}
-	if cfg.MaximumChunkSize == 0 {
-		cfg.MaximumChunkSize = defaultMaximumChunkSize
-	}
-	if cfg.MinimumChunkSize == 0 {
-		cfg.MinimumChunkSize = defaultMinimumChunkSize
-	}
-	if cfg.MaximumSampleSize == 0 {
-		cfg.MaximumSampleSize = defaultMaximumSampleSize
-	}
-	if cfg.MaximumPartitionSize == 0 {
-		cfg.MaximumPartitionSize = defaultMaximumPartitionSize
-	}
+
 	rc.v3iocfg = cfg
 	return nil
 }
@@ -172,7 +191,5 @@ func (rc *RootCommandeer) startAdapter() error {
 	}
 
 	rc.logger = rc.adapter.GetLogger("cli")
-
 	return nil
-
 }

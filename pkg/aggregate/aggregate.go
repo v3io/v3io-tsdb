@@ -72,6 +72,10 @@ var aggrToSchemaField = map[string]config.SchemaField{
 	"stdvar": {Name: "stdvar", Type: "array", Nullable: true, Items: "double"},
 }
 
+func (a AggrType) HasAverage() bool {
+	return (a & aggrTypeAvg) == aggrTypeAvg
+}
+
 func SchemaFieldFromString(aggregators []string, col string) ([]config.SchemaField, error) {
 	fieldList := make([]config.SchemaField, 0, len(aggregators))
 	for _, s := range aggregators {
@@ -122,6 +126,7 @@ func AggregatorsToStringList(aggregators string) ([]string, error) {
 // convert comma separated string to aggregator mask
 func AggrsFromString(split []string) (AggrType, error) {
 	var aggrList AggrType
+	var hasAggregators bool
 	for _, s := range split {
 		trimmed := strings.TrimSpace(s)
 		if trimmed != "" {
@@ -129,8 +134,13 @@ func AggrsFromString(split []string) (AggrType, error) {
 			if !ok {
 				return aggrList, fmt.Errorf("invalid aggragator type '%s'", s)
 			}
+			hasAggregators = true
 			aggrList = aggrList | aggr
 		}
+	}
+	// Always have count aggregator by default
+	if hasAggregators {
+		aggrList = aggrList | aggrTypeCount
 	}
 	return aggrList, nil
 }

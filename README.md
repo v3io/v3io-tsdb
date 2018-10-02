@@ -81,17 +81,17 @@ A user can run the CLI to add (append) or query the DB, to use the CLI, build th
 it has built-in help, see the following add/query examples:
 
 ```
-	# create a DB with some aggregates (at 30 min interval) 
-	tsdbctl create -p <path> -r count,sum,max -i 30
+	# create a DB with expected ingestion rate of one sample per second and some aggregates (at 30 min interval) 
+	tsdbctl create -t <table> --ingestion-rate 1/s -a count,sum,max -i 30m
 
 	# display DB info with metric names (types) 
-	tsdbctl info -n
+	tsdbctl info -t <table> -n
 	
 	# append a sample (73.2) to the specified metric type (cpu) + labels at the current time
-	tsdbctl add cpu os=win,node=xyz123 -d 73.2
+	tsdbctl add -t <table> cpu os=win,node=xyz123 -d 73.2
 	
 	# display all the CPU metrics for win servers from the last hours, in CSV format 
-	tsdbctl query cpu -f "os=='win'" -l 1h -o csv
+	tsdbctl query -t <table> cpu -f "os=='win'" -l 1h -o csv
 	
 ```
 
@@ -106,17 +106,21 @@ such as partitioning strategy, retention, aggregators, etc. this can be done via
 
 ```go
 	// Load v3io connection/path details (see YAML below)
-	v3iocfg, _ := cfg, err = config.LoadConfig("v3io.yaml")
-
-	// Specify the default DB configuration (can be modified per partition)
-	dbcfg := config.DBPartConfig{
-		DaysPerObj:     1,
-		HrInChunk:      1,
-		DefaultRollups: "count,avg,sum,stddev",
-		RollupMin:      30,
+	v3iocfg, err := config.GetOrLoadFromFile("v3io.yaml")
+	if err != nil {
+		// TODO: handle error
 	}
 
-	return tsdb.CreateTSDB(v3iocfg, &dbcfg)
+	// Specify the default DB configuration (can be modified per partition)
+	sampleRate = "1/s"
+	aggregatorGranularity = "1h"
+	aggregatesList = "scount,avg,min,max"
+	schema, err := schema.NewSchema(v3iocfg, sampleRate, aggregatorGranularity, aggregatesList)
+	if err != nil {
+		// TODO: handle error
+	}
+	
+	return tsdb.CreateTSDB(v3iocfg, schema)
 ```
 
 > If you plan on using pre-aggregation to speed aggregate queries you should specify the `Rollups` (function list) and 
@@ -127,14 +131,14 @@ In order to use the TSDB we need to create an adapter, the `NewV3ioAdapter` func
 parameters: the configuration structure, v3io data container object and logger object. The last 2 are optional, in case
 you already have container and logger (when using nuclio data bindings).
 
-Configuration is specified in a YAML or JSON format, and can be read from a file using `config.LoadConfig(path string)` 
-or can be loaded from a local buffer using `config.LoadFromData(data []byte)`. You can see details on the configuration
+Configuration is specified in a YAML or JSON format, and can be read from a file using `config.GetOrLoadFromFile(path string)` 
+or can be loaded from a local buffer using `config.GetOrLoadFromData(data []byte)`. You can see details on the configuration
 options in [config](internal/pkg/config/config.go), a minimal configuration looks like: 
 
 ```yaml
 v3ioUrl: "v3io address:port"
 container: "tsdb"
-path: "metrics"
+path: performance
 username: "<username>"
 password: "<password>"
 ```
@@ -143,15 +147,15 @@ example of creating an adapter:
 
 ```go
 	// create configuration object from file
-	cfg, err := config.LoadConfig("v3io.yaml")
+	cfg, err := config.GetOrLoadFromFile("v3io.yaml")
 	if err != nil {
-		panic(err)
+		// TODO: handle error
 	}
 
 	// create and start a new TSDB adapter 
 	adapter, err := tsdb.NewV3ioAdapter(cfg, nil, nil)
 	if err != nil {
-		panic(err)
+		// TODO: handle error
 	}
 ```
 

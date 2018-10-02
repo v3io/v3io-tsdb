@@ -54,21 +54,24 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 package chunkenc
 
 import (
+	"github.com/nuclio/logger"
 	"math"
 	"math/bits"
 )
 
 // XORChunk holds XOR encoded sample data.
 type XORChunk struct {
+	logger logger.Logger
+
 	b       *bstream
 	samples uint16
 	offset  int
 }
 
 // NewXORChunk returns a new chunk with XOR encoding of the given size.
-func NewXORChunk() Chunk {
+func NewXORChunk(logger logger.Logger) Chunk {
 	//b := make([]byte, 32, 32)
-	return &XORChunk{b: newBWriter(256)}
+	return &XORChunk{logger: logger, b: newBWriter(256)}
 }
 
 // Encoding returns the encoding type.
@@ -90,7 +93,7 @@ func (c *XORChunk) Clear() {
 // Appender implements the Chunk interface.
 // new implementation, doesnt read the existing buffer, assume its new
 func (c *XORChunk) Appender() (Appender, error) {
-	a := &xorAppender{c: c, b: c.b, samples: &c.samples}
+	a := &xorAppender{logger: c.logger, c: c, b: c.b, samples: &c.samples}
 	if c.samples == 0 {
 		a.leading = 0xff
 	}
@@ -143,6 +146,8 @@ func (c *XORChunk) Iterator() Iterator {
 }
 
 type xorAppender struct {
+	logger logger.Logger
+
 	c       *XORChunk
 	b       *bstream
 	samples *uint16
@@ -162,6 +167,12 @@ func (a *xorAppender) Chunk() Chunk {
 func (a *xorAppender) Append(t int64, v float64) {
 	var tDelta uint64
 	num := *a.samples
+
+	// Do not append if sample is too old.
+	if t < a.t {
+		a.logger.Info("Discarding sample from %d, as it is older than the latest sample (%d).", t, a.t)
+		return
+	}
 
 	if num == 0 {
 		// add a signature 11111 to indicate start of cseries in case we put few in the same chunk (append to existing)
