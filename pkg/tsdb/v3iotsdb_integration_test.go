@@ -478,7 +478,7 @@ func TestCreateTSDB(t *testing.T) {
 
 	testCases := []struct {
 		desc         string
-		conf         config.Schema
+		conf         *config.Schema
 		ignoreReason string
 	}{
 		{desc: "Should create TSDB with standard configuration", conf: testutils.CreateSchema(t, "sum,count")},
@@ -494,18 +494,17 @@ func TestCreateTSDB(t *testing.T) {
 			testCreateTSDBcase(t, v3ioConfig, test.conf)
 		})
 	}
-
 }
 
-func testCreateTSDBcase(t *testing.T, v3ioConfig *config.V3ioConfig, dbConfig config.Schema) {
-	defer tsdbtest.SetUpWithDBConfig(t, v3ioConfig, &dbConfig)()
+func testCreateTSDBcase(t *testing.T, v3ioConfig *config.V3ioConfig, dbConfig *config.Schema) {
+	defer tsdbtest.SetUpWithDBConfig(t, v3ioConfig, dbConfig)()
 
 	adapter, err := NewV3ioAdapter(v3ioConfig, nil, nil)
 	if err != nil {
 		t.Fatalf("Failed to create adapter. reason: %s", err)
 	}
 
-	actualDbConfig := *adapter.GetSchema()
+	actualDbConfig := adapter.GetSchema()
 	assert.Equal(t, actualDbConfig, dbConfig)
 }
 
@@ -517,7 +516,7 @@ func TestDeleteTSDB(t *testing.T) {
 
 	schema := testutils.CreateSchema(t, "count,sum")
 	v3ioConfig.TablePath = t.Name()
-	if err := CreateTSDB(v3ioConfig, &schema); err != nil {
+	if err := CreateTSDB(v3ioConfig, schema); err != nil {
 		v3ioConfigAsJson, _ := json.MarshalIndent(v3ioConfig, "", "  ")
 		t.Fatalf("Failed to create TSDB. Reason: %s\nConfiguration:\n%s", err, string(v3ioConfigAsJson))
 	}
