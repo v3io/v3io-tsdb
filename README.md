@@ -112,10 +112,10 @@ such as partitioning strategy, retention, aggregators, etc. this can be done via
 	}
 
 	// Specify the default DB configuration (can be modified per partition)
-	sampleRate = "1/s"
+	samplesIngestionRate = "1/s"
 	aggregatorGranularity = "1h"
 	aggregatesList = "scount,avg,min,max"
-	schema, err := schema.NewSchema(v3iocfg, sampleRate, aggregatorGranularity, aggregatesList)
+	schema, err := schema.NewSchema(v3iocfg, samplesIngestionRate, aggregatorGranularity, aggregatesList)
 	if err != nil {
 		// TODO: handle error
 	}
