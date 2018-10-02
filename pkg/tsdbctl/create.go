@@ -44,15 +44,15 @@ const (
 )
 
 type createCommandeer struct {
-	cmd             *cobra.Command
-	rootCommandeer  *RootCommandeer
-	path            string
-	storageClass    string
-	defaultRollups  string
-	rollupInterval  string
-	shardingBuckets int
-	sampleRetention int
-	sampleRate      string
+	cmd                     *cobra.Command
+	rootCommandeer          *RootCommandeer
+	path                    string
+	storageClass            string
+	defaultRollups          string
+	rollupInterval          string
+	shardingBuckets         int
+	sampleRetention         int
+	samplesIngestionRate    string
 }
 
 func newCreateCommandeer(rootCommandeer *RootCommandeer) *createCommandeer {
@@ -84,7 +84,7 @@ func newCreateCommandeer(rootCommandeer *RootCommandeer) *createCommandeer {
 	// TODO: enable sample-retention when supported:
 	// cmd.Flags().IntVarP(&commandeer.sampleRetention, "sample-retention", "r", defaultSampleRetentionHours,
 	//	"Metric-samples retention period, in hours. Example: 1 (retain samples for 1 hour).")
-	cmd.Flags().StringVarP(&commandeer.sampleRate, "rate", "r", defaultIngestionRate,
+	cmd.Flags().StringVarP(&commandeer.samplesIngestionRate, "rate", "r", defaultIngestionRate,
 		"[Required] Metric-samples ingestion rate - the maximum\ningestion rate for a single metric (calculated\naccording to the slowest expecetd ingestion rate) -\nof the format \"[0-9]+/[mhd]\" (where 'm' = minutes,\n'h' = hours, and 'd' = days). Examples: \"12/m\" (12\nsamples per minute); \"1s\" (one sample per second).")
 
 	commandeer.cmd = cmd
@@ -108,17 +108,17 @@ func (cc *createCommandeer) create() error {
 		return errors.Wrap(err, "Failed to parse the default-aggregates list.")
 	}
 
-	if cc.sampleRate == "" {
-		return errors.New(`Sample rate not provided. Use the --rate flag to provide a sample rate in the format of "[0-9]+/[mhd]". For example, "12/m".`)
+	if cc.samplesIngestionRate == "" {
+		return errors.New(`Use the --rate flag to provide a metric-samples ingestion rate in the format of "[0-9]+/[mhd]". For example, "12/m".`)
 	}
-	rateInHours, err := rateToHours(cc.sampleRate)
+	rateInHours, err := rateToHours(cc.samplesIngestionRate)
 	if err != nil {
-		return errors.Wrap(err, "failed to parse sample rate")
+		return errors.Wrap(err, "Failed to parse the samples ingestion rate.")
 	}
 
 	chunkInterval, partitionInterval, err := cc.calculatePartitionAndChunkInterval(rateInHours)
 	if err != nil {
-		return errors.Wrap(err, "failed to calculate chunk interval")
+		return errors.Wrap(err, "Failed to calculate the chunk interval.")
 	}
 
 	defaultRollup := config.Rollup{
@@ -186,13 +186,13 @@ func (cc *createCommandeer) calculatePartitionAndChunkInterval(rateInHours int) 
 
 	chunkInterval := maxNumberOfEventsPerChunk / rateInHours
 	if chunkInterval == 0 {
-		return "", "", errors.New("sample rate is too high")
+		return "", "", fmt.Errorf("The samples ingestion rate (%v/h) is too high.", rateInHours)
 	}
 
 	// Make sure the expected chunk size is greater then the supported minimum.
 	if chunkInterval < minNumberOfEventsPerChunk/rateInHours {
 		return "", "", fmt.Errorf(
-			"calculated chunk size is less than minimum, rate - %v/h, calculated chunk interval - %v, minimum size - %v",
+            "The calculated chunk size is smaller than the minimum: samples ingestion rate = %v/h, calculated chunk interval = %v, minimum size = %v",
 			rateInHours, chunkInterval, cc.rootCommandeer.v3iocfg.MinimumChunkSize)
 	}
 
@@ -203,32 +203,32 @@ func (cc *createCommandeer) calculatePartitionAndChunkInterval(rateInHours int) 
 		numberOfChunksInPartition += 24
 	}
 	if numberOfChunksInPartition == 0 {
-		return "", "", errors.Errorf("given rate is too high, can not fit a partition in a day interval with the calculated chunk size %vh", chunkInterval)
+		return "", "", errors.Errorf("The samples ingestion rate (%v/h) is too high - cannot fit a partition in a day interval with the calculated chunk size (%v).", rateInHours, chunkInterval)
 	}
 
 	partitionInterval := numberOfChunksInPartition * chunkInterval
 	return strconv.Itoa(chunkInterval) + "h", strconv.Itoa(partitionInterval) + "h", nil
 }
 
-func rateToHours(sampleRate string) (int, error) {
-	parsingError := errors.New(`Invalid rate. The sample rate must be of the format "[0-9]+/[mhd]". For example, "12/m".`)
+func rateToHours(samplesIngestionRate string) (int, error) {
+	parsingError := errors.New(`Invalid samples ingestion rate. The rate must be of the format "[0-9]+/[mhd]". For example, "12/m".`)
 
-	if len(sampleRate) < 3 {
+	if len(samplesIngestionRate) < 3 {
 		return 0, parsingError
 	}
-	if sampleRate[len(sampleRate)-2] != '/' {
+	if samplesIngestionRate[len(samplesIngestionRate)-2] != '/' {
 		return 0, parsingError
 	}
 
-	last := sampleRate[len(sampleRate)-1]
-	// get the number ignoring slash and time unit
-	sampleRate = sampleRate[:len(sampleRate)-2]
-	i, err := strconv.Atoi(sampleRate)
+	last := samplesIngestionRate[len(samplesIngestionRate)-1]
+	// Get the ingestion-rate samples number, ignoring the slash and time unit
+	samplesIngestionRate = samplesIngestionRate[:len(samplesIngestionRate)-2]
+	i, err := strconv.Atoi(samplesIngestionRate)
 	if err != nil {
 		return 0, errors.Wrap(err, parsingError.Error())
 	}
 	if i <= 0 {
-		return 0, errors.New("rate should be a positive number")
+        return 0, fmt.Errorf("Invalid samples ingestion rate (%s). The rate cannot have a negative number of samples.", samplesIngestionRate)
 	}
 	switch last {
 	case 's':
