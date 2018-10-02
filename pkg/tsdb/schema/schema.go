@@ -57,11 +57,11 @@ func newSchema(samplesIngestionRate, aggregationGranularity, aggregatesList stri
 	}
 
 	tableSchema := config.TableSchema{
-		Version:             Version,
-		RollupLayers:        []config.Rollup{defaultRollup},
-		ShardingBucketsCount:     shardingBucketsCount,
-		PartitionerInterval: partitionInterval,
-		ChunckerInterval:    chunkInterval,
+		Version:              Version,
+		RollupLayers:         []config.Rollup{defaultRollup},
+		ShardingBucketsCount: shardingBucketsCount,
+		PartitionerInterval:  partitionInterval,
+		ChunckerInterval:     chunkInterval,
 	}
 
 	if len(aggregates) == 0 {

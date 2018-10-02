@@ -205,7 +205,7 @@ func ValidateRawData(t testing.TB, adapter *V3ioAdapter, metricName string, star
 			currentDataPoint := &DataPoint{Time: currentTime, Value: currentValue}
 
 			if lastDataPoint.Value >= 0 {
-                // Note: We cast float to integer to eliminate the risk of a
+				// Note: We cast float to integer to eliminate the risk of a
 				// precision error
 				if !isValid(lastDataPoint, currentDataPoint) {
 					t.Fatalf("The raw-data consistency check failed: metric name='%s'\n\tisValid(%v, %v) == false",

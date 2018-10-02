@@ -35,7 +35,7 @@ type createCommandeer struct {
 	storageClass           string
 	defaultRollups         string
 	aggregationGranularity string
-	shardingBucketsCount        int
+	shardingBucketsCount   int
 	sampleRetention        int
 	samplesIngestionRate   string
 }
