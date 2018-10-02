@@ -115,7 +115,7 @@ func (s *V3ioSeriesSet) Next() bool {
 			start := s.partition.Time2Bucket(s.mint)
 			end := s.partition.Time2Bucket(s.maxt+s.interval) + 1
 
-            // Calculate the length of the returned array: time-range/interval + 2
+			// Calculate the length of the returned array: time-range/interval + 2
 			length := int((maxtUpdate-s.mint)/s.interval) + 2
 
 			if s.overlapWin != nil {
@@ -142,7 +142,7 @@ func (s *V3ioSeriesSet) Next() bool {
 			// Create a series from raw chunks
 			s.currSeries = NewSeries(s)
 
-            // Calculate the number of cells: (maxt-mint)/interval + 1
+			// Calculate the number of cells: (maxt-mint)/interval + 1
 			numCells := (s.maxt-s.mint)/s.interval + 1
 
 			s.aggrSet = s.aggrSeries.NewSetFromChunks(int(numCells))

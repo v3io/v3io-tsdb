@@ -25,9 +25,9 @@ import (
 	"fmt"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
+	"github.com/v3io/v3io-tsdb/pkg/config"
 	"github.com/v3io/v3io-tsdb/pkg/tsdb"
 	"github.com/v3io/v3io-tsdb/pkg/utils"
-	"github.com/v3io/v3io-tsdb/pkg/config"
 	"io"
 	"os"
 	"sort"
@@ -220,7 +220,6 @@ func (ac *addCommandeer) appendMetrics(append tsdb.Appender, lset utils.Labels) 
 
 		if len(line) < 3 || len(line) > 4 {
 			return fmt.Errorf("Line %d of the CSV input file (%v) doesn't conform to the CSV-record requirements of 3-4 columns in each row - metric name,labels,value,[time]", num, line)
-			// 
 		}
 
 		if lset, err = strToLabels(line[0], line[1]); err != nil {

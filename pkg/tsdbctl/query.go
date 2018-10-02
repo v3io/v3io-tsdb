@@ -23,10 +23,10 @@ package tsdbctl
 import (
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
+	"github.com/v3io/v3io-tsdb/pkg/config"
 	"github.com/v3io/v3io-tsdb/pkg/formatter"
 	"github.com/v3io/v3io-tsdb/pkg/querier"
 	"github.com/v3io/v3io-tsdb/pkg/utils"
-	"github.com/v3io/v3io-tsdb/pkg/config"
 	"strconv"
 	"strings"
 	"time"
@@ -189,7 +189,7 @@ func (qc *queryCommandeer) query() error {
 
 	f, err := formatter.NewFormatter(qc.output, nil)
 	if err != nil {
-		return errors.Wrap(err, "Failed to start formatter '" + qc.output + "'.")
+		return errors.Wrap(err, "Failed to start formatter '"+qc.output+"'.")
 	}
 
 	err = f.Write(qc.cmd.OutOrStdout(), set)

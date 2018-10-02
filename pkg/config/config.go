@@ -95,13 +95,13 @@ type V3ioConfig struct {
 
 type MetricsReporterConfig struct {
 	// Report on shutdown (Boolean)
-	ReportOnShutdown   bool   `json:"reportOnShutdown,omitempty"`
+	ReportOnShutdown bool `json:"reportOnShutdown,omitempty"`
 	// Output destination - "stdout", "stderr", "syslog", etc.
-	Output             string `json:"output"`
+	Output string `json:"output"`
 	// Report periodically (Boolean)
-	ReportPeriodically bool   `json:"reportPeriodically,omitempty"`
+	ReportPeriodically bool `json:"reportPeriodically,omitempty"`
 	// Interval between consequence reports (in seconds)
-	RepotInterval      int    `json:"reportInterval"`
+	RepotInterval int `json:"reportInterval"`
 }
 
 type Rollup struct {

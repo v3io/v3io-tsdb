@@ -174,7 +174,7 @@ func (q *V3ioQuerier) queryNumericPartition(
 		functions = "avg"
 	}
 
-    // Check whether there are aggregations to add and aggregates aren't disabled
+	// Check whether there are aggregations to add and aggregates aren't disabled
 	if functions != "" && !q.disableAllAggr {
 
 		// If step isn't passed (e.g., when using the console), the step is the

@@ -26,8 +26,8 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/v3io/v3io-go-http"
 	"github.com/v3io/v3io-tsdb/pkg/chunkenc"
-	"github.com/v3io/v3io-tsdb/pkg/utils"
 	"github.com/v3io/v3io-tsdb/pkg/config"
+	"github.com/v3io/v3io-tsdb/pkg/utils"
 	"time"
 )
 
@@ -44,17 +44,17 @@ func newCheckCommandeer(rootCommandeer *RootCommandeer) *checkCommandeer {
 	}
 
 	cmd := &cobra.Command{
-		Use:     "check <item-path>",
-		Hidden:  true,
-		Short:   "Get information about a TSDB metric item",
-		Long:    `Get information about a TSDB metric item.`,
+		Use:    "check <item-path>",
+		Hidden: true,
+		Short:  "Get information about a TSDB metric item",
+		Long:   `Get information about a TSDB metric item.`,
 		Example: `The examples assume that the endpoint of the web-gateway service, the login credentails, and
 the name of the data container are configured in the default configuration file (` + config.DefaultConfigurationFileName + `)
 - tsdbctl -t mytsdb 1537920000/cpu
 
 Arguments:
 - <item-path> (string) [Required] Path to a metric item within the TSDB table.`,
-			// TODO: Add an example with -a.
+		// TODO: Add an example with -a.
 		RunE: func(cmd *cobra.Command, args []string) error {
 
 			if len(args) == 0 {

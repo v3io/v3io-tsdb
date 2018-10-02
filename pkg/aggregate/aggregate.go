@@ -132,7 +132,7 @@ func AggrsFromString(split []string) (AggrType, error) {
 		if trimmed != "" {
 			aggr, ok := aggrTypeString[trimmed]
 			if !ok {
-                return aggrList, fmt.Errorf("Invalid aggragate type: '%s'", s)
+				return aggrList, fmt.Errorf("Invalid aggragate type: '%s'", s)
 			}
 			hasAggregators = true
 			aggrList = aggrList | aggr

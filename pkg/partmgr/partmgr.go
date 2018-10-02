@@ -234,13 +234,13 @@ func (p *PartitionManager) ReadAndUpdateSchema() (err error) {
 		fullPath := path.Join(p.Path(), config.SchemaConfigFileName)
 		resp, err := p.container.Sync.GetObject(&v3io.GetObjectInput{Path: fullPath})
 		if err != nil {
-			err = errors.Wrap(err, "Failed to read schema at path '" + fullPath + "'.")
+			err = errors.Wrap(err, "Failed to read schema at path '"+fullPath+"'.")
 		}
 
 		schema := &config.Schema{}
 		err = json.Unmarshal(resp.Body(), schema)
 		if err != nil {
-			err = errors.Wrap(err, "Failed to unmarshal schema at path '" + fullPath + "'.")
+			err = errors.Wrap(err, "Failed to unmarshal schema at path '"+fullPath+"'.")
 		}
 		p.schemaConfig = schema
 		p.updatePartitionsFromSchema(schema)

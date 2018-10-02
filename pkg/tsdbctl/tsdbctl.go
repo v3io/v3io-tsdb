@@ -70,14 +70,14 @@ func NewRootCommandeer() *RootCommandeer {
 	cmd.PersistentFlags().Lookup("verbose").NoOptDefVal = defaultVerbosityLevel
 	cmd.PersistentFlags().StringVarP(&commandeer.dbPath, "table-path", "t", "",
 		"[Required] Path to the TSDB table within the configured\ndata container. Examples: \"mytsdb\"; \"/my_tsdbs/tsdbd1\".")
-		// We don't enforce this flag (cmd.MarkFlagRequired("table-path")),
-		// although it's documented as Required, because this flag isn't
-		// required for the hidden `time` command + during internal tests we
-		// might want to configure the table path in a configuration file.
+	// We don't enforce this flag (cmd.MarkFlagRequired("table-path")),
+	// although it's documented as Required, because this flag isn't required
+	// for the hidden `time` command + during internal tests we might want to
+	// configure the table path in a configuration file.
 	cmd.PersistentFlags().StringVarP(&commandeer.v3ioPath, "server", "s", defaultV3ioServer,
 		"Web-gateway (web-APIs) service endpoint of an instance of\nthe Iguazio Continuous Data Platfrom, of the format\n\"<IP address>:<port number=8081>\". Examples: \"localhost:8081\"\n(when running on the target platform); \"192.168.1.100:8081\".")
 	cmd.PersistentFlags().StringVarP(&commandeer.cfgFilePath, "config", "g", "",
-		"Path to a YAML TSDB configuration file. When this flag isn't\nset, the CLI checks for a " + config.DefaultConfigurationFileName + " configuration file in the\ncurrent directory. CLI flags override file confiugrations.\nExample: \"~/cfg/my_v3io_tsdb_cfg.yaml\".")
+		"Path to a YAML TSDB configuration file. When this flag isn't\nset, the CLI checks for a "+config.DefaultConfigurationFileName+" configuration file in the\ncurrent directory. CLI flags override file confiugrations.\nExample: \"~/cfg/my_v3io_tsdb_cfg.yaml\".")
 	cmd.PersistentFlags().StringVarP(&commandeer.container, "container", "c", "",
 		"The name of an Iguazio Continous Data Platform data container\nin which to create the TSDB table. Example: \"bigdata\".")
 	cmd.PersistentFlags().StringVarP(&commandeer.username, "username", "u", "",
