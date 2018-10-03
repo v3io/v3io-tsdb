@@ -35,7 +35,7 @@ func newSchema(samplesIngestionRate, aggregationGranularity, aggregatesList stri
 	}
 
 	if err := validateAggregatesGranularity(aggregationGranularity); err != nil {
-		return nil, errors.Wrapf(err, "Failed to parse aggregation granularity '%v'.", aggregationGranularity)
+		return nil, errors.Wrapf(err, "Failed to parse aggregation granularity '%s'.", aggregationGranularity)
 	}
 
 	chunkInterval, partitionInterval, err := calculatePartitionAndChunkInterval(rateInHours, minChunkSize, maxChunkSize, maxSampleSize, maxPartitionSize)
