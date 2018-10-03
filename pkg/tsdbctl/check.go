@@ -50,11 +50,11 @@ func newCheckCommandeer(rootCommandeer *RootCommandeer) *checkCommandeer {
 		Long:   `Get information about a TSDB metric item.`,
 		Example: `The examples assume that the endpoint of the web-gateway service, the login credentails, and
 the name of the data container are configured in the default configuration file (` + config.DefaultConfigurationFileName + `)
-- tsdbctl 1537920000/cpu -t mytsdb
+- tsdbctl check 1537920000/cpu_2.40480e29c7d6f962 -t mytsdb
+- tsdbctl check 1538265600/memo_1.c6b54e7ce82c2c11 -t my_tsdb -a _v12
 
 Arguments:
 - <item-path> (string) [Required] Path to a metric item within the TSDB table.`,
-		// TODO: Add an example with -a.
 		RunE: func(cmd *cobra.Command, args []string) error {
 
 			if len(args) == 0 {
@@ -69,7 +69,7 @@ Arguments:
 	}
 
 	cmd.Flags().StringSliceVarP(&commandeer.attrs, "attrs", "a", []string{},
-		"An array of metric-item attribute-name strings.")
+		"An array of metric-item blob attribute names, as a comma-separated list.\nFor example: \"_v35\"; \"_v22,_v23\".")
 
 	commandeer.cmd = cmd
 
