@@ -63,10 +63,10 @@ func newAddCommandeer(rootCommandeer *RootCommandeer) *addCommandeer {
 		Example: `The examples assume that the endpoint of the web-gateway service, the login credentails, and
 the name of the data container are configured in the default configuration file (` + config.DefaultConfigurationFileName + `)
 instead of using the -s|--server, -u|--username, -p|--password, and -c|--container flags.
-- tsdbctl -t mytsdb add temperature -d 28 -m now-2h
-- tsdbctl -t mytsdb add http_req method=get -d 99.9
-- tsdbctl -t metrics-table add cpu "host=A,os=win" -d "73.2,45.1" -m "1533026403000,now-1d"
-- tsdbctl -t perfstats add -f ~/tsdb/tsdb_input.csv
+- tsdbctl add temperature -t mytsdb -d 28 -m now-2h
+- tsdbctl add http_req method=get -t mytsdb -d 99.9
+- tsdbctl add cpu "host=A,os=win" -t metrics-table -d "73.2,45.1" -m "1533026403000,now-1d"
+- tsdbctl add -t perfstats -f ~/tsdb/tsdb_input.csv
 
 Notes:
 The command requires a metric name and one or more sample values. You can provide this

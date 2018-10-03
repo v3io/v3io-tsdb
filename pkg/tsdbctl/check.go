@@ -50,7 +50,7 @@ func newCheckCommandeer(rootCommandeer *RootCommandeer) *checkCommandeer {
 		Long:   `Get information about a TSDB metric item.`,
 		Example: `The examples assume that the endpoint of the web-gateway service, the login credentails, and
 the name of the data container are configured in the default configuration file (` + config.DefaultConfigurationFileName + `)
-- tsdbctl -t mytsdb 1537920000/cpu
+- tsdbctl 1537920000/cpu -t mytsdb
 
 Arguments:
 - <item-path> (string) [Required] Path to a metric item within the TSDB table.`,
