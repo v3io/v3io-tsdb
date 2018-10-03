@@ -14,13 +14,10 @@ webApiEndpoint: "<IP address/host name>:8081"
 # Example: "bigdata"
 container: "<container name>"
 
-# Logging verbosity level
-# Valid values: "debug" | "info" | "warn" | "error"
-# Default value: "debug"
-verbose: "warn"
+# Logging level
+# Valid values: "debug" | "info" | "warn" (default) | "error"
+logLevel: "<log level>"
 
 # Authentication credentials for the web-API service
-# Username
 username: "<username>"
-# Password
 password: "<password>"
