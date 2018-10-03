@@ -30,9 +30,9 @@ import (
 	"time"
 )
 
-func NewLogger(verbose string) (logger.Logger, error) {
+func NewLogger(level string) (logger.Logger, error) {
 	var logLevel nucliozap.Level
-	switch verbose {
+	switch level {
 	case "debug":
 		logLevel = nucliozap.DebugLevel
 	case "info":

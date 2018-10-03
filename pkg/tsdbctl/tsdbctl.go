@@ -42,7 +42,7 @@ type RootCommandeer struct {
 	v3ioPath    string
 	dbPath      string
 	cfgFilePath string
-	verbose     string
+	logLevel    string
 	container   string
 	username    string
 	password    string
@@ -60,9 +60,9 @@ func NewRootCommandeer() *RootCommandeer {
 
 	defaultV3ioServer := os.Getenv("V3IO_SERVICE_URL")
 
-	cmd.PersistentFlags().StringVarP(&commandeer.verbose,
-		"verbose", "v", "", "Verbose output")
-	cmd.PersistentFlags().Lookup("verbose").NoOptDefVal = config.DefaultLoggingLevel
+	cmd.PersistentFlags().StringVarP(&commandeer.logLevel, "log-level", "v", "",
+    "Verbose output. You can provide one of the following logging levels\nas an argument for this flag by using the assignment operator ('='):\n\"debug\" | \"info\" | \"warn\" | \"error\". For example: -v=info. The default\nlog level when using this flag without an argument is \"" + config.DefaultLoggingLevel + "\".")
+	cmd.PersistentFlags().Lookup("log-level").NoOptDefVal = config.DefaultLoggingLevel
 	cmd.PersistentFlags().StringVarP(&commandeer.dbPath, "table-path", "t", "",
 		"[Required] Path to the TSDB table within the configured\ndata container. Examples: \"mytsdb\"; \"/my_tsdbs/tsdbd1\".")
 	// We don't enforce this flag (cmd.MarkFlagRequired("table-path")),
@@ -189,8 +189,8 @@ func (rc *RootCommandeer) populateConfig(cfg *config.V3ioConfig) error {
 	if cfg.WebApiEndpoint == "" || cfg.Container == "" || cfg.TablePath == "" {
 		return fmt.Errorf("Not all required configuration information was provided. The endpoint of the web-gateway service, related username and password authentication credentials, the name of the TSDB parent data container, and the path to the TSDB table within the container, must be defined as part of the CLI command or in a configuration file.")
 	}
-	if rc.verbose != "" {
-		cfg.Verbose = rc.verbose
+	if rc.logLevel != "" {
+		cfg.LogLevel = rc.logLevel
 	}
 
 	rc.v3iocfg = cfg

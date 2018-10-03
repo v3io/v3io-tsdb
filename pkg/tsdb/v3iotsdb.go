@@ -47,7 +47,7 @@ type V3ioAdapter struct {
 
 func CreateTSDB(v3iocfg *config.V3ioConfig, schema *config.Schema) error {
 
-	lgr, _ := utils.NewLogger(v3iocfg.Verbose)
+	lgr, _ := utils.NewLogger(v3iocfg.LogLevel)
 	container, err := utils.CreateContainer(
 		lgr, v3iocfg.WebApiEndpoint, v3iocfg.Container, v3iocfg.Username, v3iocfg.Password, v3iocfg.Workers)
 	if err != nil {
@@ -84,7 +84,7 @@ func NewV3ioAdapter(cfg *config.V3ioConfig, container *v3io.Container, logger lo
 	if logger != nil {
 		newV3ioAdapter.logger = logger
 	} else {
-		newV3ioAdapter.logger, err = utils.NewLogger(cfg.Verbose)
+		newV3ioAdapter.logger, err = utils.NewLogger(cfg.LogLevel)
 		if err != nil {
 			return nil, err
 		}

@@ -78,7 +78,7 @@ type V3ioConfig struct {
 	// enables the internal Prometheus TSDB instead
 	Disabled bool `json:"disabled,omitempty"`
 	// Logging verbosity level - "debug" | "info" | "warn" | "error"
-	Verbose string `json:"verbose,omitempty"`
+	LogLevel string `json:"logLevel,omitempty"`
 	// Number of parallel V3IO worker routines
 	Workers int `json:"workers"`
 	// Number of parallel V3IO worker routines for queries;
