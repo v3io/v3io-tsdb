@@ -59,10 +59,11 @@ func newQueryCommandeer(rootCommandeer *RootCommandeer) *queryCommandeer {
 		Example: `The examples assume that the endpoint of the web-gateway service, the login credentails, and
 the name of the data container are configured in the default configuration file (` + config.DefaultConfigurationFileName + `)
 instead of using the -s|--server, -u|--username, -p|--password, and -c|--container flags.
-- tsdbctl query -p mytsdb temperature
-- tsdbctl query -p performance filter="starts(__name__, 'cpu') AND os=='win'"
-- tsdbctl query -p pmertics -b 0 -e now-1h -a "sum,avg" -i 20m
-- tsdbctl query -p mytsdb -f "LabelA==8.1" -l 1d -o json
+- tsdbctl query temperature -t mytsdb
+- tsdbctl query -t performance -f "starts(__name__, 'cpu') AND os=='win'"
+- tsdbctl query metric2 -t pmertics -b 0 -e now-1h -a "sum,avg" -i 20m
+- tsdbctl query -t mytsdb -f "LabelA==8.1" -l 1d -o json
+- tsdbctl query noise -t my_tsdb -w "1,7,14" -i "1d" -a "count,sum,avg"
 
 Notes:
 - You must set the mertic-name argument (<metric>) and/or the query-filter flag (-f|--filter).
@@ -97,11 +98,16 @@ Arguments:
 	cmd.Flags().StringVarP(&commandeer.last, "last", "l", "",
 		"Return data for the specified time period before the\ncurrent time, of the format \"[0-9]+[mhd]\" (where\n'm' = minutes, 'h' = hours, and 'd' = days>). When setting\nthis flag, don't set the -b|--begin or -e|--end flags.\nExamples: \"1h\"; \"15m\"; \"30d\" to return data for the last\n1 hour, 15 minutes, or 30 days.")
 	cmd.Flags().StringVarP(&commandeer.windows, "windows", "w", "",
-		"Overlapping windows of time to which to apply the\naggregation functions (if set - see -a|--aggregates),\nstarting from the query's end time, as a comma separated\nlist of integer values (\"[0-9]+\"). The duration of each\nwindow is calculated by multiplying the flag value with\nthe aggregation interval (see -i|--aggregation-interval).\nExample: -w \"1,2\" with -i \"2h\" defines overlapping\naggegration windows of 2 hours and 4 hours.")
+		"Overlapping windows of time to which to apply the aggregation functions\n(if defined - see the -a|--aggregates flag), as a comma separated list\nof integer values (\"[0-9]+\"). The duration of each window is calculated\nby multiplying the value from the windows flag with the aggregation\ninterval (see -i|--aggregation-interval). The windows' end time is the\nquery's end time (see -e|--end and -l|--last). If the window's duration\nextends beyond the query's start time (see -b|--begin and -l|--last), it\nwill be shortened to fit the start time. Example: -w \"1,2\" with -i \"2h\",\n-b 0, and the default end time (\"now\") defines overlapping aggegration\nwindows for the last 2 hours and 4 hours.")
+	// The default aggregates list for an overlapping-windows query is "avg",
+	// provided the TSDB instance has the "count" and "sum" aggregates, which
+	// make up the "avg" aggregate; ("count" is added automatically when adding
+	// any other aggregate). However, it was decided that documenting this
+	// would over complicate the documentation.
 	cmd.Flags().StringVarP(&commandeer.functions, "aggregates", "a", "",
 		"Aggregation information to return, as a comma-separated\nlist of supported aggregation functions - count | avg |\nsum | min | max | stddev | stdvar | last | rate.\nExample: \"sum,min,max,count\".")
 	cmd.Flags().StringVarP(&commandeer.step, "aggregation-interval", "i", "",
-		"Aggregation interval for applying the aggregation functions\n(if set - see the -a|--aggregates flag), of the format\n\"[0-9]+[mhd]\" (where 'm' = minutes, 'h' = hours, and\n'd' = \"days\"). Examples: \"1h\"; \"150m\".(default =\n<end time> - <start time>)")
+		"Aggregation interval for applying the aggregation functions\n(if set - see the -a|--aggregates flag), of the format\n\"[0-9]+[mhd]\" (where 'm' = minutes, 'h' = hours, and\n'd' = \"days\"). Examples: \"1h\"; \"150m\". (default =\n<end time> - <start time>)")
 
 	commandeer.cmd = cmd
 
