@@ -133,7 +133,7 @@ you already have container and logger (when using nuclio data bindings).
 
 Configuration is specified in a YAML or JSON format, and can be read from a file using `config.GetOrLoadFromFile(path string)` 
 or can be loaded from a local buffer using `config.GetOrLoadFromData(data []byte)`.
-You can see details on the configuration options in [config](internal/pkg/config/config.go).
+You can see details on the configuration options in the V3IO TSDB [**config.go**](pkg/config/config.go) source file.
 A template configuration file is found at **examples/v3io.yaml.template**.
 You can use it as a reference for creating your own TSDB configuration file.
 For example:
