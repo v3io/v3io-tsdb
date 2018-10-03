@@ -53,23 +53,23 @@ func TestIngestData(t *testing.T) {
 		data         []tsdbtest.DataPoint
 		ignoreReason string
 	}{
-		{desc: "Should ingest one data point", metricName: "cpu", labels: utils.FromStrings("testLabel", "balbala"),
+		{desc: "Should ingest one data point", metricName: "cpu", labels: utils.LabelsFromStrings("testLabel", "balbala"),
 			data: []tsdbtest.DataPoint{{Time: 1532940510, Value: 314.3}}},
 
 		{desc: "Should ingest multiple data points", metricName: "cpu",
-			labels: utils.FromStrings("os", "linux", "iguaz", "yesplease"),
+			labels: utils.LabelsFromStrings("os", "linux", "iguaz", "yesplease"),
 			data: []tsdbtest.DataPoint{{Time: 1532940510, Value: 314.3},
 				{Time: 1532940510 + 5, Value: 300.3},
 				{Time: 1532940510 + 10, Value: 3234.6}}},
 
 		{desc: "Should ingest record with late arrival same chunk", metricName: "cpu",
-			labels: utils.FromStrings("os", "linux", "iguaz", "yesplease"),
+			labels: utils.LabelsFromStrings("os", "linux", "iguaz", "yesplease"),
 			data: []tsdbtest.DataPoint{{Time: 1532940510, Value: 314.3},
 				{Time: 1532940510 + 5, Value: 300.3},
 				{Time: 1532940510 - 10, Value: 3234.6}}},
 
 		{desc: "Should ingest record with a dash in the metric name (IG-8585)", metricName: "cool-cpu",
-			labels: utils.FromStrings("os", "linux", "iguaz", "yesplease"),
+			labels: utils.LabelsFromStrings("os", "linux", "iguaz", "yesplease"),
 			data: []tsdbtest.DataPoint{{Time: 1532940510, Value: 314.3},
 				{Time: 1532940510 + 5, Value: 300.3},
 				{Time: 1532940510 - 10, Value: 3234.6}}},
@@ -142,7 +142,7 @@ func TestQueryData(t *testing.T) {
 		expectFail   bool
 	}{
 		{desc: "Should ingest and query one data point", metricName: "cpu",
-			labels:   utils.FromStrings("testLabel", "balbala"),
+			labels:   utils.LabelsFromStrings("testLabel", "balbala"),
 			data:     []tsdbtest.DataPoint{{Time: 1532940510, Value: 314.3}},
 			from:     0,
 			to:       1532940510 + 1,
@@ -150,7 +150,7 @@ func TestQueryData(t *testing.T) {
 			expected: map[string][]tsdbtest.DataPoint{"": {{Time: 1532940510, Value: 314.3}}}},
 
 		{desc: "Should ingest and query multiple data points", metricName: "cpu",
-			labels: utils.FromStrings("os", "linux", "iguaz", "yesplease"),
+			labels: utils.LabelsFromStrings("os", "linux", "iguaz", "yesplease"),
 			data: []tsdbtest.DataPoint{{Time: 1532940510 - 10, Value: 314.3},
 				{Time: 1532940510 - 5, Value: 300.3},
 				{Time: 1532940510, Value: 3234.6}},
@@ -162,7 +162,7 @@ func TestQueryData(t *testing.T) {
 				{Time: 1532940510, Value: 3234.6}}}},
 
 		{desc: "Should query with filter on metric name", metricName: "cpu",
-			labels:   utils.FromStrings("os", "linux", "iguaz", "yesplease"),
+			labels:   utils.LabelsFromStrings("os", "linux", "iguaz", "yesplease"),
 			data:     []tsdbtest.DataPoint{{Time: 1532940510, Value: 33.3}},
 			filter:   "_name=='cpu'",
 			from:     0,
@@ -171,7 +171,7 @@ func TestQueryData(t *testing.T) {
 			expected: map[string][]tsdbtest.DataPoint{"": {{Time: 1532940510, Value: 33.3}}}},
 
 		{desc: "Should query with filter on label name", metricName: "cpu",
-			labels:   utils.FromStrings("os", "linux", "iguaz", "yesplease"),
+			labels:   utils.LabelsFromStrings("os", "linux", "iguaz", "yesplease"),
 			data:     []tsdbtest.DataPoint{{Time: 1532940510, Value: 31.3}},
 			filter:   "os=='linux'",
 			from:     0,
@@ -180,7 +180,7 @@ func TestQueryData(t *testing.T) {
 			expected: map[string][]tsdbtest.DataPoint{"": {{Time: 1532940510, Value: 31.3}}}},
 
 		{desc: "Should ingest and query data with '-' in the metric name (IG-8585)", metricName: "cool-cpu",
-			labels:   utils.FromStrings("testLabel", "balbala"),
+			labels:   utils.LabelsFromStrings("testLabel", "balbala"),
 			data:     []tsdbtest.DataPoint{{Time: 1532940510, Value: 314.3}},
 			from:     0,
 			to:       1532940510 + 1,
@@ -188,7 +188,7 @@ func TestQueryData(t *testing.T) {
 			expected: map[string][]tsdbtest.DataPoint{"": {{Time: 1532940510, Value: 314.3}}}},
 
 		{desc: "Should ingest and query by time", metricName: "cpu",
-			labels: utils.FromStrings("os", "linux", "iguaz", "yesplease"),
+			labels: utils.LabelsFromStrings("os", "linux", "iguaz", "yesplease"),
 			data: []tsdbtest.DataPoint{{Time: 1532940510, Value: 314.3},
 				{Time: 1532940510 + 5, Value: 300.3},
 				{Time: 1532940510 + 10, Value: 3234.6}},
@@ -199,7 +199,7 @@ func TestQueryData(t *testing.T) {
 				{Time: 1532940510 + 10, Value: 3234.6}}}},
 
 		{desc: "Should ingest and query by time with no results", metricName: "cpu",
-			labels: utils.FromStrings("os", "linux", "iguaz", "yesplease"),
+			labels: utils.LabelsFromStrings("os", "linux", "iguaz", "yesplease"),
 			data: []tsdbtest.DataPoint{{Time: 1532940510, Value: 314.3},
 				{Time: 1532940510 + 5, Value: 300.3},
 				{Time: 1532940510 + 10, Value: 3234.6}},
@@ -209,7 +209,7 @@ func TestQueryData(t *testing.T) {
 			expected: map[string][]tsdbtest.DataPoint{}},
 
 		{desc: "Should ingest and query an aggregator", metricName: "cpu",
-			labels: utils.FromStrings("os", "linux", "iguaz", "yesplease"),
+			labels: utils.LabelsFromStrings("os", "linux", "iguaz", "yesplease"),
 			data: []tsdbtest.DataPoint{{Time: 1532940510, Value: 300.3},
 				{Time: 1532940510 + 5, Value: 300.3},
 				{Time: 1532940510 + 10, Value: 100.4}},
@@ -220,7 +220,7 @@ func TestQueryData(t *testing.T) {
 			expected:    map[string][]tsdbtest.DataPoint{"sum": {{Time: 1532940510, Value: 701.0}}}},
 
 		{desc: "Should ingest and query an aggregator with interval greater than step size", metricName: "cpu",
-			labels: utils.FromStrings("os", "linux", "iguaz", "yesplease"),
+			labels: utils.LabelsFromStrings("os", "linux", "iguaz", "yesplease"),
 			data: []tsdbtest.DataPoint{{Time: 1532940510, Value: 300.3},
 				{Time: 1532940510 + 60, Value: 300.3},
 				{Time: 1532940510 + 2*60, Value: 100.4},
@@ -232,7 +232,7 @@ func TestQueryData(t *testing.T) {
 			expected:    map[string][]tsdbtest.DataPoint{"sum": {{Time: 1532940510, Value: 901.0}}}},
 
 		{desc: "Should ingest and query multiple aggregators", metricName: "cpu",
-			labels: utils.FromStrings("os", "linux", "iguaz", "yesplease"),
+			labels: utils.LabelsFromStrings("os", "linux", "iguaz", "yesplease"),
 			data: []tsdbtest.DataPoint{{Time: 1532940510, Value: 300.3},
 				{Time: 1532940510 + 5, Value: 300.3},
 				{Time: 1532940510 + 10, Value: 100.4}},
@@ -244,7 +244,7 @@ func TestQueryData(t *testing.T) {
 				"count": {{Time: 1532940510, Value: 3}}}},
 
 		{desc: "Should fail on query with illegal time (switch from and to)", metricName: "cpu",
-			labels: utils.FromStrings("os", "linux", "iguaz", "yesplease"),
+			labels: utils.LabelsFromStrings("os", "linux", "iguaz", "yesplease"),
 			data: []tsdbtest.DataPoint{{Time: 1532940510, Value: 314.3},
 				{Time: 1532940510 + 5, Value: 300.3},
 				{Time: 1532940510 + 10, Value: 3234.6}},
@@ -255,7 +255,7 @@ func TestQueryData(t *testing.T) {
 		},
 
 		{desc: "Should query with filter on not existing metric name", metricName: "cpu",
-			labels:   utils.FromStrings("os", "linux", "iguaz", "yesplease"),
+			labels:   utils.LabelsFromStrings("os", "linux", "iguaz", "yesplease"),
 			data:     []tsdbtest.DataPoint{{Time: 1532940510, Value: 33.3}},
 			filter:   "_name=='hahaha'",
 			from:     0,
@@ -264,7 +264,7 @@ func TestQueryData(t *testing.T) {
 			expected: map[string][]tsdbtest.DataPoint{}},
 
 		{desc: "Should ingest and query aggregators with empty bucket", metricName: "cpu",
-			labels: utils.FromStrings("os", "linux", "iguaz", "yesplease"),
+			labels: utils.LabelsFromStrings("os", "linux", "iguaz", "yesplease"),
 			data: []tsdbtest.DataPoint{{Time: 1537972278402, Value: 300.3},
 				{Time: 1537972278402 + 8*minuteInMillis, Value: 300.3},
 				{Time: 1537972278402 + 9*minuteInMillis, Value: 100.4}},
@@ -277,7 +277,7 @@ func TestQueryData(t *testing.T) {
 					{Time: 1537972578402, Value: 2}}}},
 
 		{desc: "Should ingest and query aggregators with few empty buckets in a row", metricName: "cpu",
-			labels: utils.FromStrings("os", "linux", "iguaz", "yesplease"),
+			labels: utils.LabelsFromStrings("os", "linux", "iguaz", "yesplease"),
 			data: []tsdbtest.DataPoint{{Time: 1537972278402, Value: 300.3},
 				{Time: 1537972278402 + 16*minuteInMillis, Value: 300.3},
 				{Time: 1537972278402 + 17*minuteInMillis, Value: 100.4}},
@@ -371,7 +371,7 @@ func TestQueryDataOverlappingWindow(t *testing.T) {
 	}{
 		{desc: "Should ingest and query with windowing",
 			metricName: "cpu",
-			labels:     utils.FromStrings("os", "linux", "iguaz", "yesplease"),
+			labels:     utils.LabelsFromStrings("os", "linux", "iguaz", "yesplease"),
 			data: []tsdbtest.DataPoint{{Time: 1532940510, Value: 314.3},
 				{Time: 1532944110, Value: 314.3},
 				{Time: 1532947710, Value: 300.3},
@@ -387,7 +387,7 @@ func TestQueryDataOverlappingWindow(t *testing.T) {
 
 		{desc: "Should ingest and query with windowing on multiple agg",
 			metricName: "cpu",
-			labels:     utils.FromStrings("os", "linux", "iguaz", "yesplease"),
+			labels:     utils.LabelsFromStrings("os", "linux", "iguaz", "yesplease"),
 			data: []tsdbtest.DataPoint{{Time: 1532940510, Value: 314.3},
 				{Time: 1532944110, Value: 314.3},
 				{Time: 1532947710, Value: 300.3},
