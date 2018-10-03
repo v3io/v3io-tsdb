@@ -25,6 +25,7 @@ import (
 	"github.com/nuclio/logger"
 	"github.com/pkg/errors"
 	"github.com/v3io/v3io-go-http"
+	"github.com/v3io/v3io-tsdb/internal/pkg/performance"
 	"github.com/v3io/v3io-tsdb/pkg/config"
 	"github.com/v3io/v3io-tsdb/pkg/partmgr"
 	"github.com/v3io/v3io-tsdb/pkg/utils"
@@ -264,12 +265,27 @@ func (mc *MetricsCache) WaitForCompletion(timeout time.Duration) (int, error) {
 		maxWaitTime = time.Duration(mc.cfg.DefaultTimeoutInSeconds) * time.Second
 	}
 
-	select {
-	case res := <-waitChan:
-		lastError := mc.lastError
-		mc.lastError = nil
-		return res, lastError
-	case <-time.After(maxWaitTime):
-		return 0, errors.Errorf("the operation was timed out after %.2f seconds", maxWaitTime.Seconds())
+	metricReporter := performance.ReporterInstanceFromConfig(mc.cfg)
+	timer, err := metricReporter.GetTimer("WaitForCompletionTimer")
+	if err != nil {
+		err = errors.Wrap(err, "Failed to create timer: WaitForCompletionTimer")
+		return 0, err
 	}
+
+	var resultCount int
+
+	timer.Time(func() {
+		select {
+		case resultCount = <-waitChan:
+			err = mc.lastError
+			mc.lastError = nil
+			return
+		case <-time.After(maxWaitTime):
+			resultCount = 0
+			err = errors.Errorf("The operation was timed out after %.2f seconds", maxWaitTime.Seconds())
+			return
+		}
+	})
+
+	return resultCount, err
 }
