@@ -101,7 +101,7 @@ type V3ioConfig struct {
 	// Maximum chunk size, in bytes (for the worst compression scenario)
 	MaximumChunkSize int `json:"maximumChunkSize,omitempty"`
 	// Number of sharding buckets
-	ShardingBucketsCount int `json:"shardingBucketsCount,omitempty"`
+	ShardingBucketsCount int `json:"shardingBuckets,omitempty"`
 	// Metrics-reporter configuration
 	MetricsReporter MetricsReporterConfig `json:"performance,omitempty"`
 	// Don't aggregate from raw chunks, for use when working as a Prometheus
@@ -135,7 +135,7 @@ type Rollup struct {
 type TableSchema struct {
 	Version              int      `json:"version"`
 	RollupLayers         []Rollup `json:"rollupLayers"`
-	ShardingBucketsCount int      `json:"shardingBucketsCount"`
+	ShardingBucketsCount int      `json:"shardingBuckets"`
 	PartitionerInterval  string   `json:"partitionerInterval"`
 	ChunckerInterval     string   `json:"chunckerInterval"`
 }
