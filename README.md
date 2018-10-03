@@ -175,8 +175,8 @@ Example:
 
 	// create metrics labels, `__name__` label specify the metric type (e.g. cpu, temperature, ..)
 	// the other labels can be used in searches (filtering or grouping) or aggregations
-	// use utils.FromStrings(s ...string) for string list input or utils.FromMap(m map[string]string) for map input
-	lset := utils.FromStrings("__name__","http_req", "method", "post")
+	// use utils.LabelsFromStrings(s ...string) for string list input or utils.LabelsFromMap(m map[string]string) for map input
+	lset := utils.LabelsFromStrings("__name__","http_req", "method", "post")
 
 	// Add a sample with current time (in milisec) and the value of 7.9
 	ref, err := appender.Add(lset, time.Now().Unix * 1000, 7.9)
