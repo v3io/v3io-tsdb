@@ -59,26 +59,30 @@ type V3ioQuerier struct {
 	performanceReporter *performance.MetricReporter
 }
 
-//  Standard Time Series Query, return a set of series which match the condition
+// Standard Time Series Query, return a set of series which match the condition
 func (q *V3ioQuerier) Select(name, functions string, step int64, filter string) (SeriesSet, error) {
 	return q.selectQry(name, functions, step, nil, filter)
 }
 
-// Prometheus Time Series Query, return a set of series which match the condition
+// Prometheus time-series query - return a set of time series that match the
+// specified conditions
 func (q *V3ioQuerier) SelectProm(name, functions string, step int64, filter string, noAggr bool) (SeriesSet, error) {
 	q.disableClientAggr = true
 	q.disableAllAggr = noAggr
 	return q.selectQry(name, functions, step, nil, filter)
 }
 
-// Overlapping windows Time Series Query, return a set of series each with a list of aggregated results per window
-// e.g. get the last 1hr, 6hr, 24hr stats per metric (specify a 1hr step of 3600*1000, 1,6,24 windows, and max time)
+// Overlapping windows time-series query - return a set of series each with a
+// list of aggregated results per window
+// For example, get the last 1h, 6h, and 24h stats per metric (specify a 1h
+// aggregation interval (step) of 3600*1000 (=1h), windows 1, 6, and 24, and an
+// end (max) time).
 func (q *V3ioQuerier) SelectOverlap(name, functions string, step int64, windows []int, filter string) (SeriesSet, error) {
 	sort.Sort(sort.Reverse(sort.IntSlice(windows)))
 	return q.selectQry(name, functions, step, windows, filter)
 }
 
-// base query function
+// Base query function
 func (q *V3ioQuerier) selectQry(
 	name, functions string, step int64, windows []int, filter string) (set SeriesSet, err error) {
 
@@ -89,7 +93,7 @@ func (q *V3ioQuerier) selectQry(
 	err = q.partitionMngr.ReadAndUpdateSchema()
 
 	if err != nil {
-		return nullSeriesSet{}, errors.Wrap(err, "failed to read/update schema")
+		return nullSeriesSet{}, errors.Wrap(err, "Failed to read/update the TSDB schema.")
 	}
 
 	q.performanceReporter.WithTimer("QueryTimer", func() {
@@ -116,7 +120,7 @@ func (q *V3ioQuerier) selectQry(
 			sets[i] = set
 		}
 
-		// sort each partition when not using range scan
+		// Sort each partition when not using range scan
 		if name == "" {
 			for i := 0; i < len(sets); i++ {
 				// TODO make it a Go routine per part
@@ -136,7 +140,7 @@ func (q *V3ioQuerier) selectQry(
 	return
 }
 
-// Query a single partition (with numeric/float values)
+// Query a single partition (with integer or float values)
 func (q *V3ioQuerier) queryNumericPartition(
 	partition *partmgr.DBPartition, name, functions string, step int64, windows []int, filter string) (SeriesSet, error) {
 
@@ -149,25 +153,28 @@ func (q *V3ioQuerier) queryNumericPartition(
 	if q.mint > mint {
 		mint = q.mint
 		if step != 0 && step < (maxt-mint) {
-			// temporary Aggregation fix: if mint is not aligned with steps, move it to the next step tick
+			// Temporary aggregation fix: if mint isn't aligned with the step,
+			// move it to the next step tick
 			mint += (maxt - mint) % step
 		}
 	}
 
 	newSet := &V3ioSeriesSet{mint: mint, maxt: maxt, partition: partition, logger: q.logger}
 
-	// if there is no aggregation function and the step size is grater than the stored aggregate use Average aggr
-	// TODO: in non Prometheus we may want avg aggregator for any step>0
-	// in Prom range vectors use seek and it would be inefficient to do avg aggregator
+	// If there are no aggregation functions and the aggregation-interval (step)
+	// size is greater than the stored aggregate, use the Average aggregate.
+	// TODO: When not using the Prometheus TSDB, we may want an avg aggregate
+	// for any step>0 in the Prometheus range vectors using seek, and it would
+	// be inefficient to use an avg aggregate.
 	if functions == "" && step > 0 && step >= partition.RollupTime() && partition.AggrType().HasAverage() {
 		functions = "avg"
 	}
 
-	// if there are aggregations to be made and its not disabled
+	// Check whether there are aggregations to add and aggregates aren't disabled
 	if functions != "" && !q.disableAllAggr {
 
-		// if step isn't passed (e.g. when using the console) - the step is the difference between max
-		// and min times (e.g. 5 minutes)
+		// If step isn't passed (e.g., when using the console), the step is the
+		// difference between the end (maxt) and start (mint) times (e.g., 5 minutes)
 		if step == 0 {
 			step = maxt - mint
 		}
@@ -187,14 +194,15 @@ func (q *V3ioQuerier) queryNumericPartition(
 			return nil, err
 		}
 
-		// use aggregates if DB side is possible or client aggr is enabled (Prometheus disable client side)
+		// Use aggregates if possible on the TSDB side or if client aggregation
+		// is enabled (Prometheus is disabled on the client side)
 		newSet.canAggregate = newAggrSeries.CanAggregate(partition.AggrType())
 		if newSet.canAggregate || !q.disableClientAggr {
 			newSet.aggrSeries = newAggrSeries
 			newSet.interval = step
 			newSet.aggrIdx = newAggrSeries.NumFunctions() - 1
 			newSet.overlapWin = windows
-			newSet.noAggrLbl = q.disableClientAggr // dont add "Aggregator" label in Prometheus
+			newSet.noAggrLbl = q.disableClientAggr // Don't add an "Aggregator" label in Prometheus
 		}
 	}
 
@@ -203,7 +211,7 @@ func (q *V3ioQuerier) queryNumericPartition(
 	return newSet, err
 }
 
-// return the current metric names
+// Return the current metric names
 func (q *V3ioQuerier) LabelValues(labelKey string) (result []string, err error) {
 	q.performanceReporter.WithTimer("LabelValuesTimer", func() {
 		if labelKey == "__name__" {
@@ -237,7 +245,7 @@ func (q *V3ioQuerier) getMetricNames() ([]string, error) {
 	}
 
 	if iter.Err() != nil {
-		q.logger.InfoWith("Failed to read metric names, returning empty list", "err", iter.Err().Error())
+		q.logger.InfoWith("Failed to read metric names; returning an empty list.", "err", iter.Err().Error())
 	}
 
 	return metricNames, nil
@@ -245,7 +253,7 @@ func (q *V3ioQuerier) getMetricNames() ([]string, error) {
 
 func (q *V3ioQuerier) getLabelValues(labelKey string) ([]string, error) {
 
-	// sync partition manager (hack)
+	// Sync the partition manager (hack)
 	err := q.partitionMngr.ReadAndUpdateSchema()
 	if err != nil {
 		return nil, err
@@ -253,14 +261,14 @@ func (q *V3ioQuerier) getLabelValues(labelKey string) ([]string, error) {
 
 	partitionPaths := q.partitionMngr.GetPartitionsPaths()
 
-	// if no partitions yet - there are no labels
+	// If there are no partitions yet, there are no labels
 	if len(partitionPaths) == 0 {
 		return nil, nil
 	}
 
 	labelValuesMap := map[string]struct{}{}
 
-	// get all labelsets
+	// Get all label sets
 	input := v3io.GetItemsInput{
 		Path:           partitionPaths[0],
 		AttributeNames: []string{"_lset"},
@@ -271,21 +279,22 @@ func (q *V3ioQuerier) getLabelValues(labelKey string) ([]string, error) {
 		return nil, err
 	}
 
-	// iterate over the results
+	// Iterate over the results
 	for iter.Next() {
 		labelSet := iter.GetField("_lset").(string)
 
-		// the labelSet will be k1=v1,k2=v2, k2=v3. Assuming labelKey is "k2", we want to convert
-		// that to [v2, v3]
+		// For a label set of k1=v1,k2=v2, k2=v3, for labelKey "k2", for example,
+		// we want to convert the set to [v2, v3]
 
-		// split at "," to get k=v pairs
+		// Split at "," to get k=v pairs
 		for _, label := range strings.Split(labelSet, ",") {
 
-			// split at "=" to get label key and label value
+			// Split at "=" to get the label key and label value
 			splitLabel := strings.SplitN(label, "=", 2)
 
-			// if we got two elements and the first element (the key) is equal to what we're looking
-			// for, save the label value in the map. use a map to prevent duplications
+			// If we have two elements and the first element (the key) is equal
+			// to what we're looking for, save the label value in the map.
+			// Use a map to prevent duplicates.
 			if len(splitLabel) == 2 && splitLabel[0] == labelKey {
 				labelValuesMap[splitLabel[1]] = struct{}{}
 			}

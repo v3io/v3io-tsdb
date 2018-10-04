@@ -53,28 +53,28 @@ func NewLogger(level string) (logger.Logger, error) {
 }
 
 func CreateContainer(logger logger.Logger, addr, cont, username, password string, workers int) (*v3io.Container, error) {
-	// create context
+	// Create context
 	context, err := v3io.NewContext(logger, addr, workers)
 	if err != nil {
-		return nil, errors.Wrap(err, "Failed to create client")
+		return nil, errors.Wrap(err, "Failed to create a V3IO TSDB client.")
 	}
 
-	// create session
+	// Create session
 	session, err := context.NewSession(username, password, "v3test")
 	if err != nil {
-		return nil, errors.Wrap(err, "Failed to create session")
+		return nil, errors.Wrap(err, "Failed to create a session.")
 	}
 
-	// create the container
+	// Create the container
 	container, err := session.NewContainer(cont)
 	if err != nil {
-		return nil, errors.Wrap(err, "Failed to create container")
+		return nil, errors.Wrap(err, "Failed to create a container.")
 	}
 
 	return container, nil
 }
 
-// convert v3io blob to Int array
+// Convert a V3IO blob to an integers array
 func AsInt64Array(val []byte) []uint64 {
 	var array []uint64
 	bytes := val
@@ -103,7 +103,7 @@ func DeleteTable(logger logger.Logger, container *v3io.Container, path, filter s
 		req, err := container.DeleteObject(&v3io.DeleteObjectInput{Path: path + "/" + name}, nil, responseChan)
 		if err != nil {
 			commChan <- i
-			return errors.Wrap(err, "failed to delete object "+name)
+			return errors.Wrapf(err, "Failed to delete object '%s'.", name)
 		}
 		reqMap[req.ID] = true
 		i++
@@ -111,7 +111,7 @@ func DeleteTable(logger logger.Logger, container *v3io.Container, path, filter s
 
 	commChan <- i
 	if iter.Err() != nil {
-		return errors.Wrap(iter.Err(), "failed to delete object ")
+		return errors.Wrap(iter.Err(), "Failed to delete object.")
 	}
 
 	<-doneChan
@@ -134,7 +134,7 @@ func respWaitLoop(comm chan int, responseChan chan *v3io.Response, timeout time.
 				active = true
 
 				if resp.Error != nil {
-					fmt.Println(resp.Error, "failed Delete response")
+					fmt.Println(resp.Error, "Failed to receive a response to delete request.")
 				}
 
 				if requests == responses {
@@ -150,7 +150,7 @@ func respWaitLoop(comm chan int, responseChan chan *v3io.Response, timeout time.
 
 			case <-time.After(timeout):
 				if !active {
-					fmt.Println("\nResp loop timed out! ", requests, responses)
+					fmt.Println("\nResponse loop timed out.", requests, responses)
 					done <- true
 					return
 				} else {

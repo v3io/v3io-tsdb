@@ -12,13 +12,13 @@ import (
 )
 
 // Configuration
-// Note: the TSDB (path) must be first created using the CLI or API
-// the user must also define the v3io data binding in the nuclio function with path, username, password and name it db0
+// Note: the TSDB instance (`path`) must first be created using the CLI or API.
+// The user must also define the V3IO data binding in the Nuclio function - including path, username, and password - and name it "db0".
 var tsdbConfig = `
 path: "pmetric"
 `
 
-// example event
+// Example event
 const pushEvent = `
 {
   "Lset": { "__name__":"cpu", "os" : "win", "node" : "xyz123"},
@@ -38,12 +38,15 @@ func Handler(context *nuclio.Context, event nuclio.Event) (interface{}, error) {
 	}
 	app := context.UserData.(tsdb.Appender)
 
-	// if time is not specified assume "now"
+	// If time isn't specified, assume "now" (default)
 	if sample.Time == "" {
 		sample.Time = "now"
 	}
 
-	// convert time string to time int, string can be: now, now-2h, int (unix milisec time), or RFC3339 date string
+	// Convert a time string to a Unix timestamp in milliseconds integer.
+	// The input time string can be of the format "now", "now-[0-9]+[mdh]"
+	// (for example, "now-2h"), "<Unix timestamp in milliseconds>", or
+	// "<RFC3339 time>" (for example, "2018-09-26T14:10:20Z").
 	t, err := utils.Str2unixTime(sample.Time)
 	if err != nil {
 		return "", err
@@ -54,7 +57,7 @@ func Handler(context *nuclio.Context, event nuclio.Event) (interface{}, error) {
 	return "", err
 }
 
-// InitContext runs only once when the function runtime starts
+// InitContext runs only once, when the function runtime starts
 func InitContext(context *nuclio.Context) error {
 
 	var err error
@@ -62,7 +65,7 @@ func InitContext(context *nuclio.Context) error {
 	adapterMtx.Lock()
 
 	if adapter == nil {
-		// create adapter once for all contexts
+		// Create an adapter once for all contexts
 		cfg, _ := config.GetOrLoadFromData([]byte(tsdbConfig))
 		data := context.DataBinding["db0"].(*v3io.Container)
 		adapter, err = tsdb.NewV3ioAdapter(cfg, data, context.Logger)

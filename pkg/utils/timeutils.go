@@ -33,10 +33,11 @@ const (
 	OneDayMs    = 24 * 3600 * 1000
 )
 
-// convert duration string e.g. 24h to time (unix milisecond)
+// Convert a "[0-9]+[mhd]" duration string (for example, "24h") to a
+// Unix timestamp in milliseconds integer
 func Str2duration(duration string) (int64, error) {
 
-	multiply := OneHourMs // hour by default
+	multiply := OneHourMs // 1 hour by default
 	if len(duration) > 0 {
 		last := duration[len(duration)-1:]
 		if last == "m" || last == "h" || last == "d" {
@@ -59,16 +60,19 @@ func Str2duration(duration string) (int64, error) {
 	i, err := strconv.Atoi(duration)
 	if err != nil {
 		return 0, errors.Wrap(err,
-			`not a valid duration. Accepted pattern: [0-9]+[dhm]. Examples: 30d (30 days), 5m (5 minutes)`)
+			`Invalid duration. Accepted pattern: [0-9]+[mhd]. Examples: "30d" (30 days); "5m" (5 minutes).`)
 	}
 	if i < 0 {
-		return 0, errors.Errorf("specified duration (%s) is negative", duration)
+		return 0, errors.Errorf("The specified duration (%s) is negative.", duration)
 	}
 
 	return int64(i * multiply), nil
 }
 
-// convert time string to time (unix milisecond)
+// Convert a time string to a Unix timestamp in milliseconds integer.
+// The input time string can be of the format "now", "now-[0-9]+[mdh]" (for
+// example, "now-2h"), "<Unix timestamp in milliseconds>", or "<RFC3339 time>"
+// (for example, "2018-09-26T14:10:20Z").
 func Str2unixTime(timeString string) (int64, error) {
 	if strings.HasPrefix(timeString, "now") {
 		if len(timeString) > 3 {
@@ -77,7 +81,7 @@ func Str2unixTime(timeString string) (int64, error) {
 
 			t, err := Str2duration(duration)
 			if err != nil {
-				return 0, errors.Wrap(err, "could not parse pattern following 'now-'")
+				return 0, errors.Wrap(err, "Could not parse the pattern following 'now-'.")
 			}
 			if sign == "-" {
 				return CurrentTimeInMillis() - int64(t), nil
@@ -98,7 +102,7 @@ func Str2unixTime(timeString string) (int64, error) {
 
 	t, err := time.Parse(time.RFC3339, timeString)
 	if err != nil {
-		return 0, errors.Wrap(err, "Not an RFC 3339 time format")
+		return 0, errors.Wrap(err, "Invalid time string - not an RFC 3339 time format.")
 	}
 	return t.Unix() * 1000, nil
 }
