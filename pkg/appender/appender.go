@@ -245,7 +245,7 @@ func (mc *MetricsCache) AddFast(ref uint64, t int64, v interface{}) error {
 
 func verifyTimeValid(t int64) error {
 	if t > maxUnixTimeMs || t < minimalUnixTimeMs {
-		return fmt.Errorf("time seems invalid (in unix milisec time), must be between years 1970-2400 - %d", t)
+		return fmt.Errorf("Time '%d' doesn't seem to be a valid Unix timesamp in milliseconds. The time must be in the years range 1970-2400.", t)
 	}
 	return nil
 }
@@ -257,18 +257,18 @@ func (mc *MetricsCache) WaitForCompletion(timeout time.Duration) (int, error) {
 	var maxWaitTime time.Duration = 0
 
 	if timeout == 0 {
-		maxWaitTime = 24 * time.Hour // almost infinite time
+		maxWaitTime = 24 * time.Hour // Almost-infinite time
 	} else if timeout > 0 {
 		maxWaitTime = timeout
 	} else {
-		// if negative - use default value from configuration
+		// If negative, use the default configured timeout value
 		maxWaitTime = time.Duration(mc.cfg.DefaultTimeoutInSeconds) * time.Second
 	}
 
 	metricReporter := performance.ReporterInstanceFromConfig(mc.cfg)
 	timer, err := metricReporter.GetTimer("WaitForCompletionTimer")
 	if err != nil {
-		err = errors.Wrap(err, "Failed to create timer: WaitForCompletionTimer")
+		err = errors.Wrap(err, "Failed to create timer WaitForCompletionTimer.")
 		return 0, err
 	}
 
@@ -282,7 +282,7 @@ func (mc *MetricsCache) WaitForCompletion(timeout time.Duration) (int, error) {
 			return
 		case <-time.After(maxWaitTime):
 			resultCount = 0
-			err = errors.Errorf("The operation was timed out after %.2f seconds", maxWaitTime.Seconds())
+			err = errors.Errorf("The operation timed out after %.2f seconds.", maxWaitTime.Seconds())
 			return
 		}
 	})

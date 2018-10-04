@@ -112,10 +112,10 @@ such as partitioning strategy, retention, aggregators, etc. this can be done via
 	}
 
 	// Specify the default DB configuration (can be modified per partition)
-	sampleRate = "1/s"
+	samplesIngestionRate = "1/s"
 	aggregatorGranularity = "1h"
 	aggregatesList = "scount,avg,min,max"
-	schema, err := schema.NewSchema(v3iocfg, sampleRate, aggregatorGranularity, aggregatesList)
+	schema, err := schema.NewSchema(v3iocfg, samplesIngestionRate, aggregatorGranularity, aggregatesList)
 	if err != nil {
 		// TODO: handle error
 	}
@@ -132,18 +132,20 @@ parameters: the configuration structure, v3io data container object and logger o
 you already have container and logger (when using nuclio data bindings).
 
 Configuration is specified in a YAML or JSON format, and can be read from a file using `config.GetOrLoadFromFile(path string)` 
-or can be loaded from a local buffer using `config.GetOrLoadFromData(data []byte)`. You can see details on the configuration
-options in [config](internal/pkg/config/config.go), a minimal configuration looks like: 
+or can be loaded from a local buffer using `config.GetOrLoadFromData(data []byte)`.
+You can see details on the configuration options in the V3IO TSDB [**config.go**](pkg/config/config.go) source file.
+A template configuration file is found at **examples/v3io.yaml.template**.
+You can use it as a reference for creating your own TSDB configuration file.
+For example:
 
 ```yaml
-v3ioUrl: "v3io address:port"
+webApiEndpoint: "192.168.1.100:8081"
 container: "tsdb"
-path: performance
-username: "<username>"
-password: "<password>"
+username: "johnd"
+password: "OpenSesame"
 ```
 
-example of creating an adapter:
+Following is an example of code for creating an adapter:
 
 ```go
 	// create configuration object from file
