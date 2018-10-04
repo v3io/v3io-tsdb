@@ -46,7 +46,7 @@ func BenchmarkIngest(b *testing.B) {
 	}
 
 	// Create test path (tsdb instance)
-	tsdbPath := tsdbtest.NormalizePath(fmt.Sprintf("tsdb-%s-%d-%s", b.Name(), b.N, time.Now().Format(time.RFC3339)))
+	tsdbPath := tsdbtest.PrefixTablePath(tsdbtest.NormalizePath(fmt.Sprintf("tsdb-%s-%d-%s", b.Name(), b.N, time.Now().Format(time.RFC3339))))
 
 	// Update TSDB instance path for this test
 	v3ioConfig.TablePath = tsdbPath

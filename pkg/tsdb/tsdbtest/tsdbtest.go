@@ -8,6 +8,8 @@ import (
 	. "github.com/v3io/v3io-tsdb/pkg/tsdb"
 	"github.com/v3io/v3io-tsdb/pkg/tsdb/tsdbtest/testutils"
 	"github.com/v3io/v3io-tsdb/pkg/utils"
+	"os"
+	"path"
 	"regexp"
 	"strings"
 	"testing"
@@ -53,7 +55,7 @@ func CreateTestTSDB(t testing.TB, v3ioConfig *config.V3ioConfig) {
 }
 
 func SetUp(t testing.TB, v3ioConfig *config.V3ioConfig) func() {
-	v3ioConfig.TablePath = fmt.Sprintf("%s-%d", t.Name(), time.Now().Nanosecond())
+	v3ioConfig.TablePath = PrefixTablePath(fmt.Sprintf("%s-%d", t.Name(), time.Now().Nanosecond()))
 	CreateTestTSDB(t, v3ioConfig)
 
 	// Measure performance
@@ -79,7 +81,7 @@ func SetUpWithData(t *testing.T, v3ioConfig *config.V3ioConfig, metricName strin
 }
 
 func SetUpWithDBConfig(t *testing.T, v3ioConfig *config.V3ioConfig, schema *config.Schema) func() {
-	v3ioConfig.TablePath = fmt.Sprintf("%s-%d", t.Name(), time.Now().Nanosecond())
+	v3ioConfig.TablePath = PrefixTablePath(fmt.Sprintf("%s-%d", t.Name(), time.Now().Nanosecond()))
 	if err := CreateTSDB(v3ioConfig, schema); err != nil {
 		v3ioConfigAsJson, _ := json2.MarshalIndent(v3ioConfig, "", "  ")
 		t.Fatalf("Failed to create a TSDB instance (table). Reason: %s\nConfiguration:\n%s", err, string(v3ioConfigAsJson))
@@ -226,4 +228,12 @@ func NormalizePath(path string) string {
 	r := strings.Join(chars, "")
 	re := regexp.MustCompile("[" + r + "]+")
 	return re.ReplaceAllString(path, "_")
+}
+
+func PrefixTablePath(tablePath string) string {
+	base := os.Getenv("TSDB_TEST_TABLE_PATH")
+	if base == "" {
+		return tablePath
+	}
+	return path.Join(os.Getenv("TSDB_TEST_TABLE_PATH"), tablePath)
 }

@@ -515,7 +515,7 @@ func TestDeleteTSDB(t *testing.T) {
 	}
 
 	schema := testutils.CreateSchema(t, "count,sum")
-	v3ioConfig.TablePath = t.Name()
+	v3ioConfig.TablePath = tsdbtest.PrefixTablePath(t.Name())
 	if err := CreateTSDB(v3ioConfig, schema); err != nil {
 		v3ioConfigAsJson, _ := json.MarshalIndent(v3ioConfig, "", "  ")
 		t.Fatalf("Failed to create TSDB. Reason: %s\nConfiguration:\n%s", err, string(v3ioConfigAsJson))
