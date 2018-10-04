@@ -6,7 +6,6 @@ go:
 script:
   - make test
   - make lint
-  - echo 'container: "bigdata"\nworkers: 1\nwebApiEndpoint: "webapi.iguazio.app.mianvbzjrnzf.dev.trl.iguazio.com:8081"\nusername: "iguazio@Default"\npassword: "usUvWsWomVveV7Lc"' > travis_v3io.yaml
   - V3IO_CONF="$TRAVIS_BUILD_DIR/travis_v3io.yaml" TSDB_TEST_TABLE_PATH="TSDB_INTEGRATION_TESTS/$TRAVIS_BUILD_NUMBER" make integration
 
 before_deploy:
