@@ -267,7 +267,12 @@ func (cs *chunkStore) writeChunks(mc *MetricsCache, metric *MetricState) (hasPen
 	metricReporter := performance.ReporterInstanceFromConfig(mc.cfg)
 	writeChunksTimer, err := metricReporter.GetTimer("WriteChunksTimer")
 	if err != nil {
-		return hasPendingUpdates, errors.Wrap(err, "Failed to obtain timer object LabelValuesTimer.")
+		return hasPendingUpdates, errors.Wrap(err, "Failed to obtain timer object WriteChunksTimer.")
+	}
+
+	writeChunksSizeHistush, err := metricReporter.GetHistogram("WriteChunksSizeHistogram", 100)
+	if err != nil {
+		return hasPendingUpdates, errors.Wrap(err, "Failed to obtain a timer object for WriteChunksSizeHistogram.")
 	}
 
 	writeChunksTimer.Time(func() {
@@ -407,6 +412,7 @@ func (cs *chunkStore) writeChunks(mc *MetricsCache, metric *MetricState) (hasPen
 		mc.logger.DebugWith("Update-metric expression", "name", metric.name, "key", metric.key, "expr", expr, "reqid", request.ID)
 
 		hasPendingUpdates, err = true, nil
+		writeChunksSizeHistush.Update(int64(pendingSamplesCount))
 		return
 	})
 
