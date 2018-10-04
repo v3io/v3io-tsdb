@@ -69,7 +69,7 @@ func (mc *MetricsCache) metricFeed(index int) {
 				dataQueued := 0
 				numPushed := 0
 			inLoop:
-				for i := 0; i <= maxSamplesBatchSize; i++ {
+				for i := 0; i <= mc.cfg.BatchSize; i++ {
 					if app.metric == nil {
 						// Handle update completion requests (metric == nil)
 						completeChan = app.resp
@@ -111,7 +111,7 @@ func (mc *MetricsCache) metricFeed(index int) {
 					}
 
 					// Poll if we have more updates (accelerate the outer select)
-					if i < maxSamplesBatchSize {
+					if i < mc.cfg.BatchSize {
 						select {
 						case app = <-mc.asyncAppendChan:
 						default:
@@ -125,7 +125,7 @@ func (mc *MetricsCache) metricFeed(index int) {
 				}
 
 				// If we have too much work, stall the queue for some time
-				if numPushed > maxSamplesBatchSize/2 && dataQueued/numPushed > 64 {
+				if numPushed > mc.cfg.BatchSize/2 && dataQueued/numPushed > 64 {
 					switch {
 					case dataQueued/numPushed <= 96:
 						time.Sleep(queueStallTime)
@@ -169,7 +169,7 @@ func (mc *MetricsCache) metricsUpdateLoop(index int) {
 				nonQueued := mc.metricQueue.IsEmpty()
 
 			inLoop:
-				for i := 0; i <= maxSamplesBatchSize; i++ {
+				for i := 0; i <= mc.cfg.BatchSize; i++ {
 
 					mc.updatesInFlight--
 					counter++
@@ -180,7 +180,7 @@ func (mc *MetricsCache) metricsUpdateLoop(index int) {
 					mc.handleResponse(metric, resp, nonQueued)
 
 					// Poll if we have more responses (accelerate the outer select)
-					if i < maxSamplesBatchSize {
+					if i < mc.cfg.BatchSize {
 						select {
 						case resp = <-mc.responseChan:
 						default:
