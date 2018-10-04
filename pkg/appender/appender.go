@@ -35,8 +35,7 @@ import (
 
 // TODO: make configurable
 const maxRetriesOnWrite = 3
-const channelSize = 4048
-const maxSamplesBatchSize = 16
+const channelSize = 4096
 const queueStallTime = 1 * time.Millisecond
 
 const minimalUnixTimeMs = 0          // year 1970
