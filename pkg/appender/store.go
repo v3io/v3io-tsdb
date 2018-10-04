@@ -24,7 +24,6 @@ import (
 	"encoding/base64"
 	"fmt"
 	"github.com/nuclio/logger"
-	"github.com/pkg/errors"
 	"github.com/v3io/v3io-go-http"
 	"github.com/v3io/v3io-tsdb/internal/pkg/performance"
 	"github.com/v3io/v3io-tsdb/pkg/aggregate"
@@ -41,12 +40,15 @@ func NewChunkStore(logger logger.Logger) *chunkStore {
 	store := chunkStore{logger: logger}
 	store.chunks[0] = &attrAppender{}
 	store.chunks[1] = &attrAppender{}
+	store.performanceReporter, _ = performance.DefaultReporterInstance()
+
 	return &store
 }
 
 // chunkStore store state & latest + previous chunk appenders
 type chunkStore struct {
-	logger logger.Logger
+	logger              logger.Logger
+	performanceReporter *performance.MetricReporter
 
 	curChunk int
 	lastTid  int64
@@ -166,12 +168,8 @@ func (cs *chunkStore) processGetResp(mc *MetricsCache, metric *MetricState, resp
 			request, err := mc.container.PutItem(&putInput, metric, mc.nameUpdateChan)
 			if err != nil {
 				// Count errors
-				counter, err := performance.ReporterInstanceFromConfig(mc.cfg).GetCounter("PutNameError")
-				if err != nil {
-					mc.logger.Error("failed to create performance counter for PutNameError. Error: %v", err)
-				} else {
-					counter.Inc(1)
-				}
+				cs.performanceReporter.IncrementCounter("PutNameError", 1)
+
 				mc.logger.ErrorWith("Update name putItem Failed", "metric", metric.key, "err", err)
 			} else {
 				mc.logger.DebugWith("Update name", "name", metric.name, "key", metric.key, "reqid", request.ID)
@@ -207,9 +205,7 @@ func (cs *chunkStore) processGetResp(mc *MetricsCache, metric *MetricState, resp
 // Append data to the right chunk and table based on the time and state
 func (cs *chunkStore) Append(t int64, v interface{}) {
 	if metricReporter, err := performance.DefaultReporterInstance(); err == nil {
-		if counter, err := metricReporter.GetCounter("AppendCounter"); err == nil {
-			counter.Inc(1)
-		}
+		metricReporter.IncrementCounter("AppendCounter", 1)
 	}
 
 	cs.pending = append(cs.pending, pendingData{t: t, v: v})
@@ -263,19 +259,7 @@ func (cs *chunkStore) chunkByTime(t int64) *attrAppender {
 
 // write all pending samples to DB chunks and aggregators
 func (cs *chunkStore) writeChunks(mc *MetricsCache, metric *MetricState) (hasPendingUpdates bool, err error) {
-
-	metricReporter := performance.ReporterInstanceFromConfig(mc.cfg)
-	writeChunksTimer, err := metricReporter.GetTimer("WriteChunksTimer")
-	if err != nil {
-		return hasPendingUpdates, errors.Wrap(err, "Failed to obtain timer object for WriteChunksTimer")
-	}
-
-	writeChunksSizeHistush, err := metricReporter.GetHistogram("WriteChunksSizeHistogram", 100)
-	if err != nil {
-		return hasPendingUpdates, errors.Wrap(err, "Failed to obtain timer object for WriteChunksSizeHistogram")
-	}
-
-	writeChunksTimer.Time(func() {
+	cs.performanceReporter.WithTimer("WriteChunksTimer", func() {
 		// return if there are no pending updates
 		if len(cs.pending) == 0 {
 			hasPendingUpdates, err = false, nil
@@ -407,7 +391,7 @@ func (cs *chunkStore) writeChunks(mc *MetricsCache, metric *MetricState) (hasPen
 		mc.logger.DebugWith("updateMetric expression", "name", metric.name, "key", metric.key, "expr", expr, "reqid", request.ID)
 
 		hasPendingUpdates, err = true, nil
-		writeChunksSizeHistush.Update(int64(pendingSamplesCount))
+		cs.performanceReporter.UpdateHistogram("WriteChunksSizeHistogram", int64(pendingSamplesCount))
 		return
 	})
 
