@@ -44,17 +44,19 @@ func NewV3ioQuerier(container *v3io.Container, logger logger.Logger, mint, maxt 
 		disableClientAggr: cfg.DisableClientAggr,
 	}
 	newQuerier.partitionMngr = partMngr
+	newQuerier.performanceReporter = performance.ReporterInstanceFromConfig(cfg)
 	return &newQuerier
 }
 
 type V3ioQuerier struct {
-	logger            logger.Logger
-	container         *v3io.Container
-	cfg               *config.V3ioConfig
-	mint, maxt        int64
-	partitionMngr     *partmgr.PartitionManager
-	disableClientAggr bool
-	disableAllAggr    bool
+	logger              logger.Logger
+	container           *v3io.Container
+	cfg                 *config.V3ioConfig
+	mint, maxt          int64
+	partitionMngr       *partmgr.PartitionManager
+	disableClientAggr   bool
+	disableAllAggr      bool
+	performanceReporter *performance.MetricReporter
 }
 
 // Standard Time Series Query, return a set of series which match the condition
@@ -94,13 +96,7 @@ func (q *V3ioQuerier) selectQry(
 		return nullSeriesSet{}, errors.Wrap(err, "Failed to read/update the TSDB schema.")
 	}
 
-	queryTimer, err := performance.ReporterInstanceFromConfig(q.cfg).GetTimer("QueryTimer")
-
-	if err != nil {
-		return nullSeriesSet{}, errors.Wrap(err, "Failed to create a performance metric [QueryTimer].")
-	}
-
-	queryTimer.Time(func() {
+	q.performanceReporter.WithTimer("QueryTimer", func() {
 		filter = strings.Replace(filter, "__name__", "_name", -1)
 		q.logger.DebugWith("Select query", "func", functions, "step", step, "filter", filter, "window", windows)
 
@@ -217,12 +213,7 @@ func (q *V3ioQuerier) queryNumericPartition(
 
 // Return the current metric names
 func (q *V3ioQuerier) LabelValues(labelKey string) (result []string, err error) {
-	labelValuesTimer, err := performance.ReporterInstanceFromConfig(q.cfg).GetTimer("LabelValuesTimer")
-	if err != nil {
-		return result, errors.Wrap(err, "Failed to obtain a timer object for timer LabelValuesTimer.")
-	}
-
-	labelValuesTimer.Time(func() {
+	q.performanceReporter.WithTimer("LabelValuesTimer", func() {
 		if labelKey == "__name__" {
 			result, err = q.getMetricNames()
 		} else {
