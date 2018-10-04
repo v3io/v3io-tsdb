@@ -134,7 +134,8 @@ func (mr *MetricReporter) UpdateMeter(name string, count int64) {
 
 func (mr *MetricReporter) UpdateHistogram(name string, value int64) {
 	if mr.isRunning() {
-		metrics.GetOrRegisterHistogram(name, mr.registry, sampleInstance)
+		histogram := metrics.GetOrRegisterHistogram(name, mr.registry, sampleInstance)
+		histogram.Update(value)
 	}
 }
 
