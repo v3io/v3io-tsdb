@@ -51,7 +51,6 @@ func newCheckCommandeer(rootCommandeer *RootCommandeer) *checkCommandeer {
 		Example: `The examples assume that the endpoint of the web-gateway service, the login credentails, and
 the name of the data container are configured in the default configuration file (` + config.DefaultConfigurationFileName + `)
 - tsdbctl check 1538265600/memo_1.c6b54e7ce82c2c11 -t my_tsdb -a _v12
-- tsdbctl check 1537920000/cpu_2.40480e29c7d6f962 -t mytsdb -a "_v30,_v31"
 
 Arguments:
 - <item-path> (string) [Required] Path to a metric item within the TSDB table.`,
