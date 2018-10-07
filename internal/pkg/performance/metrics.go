@@ -14,8 +14,13 @@ import (
 	"time"
 )
 
+const (
+	reservoirSize = 100
+)
+
 var instance *MetricReporter
 var once sync.Once
+var sampleInstance metrics.Sample
 
 const (
 	STDOUT = "stdout"
@@ -59,6 +64,7 @@ func ReporterInstance(writeTo string, reportPeriodically bool, reportIntervalSec
 			writer = os.Stdout
 		}
 
+		sampleInstance = metrics.NewUniformSample(reservoirSize)
 		instance = newMetricReporter(writer, reportPeriodically, reportIntervalSeconds, reportOnShutdown)
 	})
 	return instance
@@ -76,7 +82,7 @@ func (mr *MetricReporter) Start() error {
 	mr.lock.Lock()
 	defer mr.lock.Unlock()
 
-	if !mr.running {
+	if mr.isEnabled() && !mr.running {
 		mr.running = true
 	} else {
 		return errors.Errorf("metric reporter is already running.")
@@ -103,36 +109,33 @@ func (mr *MetricReporter) Stop() error {
 	return nil
 }
 
-func (mr *MetricReporter) GetTimer(name string) (metrics.Timer, error) {
-	if mr.running {
-		return metrics.GetOrRegisterTimer(name, mr.registry), nil
+func (mr *MetricReporter) WithTimer(name string, body func()) {
+	if mr.isRunning() {
+		timer := metrics.GetOrRegisterTimer(name, mr.registry)
+		timer.Time(body)
 	} else {
-		return nil, errors.Errorf("failed to create timer '%s'. Reason: metric reporter in not running", name)
+		body()
 	}
 }
 
-func (mr *MetricReporter) GetCounter(name string) (metrics.Counter, error) {
-	if mr.running {
-		return metrics.GetOrRegisterCounter(name, mr.registry), nil
-	} else {
-		return nil, errors.Errorf("failed to create counter '%s'. Reason: metric reporter in not running", name)
+func (mr *MetricReporter) IncrementCounter(name string, count int64) {
+	if mr.isRunning() {
+		counter := metrics.GetOrRegisterCounter(name, mr.registry)
+		counter.Inc(count)
 	}
 }
 
-func (mr *MetricReporter) GetMeter(name string) (metrics.Meter, error) {
-	if mr.running {
-		return metrics.GetOrRegisterMeter(name, mr.registry), nil
-	} else {
-		return nil, errors.Errorf("failed to create meter '%s'. Reason: metric reporter in not running", name)
+func (mr *MetricReporter) UpdateMeter(name string, count int64) {
+	if mr.isRunning() {
+		meter := metrics.GetOrRegisterMeter(name, mr.registry)
+		meter.Mark(count)
 	}
 }
 
-func (mr *MetricReporter) GetHistogram(name string, reservoirSize int) (metrics.Histogram, error) {
-	if mr.running {
-		sample := metrics.NewUniformSample(reservoirSize)
-		return metrics.GetOrRegisterHistogram(name, mr.registry, sample), nil
-	} else {
-		return nil, errors.Errorf("failed to create histogram '%s'. Reason: metric reporter in not running", name)
+func (mr *MetricReporter) UpdateHistogram(name string, value int64) {
+	if mr.isRunning() {
+		histogram := metrics.GetOrRegisterHistogram(name, mr.registry, sampleInstance)
+		histogram.Update(value)
 	}
 }
 
@@ -181,4 +184,15 @@ func newMetricReporter(outputWriter io.Writer, reportPeriodically bool, reportIn
 	}
 
 	return &reporter
+}
+
+func (mr *MetricReporter) isEnabled() bool {
+	return mr.reportOnShutdown || mr.reportPeriodically
+}
+
+func (mr *MetricReporter) isRunning() bool {
+	mr.lock.Lock()
+	defer mr.lock.Unlock()
+
+	return mr.running
 }

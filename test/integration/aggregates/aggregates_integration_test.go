@@ -90,7 +90,7 @@ func t1Config(testCtx *testing.T) *TestConfig {
 		desc:          "Test case #1",
 		testEndTime:   currentRoundedTimeNano,
 		testStartTime: currentRoundedTimeNano - testDuration,
-		interval:      int64(10 * time.Second),
+		interval:      int64(10 * time.Minute),
 		testDuration:  testDuration,
 		numMetrics:    1,
 		numLabels:     1,

@@ -35,8 +35,7 @@ import (
 
 // TODO: make configurable
 const maxRetriesOnWrite = 3
-const channelSize = 4048
-const maxSamplesBatchSize = 16
+const channelSize = 4096
 const queueStallTime = 1 * time.Millisecond
 
 const minimalUnixTimeMs = 0          // year 1970
@@ -120,7 +119,8 @@ type MetricsCache struct {
 
 	NameLabelMap map[string]bool // temp store all lable names
 
-	lastError error
+	lastError           error
+	performanceReporter *performance.MetricReporter
 }
 
 func NewMetricsCache(container *v3io.Container, logger logger.Logger, cfg *config.V3ioConfig,
@@ -139,6 +139,8 @@ func NewMetricsCache(container *v3io.Container, logger logger.Logger, cfg *confi
 	newCache.newUpdates = make(chan int, 1000)
 
 	newCache.NameLabelMap = map[string]bool{}
+	newCache.performanceReporter = performance.ReporterInstanceFromConfig(cfg)
+
 	return &newCache
 }
 
@@ -265,16 +267,10 @@ func (mc *MetricsCache) WaitForCompletion(timeout time.Duration) (int, error) {
 		maxWaitTime = time.Duration(mc.cfg.DefaultTimeoutInSeconds) * time.Second
 	}
 
-	metricReporter := performance.ReporterInstanceFromConfig(mc.cfg)
-	timer, err := metricReporter.GetTimer("WaitForCompletionTimer")
-	if err != nil {
-		err = errors.Wrap(err, "Failed to create timer WaitForCompletionTimer.")
-		return 0, err
-	}
-
 	var resultCount int
+	var err error
 
-	timer.Time(func() {
+	mc.performanceReporter.WithTimer("WaitForCompletionTimer", func() {
 		select {
 		case resultCount = <-waitChan:
 			err = mc.lastError

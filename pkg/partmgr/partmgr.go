@@ -176,13 +176,7 @@ func (p *PartitionManager) createAndUpdatePartition(t int64) (*DBPartition, erro
 func (p *PartitionManager) updateSchema() (err error) {
 
 	metricReporter := performance.ReporterInstanceFromConfig(p.v3ioConfig)
-	timer, err := metricReporter.GetTimer("UpdateSchemaTimer")
-	if err != nil {
-		err = errors.Wrap(err, "Failed to create timer UpdateSchemaTimer.")
-		return
-	}
-
-	timer.Time(func() {
+	metricReporter.WithTimer("UpdateSchemaTimer", func() {
 		data, err := json.Marshal(p.schemaConfig)
 		if err != nil {
 			err = errors.Wrap(err, "Failed to update a new partition in the schema file.")
@@ -225,8 +219,6 @@ func (p *PartitionManager) ReadAndUpdateSchema() (err error) {
 		return
 	}
 
-	timer, err := metricReporter.GetTimer("ReadAndUpdateSchemaTimer")
-
 	fullPath := path.Join(p.Path(), config.SchemaConfigFileName)
 	if err != nil {
 		err = errors.Wrap(err, "Failed to create timer ReadAndUpdateSchemaTimer.")
@@ -250,7 +242,7 @@ func (p *PartitionManager) ReadAndUpdateSchema() (err error) {
 		p.schemaMtimeSecs = mtimeSecs
 		p.schemaMtimeNanosecs = mtimeNsecs
 
-		timer.Time(func() {
+		metricReporter.WithTimer("ReadAndUpdateSchemaTimer", func() {
 			resp, err := p.container.Sync.GetObject(&v3io.GetObjectInput{Path: fullPath})
 			if err != nil {
 				err = errors.Wrapf(err, "Failed to read schema at path '%s'.", fullPath)
