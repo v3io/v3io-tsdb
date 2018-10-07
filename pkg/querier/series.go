@@ -217,7 +217,7 @@ func NewAggrSeries(set *V3ioSeriesSet, aggr aggregate.AggrType) *V3ioSeries {
 	newSeries := V3ioSeries{set: set}
 	lset := initLabels(set)
 	if !set.noAggrLbl {
-		lset = append(lset, utils.Label{Name: "Aggregator", Value: aggr.String()})
+		lset = append(lset, utils.Label{Name: aggregate.AggregateLabel, Value: aggr.String()})
 	}
 	newSeries.lset = lset
 

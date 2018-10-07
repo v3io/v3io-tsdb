@@ -210,7 +210,7 @@ The `Select()` call accepts 4 parameters:
 
 using `functions` and `step` is optional, use it only when you are interested in pre-aggregation and the step is >> than 
 the sampling interval (and preferably equal or greater than the partition RollupMin interval). when using aggregates it will
-return one series per aggregate function, the `Aggregator` label will be added to that series with the function name.
+return one series per aggregate function, the `Aggregate` label will be added to that series with the function name.
 
 In some cases we would like to retrieve overlapping aggregates instead of fixed interval ones, e.g. stats for last 1hr, 6hr, 24hr
 the `SelectOverlap()` call adds the `win` integer array ([]int) which allow specifying the requested windows. the windows are 

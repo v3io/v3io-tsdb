@@ -7,6 +7,7 @@ import (
 	"github.com/prometheus/prometheus/pkg/labels"
 	"github.com/prometheus/prometheus/storage"
 	"github.com/v3io/v3io-go-http"
+	"github.com/v3io/v3io-tsdb/pkg/aggregate"
 	"github.com/v3io/v3io-tsdb/pkg/appender"
 	"github.com/v3io/v3io-tsdb/pkg/config"
 	"github.com/v3io/v3io-tsdb/pkg/querier"
@@ -90,7 +91,7 @@ func match2filter(oms []*labels.Matcher) (string, string, string) {
 	name := ""
 
 	for _, matcher := range oms {
-		if matcher.Name == "Aggregator" {
+		if matcher.Name == aggregate.AggregateLabel {
 			aggregator = matcher.Value
 		} else if matcher.Name == "__name__" && matcher.Type == labels.MatchEqual {
 			name = matcher.Value

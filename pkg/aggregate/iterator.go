@@ -52,7 +52,7 @@ func NewAggregateSeries(functions, col string, buckets int, interval, rollupTime
 		aggrList = append(aggrList, aggr)
 	}
 
-	// Always have count Aggregator by default
+	// Always have count Aggregate by default
 	if aggrMask != 0 {
 		aggrMask |= aggrTypeCount
 	}
@@ -100,7 +100,7 @@ func (as *AggregateSeries) toAttrName(aggr AggrType) string {
 func (as *AggregateSeries) GetAttrNames() []string {
 	var names []string
 
-	for _, aggr := range rawAggregators {
+	for _, aggr := range rawAggregates {
 		if aggr&as.aggrMask != 0 {
 			names = append(names, as.toAttrName(aggr))
 		}
@@ -122,7 +122,7 @@ func (as *AggregateSeries) NewSetFromAttrs(
 		maxAligned = (maxt / as.interval) * as.interval
 	}
 
-	for _, aggr := range rawAggregators {
+	for _, aggr := range rawAggregates {
 		if aggr&as.aggrMask != 0 {
 			attrBlob, ok := (*attrs)[as.toAttrName(aggr)]
 			if !ok {
@@ -181,7 +181,7 @@ func (as *AggregateSeries) NewSetFromChunks(length int) *AggregateSet {
 	newAggregateSet := AggregateSet{length: length, interval: as.interval, overlapWin: as.overlapWindows}
 	dataArrays := map[AggrType][]float64{}
 
-	for _, aggr := range rawAggregators {
+	for _, aggr := range rawAggregates {
 		if aggr&as.aggrMask != 0 {
 			dataArrays[aggr] = make([]float64, length, length) // TODO: len/capacity & reuse (pool)
 			if aggr == aggrTypeMax || aggr == aggrTypeMin || aggr == aggrTypeLast {

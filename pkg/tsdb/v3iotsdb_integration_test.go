@@ -26,6 +26,7 @@ import (
 	"encoding/json"
 	"github.com/stretchr/testify/assert"
 	"github.com/v3io/v3io-go-http"
+	"github.com/v3io/v3io-tsdb/pkg/aggregate"
 	"github.com/v3io/v3io-tsdb/pkg/chunkenc"
 	"github.com/v3io/v3io-tsdb/pkg/config"
 	. "github.com/v3io/v3io-tsdb/pkg/tsdb"
@@ -329,7 +330,7 @@ func testQueryDataCase(test *testing.T, v3ioConfig *config.V3ioConfig,
 		}
 
 		series := set.At()
-		agg := series.Labels().Get("Aggregator")
+		agg := series.Labels().Get(aggregate.AggregateLabel)
 		iter := series.Iterator()
 		if iter.Err() != nil {
 			test.Fatalf("Failed to query data series. reason: %v", iter.Err())
@@ -446,7 +447,7 @@ func testQueryDataOverlappingWindowCase(test *testing.T, v3ioConfig *config.V3io
 		}
 
 		series := set.At()
-		agg := series.Labels().Get("Aggregator")
+		agg := series.Labels().Get(aggregate.AggregateLabel)
 		iter := series.Iterator()
 		if iter.Err() != nil {
 			test.Fatalf("Failed to query data series. reason: %v", iter.Err())

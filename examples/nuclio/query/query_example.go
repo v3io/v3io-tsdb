@@ -19,13 +19,13 @@ path: "pmetric"
 `
 
 type tsdbQuery struct {
-	Name        string
-	Aggregators []string
-	Step        string
-	Filter      string
-	From        string
-	To          string
-	Last        string
+	Name       string
+	Aggregates []string
+	Step       string
+	Filter     string
+	From       string
+	To         string
+	Last       string
 }
 
 // Example query event
@@ -65,7 +65,7 @@ func Handler(context *nuclio.Context, event nuclio.Event) (interface{}, error) {
 	}
 
 	// Select a query to get back a series-set iterator
-	set, err := qry.Select(query.Name, strings.Join(query.Aggregators, ","), step, query.Filter)
+	set, err := qry.Select(query.Name, strings.Join(query.Aggregates, ","), step, query.Filter)
 	if err != nil {
 		return nil, errors.Wrap(err, "Select Failed")
 	}

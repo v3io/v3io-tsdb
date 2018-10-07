@@ -10,7 +10,7 @@ import (
 	"testing"
 )
 
-func TestAggregators(t *testing.T) {
+func TestAggregates(t *testing.T) {
 	testCases := []struct {
 		desc               string
 		aggString          string
@@ -110,13 +110,13 @@ func TestAggregators(t *testing.T) {
 			if test.ignoreReason != "" {
 				t.Skip(test.ignoreReason)
 			}
-			testAggregatorCase(t, test.aggString, test.data, test.exprCol, test.bucket, test.expectedUpdateExpr,
+			testAggregateCase(t, test.aggString, test.data, test.exprCol, test.bucket, test.expectedUpdateExpr,
 				test.expectedSetExpr, test.expectFail)
 		})
 	}
 }
 
-func testAggregatorCase(t *testing.T, aggString string, data map[int64]float64, exprCol string, bucket int,
+func testAggregateCase(t *testing.T, aggString string, data map[int64]float64, exprCol string, bucket int,
 	expectedUpdateExpr string, expectedSetExpr string, expectFail bool) {
 
 	aggregator, err := AggrsFromString(strings.Split(aggString, ","))
@@ -127,7 +127,7 @@ func testAggregatorCase(t *testing.T, aggString string, data map[int64]float64, 
 			return
 		}
 	}
-	aggregatorList := NewAggregatorList(aggregator)
+	aggregatorList := NewAggregatesList(aggregator)
 
 	for k, v := range data {
 		aggregatorList.Aggregate(k, v)

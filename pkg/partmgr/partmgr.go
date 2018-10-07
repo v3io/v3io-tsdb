@@ -48,7 +48,7 @@ func NewPartitionMngr(schemaConfig *config.Schema, cont *v3io.Container, v3ioCon
 
 // Create and initialize a new partition
 func NewDBPartition(pmgr *PartitionManager, startTime int64, path string) (*DBPartition, error) {
-	rollupTime, err := utils.Str2duration(pmgr.schemaConfig.PartitionSchemaInfo.AggregatorsGranularity)
+	rollupTime, err := utils.Str2duration(pmgr.schemaConfig.PartitionSchemaInfo.AggregationGranularity)
 	if err != nil {
 		return nil, err
 	}
@@ -71,7 +71,7 @@ func NewDBPartition(pmgr *PartitionManager, startTime int64, path string) (*DBPa
 		rollupTime:        rollupTime,
 	}
 
-	aggrType, err := aggregate.AggrsFromString(pmgr.schemaConfig.PartitionSchemaInfo.Aggregators)
+	aggrType, err := aggregate.AggrsFromString(pmgr.schemaConfig.PartitionSchemaInfo.Aggregates)
 	if err != nil {
 		return nil, err
 	}
