@@ -52,7 +52,7 @@ Define the following environment variables.
 > **Note:** You can also define variables locally in a script or in the command line from which the relevant command is executed.
 
 ```bash 
-    V3IO_CONF="$HOME/go/bin/v3io-custom.yaml"
+    V3IO_TSDB_CONFIG="$HOME/go/bin/v3io-custom.yaml"
     TSDB_BENCH_INGEST_CONFIG="$HOME/go/bin/tsdb-bench-test-config.yaml"
 ```
 
@@ -84,7 +84,7 @@ Use the following script as a reference:
     
     # Note: You can select either the "-bench=^BenchmarkIngest$" or
     # "-bench=^BenchmarkIngestWithNuclio$" test.
-    time V3IO_CONF="$HOME/go/bin/v3io-custom.yaml" TSDB_BENCH_INGEST_CONFIG="$HOME/go/bin/tsdb-bench-test-config.yaml" go test -benchtime $BENCH_TIME -run=DO_NOT_RUN_TESTS -bench=^BenchmarkIngest$ ../../test/benchmark
+    time V3IO_TSDB_CONFIG="$HOME/go/bin/v3io-custom.yaml" TSDB_BENCH_INGEST_CONFIG="$HOME/go/bin/tsdb-bench-test-config.yaml" go test -benchtime $BENCH_TIME -run=DO_NOT_RUN_TESTS -bench=^BenchmarkIngest$ ../../test/benchmark
     
     echo Done
 ```
@@ -107,7 +107,7 @@ You can use the following shell script example to query counts for all types of 
     GOBIN=$HOME/go/bin
     LOOK_BACK_DURATION=72h
     TSDB_AGGREGATION_INTERVAL=5m
-    V3IO_CONF=$GOBIN/v3io-custom.yaml
+    V3IO_TSDB_CONFIG=$GOBIN/v3io-custom.yaml
     
     for x in {A..Z}
     do
