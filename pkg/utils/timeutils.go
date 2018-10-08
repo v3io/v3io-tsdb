@@ -35,7 +35,6 @@ const (
 )
 
 var (
-	// TimeFormats are time formats
 	TimeFormats = []string{
 		time.RFC3339,
 		time.RFC3339Nano,

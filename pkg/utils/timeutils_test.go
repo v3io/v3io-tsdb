@@ -108,10 +108,12 @@ func (suite *testTimeSuite) TestStr2unixTimeWithNowPlusMinus() {
 
 func (suite *testTimeSuite) TestStr2unixTimeFRC() {
 	// RFC3339
-	_, err := Str2unixTime("2018-10-04T15:09:36+03:00")
+	t, err := Str2unixTime("2018-10-04T15:09:36+03:00")
 	suite.Require().Nil(err)
+	suite.Require().True(t != 0)
 	// RFC3339Nano
-	_, err = Str2unixTime("2018-10-04T15:08:53.229364634+03:00")
+	t, err = Str2unixTime("2018-10-04T15:08:53.229364634+03:00")
+	suite.Require().True(t != 0)
 	suite.Require().Nil(err)
 }
 
