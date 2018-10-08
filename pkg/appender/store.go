@@ -29,7 +29,9 @@ import (
 	"github.com/v3io/v3io-tsdb/pkg/aggregate"
 	"github.com/v3io/v3io-tsdb/pkg/chunkenc"
 	"github.com/v3io/v3io-tsdb/pkg/partmgr"
+	"github.com/v3io/v3io-tsdb/pkg/utils"
 	"sort"
+	"time"
 )
 
 // TODO: make it configurable
@@ -158,22 +160,28 @@ func (cs *chunkStore) processGetResp(mc *MetricsCache, metric *MetricState, resp
 	cs.chunks[0].appender = app
 	cs.chunks[0].state |= chunkStateFirst
 
+	latencyNano := time.Now().UnixNano() - resp.Request().CreateTimeNano
+	cs.performanceReporter.UpdateHistogram("UpdateMetricLatency", latencyNano)
+
 	if resp.Error != nil {
-		// assume the item not found   TODO: check error code
+		if utils.IsNotExistsError(resp.Error) {
+			if metric.newName {
+				path := mc.cfg.TablePath + "/names/" + metric.name
+				putInput := v3io.PutItemInput{Path: path, Attributes: map[string]interface{}{}}
 
-		if metric.newName {
-			path := mc.cfg.TablePath + "/names/" + metric.name
-			putInput := v3io.PutItemInput{Path: path, Attributes: map[string]interface{}{}}
+				request, err := mc.container.PutItem(&putInput, metric, mc.nameUpdateChan)
+				if err != nil {
+					// Count errors
+					cs.performanceReporter.IncrementCounter("PutNameError", 1)
 
-			request, err := mc.container.PutItem(&putInput, metric, mc.nameUpdateChan)
-			if err != nil {
-				// Count errors
-				cs.performanceReporter.IncrementCounter("PutNameError", 1)
-
-				mc.logger.ErrorWith("Update-name PutItem failed", "metric", metric.key, "err", err)
-			} else {
-				mc.logger.DebugWith("Update name", "name", metric.name, "key", metric.key, "reqid", request.ID)
+					mc.logger.ErrorWith("Update-name PutItem failed", "metric", metric.key, "err", err)
+				} else {
+					mc.logger.DebugWith("Update name", "name", metric.name, "key", metric.key, "reqid", request.ID)
+				}
 			}
+		} else {
+			// Count errors
+			cs.performanceReporter.IncrementCounter("UpdateMetricError", 1)
 		}
 
 		return

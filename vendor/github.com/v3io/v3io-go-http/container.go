@@ -1,9 +1,9 @@
 package v3io
 
 import (
-	"sync/atomic"
-
 	"github.com/nuclio/logger"
+	"sync/atomic"
+	"time"
 )
 
 type Container struct {
@@ -119,6 +119,7 @@ func (c *Container) sendRequest(input interface{},
 	context interface{},
 	responseChan chan *Response) (*Request, error) {
 	id := atomic.AddUint64(&requestID, 1)
+	cTime := time.Now().UnixNano()
 
 	// create a request/response (TODO: from pool)
 	requestResponse := &RequestResponse{
@@ -128,6 +129,7 @@ func (c *Container) sendRequest(input interface{},
 			Input:        input,
 			Context:      context,
 			responseChan: responseChan,
+			CreateTimeNano:   cTime,
 		},
 	}
 
