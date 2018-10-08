@@ -9,7 +9,7 @@
 
 You can optionally create a TSDB configuration file instead of setting the relevant configuration using TSDB CLI configuration flags.
 Use the example configuration-file template at **examples/** as a reference.
-By default, the TSDB CLI (**tsbbctl**) looks for a **v3io.yaml** file in the current directory.
+By default, the TSDB CLI (**tsbbctl**) looks for a **v3io-tsdb-config.yaml** file in the current directory.
 
 ### Create a TSDB Instance Using the TSDB CLI
 
@@ -35,7 +35,7 @@ You can use the following shell script as a reference:
     # web-gateway service endpoint and authentication credentials and the
     # parent data container using the CLI -s, -u, -p, and -c flags.
     SCRIPTPATH="$( cd "$(dirname "$0")" ; pwd -P )"
-    $SCRIPTPATH/tsdbctl create -t $TSDB_PATH -r 1/s -a count,sum,min,max -i 5 -v -g $SCRIPTPATH/v3io-custom.yaml
+    $SCRIPTPATH/tsdbctl create -t $TSDB_PATH -r 1/s -a count,sum,min,max -i 5 -v -g $SCRIPTPATH/v3io-tsdb-custom.yaml
     
     echo Done.
 ```

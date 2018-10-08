@@ -87,12 +87,12 @@ func (q *V3ioPromQuerier) Close() error {
 
 func match2filter(oms []*labels.Matcher) (string, string, string) {
 	filter := []string{}
-	aggregator := ""
+	agg := ""
 	name := ""
 
 	for _, matcher := range oms {
 		if matcher.Name == aggregate.AggregateLabel {
-			aggregator = matcher.Value
+			agg = matcher.Value
 		} else if matcher.Name == "__name__" && matcher.Type == labels.MatchEqual {
 			name = matcher.Value
 		} else {
@@ -109,7 +109,7 @@ func match2filter(oms []*labels.Matcher) (string, string, string) {
 			}
 		}
 	}
-	return name, strings.Join(filter, " and "), aggregator
+	return name, strings.Join(filter, " and "), agg
 }
 
 type V3ioPromSeriesSet struct {

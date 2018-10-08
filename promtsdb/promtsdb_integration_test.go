@@ -21,7 +21,7 @@ func TestTsdbIntegration(t *testing.T) {
 
 	d, h := partmgr.TimeToDHM(basetime)
 	fmt.Println("base=", d, h)
-	cfg, err := config.GetOrLoadFromFile("../v3io.yaml")
+	cfg, err := config.GetOrLoadFromFile("../v3io-tsdb-config.yaml")
 	if err != nil {
 		t.Fatal(err)
 	}

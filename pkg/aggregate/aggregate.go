@@ -78,9 +78,9 @@ func (a AggrType) HasAverage() bool {
 	return (a & aggrTypeAvg) == aggrTypeAvg
 }
 
-func SchemaFieldFromString(aggregators []string, col string) ([]config.SchemaField, error) {
-	fieldList := make([]config.SchemaField, 0, len(aggregators))
-	for _, s := range aggregators {
+func SchemaFieldFromString(aggregates []string, col string) ([]config.SchemaField, error) {
+	fieldList := make([]config.SchemaField, 0, len(aggregates))
+	for _, s := range aggregates {
 		trimmed := strings.TrimSpace(s)
 		if trimmed != "" {
 			if trimmed == "*" {
@@ -109,8 +109,8 @@ func getAggrFullName(field config.SchemaField, col string) config.SchemaField {
 
 func (a AggrType) String() string { return aggrToString[a] }
 
-func AggregatesToStringList(aggregators string) ([]string, error) {
-	aggrs := strings.Split(aggregators, ",")
+func AggregatesToStringList(aggregates string) ([]string, error) {
+	aggrs := strings.Split(aggregates, ",")
 	aggType, err := AggrsFromString(aggrs)
 	if err != nil {
 		return nil, err
@@ -140,7 +140,7 @@ func AggrsFromString(split []string) (AggrType, error) {
 			aggrList = aggrList | aggr
 		}
 	}
-	// Always have count aggregator by default
+	// Always have count aggregate by default
 	if hasAggregates {
 		aggrList = aggrList | aggrTypeCount
 	}

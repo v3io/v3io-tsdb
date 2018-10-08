@@ -71,10 +71,10 @@ func NewAggregateSeries(functions, col string, buckets int, interval, rollupTime
 }
 
 func (as *AggregateSeries) CanAggregate(partitionAggr AggrType) bool {
-	// keep only real aggregators
+	// keep only real aggregates
 	aggrMask := 0x7f & as.aggrMask
-	// make sure the DB has all the aggregators we need (on bits in the mask)
-	// and that the requested interval is greater/eq to aggregator resolution and is an even divisor
+	// make sure the DB has all the aggregates we need (on bits in the mask)
+	// and that the requested interval is greater/eq to aggregate resolution and is an even divisor
 	// if interval and rollup are not even divisors we need higher resolution (3x) to smooth the graph
 	// when we add linear/spline graph projection we can reduce back to 1x
 	return ((aggrMask & partitionAggr) == aggrMask) &&

@@ -1,4 +1,4 @@
-# File: v3io.yaml
+# File: v3io-tsdb-config.yaml
 
 # NGINX server address:PORT
 v3ioUrl: <path to server>:8081

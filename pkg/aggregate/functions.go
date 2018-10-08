@@ -35,7 +35,7 @@ type Aggregate interface {
 	InitExpr(col string, buckets int) string
 }
 
-// Count aggregator
+// Count aggregate
 type CountAggregate struct {
 	count int
 }

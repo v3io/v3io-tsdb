@@ -69,7 +69,7 @@ The code is separated to Prometheus compliant adapter in [/promtsdb](promtsdb) a
 [v3iotsdb_test.go](/pkg/tsdb/v3iotsdb_test.go), both have similar semantics.
 
 For Prometheus you would need to use the fork found in `https://github.com/v3io/prometheus`, it already loads this
-library, you would need to place a `v3io.yaml` file with relevant configuration in the same folder as the Prometheus
+library, you would need to place a `v3io-tsdb-config.yaml` file with relevant configuration in the same folder as the Prometheus
 executable (see details on configurations below).
 
 A developer using this library should first create a TSDB, this can be done using the CLI or an API call (`CreateTSDB`) 
@@ -102,20 +102,20 @@ For use with nuclio function you can see function example under [\nuclio](exampl
 ### Creating and Configuring a TSDB Adapter 
 
 The first step is to create a TSDB, this is done only once per TSDB and generates the required metadata and configuration
-such as partitioning strategy, retention, aggregators, etc. this can be done via the CLI or a function call.
+such as partitioning strategy, retention, aggregates, etc. this can be done via the CLI or a function call.
 
 ```go
 	// Load v3io connection/path details (see YAML below)
-	v3iocfg, err := config.GetOrLoadFromFile("v3io.yaml")
+	v3iocfg, err := config.GetOrLoadFromFile("v3io-tsdb-config.yaml")
 	if err != nil {
 		// TODO: handle error
 	}
 
 	// Specify the default DB configuration (can be modified per partition)
 	samplesIngestionRate = "1/s"
-	aggregatorGranularity = "1h"
+	aggregationGranularity = "1h"
 	aggregatesList = "scount,avg,min,max"
-	schema, err := schema.NewSchema(v3iocfg, samplesIngestionRate, aggregatorGranularity, aggregatesList)
+	schema, err := schema.NewSchema(v3iocfg, samplesIngestionRate, aggregationGranularity, aggregatesList)
 	if err != nil {
 		// TODO: handle error
 	}
@@ -134,7 +134,7 @@ you already have container and logger (when using nuclio data bindings).
 Configuration is specified in a YAML or JSON format, and can be read from a file using `config.GetOrLoadFromFile(path string)` 
 or can be loaded from a local buffer using `config.GetOrLoadFromData(data []byte)`.
 You can see details on the configuration options in the V3IO TSDB [**config.go**](pkg/config/config.go) source file.
-A template configuration file is found at **examples/v3io.yaml.template**.
+A template configuration file is found at **examples/v3io-tsdb-config.yaml.template**.
 You can use it as a reference for creating your own TSDB configuration file.
 For example:
 
@@ -149,7 +149,7 @@ Following is an example of code for creating an adapter:
 
 ```go
 	// create configuration object from file
-	cfg, err := config.GetOrLoadFromFile("v3io.yaml")
+	cfg, err := config.GetOrLoadFromFile("v3io-tsdb-config.yaml")
 	if err != nil {
 		// TODO: handle error
 	}
@@ -199,8 +199,8 @@ The `Querier` interface is used to query the database and return one or more met
 and specify the query window (min and max times), once we did we can use `Select()` or `SelectOverlap()` commands which will 
 return a list of series (as an iterator object).
 
-Every returned series have two interfaces, `Labels()` which returns the series or aggregator labels, and `Iterator()`
-which returns an iterator over the series or aggregator values.
+Every returned series have two interfaces, `Labels()` which returns the series or aggregate labels, and `Iterator()`
+which returns an iterator over the series or aggregate values.
 
 The `Select()` call accepts 4 parameters:
 * name (string) - optional, metric type (e.g. cpu, memory, ..), specifying it accelerate performance (use range queries)   
