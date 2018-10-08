@@ -161,7 +161,7 @@ func (cs *chunkStore) processGetResp(mc *MetricsCache, metric *MetricState, resp
 	cs.chunks[0].state |= chunkStateFirst
 
 	latencyNano := time.Now().UnixNano() - resp.Request().CreateTimeNano
-	cs.performanceReporter.UpdateHistogram("UpdateMetricLatency", latencyNano)
+	cs.performanceReporter.UpdateHistogram("UpdateMetricLatencyHistogram", latencyNano)
 
 	if resp.Error != nil {
 		if utils.IsNotExistsError(resp.Error) {
