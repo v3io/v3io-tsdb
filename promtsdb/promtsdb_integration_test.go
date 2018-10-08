@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/prometheus/prometheus/pkg/labels"
 	"github.com/prometheus/prometheus/storage"
+	"github.com/v3io/v3io-tsdb/pkg/aggregate"
 	"github.com/v3io/v3io-tsdb/pkg/config"
 	"github.com/v3io/v3io-tsdb/pkg/partmgr"
 	"math/rand"
@@ -20,7 +21,7 @@ func TestTsdbIntegration(t *testing.T) {
 
 	d, h := partmgr.TimeToDHM(basetime)
 	fmt.Println("base=", d, h)
-	cfg, err := config.GetOrLoadFromFile("../v3io.yaml")
+	cfg, err := config.GetOrLoadFromFile("../v3io-tsdb-config.yaml")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -55,7 +56,7 @@ func TestTsdbIntegration(t *testing.T) {
 	}
 
 	match := labels.Matcher{Type: labels.MatchEqual, Name: "__name__", Value: "http_req"}
-	match2 := labels.Matcher{Type: labels.MatchEqual, Name: "Aggregator", Value: "count,avg,sum"}
+	match2 := labels.Matcher{Type: labels.MatchEqual, Name: aggregate.AggregateLabel, Value: "count,avg,sum"}
 	//params := storage.SelectParams{Func: "count,avg,sum", Step: 1000 * 3600}
 	params := storage.SelectParams{Func: "", Step: 0}
 	set, err := qry.Select(&params, &match, &match2)

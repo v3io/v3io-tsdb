@@ -27,6 +27,7 @@ import (
 	"github.com/nuclio/logger"
 	"github.com/stretchr/testify/assert"
 	"github.com/v3io/v3io-tsdb/internal/pkg/performance"
+	"github.com/v3io/v3io-tsdb/pkg/aggregate"
 	"github.com/v3io/v3io-tsdb/pkg/config"
 	"github.com/v3io/v3io-tsdb/pkg/tsdb"
 	"github.com/v3io/v3io-tsdb/pkg/tsdb/tsdbtest"
@@ -180,7 +181,7 @@ func testAggregatesCase(t *testing.T, testConfig *TestConfig) {
 
 		series := set.At()
 		lset := series.Labels()
-		aggr := lset.Get("Aggregator")
+		aggr := lset.Get(aggregate.AggregateLabel)
 		testConfig.logger.Debug(fmt.Sprintf("\nLables: %v", lset))
 
 		iter := series.Iterator()

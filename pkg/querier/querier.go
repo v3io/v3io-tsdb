@@ -202,7 +202,7 @@ func (q *V3ioQuerier) queryNumericPartition(
 			newSet.interval = step
 			newSet.aggrIdx = newAggrSeries.NumFunctions() - 1
 			newSet.overlapWin = windows
-			newSet.noAggrLbl = q.disableClientAggr // Don't add an "Aggregator" label in Prometheus
+			newSet.noAggrLbl = q.disableClientAggr // Don't add an "Aggregate" label in Prometheus (see aggregate.AggregateLabel)
 		}
 	}
 

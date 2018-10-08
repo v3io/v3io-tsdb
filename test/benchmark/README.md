@@ -9,7 +9,7 @@
 
 You can optionally create a TSDB configuration file instead of setting the relevant configuration using TSDB CLI configuration flags.
 Use the example configuration-file template at **examples/** as a reference.
-By default, the TSDB CLI (**tsbbctl**) looks for a **v3io.yaml** file in the current directory.
+By default, the TSDB CLI (**tsbbctl**) looks for a **v3io-tsdb-config.yaml** file in the current directory.
 
 ### Create a TSDB Instance Using the TSDB CLI
 
@@ -35,7 +35,7 @@ You can use the following shell script as a reference:
     # web-gateway service endpoint and authentication credentials and the
     # parent data container using the CLI -s, -u, -p, and -c flags.
     SCRIPTPATH="$( cd "$(dirname "$0")" ; pwd -P )"
-    $SCRIPTPATH/tsdbctl create -t $TSDB_PATH -r 1/s -a count,sum,min,max -i 5 -v -g $SCRIPTPATH/v3io-custom.yaml
+    $SCRIPTPATH/tsdbctl create -t $TSDB_PATH -r 1/s -a count,sum,min,max -i 5 -v -g $SCRIPTPATH/v3io-tsdb-custom.yaml
     
     echo Done.
 ```
@@ -52,7 +52,7 @@ Define the following environment variables.
 > **Note:** You can also define variables locally in a script or in the command line from which the relevant command is executed.
 
 ```bash 
-    V3IO_CONF="$HOME/go/bin/v3io-custom.yaml"
+    V3IO_TSDB_CONFIG="$HOME/go/bin/v3io-custom.yaml"
     TSDB_BENCH_INGEST_CONFIG="$HOME/go/bin/tsdb-bench-test-config.yaml"
 ```
 
@@ -84,7 +84,7 @@ Use the following script as a reference:
     
     # Note: You can select either the "-bench=^BenchmarkIngest$" or
     # "-bench=^BenchmarkIngestWithNuclio$" test.
-    time V3IO_CONF="$HOME/go/bin/v3io-custom.yaml" TSDB_BENCH_INGEST_CONFIG="$HOME/go/bin/tsdb-bench-test-config.yaml" go test -benchtime $BENCH_TIME -run=DO_NOT_RUN_TESTS -bench=^BenchmarkIngest$ ../../test/benchmark
+    time V3IO_TSDB_CONFIG="$HOME/go/bin/v3io-custom.yaml" TSDB_BENCH_INGEST_CONFIG="$HOME/go/bin/tsdb-bench-test-config.yaml" go test -benchtime $BENCH_TIME -run=DO_NOT_RUN_TESTS -bench=^BenchmarkIngest$ ../../test/benchmark
     
     echo Done
 ```
@@ -107,7 +107,7 @@ You can use the following shell script example to query counts for all types of 
     GOBIN=$HOME/go/bin
     LOOK_BACK_DURATION=72h
     TSDB_AGGREGATION_INTERVAL=5m
-    V3IO_CONF=$GOBIN/v3io-custom.yaml
+    V3IO_TSDB_CONFIG=$GOBIN/v3io-custom.yaml
     
     for x in {A..Z}
     do

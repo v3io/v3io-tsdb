@@ -26,7 +26,7 @@ import (
 	"math"
 )
 
-type Aggregator interface {
+type Aggregate interface {
 	Aggregate(t int64, v float64)
 	Clear()
 	GetAttr() string
@@ -35,113 +35,113 @@ type Aggregator interface {
 	InitExpr(col string, buckets int) string
 }
 
-// Count aggregator
-type CountAggregator struct {
+// Count aggregate
+type CountAggregate struct {
 	count int
 }
 
-func (a *CountAggregator) Aggregate(t int64, v float64) { a.count++ }
-func (a *CountAggregator) Clear()                       { a.count = 0 }
-func (a *CountAggregator) GetAttr() string              { return "count" }
+func (a *CountAggregate) Aggregate(t int64, v float64) { a.count++ }
+func (a *CountAggregate) Clear()                       { a.count = 0 }
+func (a *CountAggregate) GetAttr() string              { return "count" }
 
-func (a *CountAggregator) UpdateExpr(col string, bucket int) string {
+func (a *CountAggregate) UpdateExpr(col string, bucket int) string {
 	return fmt.Sprintf("_%s_count[%d]=_%s_count[%d]+%d;", col, bucket, col, bucket, a.count)
 }
 
-func (a *CountAggregator) SetExpr(col string, bucket int) string {
+func (a *CountAggregate) SetExpr(col string, bucket int) string {
 	return fmt.Sprintf("_%s_count[%d]=%d;", col, bucket, a.count)
 }
 
-func (a *CountAggregator) InitExpr(col string, buckets int) string {
+func (a *CountAggregate) InitExpr(col string, buckets int) string {
 	return fmt.Sprintf("_%s_count=init_array(%d,'int');", col, buckets)
 }
 
-// base float64 Aggregator
-type FloatAggregator struct {
+// base float64 Aggregate
+type FloatAggregate struct {
 	val  float64
 	attr string
 }
 
-func (a *FloatAggregator) Clear()          { a.val = 0 }
-func (a *FloatAggregator) GetAttr() string { return a.attr }
-func (a *FloatAggregator) GetVal() float64 { return a.val }
-func (a *FloatAggregator) SetExpr(col string, bucket int) string {
+func (a *FloatAggregate) Clear()          { a.val = 0 }
+func (a *FloatAggregate) GetAttr() string { return a.attr }
+func (a *FloatAggregate) GetVal() float64 { return a.val }
+func (a *FloatAggregate) SetExpr(col string, bucket int) string {
 	return fmt.Sprintf("_%s_%s[%d]=%s;", col, a.attr, bucket, utils.FloatToNormalizedScientificStr(a.val))
 }
 
-func (a *FloatAggregator) UpdateExpr(col string, bucket int) string {
+func (a *FloatAggregate) UpdateExpr(col string, bucket int) string {
 	return fmt.Sprintf("_%s_%s[%d]=_%s_%s[%d]+%s;", col, a.attr, bucket, col, a.attr, bucket,
 		utils.FloatToNormalizedScientificStr(a.val))
 }
 
-func (a *FloatAggregator) InitExpr(col string, buckets int) string {
+func (a *FloatAggregate) InitExpr(col string, buckets int) string {
 	return fmt.Sprintf("_%s_%s=init_array(%d,'double',%f);", col, a.attr, buckets, a.val)
 }
 
-// Sum Aggregator
-type SumAggregator struct{ FloatAggregator }
+// Sum Aggregate
+type SumAggregate struct{ FloatAggregate }
 
-func (a *SumAggregator) Aggregate(t int64, v float64) {
+func (a *SumAggregate) Aggregate(t int64, v float64) {
 	if utils.IsDefined(v) {
 		a.val += v
 	}
 }
 
-// Power of 2 Aggregator
-type SqrAggregator struct{ FloatAggregator }
+// Power of 2 Aggregate
+type SqrAggregate struct{ FloatAggregate }
 
-func (a *SqrAggregator) Aggregate(t int64, v float64) {
+func (a *SqrAggregate) Aggregate(t int64, v float64) {
 	if utils.IsDefined(v) {
 		a.val += v * v
 	}
 }
 
-// Minimum Aggregator
-type MinAggregator struct{ FloatAggregator }
+// Minimum Aggregate
+type MinAggregate struct{ FloatAggregate }
 
-func (a *MinAggregator) Clear() { a.val = math.Inf(1) }
+func (a *MinAggregate) Clear() { a.val = math.Inf(1) }
 
-func (a *MinAggregator) Aggregate(t int64, v float64) {
+func (a *MinAggregate) Aggregate(t int64, v float64) {
 	if v < a.val {
 		a.val = v
 	}
 }
-func (a *MinAggregator) UpdateExpr(col string, bucket int) string {
+func (a *MinAggregate) UpdateExpr(col string, bucket int) string {
 	return fmt.Sprintf("_%s_%s[%d]=min(_%s_%s[%d],%s);", col, a.attr, bucket, col, a.attr, bucket,
 		utils.FloatToNormalizedScientificStr(a.val))
 }
 
-// Maximum Aggregator
-type MaxAggregator struct{ FloatAggregator }
+// Maximum Aggregate
+type MaxAggregate struct{ FloatAggregate }
 
-func (a *MaxAggregator) Clear() { a.val = math.Inf(-1) }
+func (a *MaxAggregate) Clear() { a.val = math.Inf(-1) }
 
-func (a *MaxAggregator) Aggregate(t int64, v float64) {
+func (a *MaxAggregate) Aggregate(t int64, v float64) {
 	if v > a.val {
 		a.val = v
 	}
 }
-func (a *MaxAggregator) UpdateExpr(col string, bucket int) string {
+func (a *MaxAggregate) UpdateExpr(col string, bucket int) string {
 	return fmt.Sprintf("_%s_%s[%d]=max(_%s_%s[%d],%s);", col, a.attr, bucket, col, a.attr, bucket,
 		utils.FloatToNormalizedScientificStr(a.val))
 }
 
-// Last value Aggregator
-type LastAggregator struct {
-	FloatAggregator
+// Last value Aggregate
+type LastAggregate struct {
+	FloatAggregate
 	lastT int64
 }
 
-func (a *LastAggregator) Clear() { a.val = math.Inf(-1) }
+func (a *LastAggregate) Clear() { a.val = math.Inf(-1) }
 
-func (a *LastAggregator) Aggregate(t int64, v float64) {
+func (a *LastAggregate) Aggregate(t int64, v float64) {
 	if t > a.lastT {
 		a.val = v
 		a.lastT = t
 	}
 }
 
-func (a *LastAggregator) UpdateExpr(col string, bucket int) string {
+func (a *LastAggregate) UpdateExpr(col string, bucket int) string {
 	if utils.IsUndefined(a.val) {
 		return ""
 	}

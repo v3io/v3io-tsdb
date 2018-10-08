@@ -10,7 +10,7 @@ import (
 	"testing"
 )
 
-func TestAggregators(t *testing.T) {
+func TestAggregates(t *testing.T) {
 	testCases := []struct {
 		desc               string
 		aggString          string
@@ -22,27 +22,27 @@ func TestAggregators(t *testing.T) {
 		expectFail         bool
 		ignoreReason       string
 	}{
-		{desc: "Should aggregate data with Count aggregator",
+		{desc: "Should aggregate data with Count aggregate",
 			aggString: "count",
 			data:      map[int64]float64{1: 7.5, 2: 2.5},
 			exprCol:   "v", bucket: 1,
 			expectedUpdateExpr: "_v_count[1]=_v_count[1]+2;", expectedSetExpr: "_v_count[1]=2;"},
 
-		{desc: "Should aggregate data with Sum aggregator",
+		{desc: "Should aggregate data with Sum aggregate",
 			aggString: "sum",
 			data:      map[int64]float64{1: 7.5, 2: 2.5},
 			exprCol:   "v", bucket: 1,
 			expectedUpdateExpr: fmt.Sprintf("_v_sum[1]=_v_sum[1]+%s;_v_count[1]=_v_count[1]+2;", utils.FloatToNormalizedScientificStr(10.0)),
 			expectedSetExpr:    fmt.Sprintf("_v_sum[1]=%s;_v_count[1]=2;", utils.FloatToNormalizedScientificStr(10.0))},
 
-		{desc: "Should aggregate data with Sqr aggregator",
+		{desc: "Should aggregate data with Sqr aggregate",
 			aggString: "sqr",
 			data:      map[int64]float64{1: 2.0},
 			exprCol:   "v", bucket: 1,
 			expectedUpdateExpr: fmt.Sprintf("_v_sqr[1]=_v_sqr[1]+%s;_v_count[1]=_v_count[1]+1;", utils.FloatToNormalizedScientificStr(4.0)),
 			expectedSetExpr:    fmt.Sprintf("_v_sqr[1]=%s;_v_count[1]=1;", utils.FloatToNormalizedScientificStr(4.0))},
 
-		{desc: "Should aggregate data with Min & Max aggregators",
+		{desc: "Should aggregate data with Min & Max aggregates",
 			aggString: "min,max",
 			data:      map[int64]float64{1: 7.5, 2: 2.5},
 			exprCol:   "v", bucket: 1,
@@ -52,7 +52,7 @@ func TestAggregators(t *testing.T) {
 				utils.FloatToNormalizedScientificStr(2.5),
 				utils.FloatToNormalizedScientificStr(7.5))},
 
-		{desc: "Should aggregate data with Count,Sum,Sqr,Last aggregators",
+		{desc: "Should aggregate data with Count,Sum,Sqr,Last aggregates",
 			aggString: "count,sum,sqr,last",
 			data:      map[int64]float64{1: 7.5, 2: 2.5},
 			exprCol:   "v", bucket: 1,
@@ -63,7 +63,7 @@ func TestAggregators(t *testing.T) {
 				utils.FloatToNormalizedScientificStr(10.0),
 				utils.FloatToNormalizedScientificStr(62.5), utils.FloatToNormalizedScientificStr(2.5))},
 
-		{desc: "Should aggregate data with Wildcard aggregators",
+		{desc: "Should aggregate data with Wildcard aggregates",
 			aggString: "*",
 			data:      map[int64]float64{1: 7.5, 2: 2.5},
 			exprCol:   "v", bucket: 1,
@@ -79,13 +79,13 @@ func TestAggregators(t *testing.T) {
 				utils.FloatToNormalizedScientificStr(2.5), utils.FloatToNormalizedScientificStr(7.5),
 				utils.FloatToNormalizedScientificStr(2.5))},
 
-		{desc: "Should aggregate data with Bad aggregator",
+		{desc: "Should aggregate data with Bad aggregate",
 			aggString: "not-real",
 			data:      map[int64]float64{1: 7.5, 2: 2.5},
 			exprCol:   "v", bucket: 1,
 			expectedUpdateExpr: "_v_count[1]=_v_count[1]+2;", expectedSetExpr: "_v_count[1]=2;", expectFail: true},
 
-		{desc: "Should aggregate data when specifying aggregators with sapces",
+		{desc: "Should aggregate data when specifying aggregates with sapces",
 			aggString: "min , max   ",
 			data:      map[int64]float64{1: 7.5, 2: 2.5},
 			exprCol:   "v", bucket: 1,
@@ -94,7 +94,7 @@ func TestAggregators(t *testing.T) {
 			expectedSetExpr: fmt.Sprintf("_v_min[1]=%s;_v_max[1]=%s;_v_count[1]=2;",
 				utils.FloatToNormalizedScientificStr(2.5), utils.FloatToNormalizedScientificStr(7.5))},
 
-		{desc: "Should aggregate data when specifying aggregators with empty values",
+		{desc: "Should aggregate data when specifying aggregates with empty values",
 			aggString: "min , ,max   ",
 			data:      map[int64]float64{1: 7.5, 2: 2.5},
 			exprCol:   "v", bucket: 1,
@@ -110,16 +110,16 @@ func TestAggregators(t *testing.T) {
 			if test.ignoreReason != "" {
 				t.Skip(test.ignoreReason)
 			}
-			testAggregatorCase(t, test.aggString, test.data, test.exprCol, test.bucket, test.expectedUpdateExpr,
+			testAggregateCase(t, test.aggString, test.data, test.exprCol, test.bucket, test.expectedUpdateExpr,
 				test.expectedSetExpr, test.expectFail)
 		})
 	}
 }
 
-func testAggregatorCase(t *testing.T, aggString string, data map[int64]float64, exprCol string, bucket int,
+func testAggregateCase(t *testing.T, aggString string, data map[int64]float64, exprCol string, bucket int,
 	expectedUpdateExpr string, expectedSetExpr string, expectFail bool) {
 
-	aggregator, err := AggrsFromString(strings.Split(aggString, ","))
+	aggregates, err := AggrsFromString(strings.Split(aggString, ","))
 	if err != nil {
 		if !expectFail {
 			t.Fatal(err)
@@ -127,17 +127,17 @@ func testAggregatorCase(t *testing.T, aggString string, data map[int64]float64, 
 			return
 		}
 	}
-	aggregatorList := NewAggregatorList(aggregator)
+	aggregatesList := NewAggregatesList(aggregates)
 
 	for k, v := range data {
-		aggregatorList.Aggregate(k, v)
+		aggregatesList.Aggregate(k, v)
 	}
 
-	actualUpdateExpr := strings.Split(aggregatorList.UpdateExpr(exprCol, bucket), ";")
+	actualUpdateExpr := strings.Split(aggregatesList.UpdateExpr(exprCol, bucket), ";")
 	expectedUpdateExprSet := strings.Split(expectedUpdateExpr, ";")
 	assert.ElementsMatch(t, actualUpdateExpr, expectedUpdateExprSet)
 
-	actualSetExpr := strings.Split(aggregatorList.SetExpr(exprCol, bucket), ";")
+	actualSetExpr := strings.Split(aggregatesList.SetExpr(exprCol, bucket), ";")
 	expectedSetExprSet := strings.Split(expectedSetExpr, ";")
 	assert.ElementsMatch(t, actualSetExpr, expectedSetExprSet)
 }

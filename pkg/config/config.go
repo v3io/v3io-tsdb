@@ -30,8 +30,8 @@ import (
 )
 
 const (
-	V3ioConfigEnvironmentVariable = "V3IO_CONF"
-	DefaultConfigurationFileName  = "v3io.yaml"
+	V3ioConfigEnvironmentVariable = "V3IO_TSDB_CONFIG"
+	DefaultConfigurationFileName  = "v3io-tsdb-config.yaml"
 	SchemaConfigFileName          = ".schema"
 
 	defaultNumberOfIngestWorkers = 1
@@ -101,7 +101,7 @@ type V3ioConfig struct {
 	// Maximum chunk size, in bytes (for the worst compression scenario)
 	MaximumChunkSize int `json:"maximumChunkSize,omitempty"`
 	// Number of sharding buckets
-	ShardingBucketsCount int `json:"shardingBuckets,omitempty"`
+	ShardingBucketsCount int `json:"shardingBucketsCount,omitempty"`
 	// Metrics-reporter configuration
 	MetricsReporter MetricsReporterConfig `json:"performance,omitempty"`
 	// Don't aggregate from raw chunks, for use when working as a Prometheus
@@ -121,8 +121,8 @@ type MetricsReporterConfig struct {
 }
 
 type Rollup struct {
-	Aggregators            []string `json:"aggregators"`
-	AggregatorsGranularity string   `json:"aggregatorsGranularity"`
+	Aggregates             []string `json:"aggregates"`
+	AggregationGranularity string   `json:"aggregationGranularity"`
 	// Storage class for the aggregates and sample chunks - "cloud" | "local"
 	StorageClass string `json:"storageClass"`
 	// [FUTURE] Sample retention period, in hours. 0 means no need to save samples.
@@ -135,15 +135,15 @@ type Rollup struct {
 type TableSchema struct {
 	Version              int      `json:"version"`
 	RollupLayers         []Rollup `json:"rollupLayers"`
-	ShardingBucketsCount int      `json:"shardingBuckets"`
+	ShardingBucketsCount int      `json:"shardingBucketsCount"`
 	PartitionerInterval  string   `json:"partitionerInterval"`
 	ChunckerInterval     string   `json:"chunckerInterval"`
 }
 
 type PartitionSchema struct {
 	Version                int      `json:"version"`
-	Aggregators            []string `json:"aggregators"`
-	AggregatorsGranularity string   `json:"aggregatorsGranularity"`
+	Aggregates             []string `json:"aggregates"`
+	AggregationGranularity string   `json:"aggregationGranularity"`
 	StorageClass           string   `json:"storageClass"`
 	SampleRetention        int      `json:"sampleRetention"`
 	PartitionerInterval    string   `json:"partitionerInterval"`

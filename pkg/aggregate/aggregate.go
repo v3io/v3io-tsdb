@@ -31,6 +31,8 @@ type AggrType uint16
 
 // Aggregation functions
 const (
+	AggregateLabel = "Aggregate"
+
 	aggrTypeCount AggrType = 1
 	aggrTypeSum   AggrType = 2
 	aggrTypeSqr   AggrType = 4
@@ -46,7 +48,7 @@ const (
 	aggrTypeAll    AggrType = 0xffff
 )
 
-var rawAggregators = []AggrType{aggrTypeCount, aggrTypeSum, aggrTypeSqr, aggrTypeMax, aggrTypeMin, aggrTypeLast}
+var rawAggregates = []AggrType{aggrTypeCount, aggrTypeSum, aggrTypeSqr, aggrTypeMax, aggrTypeMin, aggrTypeLast}
 
 var aggrTypeString = map[string]AggrType{
 	"count": aggrTypeCount, "sum": aggrTypeSum, "sqr": aggrTypeSqr, "max": aggrTypeMax, "min": aggrTypeMin,
@@ -76,9 +78,9 @@ func (a AggrType) HasAverage() bool {
 	return (a & aggrTypeAvg) == aggrTypeAvg
 }
 
-func SchemaFieldFromString(aggregators []string, col string) ([]config.SchemaField, error) {
-	fieldList := make([]config.SchemaField, 0, len(aggregators))
-	for _, s := range aggregators {
+func SchemaFieldFromString(aggregates []string, col string) ([]config.SchemaField, error) {
+	fieldList := make([]config.SchemaField, 0, len(aggregates))
+	for _, s := range aggregates {
 		trimmed := strings.TrimSpace(s)
 		if trimmed != "" {
 			if trimmed == "*" {
@@ -107,14 +109,14 @@ func getAggrFullName(field config.SchemaField, col string) config.SchemaField {
 
 func (a AggrType) String() string { return aggrToString[a] }
 
-func AggregatorsToStringList(aggregators string) ([]string, error) {
-	aggrs := strings.Split(aggregators, ",")
+func AggregatesToStringList(aggregates string) ([]string, error) {
+	aggrs := strings.Split(aggregates, ",")
 	aggType, err := AggrsFromString(aggrs)
 	if err != nil {
 		return nil, err
 	}
 	var list []string
-	for _, aggr := range rawAggregators {
+	for _, aggr := range rawAggregates {
 		if aggr&aggType != 0 {
 			list = append(list, aggrToString[aggr])
 		}
@@ -126,7 +128,7 @@ func AggregatorsToStringList(aggregators string) ([]string, error) {
 // Convert a comma-separated aggregation-functions string to an aggregates mask
 func AggrsFromString(split []string) (AggrType, error) {
 	var aggrList AggrType
-	var hasAggregators bool
+	var hasAggregates bool
 	for _, s := range split {
 		trimmed := strings.TrimSpace(s)
 		if trimmed != "" {
@@ -134,46 +136,46 @@ func AggrsFromString(split []string) (AggrType, error) {
 			if !ok {
 				return aggrList, fmt.Errorf("Invalid aggragate type: '%s'", s)
 			}
-			hasAggregators = true
+			hasAggregates = true
 			aggrList = aggrList | aggr
 		}
 	}
-	// Always have count aggregator by default
-	if hasAggregators {
+	// Always have count aggregate by default
+	if hasAggregates {
 		aggrList = aggrList | aggrTypeCount
 	}
 	return aggrList, nil
 }
 
 // Create a list of aggregate objects from an aggregates mask
-func NewAggregatorList(aggrType AggrType) *AggregatorList {
-	list := AggregatorList{}
+func NewAggregatesList(aggrType AggrType) *AggregatesList {
+	list := AggregatesList{}
 	if (aggrType & aggrTypeCount) != 0 {
-		list = append(list, &CountAggregator{})
+		list = append(list, &CountAggregate{})
 	}
 	if (aggrType & aggrTypeSum) != 0 {
-		list = append(list, &SumAggregator{FloatAggregator{attr: "sum"}})
+		list = append(list, &SumAggregate{FloatAggregate{attr: "sum"}})
 	}
 	if (aggrType & aggrTypeSqr) != 0 {
-		list = append(list, &SqrAggregator{FloatAggregator{attr: "sqr"}})
+		list = append(list, &SqrAggregate{FloatAggregate{attr: "sqr"}})
 	}
 	if (aggrType & aggrTypeMin) != 0 {
-		list = append(list, &MinAggregator{FloatAggregator{attr: "min", val: math.Inf(1)}})
+		list = append(list, &MinAggregate{FloatAggregate{attr: "min", val: math.Inf(1)}})
 	}
 	if (aggrType & aggrTypeMax) != 0 {
-		list = append(list, &MaxAggregator{FloatAggregator{attr: "max", val: math.Inf(-1)}})
+		list = append(list, &MaxAggregate{FloatAggregate{attr: "max", val: math.Inf(-1)}})
 	}
 	if (aggrType & aggrTypeLast) != 0 {
-		list = append(list, &LastAggregator{FloatAggregator{attr: "last", val: math.Inf(-1)}, 0})
+		list = append(list, &LastAggregate{FloatAggregate{attr: "last", val: math.Inf(-1)}, 0})
 	}
 	return &list
 }
 
 // List of aggregates
-type AggregatorList []Aggregator
+type AggregatesList []Aggregate
 
 // Append a value to all aggregates
-func (a AggregatorList) Aggregate(t int64, val interface{}) {
+func (a AggregatesList) Aggregate(t int64, val interface{}) {
 	v := val.(float64)
 	for _, aggr := range a {
 		aggr.Aggregate(t, v)
@@ -181,7 +183,7 @@ func (a AggregatorList) Aggregate(t int64, val interface{}) {
 }
 
 // Return an update expression for the aggregates in the given aggregates list
-func (a AggregatorList) UpdateExpr(col string, bucket int) string {
+func (a AggregatesList) UpdateExpr(col string, bucket int) string {
 	expr := ""
 	for _, aggr := range a {
 		expr = expr + aggr.UpdateExpr(col, bucket)
@@ -190,14 +192,14 @@ func (a AggregatorList) UpdateExpr(col string, bucket int) string {
 }
 
 // Return an aggregates set expression (first value) or update expression
-func (a AggregatorList) SetOrUpdateExpr(col string, bucket int, isNew bool) string {
+func (a AggregatesList) SetOrUpdateExpr(col string, bucket int, isNew bool) string {
 	if isNew {
 		return a.SetExpr(col, bucket)
 	}
 	return a.UpdateExpr(col, bucket)
 }
 
-func (a AggregatorList) SetExpr(col string, bucket int) string {
+func (a AggregatesList) SetExpr(col string, bucket int) string {
 	expr := ""
 	for _, aggr := range a {
 		expr = expr + aggr.SetExpr(col, bucket)
@@ -206,7 +208,7 @@ func (a AggregatorList) SetExpr(col string, bucket int) string {
 }
 
 // Return an aggregates array-initialization expression
-func (a AggregatorList) InitExpr(col string, buckets int) string {
+func (a AggregatesList) InitExpr(col string, buckets int) string {
 	expr := ""
 	for _, aggr := range a {
 		expr = expr + aggr.InitExpr(col, buckets)
@@ -215,7 +217,7 @@ func (a AggregatorList) InitExpr(col string, buckets int) string {
 }
 
 // Clear all aggregates
-func (a AggregatorList) Clear() {
+func (a AggregatesList) Clear() {
 	for _, aggr := range a {
 		aggr.Clear()
 	}

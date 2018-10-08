@@ -43,14 +43,14 @@ func newSchema(samplesIngestionRate, aggregationGranularity, aggregatesList stri
 		return nil, errors.Wrap(err, "Failed to calculate the chunk interval.")
 	}
 
-	aggregates, err := aggregate.AggregatorsToStringList(aggregatesList)
+	aggregates, err := aggregate.AggregatesToStringList(aggregatesList)
 	if err != nil {
 		return nil, errors.Wrapf(err, "Failed to parse aggregates list '%s'.", aggregatesList)
 	}
 
 	defaultRollup := config.Rollup{
-		Aggregators:            []string{},
-		AggregatorsGranularity: aggregationGranularity,
+		Aggregates:             []string{},
+		AggregationGranularity: aggregationGranularity,
 		StorageClass:           config.DefaultStorageClass,
 		SampleRetention:        sampleRetention,                  //TODO: make configurable
 		LayerRetentionTime:     config.DefaultLayerRetentionTime, //TODO: make configurable
@@ -76,8 +76,8 @@ func newSchema(samplesIngestionRate, aggregationGranularity, aggregatesList stri
 
 	partitionSchema := config.PartitionSchema{
 		Version:                tableSchema.Version,
-		Aggregators:            aggregates,
-		AggregatorsGranularity: config.DefaultAggregationGranularity,
+		Aggregates:             aggregates,
+		AggregationGranularity: config.DefaultAggregationGranularity,
 		StorageClass:           config.DefaultStorageClass,
 		SampleRetention:        config.DefaultSampleRetentionTime,
 		ChunckerInterval:       tableSchema.ChunckerInterval,

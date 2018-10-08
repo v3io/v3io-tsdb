@@ -1,4 +1,4 @@
-# File:         v3io.yaml.template
+# File:         v3io-tsdb-config.yaml
 # Description:  Template of a V3IO TSDB Configuration File
 
 # TODO: In your configuration file, delete the configuration keys that you
