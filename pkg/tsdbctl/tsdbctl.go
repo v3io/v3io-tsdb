@@ -72,7 +72,7 @@ func NewRootCommandeer() *RootCommandeer {
 	cmd.PersistentFlags().StringVarP(&commandeer.v3ioPath, "server", "s", defaultV3ioServer,
 		"Web-gateway (web-APIs) service endpoint of an instance of\nthe Iguazio Continuous Data Platfrom, of the format\n\"<IP address>:<port number=8081>\". Examples: \"localhost:8081\"\n(when running on the target platform); \"192.168.1.100:8081\".")
 	cmd.PersistentFlags().StringVarP(&commandeer.cfgFilePath, "config", "g", "",
-		"Path to a YAML TSDB configuration file. When this flag isn't\nset, the CLI checks for a "+config.DefaultConfigurationFileName+" configuration file in the\ncurrent directory. CLI flags override file confiugrations.\nExample: \"~/cfg/my_v3io_tsdb_cfg.yaml\".")
+		"Path to a YAML TSDB configuration file. When this flag isn't\nset, the CLI checks for a "+config.DefaultConfigurationFileName+" configuration file in the\ncurrent directory. CLI flags override file configurations.\nExample: \"~/cfg/my_v3io_tsdb_cfg.yaml\".")
 	cmd.PersistentFlags().StringVarP(&commandeer.container, "container", "c", "",
 		"The name of an Iguazio Continous Data Platform data container\nin which to create the TSDB table. Example: \"bigdata\".")
 	cmd.PersistentFlags().StringVarP(&commandeer.username, "username", "u", "",
