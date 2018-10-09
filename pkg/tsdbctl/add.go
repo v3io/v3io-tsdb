@@ -251,9 +251,6 @@ func (ac *addCommandeer) appendMetric(
 
 	ac.rootCommandeer.logger.DebugWith("Adding a sample value to a metric.", "lset", lset, "t", tarray, "v", varray)
 
-	if print {
-		fmt.Println("add:", lset, tarray, varray)
-	}
 	ref, err := append.Add(lset, tarray[0], varray[0])
 	if err != nil {
 		return 0, errors.Wrap(err, "Failed to add a sample value to a metric.")
