@@ -110,6 +110,7 @@ func (q *V3ioQuerier) selectQry(
 			return
 		}
 
+		// Bug: TSDB-37 -> TODO: Create result set while taking in account the step. If step is greater than partition interval it should return correct number of entries
 		sets := make([]SeriesSet, len(parts))
 		for i, part := range parts {
 			set, err := q.queryNumericPartition(part, name, functions, step, windows, filter)
