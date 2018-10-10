@@ -159,7 +159,7 @@ func (ac *addCommandeer) add() error {
 			return err
 		}
 
-		_, err = ac.appendMetric(appender, lset, tarray, varray, true)
+		_, err = ac.appendMetric(appender, lset, tarray, varray)
 		if err != nil {
 			return err
 		}
@@ -236,7 +236,7 @@ func (ac *addCommandeer) appendMetrics(append tsdb.Appender, lset utils.Labels) 
 			return err
 		}
 
-		_, err = ac.appendMetric(append, lset, tarray, varray, false)
+		_, err = ac.appendMetric(append, lset, tarray, varray)
 		if err != nil {
 			return err
 		}
@@ -247,7 +247,7 @@ func (ac *addCommandeer) appendMetrics(append tsdb.Appender, lset utils.Labels) 
 }
 
 func (ac *addCommandeer) appendMetric(
-	append tsdb.Appender, lset utils.Labels, tarray []int64, varray []float64, print bool) (uint64, error) {
+	append tsdb.Appender, lset utils.Labels, tarray []int64, varray []float64) (uint64, error) {
 
 	ac.rootCommandeer.logger.DebugWith("Adding a sample value to a metric.", "lset", lset, "t", tarray, "v", varray)
 
