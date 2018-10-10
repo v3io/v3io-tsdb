@@ -51,7 +51,7 @@ const (
 	DefaultAggregationGranularity = "1h"
 	DefaultLayerRetentionTime     = "1y"
 	DefaultSampleRetentionTime    = 0
-	DefaultLoggingLevel           = "debug"
+	DefaultVerboseLevel           = "debug"
 )
 
 var (
