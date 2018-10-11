@@ -31,6 +31,7 @@ import (
 	"github.com/v3io/v3io-tsdb/pkg/utils"
 	"sort"
 	"strings"
+	"time"
 )
 
 // Create a new Querier interface
@@ -87,9 +88,6 @@ func (q *V3ioQuerier) selectQry(
 	name, functions string, step int64, windows []int, filter string) (set SeriesSet, err error) {
 
 	set = nullSeriesSet{}
-
-	filter = strings.Replace(filter, "__name__", "_name", -1)
-	q.logger.DebugWith("Select query", "func", functions, "step", step, "filter", filter, "window", windows)
 	err = q.partitionMngr.ReadAndUpdateSchema()
 
 	if err != nil {
@@ -98,7 +96,8 @@ func (q *V3ioQuerier) selectQry(
 
 	q.performanceReporter.WithTimer("QueryTimer", func() {
 		filter = strings.Replace(filter, "__name__", "_name", -1)
-		q.logger.DebugWith("Select query", "func", functions, "step", step, "filter", filter, "window", windows)
+		q.logger.Debug("Select query:\n\tStart Time: %s\n\tEnd Time: %s\n\tFunction: %s\n\tStep: %d\n\tFilter: %s\n\tWindows: %v",
+			time.Unix(q.mint/1000, 0).String(), time.Unix(q.maxt/1000, 0).String(), functions, step, filter, windows)
 
 		parts := q.partitionMngr.PartsForRange(q.mint, q.maxt)
 		if len(parts) == 0 {
