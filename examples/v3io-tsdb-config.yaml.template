@@ -14,7 +14,7 @@ webApiEndpoint: "<IP address/host name>:8081"
 # Example: "bigdata"
 container: "<container name>"
 
-# Logging level (for verbose output)
+# Log level
 # Valid values: "debug" | "info" | "warn" | "error"
 logLevel: "warn"
 
