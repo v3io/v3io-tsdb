@@ -61,7 +61,7 @@ func NewRootCommandeer() *RootCommandeer {
 	defaultV3ioServer := os.Getenv("V3IO_SERVICE_URL")
 
 	cmd.PersistentFlags().StringVarP(&commandeer.logLevel, "log-level", "v", "",
-		"Verbose output. Add \"=<level>\" to set the log level -\ndebug | info | warn | error. For example: -v=warn.\n(default - \""+config.DefaultVerboseLevel+"\" when using the flag and \""+config.DefaultLogLevel+"\" otherwise)")
+		"Verbose output. Add \"=<level>\" to set the log level -\ndebug | info | warn | error. For example: -v=warn.\n(default - \""+config.DefaultVerboseLevel+"\" when using the flag; \""+config.DefaultLogLevel+"\" otherwise)")
 	cmd.PersistentFlags().Lookup("log-level").NoOptDefVal = config.DefaultVerboseLevel
 	cmd.PersistentFlags().StringVarP(&commandeer.dbPath, "table-path", "t", "",
 		"[Required] Path to the TSDB table within the configured\ndata container. Examples: \"mytsdb\"; \"/my_tsdbs/tsdbd1\".")
