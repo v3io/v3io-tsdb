@@ -89,7 +89,7 @@ func (q *V3ioQuerier) selectQry(
 	set = nullSeriesSet{}
 
 	filter = strings.Replace(filter, "__name__", "_name", -1)
-	q.logger.DebugWith("Select query", "func", functions, "step", step, "filter", filter, "window", windows)
+	q.logger.DebugWith("Select query", "metric", name, "func", functions, "step", step, "filter", filter, "window", windows)
 	err = q.partitionMngr.ReadAndUpdateSchema()
 
 	if err != nil {
@@ -98,7 +98,7 @@ func (q *V3ioQuerier) selectQry(
 
 	q.performanceReporter.WithTimer("QueryTimer", func() {
 		filter = strings.Replace(filter, "__name__", "_name", -1)
-		q.logger.DebugWith("Select query", "func", functions, "step", step, "filter", filter, "window", windows)
+		q.logger.DebugWith("Select query", "metric", name, "func", functions, "step", step, "filter", filter, "window", windows)
 
 		parts := q.partitionMngr.PartsForRange(q.mint, q.maxt)
 		if len(parts) == 0 {

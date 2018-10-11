@@ -70,7 +70,7 @@ func newCreateCommandeer(rootCommandeer *RootCommandeer) *createCommandeer {
 	// cmd.Flags().IntVarP(&commandeer.sampleRetention, "sample-retention", "r", config.DefaultSampleRetentionHours,
 	//	"Metric-samples retention period, in hours. Example: 1 (retain samples for 1 hour).")
 	cmd.Flags().StringVarP(&commandeer.samplesIngestionRate, "ingestion-rate", "r", config.DefaultIngestionRate,
-		"[Required] Metric-samples ingestion rate - the maximum\ningestion rate for a single metric (calculated\naccording to the slowest expecetd ingestion rate) -\nof the format \"[0-9]+/[mhd]\" (where 'm' = minutes,\n'h' = hours, and 'd' = days). Examples: \"12/m\" (12\nsamples per minute); \"1s\" (one sample per second).")
+		"[Required] Metric-samples ingestion rate - the maximum\ningestion rate for a single metric (calculated\naccording to the slowest expected ingestion rate) -\nof the format \"[0-9]+/[mhd]\" (where 'm' = minutes,\n'h' = hours, and 'd' = days). Examples: \"12/m\" (12\nsamples per minute); \"1s\" (one sample per second).")
 
 	commandeer.cmd = cmd
 
