@@ -77,7 +77,7 @@ type V3ioConfig struct {
 	// Disabled = true disables the V3IO TSDB configuration in Prometheus and
 	// enables the internal Prometheus TSDB instead
 	Disabled bool `json:"disabled,omitempty"`
-	// Logging level (for verbose output) - "debug" | "info" | "warn" | "error"
+	// Log level - "debug" | "info" | "warn" | "error"
 	LogLevel string `json:"logLevel,omitempty"`
 	// Number of parallel V3IO worker routines
 	Workers int `json:"workers"`

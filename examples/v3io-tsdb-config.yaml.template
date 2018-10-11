@@ -4,9 +4,9 @@
 # TODO: In your configuration file, delete the configuration keys that you
 #       don't need and replace the "<...>" placeholders.
 
-# Endpoint of an Iguazio Continuous Data Platform web-gateway (web-APIs)
-# service, consisting of an IP address or resolvable host domain name, and a
-# port number (currently, always port 8081)
+# Endpoint of an Iguazio Continuous Data Platform web-gateway (web-API) service,
+# consisting of an IP address or resolvable host domain name, and a port number
+# (currently, always port 8081)
 # Example: "192.168.1.100:8081"
 webApiEndpoint: "<IP address/host name>:8081"
 
@@ -14,11 +14,11 @@ webApiEndpoint: "<IP address/host name>:8081"
 # Example: "bigdata"
 container: "<container name>"
 
-# Logging level (for verbose output)
+# Log level
 # Valid values: "debug" | "info" | "warn" | "error"
 logLevel: "warn"
 
-# Authentication credentials for the web-APIs service
+# Authentication credentials for the web-API service
 username: "<username>"
 password: "<password>"
 
