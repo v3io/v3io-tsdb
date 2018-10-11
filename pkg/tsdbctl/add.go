@@ -60,7 +60,7 @@ func newAddCommandeer(rootCommandeer *RootCommandeer) *addCommandeer {
 		Use:     "add [<metric>] [<labels>] [flags]",
 		Short:   "Add metric samples to a TSDB instance",
 		Long:    `Add (ingest) metric samples into a TSDB instance (table).`,
-		Example: `The examples assume that the endpoint of the web-gateway service, the login credentails, and
+		Example: `The examples assume that the endpoint of the web-gateway service, the login credentials, and
 the name of the data container are configured in the default configuration file (` + config.DefaultConfigurationFileName + `)
 instead of using the -s|--server, -u|--username, -p|--password, and -c|--container flags.
 - tsdbctl add temperature -t mytsdb -d 28 -m now-2h
