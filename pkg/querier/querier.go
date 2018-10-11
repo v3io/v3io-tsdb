@@ -96,8 +96,8 @@ func (q *V3ioQuerier) selectQry(
 
 	q.performanceReporter.WithTimer("QueryTimer", func() {
 		filter = strings.Replace(filter, "__name__", "_name", -1)
-		q.logger.Debug("Select query:\n\tStart Time: %s\n\tEnd Time: %s\n\tFunction: %s\n\tStep: %d\n\tFilter: %s\n\tWindows: %v",
-			time.Unix(q.mint/1000, 0).String(), time.Unix(q.maxt/1000, 0).String(), functions, step, filter, windows)
+		q.logger.Debug("Select query:\n\tMetric: %s\n\tStart Time: %s\n\tEnd Time: %s\n\tFunction: %s\n\tStep: %d\n\tFilter: %s\n\tWindows: %v",
+			name, time.Unix(q.mint/1000, 0).String(), time.Unix(q.maxt/1000, 0).String(), functions, step, filter, windows)
 
 		parts := q.partitionMngr.PartsForRange(q.mint, q.maxt)
 		if len(parts) == 0 {
