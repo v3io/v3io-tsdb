@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/nuclio/logger"
+	"github.com/pkg/errors"
 	"github.com/prometheus/prometheus/pkg/labels"
 	"github.com/prometheus/prometheus/storage"
 	"github.com/v3io/v3io-go-http"
@@ -22,6 +23,14 @@ type V3ioPromAdapter struct {
 }
 
 func NewV3ioProm(cfg *config.V3ioConfig, container *v3io.Container, logger logger.Logger) (*V3ioPromAdapter, error) {
+
+	if logger == nil {
+		newLogger, err := utils.NewLogger(cfg.LogLevel)
+		if err != nil {
+			return nil, errors.Wrap(err, "Unable to initialize logger.")
+		}
+		logger = newLogger
+	}
 
 	adapter, err := tsdb.NewV3ioAdapter(cfg, container, logger)
 	newAdapter := V3ioPromAdapter{db: adapter, logger: logger.GetChild("v3io-prom-adapter")}

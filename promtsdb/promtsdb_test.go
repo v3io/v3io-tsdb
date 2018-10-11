@@ -114,5 +114,7 @@ func TestPromTsdbSuite(t *testing.T) {
 		t.Fatalf("Unable to initialize logger. Error: %v", err)
 	}
 
-	suite.Run(t, new(testPromTsdbSuite, log))
+	testSuit := new(testPromTsdbSuite)
+	testSuit.logger = log
+	suite.Run(t, testSuit)
 }
