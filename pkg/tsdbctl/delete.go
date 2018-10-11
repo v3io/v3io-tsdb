@@ -75,7 +75,7 @@ Notes:
 	cmd.Flags().BoolVarP(&commandeer.ignoreErrors, "ignore-errors", "i", false,
 		"Ignore errors - continue deleting even if some steps fail.")
 	cmd.Flags().BoolVarP(&commandeer.force, "force", "f", false,
-		"Forcefull deletion - don't display a delete-verification prompt.")
+		"Forceful deletion - don't display a delete-verification prompt.")
 	cmd.Flags().StringVarP(&commandeer.toTime, "end", "e", "",
 		"End (maximum) time for the delete operation, as a string containing an\nRFC3339 time string, a Unix timestamp in milliseconds, or a relative\ntime of the format \"now\" or \"now-[0-9]+[mhd]\" (where 'm' = minutes,\n'h' = hours, and 'd' = \"days\"). Examples: \"2018-09-26T14:10:20Z\";\n\"1537971006000\"; \"now-3h\"; \"now-7d\". (default \"now\")")
 	cmd.Flags().StringVarP(&commandeer.fromTime, "begin", "b", "",
