@@ -107,7 +107,7 @@ Arguments:
 	}
 
 	cmd.Flags().StringVarP(&commandeer.tArr, "times", "m", "",
-		"An array of metric-sample times, as a comma-separated list of times\nspecified as Unix timestamps in milliseconds or as relative times of the\nformat \"now\" or \"now-[0-9]+[mhd]\" (where 'm' = minutes, 'h' = hours,\nand 'd' = \"days\"). Note that an ingested sample time cannot be earlier\nthan the latest previously ingested sample time for the same metric.\nThis includes metrics ingested in the same command, so specify the\ningestion times in ascending chronological order. Example:\n\"1537971020000,now-2d,now-95m,now\".\nThe default sample time is the current time (\"now\").")
+		"An array of metric-sample times, as a comma-separated list of times\nspecified as Unix timestamps in milliseconds or as relative times of the\nformat \"now\" or \"now-[0-9]+[mhd]\" (where 'm' = minutes, 'h' = hours,\nand 'd' = days). Note that an ingested sample time cannot be earlier\nthan the latest previously ingested sample time for the same metric.\nThis includes metrics ingested in the same command, so specify the\ningestion times in ascending chronological order. Example:\n\"1537971020000,now-2d,now-95m,now\".\nThe default sample time is the current time (\"now\").")
 	cmd.Flags().StringVarP(&commandeer.vArr, "values", "d", "",
 		"An array of metric-sample data values, as a comma-separated list of\ninteger or float values. Example: \"99.3,82.12,25.87,100\".\nThe command requires at least one metric value, which can be provided\nwith this flag or in a CSV file that is set with the -f|--file flag.")
 	cmd.Flags().StringVarP(&commandeer.inFile, "file", "f", "",

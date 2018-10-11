@@ -88,9 +88,9 @@ Arguments:
 	}
 
 	cmd.Flags().StringVarP(&commandeer.to, "end", "e", "",
-		"End (maximum) time for the query, as a string containing an\nRFC3339 time string, a Unix timestamp in milliseconds, or\na relative time of the format \"now\" or \"now-[0-9]+[mhd]\"\n(where 'm' = minutes, 'h' = hours, and 'd' = \"days\").\nExamples: \"2018-09-26T14:10:20Z\"; \"1537971006000\";\n\"now-3h\"; \"now-7d\". (default \"now\")")
+		"End (maximum) time for the query, as a string containing an\nRFC3339 time string, a Unix timestamp in milliseconds, or\na relative time of the format \"now\" or \"now-[0-9]+[mhd]\"\n(where 'm' = minutes, 'h' = hours, and 'd' = days).\nExamples: \"2018-09-26T14:10:20Z\"; \"1537971006000\";\n\"now-3h\"; \"now-7d\". (default \"now\")")
 	cmd.Flags().StringVarP(&commandeer.from, "begin", "b", "",
-		"Start (minimum) time for the query, as a string containing\nan RFC3339 time, a Unix timestamp in milliseconds, a\nrelative time of the format \"now\" or \"now-[0-9]+[mhd]\"\n(where 'm' = minutes, 'h' = hours, and 'd' = \"days\"), or 0\nfor the earliest time. Examples: \"2016-01-02T15:34:26Z\";\n\"1451748866\"; \"now-90m\"; \"0\". (default = <end time> - 1h)")
+		"Start (minimum) time for the query, as a string containing\nan RFC3339 time, a Unix timestamp in milliseconds, a\nrelative time of the format \"now\" or \"now-[0-9]+[mhd]\"\n(where 'm' = minutes, 'h' = hours, and 'd' = days), or 0\nfor the earliest time. Examples: \"2016-01-02T15:34:26Z\";\n\"1451748866\"; \"now-90m\"; \"0\". (default = <end time> - 1h)")
 	cmd.Flags().StringVarP(&commandeer.output, "output", "o", formatter.DefaultOutputFormat,
 		"Output format in which to display the query results -\n\"text\" | \"csv\" | \"json\".")
 	cmd.Flags().StringVarP(&commandeer.filter, "filter", "f", "",
@@ -107,7 +107,7 @@ Arguments:
 	cmd.Flags().StringVarP(&commandeer.functions, "aggregates", "a", "",
 		"Aggregation information to return, as a comma-separated\nlist of supported aggregation functions - count | avg |\nsum | min | max | stddev | stdvar | last | rate.\nExample: \"sum,min,max,count\".")
 	cmd.Flags().StringVarP(&commandeer.step, "aggregation-interval", "i", "",
-		"Aggregation interval for applying the aggregation functions\n(if set - see the -a|--aggregates flag), of the format\n\"[0-9]+[mhd]\" (where 'm' = minutes, 'h' = hours, and\n'd' = \"days\"). Examples: \"1h\"; \"150m\". (default =\n<end time> - <start time>)")
+		"Aggregation interval for applying the aggregation functions\n(if set - see the -a|--aggregates flag), of the format\n\"[0-9]+[mhd]\" (where 'm' = minutes, 'h' = hours, and\n'd' = days). Examples: \"1h\"; \"150m\". (default =\n<end time> - <start time>)")
 
 	commandeer.cmd = cmd
 
