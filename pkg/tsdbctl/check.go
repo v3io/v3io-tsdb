@@ -26,6 +26,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/v3io/v3io-go-http"
 	"github.com/v3io/v3io-tsdb/pkg/chunkenc"
+	"github.com/v3io/v3io-tsdb/pkg/config"
 	"github.com/v3io/v3io-tsdb/pkg/utils"
 	"time"
 )
@@ -43,23 +44,32 @@ func newCheckCommandeer(rootCommandeer *RootCommandeer) *checkCommandeer {
 	}
 
 	cmd := &cobra.Command{
-		Use:    "check",
-		Short:  "check TSDB metric object",
+		Use:    "check <item-path>",
 		Hidden: true,
+		Short:  "Get information about a TSDB metric item",
+		Long:   `Get information about a TSDB metric item.`,
+		Example: `The examples assume that the endpoint of the web-gateway service, the login credentials, and
+the name of the data container are configured in the default configuration file (` + config.DefaultConfigurationFileName + `)
+- tsdbctl check 1538265600/memo_1.c6b54e7ce82c2c11 -t my_tsdb -a _v12
+
+Arguments:
+- <item-path> (string) [Required] Path to a metric item within the TSDB table.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 
 			if len(args) == 0 {
-				return errors.New("check requires an object path")
+				return errors.New("The check command requires an item path.")
 			}
 
 			commandeer.objPath = args[0]
 
-			// initialize params
+			// Initialize parameters
 			return commandeer.check()
 		},
 	}
 
-	cmd.Flags().StringSliceVarP(&commandeer.attrs, "attrs", "a", []string{}, "attribute")
+	cmd.Flags().StringSliceVarP(&commandeer.attrs, "attrs", "a", []string{},
+		"[Required] An array of metric-item blob attribute names, as a\ncomma-separated list. For example: \"_v35\"; \"_v22,_v23\".")
+	cmd.MarkFlagRequired("attrs")
 
 	commandeer.cmd = cmd
 
@@ -71,7 +81,7 @@ func (cc *checkCommandeer) check() error {
 	var err error
 	var lset utils.Labels
 
-	// initialize adapter
+	// Initialize the adapter
 	if err := cc.rootCommandeer.initialize(); err != nil {
 		return err
 	}
@@ -80,25 +90,25 @@ func (cc *checkCommandeer) check() error {
 		return err
 	}
 
-	// get metric data and metadata
+	// Get metric data and metadata
 	allAttrs := append(cc.attrs, "__name", "_name", "_lset", "_maxtime")
 	container, tablePath := cc.rootCommandeer.adapter.GetContainer()
 	objPath := fmt.Sprintf("%s/%s", tablePath, cc.objPath)
 	input := v3io.GetItemInput{Path: objPath, AttributeNames: allAttrs}
 	resp, err := container.Sync.GetItem(&input)
 	if err != nil {
-		return errors.Wrap(err, "failed to GetItem")
+		return errors.Wrap(err, "GetItem failed.")
 	}
 
-	// print metadata
+	// Print the metric metadata
 	item := resp.Output.(*v3io.GetItemOutput).Item
 	objName, _ := item.GetFieldString("__name")
 	metricName, _ := item.GetFieldString("_name")
 	lsetString, _ := item.GetFieldString("_lset")
 	maxtime, _ := item.GetFieldInt("_maxtime")
-	fmt.Printf("Object: %s,  %s {%s}  maxtime: %d\n", objName, metricName, lsetString, maxtime)
+	fmt.Printf("Metric Item: %s,  %s {%s}  maxtime: %d\n", objName, metricName, lsetString, maxtime)
 
-	// decompress and print metrics
+	// Decompress and print metrics
 	for _, attr := range cc.attrs {
 
 		values := item.GetField(attr)
@@ -108,7 +118,7 @@ func (cc *checkCommandeer) check() error {
 			bytes := values.([]byte)
 			chunk, err := chunkenc.FromData(cc.rootCommandeer.logger, chunkenc.EncXOR, bytes, 0)
 			if err != nil {
-				cc.rootCommandeer.logger.ErrorWith("Error reading chunk buffer", "Lset", lset, "err", err)
+				cc.rootCommandeer.logger.ErrorWith("Error reading chunk buffer.", "Lset", lset, "err", err)
 				return err
 			} else {
 				count := 0
@@ -116,11 +126,11 @@ func (cc *checkCommandeer) check() error {
 				for iter.Next() {
 					t, v := iter.At()
 					tstr := time.Unix(int64(t/1000), 0).UTC().Format(time.RFC3339)
-					fmt.Printf("unix=%d, t=%s, v=%.4f \n", t, tstr, v)
+					fmt.Printf("Unix timestamp=%d, t=%s, v=%.4f \n", t, tstr, v)
 					count++
 				}
 				if iter.Err() != nil {
-					return errors.Wrap(iter.Err(), "failed to read iterator")
+					return errors.Wrap(iter.Err(), "Failed to read the iterator.")
 				}
 
 				compressionRatio := 0.0
@@ -128,7 +138,7 @@ func (cc *checkCommandeer) check() error {
 				if count > 0 {
 					compressionRatio = float64(bytesCount) / float64(count)
 				}
-				fmt.Printf("Total Size: %d, Count: %d. Compression ratio: %.2f\n",
+				fmt.Printf("Total size=%d, Count=%d, Compression ratio=%.2f\n",
 					bytesCount, count, compressionRatio)
 			}
 		}

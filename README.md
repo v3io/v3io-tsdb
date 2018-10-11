@@ -69,7 +69,7 @@ The code is separated to Prometheus compliant adapter in [/promtsdb](promtsdb) a
 [v3iotsdb_test.go](/pkg/tsdb/v3iotsdb_test.go), both have similar semantics.
 
 For Prometheus you would need to use the fork found in `https://github.com/v3io/prometheus`, it already loads this
-library, you would need to place a `v3io.yaml` file with relevant configuration in the same folder as the Prometheus
+library, you would need to place a `v3io-tsdb-config.yaml` file with relevant configuration in the same folder as the Prometheus
 executable (see details on configurations below).
 
 A developer using this library should first create a TSDB, this can be done using the CLI or an API call (`CreateTSDB`) 
@@ -102,20 +102,20 @@ For use with nuclio function you can see function example under [\nuclio](exampl
 ### Creating and Configuring a TSDB Adapter 
 
 The first step is to create a TSDB, this is done only once per TSDB and generates the required metadata and configuration
-such as partitioning strategy, retention, aggregators, etc. this can be done via the CLI or a function call.
+such as partitioning strategy, retention, aggregates, etc. this can be done via the CLI or a function call.
 
 ```go
 	// Load v3io connection/path details (see YAML below)
-	v3iocfg, err := config.GetOrLoadFromFile("v3io.yaml")
+	v3iocfg, err := config.GetOrLoadFromFile("v3io-tsdb-config.yaml")
 	if err != nil {
 		// TODO: handle error
 	}
 
 	// Specify the default DB configuration (can be modified per partition)
-	sampleRate = "1/s"
-	aggregatorGranularity = "1h"
+	samplesIngestionRate = "1/s"
+	aggregationGranularity = "1h"
 	aggregatesList = "scount,avg,min,max"
-	schema, err := schema.NewSchema(v3iocfg, sampleRate, aggregatorGranularity, aggregatesList)
+	schema, err := schema.NewSchema(v3iocfg, samplesIngestionRate, aggregationGranularity, aggregatesList)
 	if err != nil {
 		// TODO: handle error
 	}
@@ -132,22 +132,24 @@ parameters: the configuration structure, v3io data container object and logger o
 you already have container and logger (when using nuclio data bindings).
 
 Configuration is specified in a YAML or JSON format, and can be read from a file using `config.GetOrLoadFromFile(path string)` 
-or can be loaded from a local buffer using `config.GetOrLoadFromData(data []byte)`. You can see details on the configuration
-options in [config](internal/pkg/config/config.go), a minimal configuration looks like: 
+or can be loaded from a local buffer using `config.GetOrLoadFromData(data []byte)`.
+You can see details on the configuration options in the V3IO TSDB [**config.go**](pkg/config/config.go) source file.
+A template configuration file is found at **examples/v3io-tsdb-config.yaml.template**.
+You can use it as a reference for creating your own TSDB configuration file.
+For example:
 
 ```yaml
-v3ioUrl: "v3io address:port"
+webApiEndpoint: "192.168.1.100:8081"
 container: "tsdb"
-path: performance
-username: "<username>"
-password: "<password>"
+username: "johnd"
+password: "OpenSesame"
 ```
 
-example of creating an adapter:
+Following is an example of code for creating an adapter:
 
 ```go
 	// create configuration object from file
-	cfg, err := config.GetOrLoadFromFile("v3io.yaml")
+	cfg, err := config.GetOrLoadFromFile("v3io-tsdb-config.yaml")
 	if err != nil {
 		// TODO: handle error
 	}
@@ -175,8 +177,8 @@ Example:
 
 	// create metrics labels, `__name__` label specify the metric type (e.g. cpu, temperature, ..)
 	// the other labels can be used in searches (filtering or grouping) or aggregations
-	// use utils.FromStrings(s ...string) for string list input or utils.FromMap(m map[string]string) for map input
-	lset := utils.FromStrings("__name__","http_req", "method", "post")
+	// use utils.LabelsFromStrings(s ...string) for string list input or utils.LabelsFromMap(m map[string]string) for map input
+	lset := utils.LabelsFromStrings("__name__","http_req", "method", "post")
 
 	// Add a sample with current time (in milisec) and the value of 7.9
 	ref, err := appender.Add(lset, time.Now().Unix * 1000, 7.9)
@@ -197,8 +199,8 @@ The `Querier` interface is used to query the database and return one or more met
 and specify the query window (min and max times), once we did we can use `Select()` or `SelectOverlap()` commands which will 
 return a list of series (as an iterator object).
 
-Every returned series have two interfaces, `Labels()` which returns the series or aggregator labels, and `Iterator()`
-which returns an iterator over the series or aggregator values.
+Every returned series have two interfaces, `Labels()` which returns the series or aggregate labels, and `Iterator()`
+which returns an iterator over the series or aggregate values.
 
 The `Select()` call accepts 4 parameters:
 * name (string) - optional, metric type (e.g. cpu, memory, ..), specifying it accelerate performance (use range queries)   
@@ -208,7 +210,7 @@ The `Select()` call accepts 4 parameters:
 
 using `functions` and `step` is optional, use it only when you are interested in pre-aggregation and the step is >> than 
 the sampling interval (and preferably equal or greater than the partition RollupMin interval). when using aggregates it will
-return one series per aggregate function, the `Aggregator` label will be added to that series with the function name.
+return one series per aggregate function, the `Aggregate` label will be added to that series with the function name.
 
 In some cases we would like to retrieve overlapping aggregates instead of fixed interval ones, e.g. stats for last 1hr, 6hr, 24hr
 the `SelectOverlap()` call adds the `win` integer array ([]int) which allow specifying the requested windows. the windows are 

@@ -10,12 +10,14 @@ import (
 	"time"
 )
 
+const DefaultOutputFormat = "text"
+
 func NewFormatter(format string, cfg *FormatterConfig) (Formatter, error) {
 	if cfg == nil {
 		cfg = &FormatterConfig{TimeFormat: time.RFC3339}
 	}
 	switch format {
-	case "", "text":
+	case "", DefaultOutputFormat:
 		return textFormatter{baseFormatter{cfg: cfg}}, nil
 	case "csv":
 		return csvFormatter{baseFormatter{cfg: cfg}}, nil

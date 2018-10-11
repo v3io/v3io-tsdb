@@ -46,7 +46,7 @@ func BenchmarkIngest(b *testing.B) {
 	}
 
 	// Create test path (tsdb instance)
-	tsdbPath := tsdbtest.NormalizePath(fmt.Sprintf("tsdb-%s-%d-%s", b.Name(), b.N, time.Now().Format(time.RFC3339)))
+	tsdbPath := tsdbtest.PrefixTablePath(tsdbtest.NormalizePath(fmt.Sprintf("tsdb-%s-%d-%s", b.Name(), b.N, time.Now().Format(time.RFC3339))))
 
 	// Update TSDB instance path for this test
 	v3ioConfig.TablePath = tsdbPath
@@ -109,24 +109,28 @@ func BenchmarkIngest(b *testing.B) {
 	testLimit := samplesCount * int(timestampsCount)
 
 	b.StartTimer()
-	for i := 0; i < b.N; i++ {
-		rowsAdded, err := runTest(i, appender, timestamps, sampleTemplates, refs,
-			testConfig.AppendOneByOne, testConfig.BatchSize, testConfig.Verbose, testConfig.ValidateRawData)
 
-		if err != nil {
-			b.Fatal(err)
+	var ec int
+	withTimer(b, fmt.Sprintf("BenchmarkIngest-%d -> Table: %s", b.N, tsdbPath), func() {
+		for i := 0; i < b.N; i++ {
+			rowsAdded, err := runTest(i, appender, timestamps, sampleTemplates, refs,
+				testConfig.AppendOneByOne, testConfig.BatchSize, testConfig.Verbose, testConfig.ValidateRawData)
+
+			if err != nil {
+				b.Fatal(err)
+			}
+
+			count += rowsAdded
+
+			if rowsAdded == 0 || rowsAdded >= testLimit {
+				defer b.Skipf("\nTest have reached the target (limit=%d)", testLimit)
+				break // stop the test (target has been achieved)
+			}
 		}
 
-		count += rowsAdded
-
-		if rowsAdded == 0 || rowsAdded >= testLimit {
-			defer b.Skipf("\nTest have reached the target (limit=%d)", testLimit)
-			break // stop the test (target has been achieved)
-		}
-	}
-
-	// Wait for all responses, use default timeout from configuration or unlimited if not set
-	ec, err := appender.WaitForCompletion(-1)
+		// Wait for all responses, use default timeout from configuration or unlimited if not set
+		ec, err = appender.WaitForCompletion(-1)
+	})
 	b.StopTimer()
 
 	if err != nil {
@@ -301,4 +305,12 @@ func appendAll(appender tsdb.Appender, sampleTemplates []string, timestamps []in
 	_, err := appender.WaitForCompletion(-1)
 
 	return count, err
+}
+
+func withTimer(testCtx *testing.B, title string, body func()) {
+	tStart := time.Now().UnixNano()
+	body()
+	elapsedTime := time.Now().UnixNano() - tStart
+
+	testCtx.Log(fmt.Sprintf("%s\n\tElapsed time: %d millisecond", title, elapsedTime/int64(time.Millisecond)))
 }

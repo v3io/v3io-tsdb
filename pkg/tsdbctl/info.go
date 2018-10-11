@@ -41,16 +41,21 @@ func newInfoCommandeer(rootCommandeer *RootCommandeer) *infoCommandeer {
 
 	cmd := &cobra.Command{
 		Use:   "info",
-		Short: "return TSDB config",
+		Short: "Display information about a TSDB instance",
+		Long:  `Display configuration and metrics information for a TSDB instance (table).`,
+		Example: `- tsdbctl info -s 192.168.1.100:8081 -u myuser -p mypassword -c bigdata -t mytsdb -m -n
+- tsdbctl info -s 192.168.1.100:8081 -u jerrys -p OpenSesame -c mycontainer -t my_tsdb`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 
-			// initialize params
+			// Initialize parameters
 			return commandeer.info()
 		},
 	}
 
-	cmd.Flags().BoolVarP(&commandeer.getNames, "names", "n", false, "return metric names")
-	cmd.Flags().BoolVarP(&commandeer.getCount, "performance", "m", false, "count number metric objects")
+	cmd.Flags().BoolVarP(&commandeer.getNames, "names", "n", false,
+		"Display the names of the metrics contained in the TSDB.")
+	cmd.Flags().BoolVarP(&commandeer.getCount, "performance", "m", false,
+		"Display a count of the number of metric objects contained in the TSDB.")
 
 	commandeer.cmd = cmd
 
@@ -70,26 +75,26 @@ func (ic *infoCommandeer) info() error {
 	dbconfig := ic.rootCommandeer.adapter.GetSchema()
 	info, err := yaml.Marshal(dbconfig)
 	if err != nil {
-		return errors.Wrap(err, "Failed to get config")
+		return errors.Wrap(err, "Failed to get TSDB configuration.")
 	}
 
-	fmt.Printf("TSDB Table %s Configuration:\n", ic.rootCommandeer.v3iocfg.TablePath)
+	fmt.Printf("TSDB configuration for table '%s':\n", ic.rootCommandeer.v3iocfg.TablePath)
 	fmt.Println(string(info))
 
 	if ic.getNames {
-		// create a querier
+		// Create a Querier
 		qry, err := ic.rootCommandeer.adapter.Querier(nil, 0, 0)
 		if err != nil {
-			return errors.Wrap(err, "Failed to create querier")
+			return errors.Wrap(err, "Failed to create a Querier object.")
 		}
 
-		// get all metric names
+		// Get all metric names
 		names, err := qry.LabelValues("__name__")
 		if err != nil {
-			return errors.Wrap(err, "Failed to get labels")
+			return errors.Wrap(err, "Failed to get the metric names.")
 		}
 
-		fmt.Println("Metric Names:")
+		fmt.Println("Metric names:")
 		for _, name := range names {
 			fmt.Println(name)
 		}
@@ -98,10 +103,10 @@ func (ic *infoCommandeer) info() error {
 	if ic.getCount {
 		count, err := ic.rootCommandeer.adapter.CountMetrics("")
 		if err != nil {
-			return errors.Wrap(err, "Failed to count")
+			return errors.Wrap(err, "Failed to count the metric items.")
 		}
 
-		fmt.Println("Number of objects: ", count)
+		fmt.Println("Number of metric items: ", count)
 	}
 
 	return nil

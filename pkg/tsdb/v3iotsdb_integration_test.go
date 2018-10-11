@@ -26,6 +26,7 @@ import (
 	"encoding/json"
 	"github.com/stretchr/testify/assert"
 	"github.com/v3io/v3io-go-http"
+	"github.com/v3io/v3io-tsdb/pkg/aggregate"
 	"github.com/v3io/v3io-tsdb/pkg/chunkenc"
 	"github.com/v3io/v3io-tsdb/pkg/config"
 	. "github.com/v3io/v3io-tsdb/pkg/tsdb"
@@ -53,23 +54,23 @@ func TestIngestData(t *testing.T) {
 		data         []tsdbtest.DataPoint
 		ignoreReason string
 	}{
-		{desc: "Should ingest one data point", metricName: "cpu", labels: utils.FromStrings("testLabel", "balbala"),
+		{desc: "Should ingest one data point", metricName: "cpu", labels: utils.LabelsFromStrings("testLabel", "balbala"),
 			data: []tsdbtest.DataPoint{{Time: 1532940510, Value: 314.3}}},
 
 		{desc: "Should ingest multiple data points", metricName: "cpu",
-			labels: utils.FromStrings("os", "linux", "iguaz", "yesplease"),
+			labels: utils.LabelsFromStrings("os", "linux", "iguaz", "yesplease"),
 			data: []tsdbtest.DataPoint{{Time: 1532940510, Value: 314.3},
 				{Time: 1532940510 + 5, Value: 300.3},
 				{Time: 1532940510 + 10, Value: 3234.6}}},
 
 		{desc: "Should ingest record with late arrival same chunk", metricName: "cpu",
-			labels: utils.FromStrings("os", "linux", "iguaz", "yesplease"),
+			labels: utils.LabelsFromStrings("os", "linux", "iguaz", "yesplease"),
 			data: []tsdbtest.DataPoint{{Time: 1532940510, Value: 314.3},
 				{Time: 1532940510 + 5, Value: 300.3},
 				{Time: 1532940510 - 10, Value: 3234.6}}},
 
 		{desc: "Should ingest record with a dash in the metric name (IG-8585)", metricName: "cool-cpu",
-			labels: utils.FromStrings("os", "linux", "iguaz", "yesplease"),
+			labels: utils.LabelsFromStrings("os", "linux", "iguaz", "yesplease"),
 			data: []tsdbtest.DataPoint{{Time: 1532940510, Value: 314.3},
 				{Time: 1532940510 + 5, Value: 300.3},
 				{Time: 1532940510 - 10, Value: 3234.6}}},
@@ -133,7 +134,7 @@ func TestQueryData(t *testing.T) {
 		labels       []utils.Label
 		data         []tsdbtest.DataPoint
 		filter       string
-		aggregators  string
+		aggregates   string
 		from         int64
 		to           int64
 		step         int64
@@ -142,7 +143,7 @@ func TestQueryData(t *testing.T) {
 		expectFail   bool
 	}{
 		{desc: "Should ingest and query one data point", metricName: "cpu",
-			labels:   utils.FromStrings("testLabel", "balbala"),
+			labels:   utils.LabelsFromStrings("testLabel", "balbala"),
 			data:     []tsdbtest.DataPoint{{Time: 1532940510, Value: 314.3}},
 			from:     0,
 			to:       1532940510 + 1,
@@ -150,7 +151,7 @@ func TestQueryData(t *testing.T) {
 			expected: map[string][]tsdbtest.DataPoint{"": {{Time: 1532940510, Value: 314.3}}}},
 
 		{desc: "Should ingest and query multiple data points", metricName: "cpu",
-			labels: utils.FromStrings("os", "linux", "iguaz", "yesplease"),
+			labels: utils.LabelsFromStrings("os", "linux", "iguaz", "yesplease"),
 			data: []tsdbtest.DataPoint{{Time: 1532940510 - 10, Value: 314.3},
 				{Time: 1532940510 - 5, Value: 300.3},
 				{Time: 1532940510, Value: 3234.6}},
@@ -162,7 +163,7 @@ func TestQueryData(t *testing.T) {
 				{Time: 1532940510, Value: 3234.6}}}},
 
 		{desc: "Should query with filter on metric name", metricName: "cpu",
-			labels:   utils.FromStrings("os", "linux", "iguaz", "yesplease"),
+			labels:   utils.LabelsFromStrings("os", "linux", "iguaz", "yesplease"),
 			data:     []tsdbtest.DataPoint{{Time: 1532940510, Value: 33.3}},
 			filter:   "_name=='cpu'",
 			from:     0,
@@ -171,7 +172,7 @@ func TestQueryData(t *testing.T) {
 			expected: map[string][]tsdbtest.DataPoint{"": {{Time: 1532940510, Value: 33.3}}}},
 
 		{desc: "Should query with filter on label name", metricName: "cpu",
-			labels:   utils.FromStrings("os", "linux", "iguaz", "yesplease"),
+			labels:   utils.LabelsFromStrings("os", "linux", "iguaz", "yesplease"),
 			data:     []tsdbtest.DataPoint{{Time: 1532940510, Value: 31.3}},
 			filter:   "os=='linux'",
 			from:     0,
@@ -180,7 +181,7 @@ func TestQueryData(t *testing.T) {
 			expected: map[string][]tsdbtest.DataPoint{"": {{Time: 1532940510, Value: 31.3}}}},
 
 		{desc: "Should ingest and query data with '-' in the metric name (IG-8585)", metricName: "cool-cpu",
-			labels:   utils.FromStrings("testLabel", "balbala"),
+			labels:   utils.LabelsFromStrings("testLabel", "balbala"),
 			data:     []tsdbtest.DataPoint{{Time: 1532940510, Value: 314.3}},
 			from:     0,
 			to:       1532940510 + 1,
@@ -188,7 +189,7 @@ func TestQueryData(t *testing.T) {
 			expected: map[string][]tsdbtest.DataPoint{"": {{Time: 1532940510, Value: 314.3}}}},
 
 		{desc: "Should ingest and query by time", metricName: "cpu",
-			labels: utils.FromStrings("os", "linux", "iguaz", "yesplease"),
+			labels: utils.LabelsFromStrings("os", "linux", "iguaz", "yesplease"),
 			data: []tsdbtest.DataPoint{{Time: 1532940510, Value: 314.3},
 				{Time: 1532940510 + 5, Value: 300.3},
 				{Time: 1532940510 + 10, Value: 3234.6}},
@@ -199,7 +200,7 @@ func TestQueryData(t *testing.T) {
 				{Time: 1532940510 + 10, Value: 3234.6}}}},
 
 		{desc: "Should ingest and query by time with no results", metricName: "cpu",
-			labels: utils.FromStrings("os", "linux", "iguaz", "yesplease"),
+			labels: utils.LabelsFromStrings("os", "linux", "iguaz", "yesplease"),
 			data: []tsdbtest.DataPoint{{Time: 1532940510, Value: 314.3},
 				{Time: 1532940510 + 5, Value: 300.3},
 				{Time: 1532940510 + 10, Value: 3234.6}},
@@ -208,43 +209,43 @@ func TestQueryData(t *testing.T) {
 			step:     defaultStepMs,
 			expected: map[string][]tsdbtest.DataPoint{}},
 
-		{desc: "Should ingest and query an aggregator", metricName: "cpu",
-			labels: utils.FromStrings("os", "linux", "iguaz", "yesplease"),
+		{desc: "Should ingest and query an aggregate", metricName: "cpu",
+			labels: utils.LabelsFromStrings("os", "linux", "iguaz", "yesplease"),
 			data: []tsdbtest.DataPoint{{Time: 1532940510, Value: 300.3},
 				{Time: 1532940510 + 5, Value: 300.3},
 				{Time: 1532940510 + 10, Value: 100.4}},
-			from:        1532940510,
-			to:          1532940510 + 11,
-			step:        defaultStepMs,
-			aggregators: "sum",
-			expected:    map[string][]tsdbtest.DataPoint{"sum": {{Time: 1532940510, Value: 701.0}}}},
+			from:       1532940510,
+			to:         1532940510 + 11,
+			step:       defaultStepMs,
+			aggregates: "sum",
+			expected:   map[string][]tsdbtest.DataPoint{"sum": {{Time: 1532940510, Value: 701.0}}}},
 
-		{desc: "Should ingest and query an aggregator with interval greater than step size", metricName: "cpu",
-			labels: utils.FromStrings("os", "linux", "iguaz", "yesplease"),
+		{desc: "Should ingest and query an aggregate with interval greater than step size", metricName: "cpu",
+			labels: utils.LabelsFromStrings("os", "linux", "iguaz", "yesplease"),
 			data: []tsdbtest.DataPoint{{Time: 1532940510, Value: 300.3},
 				{Time: 1532940510 + 60, Value: 300.3},
 				{Time: 1532940510 + 2*60, Value: 100.4},
 				{Time: 1532940510 + 5*60, Value: 200.0}},
-			from:        1532940510,
-			to:          1532940510 + 6*60,
-			step:        defaultStepMs,
-			aggregators: "sum",
-			expected:    map[string][]tsdbtest.DataPoint{"sum": {{Time: 1532940510, Value: 901.0}}}},
+			from:       1532940510,
+			to:         1532940510 + 6*60,
+			step:       defaultStepMs,
+			aggregates: "sum",
+			expected:   map[string][]tsdbtest.DataPoint{"sum": {{Time: 1532940510, Value: 901.0}}}},
 
-		{desc: "Should ingest and query multiple aggregators", metricName: "cpu",
-			labels: utils.FromStrings("os", "linux", "iguaz", "yesplease"),
+		{desc: "Should ingest and query multiple aggregates", metricName: "cpu",
+			labels: utils.LabelsFromStrings("os", "linux", "iguaz", "yesplease"),
 			data: []tsdbtest.DataPoint{{Time: 1532940510, Value: 300.3},
 				{Time: 1532940510 + 5, Value: 300.3},
 				{Time: 1532940510 + 10, Value: 100.4}},
-			from:        1532940510,
-			to:          1532940510 + 11,
-			step:        defaultStepMs,
-			aggregators: "sum,count",
+			from:       1532940510,
+			to:         1532940510 + 11,
+			step:       defaultStepMs,
+			aggregates: "sum,count",
 			expected: map[string][]tsdbtest.DataPoint{"sum": {{Time: 1532940510, Value: 701.0}},
 				"count": {{Time: 1532940510, Value: 3}}}},
 
 		{desc: "Should fail on query with illegal time (switch from and to)", metricName: "cpu",
-			labels: utils.FromStrings("os", "linux", "iguaz", "yesplease"),
+			labels: utils.LabelsFromStrings("os", "linux", "iguaz", "yesplease"),
 			data: []tsdbtest.DataPoint{{Time: 1532940510, Value: 314.3},
 				{Time: 1532940510 + 5, Value: 300.3},
 				{Time: 1532940510 + 10, Value: 3234.6}},
@@ -255,7 +256,7 @@ func TestQueryData(t *testing.T) {
 		},
 
 		{desc: "Should query with filter on not existing metric name", metricName: "cpu",
-			labels:   utils.FromStrings("os", "linux", "iguaz", "yesplease"),
+			labels:   utils.LabelsFromStrings("os", "linux", "iguaz", "yesplease"),
 			data:     []tsdbtest.DataPoint{{Time: 1532940510, Value: 33.3}},
 			filter:   "_name=='hahaha'",
 			from:     0,
@@ -263,28 +264,28 @@ func TestQueryData(t *testing.T) {
 			step:     defaultStepMs,
 			expected: map[string][]tsdbtest.DataPoint{}},
 
-		{desc: "Should ingest and query aggregators with empty bucket", metricName: "cpu",
-			labels: utils.FromStrings("os", "linux", "iguaz", "yesplease"),
+		{desc: "Should ingest and query aggregates with empty bucket", metricName: "cpu",
+			labels: utils.LabelsFromStrings("os", "linux", "iguaz", "yesplease"),
 			data: []tsdbtest.DataPoint{{Time: 1537972278402, Value: 300.3},
 				{Time: 1537972278402 + 8*minuteInMillis, Value: 300.3},
 				{Time: 1537972278402 + 9*minuteInMillis, Value: 100.4}},
-			from:        1537972278402 - 5*minuteInMillis,
-			to:          1537972278402 + 10*minuteInMillis,
-			step:        defaultStepMs,
-			aggregators: "count",
+			from:       1537972278402 - 5*minuteInMillis,
+			to:         1537972278402 + 10*minuteInMillis,
+			step:       defaultStepMs,
+			aggregates: "count",
 			expected: map[string][]tsdbtest.DataPoint{
 				"count": {{Time: 1537972278402, Value: 1},
 					{Time: 1537972578402, Value: 2}}}},
 
-		{desc: "Should ingest and query aggregators with few empty buckets in a row", metricName: "cpu",
-			labels: utils.FromStrings("os", "linux", "iguaz", "yesplease"),
+		{desc: "Should ingest and query aggregates with few empty buckets in a row", metricName: "cpu",
+			labels: utils.LabelsFromStrings("os", "linux", "iguaz", "yesplease"),
 			data: []tsdbtest.DataPoint{{Time: 1537972278402, Value: 300.3},
 				{Time: 1537972278402 + 16*minuteInMillis, Value: 300.3},
 				{Time: 1537972278402 + 17*minuteInMillis, Value: 100.4}},
-			from:        1537972278402 - 5*minuteInMillis,
-			to:          1537972278402 + 18*minuteInMillis,
-			step:        defaultStepMs,
-			aggregators: "count",
+			from:       1537972278402 - 5*minuteInMillis,
+			to:         1537972278402 + 18*minuteInMillis,
+			step:       defaultStepMs,
+			aggregates: "count",
 			expected: map[string][]tsdbtest.DataPoint{
 				"count": {{Time: 1537972158402, Value: 1},
 					{Time: 1537973058402, Value: 2}}}},
@@ -296,13 +297,13 @@ func TestQueryData(t *testing.T) {
 				t.Skip(test.ignoreReason)
 			}
 			testQueryDataCase(t, v3ioConfig, test.metricName, test.labels,
-				test.data, test.filter, test.aggregators, test.from, test.to, test.expected, test.expectFail)
+				test.data, test.filter, test.aggregates, test.from, test.to, test.expected, test.expectFail)
 		})
 	}
 }
 
 func testQueryDataCase(test *testing.T, v3ioConfig *config.V3ioConfig,
-	metricsName string, userLabels []utils.Label, data []tsdbtest.DataPoint, filter string, aggregator string,
+	metricsName string, userLabels []utils.Label, data []tsdbtest.DataPoint, filter string, agg string,
 	from int64, to int64, expected map[string][]tsdbtest.DataPoint, expectFail bool) {
 	adapter, teardown := tsdbtest.SetUpWithData(test, v3ioConfig, metricsName, data, userLabels)
 	defer teardown()
@@ -317,7 +318,7 @@ func testQueryDataCase(test *testing.T, v3ioConfig *config.V3ioConfig,
 	}
 
 	step := int64(5 * 60 * 1000) // 5 minutes
-	set, err := qry.Select(metricsName, aggregator, step, filter)
+	set, err := qry.Select(metricsName, agg, step, filter)
 	if err != nil {
 		test.Fatalf("Failed to run Select. reason: %v", err)
 	}
@@ -329,7 +330,7 @@ func testQueryDataCase(test *testing.T, v3ioConfig *config.V3ioConfig,
 		}
 
 		series := set.At()
-		agg := series.Labels().Get("Aggregator")
+		agg := series.Labels().Get(aggregate.AggregateLabel)
 		iter := series.Iterator()
 		if iter.Err() != nil {
 			test.Fatalf("Failed to query data series. reason: %v", iter.Err())
@@ -362,7 +363,7 @@ func TestQueryDataOverlappingWindow(t *testing.T) {
 		labels       []utils.Label
 		data         []tsdbtest.DataPoint
 		filter       string
-		aggregators  string
+		aggregates   string
 		windows      []int
 		from         int64
 		to           int64
@@ -371,14 +372,14 @@ func TestQueryDataOverlappingWindow(t *testing.T) {
 	}{
 		{desc: "Should ingest and query with windowing",
 			metricName: "cpu",
-			labels:     utils.FromStrings("os", "linux", "iguaz", "yesplease"),
+			labels:     utils.LabelsFromStrings("os", "linux", "iguaz", "yesplease"),
 			data: []tsdbtest.DataPoint{{Time: 1532940510, Value: 314.3},
 				{Time: 1532944110, Value: 314.3},
 				{Time: 1532947710, Value: 300.3},
 				{Time: 1532951310, Value: 3234.6}},
 			from: 0, to: 1532954910,
-			windows:     []int{1, 2, 4},
-			aggregators: "sum",
+			windows:    []int{1, 2, 4},
+			aggregates: "sum",
 			expected: map[string][]tsdbtest.DataPoint{
 				"sum": {{Time: 1532937600, Value: 4163.5},
 					{Time: 1532944800, Value: 3534.9},
@@ -387,14 +388,14 @@ func TestQueryDataOverlappingWindow(t *testing.T) {
 
 		{desc: "Should ingest and query with windowing on multiple agg",
 			metricName: "cpu",
-			labels:     utils.FromStrings("os", "linux", "iguaz", "yesplease"),
+			labels:     utils.LabelsFromStrings("os", "linux", "iguaz", "yesplease"),
 			data: []tsdbtest.DataPoint{{Time: 1532940510, Value: 314.3},
 				{Time: 1532944110, Value: 314.3},
 				{Time: 1532947710, Value: 300.3},
 				{Time: 1532951310, Value: 3234.6}},
 			from: 0, to: 1532954910,
-			windows:     []int{1, 2, 4},
-			aggregators: "sum,count,sqr",
+			windows:    []int{1, 2, 4},
+			aggregates: "sum,count,sqr",
 			expected: map[string][]tsdbtest.DataPoint{
 				"sum": {{Time: 1532937600, Value: 4163.5},
 					{Time: 1532944800, Value: 3534.9},
@@ -415,14 +416,14 @@ func TestQueryDataOverlappingWindow(t *testing.T) {
 				t.Skip(test.ignoreReason)
 			}
 			testQueryDataOverlappingWindowCase(t, v3ioConfig, test.metricName, test.labels,
-				test.data, test.filter, test.windows, test.aggregators, test.from, test.to, test.expected)
+				test.data, test.filter, test.windows, test.aggregates, test.from, test.to, test.expected)
 		})
 	}
 }
 
 func testQueryDataOverlappingWindowCase(test *testing.T, v3ioConfig *config.V3ioConfig,
 	metricsName string, userLabels []utils.Label, data []tsdbtest.DataPoint, filter string,
-	windows []int, aggregator string,
+	windows []int, agg string,
 	from int64, to int64, expected map[string][]tsdbtest.DataPoint) {
 	adapter, teardown := tsdbtest.SetUpWithData(test, v3ioConfig, metricsName, data, userLabels)
 	defer teardown()
@@ -434,7 +435,7 @@ func testQueryDataOverlappingWindowCase(test *testing.T, v3ioConfig *config.V3io
 		test.Fatalf("Failed to create Querier. reason: %v", err)
 	}
 
-	set, err := qry.SelectOverlap(metricsName, aggregator, step, windows, filter)
+	set, err := qry.SelectOverlap(metricsName, agg, step, windows, filter)
 	if err != nil {
 		test.Fatalf("Failed to run Select. reason: %v", err)
 	}
@@ -446,7 +447,7 @@ func testQueryDataOverlappingWindowCase(test *testing.T, v3ioConfig *config.V3io
 		}
 
 		series := set.At()
-		agg := series.Labels().Get("Aggregator")
+		agg := series.Labels().Get(aggregate.AggregateLabel)
 		iter := series.Iterator()
 		if iter.Err() != nil {
 			test.Fatalf("Failed to query data series. reason: %v", iter.Err())
@@ -515,7 +516,7 @@ func TestDeleteTSDB(t *testing.T) {
 	}
 
 	schema := testutils.CreateSchema(t, "count,sum")
-	v3ioConfig.TablePath = t.Name()
+	v3ioConfig.TablePath = tsdbtest.PrefixTablePath(t.Name())
 	if err := CreateTSDB(v3ioConfig, schema); err != nil {
 		v3ioConfigAsJson, _ := json.MarshalIndent(v3ioConfig, "", "  ")
 		t.Fatalf("Failed to create TSDB. Reason: %s\nConfiguration:\n%s", err, string(v3ioConfigAsJson))

@@ -19,16 +19,16 @@ path: "pmetric"
 `
 
 type tsdbQuery struct {
-	Name        string
-	Aggregators []string
-	Step        string
-	Filter      string
-	From        string
-	To          string
-	Last        string
+	Name       string
+	Aggregates []string
+	Step       string
+	Filter     string
+	From       string
+	To         string
+	Last       string
 }
 
-// example query event
+// Example query event
 const queryEvent = `
 {
   "Name": "cpu", 
@@ -36,7 +36,8 @@ const queryEvent = `
 }
 `
 
-// Note: the user must define the v3io data binding in the nuclio function with path, username, password and name it db0
+// Note: The user must define a "db0" V3IO data binding in the nuclio function
+// with path, username, and password.
 
 func Handler(context *nuclio.Context, event nuclio.Event) (interface{}, error) {
 
@@ -46,13 +47,16 @@ func Handler(context *nuclio.Context, event nuclio.Event) (interface{}, error) {
 		return nil, err
 	}
 
-	// convert string times (unix or RFC3339 or relative like now-2h) to unix milisec times
+	// Convert time strings to Unix timestamp in milliseconds integers.
+	// The input time string can be of the format "now", "now-[0-9]+[mdh]"
+	// (for example, "now-2h"), "<Unix timestamp in milliseconds>", or
+	// "<RFC3339 time>" (for example, "2018-09-26T14:10:20Z").
 	from, to, step, err := utils.GetTimeFromRange(query.From, query.To, query.Last, query.Step)
 	if err != nil {
-		return nil, errors.Wrap(err, "Error parsing query time range")
+		return nil, errors.Wrap(err, "Error parsing query time range.")
 	}
 
-	// Create TSDB Querier
+	// Create a TSDB Querier
 	context.Logger.DebugWith("Query", "params", query)
 	adapter := context.UserData.(*tsdb.V3ioAdapter)
 	qry, err := adapter.Querier(nil, from, to)
@@ -60,16 +64,16 @@ func Handler(context *nuclio.Context, event nuclio.Event) (interface{}, error) {
 		return nil, errors.Wrap(err, "Failed to initialize Querier")
 	}
 
-	// Select Query to get back a series set iterator
-	set, err := qry.Select(query.Name, strings.Join(query.Aggregators, ","), step, query.Filter)
+	// Select a query to get back a series-set iterator
+	set, err := qry.Select(query.Name, strings.Join(query.Aggregates, ","), step, query.Filter)
 	if err != nil {
 		return nil, errors.Wrap(err, "Select Failed")
 	}
 
-	// convert SeriesSet to Json (Grafana simpleJson format)
+	// Convert a SeriesSet to a JSON object (Grafana simpleJson format)
 	f, err := formatter.NewFormatter("json", nil)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to start json formatter")
+		return nil, errors.Wrap(err, "Failed to start the JSON formatter.")
 	}
 
 	var b bytes.Buffer
@@ -78,7 +82,7 @@ func Handler(context *nuclio.Context, event nuclio.Event) (interface{}, error) {
 	return b.String(), err
 }
 
-// InitContext runs only once when the function runtime starts
+// InitContext runs only once, when the function runtime starts
 func InitContext(context *nuclio.Context) error {
 	cfg, _ := config.GetOrLoadFromData([]byte(tsdbConfig))
 	data := context.DataBinding["db0"].(*v3io.Container)
@@ -87,7 +91,7 @@ func InitContext(context *nuclio.Context) error {
 		return err
 	}
 
-	// Store adapter in user cache
+	// Store the adapter in the user-data cache
 	context.UserData = adapter
 	return nil
 }

@@ -1,34 +1,22 @@
-# Running the benchmark test
+# Running the Benchmark Test
 
 ## Prerequisites
-* A fully operational V3IO Setup (Data and Application nodes)
+- A fully operational [Iguazio Continuous Data Platform](https://www.iguazio.com) setup (with data and application nodes)
  
 ## Configuration
 
-### Create custom `v3io.yaml` configuration. 
-   Use the following example for reference:
-```yaml
-    # File: v3io-custom.yaml
-    
-    # NGINX server address:PORT
-    v3ioUrl: "localhost:8081"
-    
-    # V3IO container ID or Name
-    container: "bigdata"
-    
-    # Path in the container
-    path: "tsdb-1"
-    
-    # Logging level. Valid values: debug,info,warn,error (Default: info)
-    logLevel: "warn"
+### Create a Custom TSDB Configuration File
 
-    # V3IO Credentials
-    username: "<user>@<tenant>"
-    password: "<password>"
-``` 
-### Create TSDB instance using `tsdbctl`.
-Use the following shell script for reference:
-> Note, the script assumes that all configuration and executable files reside at the `${HOME}/go/bin` directory.
+You can optionally create a TSDB configuration file instead of setting the relevant configuration using TSDB CLI configuration flags.
+Use the example configuration-file template at **examples/** as a reference.
+By default, the TSDB CLI (**tsbbctl**) looks for a **v3io-tsdb-config.yaml** file in the current directory.
+
+### Create a TSDB Instance Using the TSDB CLI
+
+Use the `create` command of the TSDB CLI to create a new TSDB instance (table).
+Run `tsdbctl create -h` for detailed information.
+You can use the following shell script as a reference:
+> **Note:** The script assumes that all configuration and executable files reside at the `${HOME}/go/bin` directory.
 ```bash
     #!/bin/bash
     
@@ -38,63 +26,47 @@ Use the following shell script for reference:
       TSDB_PATH=$1
     fi
     
-    echo "Creating TSDB instance at $TSDB_PATH"
+    echo "Creating a TSDB instance at '$TSDB_PATH' ..."
     
-    # Create TSDB instance "tsdb" with some pre-aggregations and interval of 5 seconds (-v for verbose mode)
+    # Create a TSDB instance "tsdb" with a sampling rate of of one sample per
+    # second, some aggregates, and an aggregation interval of 5 seconds.
+    # Use -v to run in verbose mode. Use the -g flag to point to the
+    # configuration file that you created in the previous step, or set the
+    # web-gateway service endpoint and authentication credentials and the
+    # parent data container using the CLI -s, -u, -p, and -c flags.
     SCRIPTPATH="$( cd "$(dirname "$0")" ; pwd -P )"
-    $SCRIPTPATH/tsdbctl create -p $TSDB_PATH -r count,sum,min,max -i 5 -v -c $SCRIPTPATH/v3io-custom.yaml
+    $SCRIPTPATH/tsdbctl create -t $TSDB_PATH -r 1/s -a count,sum,min,max -i 5 -v -g $SCRIPTPATH/v3io-tsdb-custom.yaml
     
     echo Done.
 ```
-### Create test configuration file `tsdb-bench-test-config.yaml` 
-   Use the following example for reference:
-```yaml
-# File: tsdb-bench-test-config.yaml
 
-# Control Nuclio test verbosity
-Verbose: true
+### Create a Benchmark-Test Ingestion Configuration File
 
-# Relative time, i.e. now() - startTimeOffset
-StartTimeOffset: "48h"
+Create a **tsdb-bench-test-config.yaml** configuration file for the TSDB ingestion benchmark test.
+Use **test/benchmark/testdata/tsdb-bench-test-config.yaml** as a reference.
 
-# Interval in milliseconds between samples
-SampleStepSize: 5000
+### Define Required Environment Variables
 
-# should be in range [1..26], i.e [A..Z]
-NamesCount: 2
+Define the following environment variables.
 
-# Pattern: Name_[A..Z][_[1..200]]
-NamesDiversity: 1
+> **Note:** You can also define variables locally in a script or in the command line from which the relevant command is executed.
 
-# should be in range [1..26]
-LabelsCount: 1
-
-# Pattern: Label_[A..Z][_[1..10]]
-LabelsDiversity: 3
-
-# should be in range [1..26], i.e [A..Z]
-LabelValuesCount: 1
-
-# Pattern: [A..Z][_[1..10]]
-LabelsValueDiversity: 10
-
-performance
-FlushFrequency: 10
-
-# Select how benchmark test will produce the data. If "AppendOneByOne=true" test will produce one sample per test cycle
-AppendOneByOne: true
-``` 
-### Define following environment variables.
-> Note: you can also define variables locally in a script
 ```bash 
-    V3IO_CONF="$HOME/go/bin/v3io-custom.yaml"
+    V3IO_TSDB_CONFIG="$HOME/go/bin/v3io-tsdb-custom.yaml"
     TSDB_BENCH_INGEST_CONFIG="$HOME/go/bin/tsdb-bench-test-config.yaml"
 ```
-### Run ingestion benchmark test for desired time interval to populate the TSDB.
+
+### Run the Ingestion Benchmark Test
+
+Run the ingestion benchmark test to populate the TSDB, using the desired time interval.
+
 Use the following script as a reference:
-> Note: you can pass test duration to the script.
-<br>For example: `./ingest.sh 5m` will run 5 minutes.
-<br>By default it will run one minute.
+> **Note:** You can pass a "[0-9]+[mhd]" test-duration parameter to the script.
+<br/>
+> For example: `./ingest.sh 5m` will run 5 minutes.
+<br>
+> By default, the test will run for one minute.
+
 ```bash
     #!/bin/bash
     
@@ -106,50 +78,61 @@ Use the following script as a reference:
       BENCH_TIME="$1"
     fi
     
-    echo "Ingesting samples (Bench Time: $BENCH_TIME) ..."
+    echo "Ingesting samples (bench time = $BENCH_TIME) ..."
     
     cd $HOME/go/src/github.com/v3io/v3io-tsdb/cmd/tsdbctl
     
-    # Note, you can select either "-bench=^BenchmarkIngest$" or "-bench=^BenchmarkIngestWithNuclio$" test
-    time V3IO_CONF="$HOME/go/bin/v3io-custom.yaml" TSDB_BENCH_INGEST_CONFIG="$HOME/go/bin/tsdb-bench-test-config.yaml" go test -benchtime $BENCH_TIME -run=DO_NOT_RUN_TESTS -bench=^BenchmarkIngest$ ../../test/benchmark
+    # Note: You can select either the "-bench=^BenchmarkIngest$" or
+    # "-bench=^BenchmarkIngestWithNuclio$" test.
+    time V3IO_TSDB_CONFIG="$HOME/go/bin/v3io-tsdb-custom.yaml" TSDB_BENCH_INGEST_CONFIG="$HOME/go/bin/tsdb-bench-test-config.yaml" go test -benchtime $BENCH_TIME -run=DO_NOT_RUN_TESTS -bench=^BenchmarkIngest$ ../../test/benchmark
     
     echo Done
 ```
-### Run Query using `tsdbctl`
- Or use the following shell script example to query counts for all types of metrics generated by the test.
- Test produces `Name_(A..Z)_(0..20)` metrics.
- > Note: The script below is fetching `count` for last `72 hours` with intervals of `5 min` (which is similar to the TSDB rollip interval)
+
+### Run a TSDB Query
+
+Use the `querey` command of the TSDB CLI (**tsdbctl**) to query the test TSDB instance.
+Run `tsdbctl query -h` for detailed information.
+
+The test produces `Name_(A..Z)_(0..20)` metrics.
+You can use the following shell script example to query counts for all types of metrics generated by the test.
+
+> **Note:** The following script fetches a `count` aggregate calculation for the last 72 hours with an aggregation interval of 5 minutes (which is similar to the TSDB aggregation granularity).
+
 ```bash
     #!/bin/bash
     
     #File: query.sh
     
     GOBIN=$HOME/go/bin
-    LOOK_BACK_INTERVAL=72h
-    TSDB_ROLLUP_INTERVAL=5m
-    V3IO_CONF=$GOBIN/v3io-custom.yaml
+    LOOK_BACK_DURATION=72h
+    TSDB_AGGREGATION_INTERVAL=5m
+    V3IO_TSDB_CONFIG=$GOBIN/v3io-tsdb-custom.yaml
     
     for x in {A..Z}
     do
       for ((i = 0; i < 10; i++))
       do
-        echo Querying Name_${x}_${i} ...
-        $GOBIN/tsdbctl query Name_${x}_${i} -a count -l $LOOK_BACK_INTERVAL -i $TSDB_ROLLUP_INTERVAL  -c $V3IO_CONF
+        echo Querying metric Name_${x}_${i} ...
+        $GOBIN/tsdbctl query Name_${x}_${i} -a count -l $LOOK_BACK_DURATION -i $TSDB_AGGREGATION_INTERVAL -g $V3IO_CONF
       done
     done
     
     echo Done
 ```
-### Example: Calculate total count
+
+### Example: Calculate a Total Samples Count
+
 ```bash
     #!/bin/bash
    
-    # Flile: count-all.sh
+    # File: count-all.sh
      
-    echo Fetching...
+    echo Querying the TSDB ...
     
     GOBIN=$HOME/go/bin
     COUNT="$($GOBIN/query.sh | grep -v "v=0" | grep 2018 | cut -d'=' -f 2 | awk '{s+=$1} END {print s}')"
     
-    echo Total samples count is: $COUNT
+    echo Total count of 2018 metric samples with value 0: $COUNT
 ```
+

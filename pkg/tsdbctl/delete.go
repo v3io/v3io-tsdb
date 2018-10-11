@@ -25,6 +25,7 @@ import (
 	"fmt"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
+	"github.com/v3io/v3io-tsdb/pkg/config"
 	"github.com/v3io/v3io-tsdb/pkg/utils"
 	"os"
 	"strings"
@@ -47,69 +48,86 @@ func newDeleteCommandeer(rootCommandeer *RootCommandeer) *delCommandeer {
 	}
 
 	cmd := &cobra.Command{
-		Use:     "del",
-		Short:   "delete a TSDB",
 		Aliases: []string{"delete"},
+		Use:     "del",
+		Short:   "Delete a TSDB instance or its content",
+		Long:    `Delete a TSDB instance (table) or delete content from the table.`,
+		Example: `The examples assume that the endpoint of the web-gateway service, the login credentials, and
+the name of the data container are configured in the default configuration file (` + config.DefaultConfigurationFileName + `)
+instead of using the -s|--server, -u|--username, -p|--password, and -c|--container flags.
+- tsdbctl delete -t metrics_tsdb -a
+- tsdbctl delete -t dbs/perfstats -f
+- tsdbctl delete -t my_tsdb -b 0 -e now-7d -i
+
+Notes:
+- When deleting content within a specific time range (see the -b|--begin and -e|--end flags and
+  their default values), all partitions containing data within this range are deleted, including
+  metric items with older or newer times. Use the info command to view the partitioning interval.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 
-			// initialize params
+			// Initialize parameters
 			return commandeer.delete()
 		},
 	}
 
-	cmd.Flags().BoolVarP(&commandeer.deleteAll, "all", "a", false, "Delete the TSDB table (including all content and the configuration schema file)")
-	cmd.Flags().BoolVarP(&commandeer.ignoreErrors, "ignore-errors", "i", false, "Delete all elements even if some steps fail")
-	cmd.Flags().BoolVarP(&commandeer.force, "force", "f", false, "Delete without prompt")
-	cmd.Flags().StringVarP(&commandeer.toTime, "end", "e", "now", "TO time")
-	cmd.Flags().StringVarP(&commandeer.fromTime, "begin", "b", "0", "FROM time")
+	cmd.Flags().BoolVarP(&commandeer.deleteAll, "all", "a", false,
+		"Delete the TSDB table, including its configuration and all content.")
+	cmd.Flags().BoolVarP(&commandeer.ignoreErrors, "ignore-errors", "i", false,
+		"Ignore errors - continue deleting even if some steps fail.")
+	cmd.Flags().BoolVarP(&commandeer.force, "force", "f", false,
+		"Forceful deletion - don't display a delete-verification prompt.")
+	cmd.Flags().StringVarP(&commandeer.toTime, "end", "e", "",
+		"End (maximum) time for the delete operation, as a string containing an\nRFC3339 time string, a Unix timestamp in milliseconds, or a relative\ntime of the format \"now\" or \"now-[0-9]+[mhd]\" (where 'm' = minutes,\n'h' = hours, and 'd' = days). Examples: \"2018-09-26T14:10:20Z\";\n\"1537971006000\"; \"now-3h\"; \"now-7d\". (default \"now\")")
+	cmd.Flags().StringVarP(&commandeer.fromTime, "begin", "b", "",
+		"Start (minimum) time for the delete operation, as a string containing\nan RFC3339 time, a Unix timestamp in milliseconds, a relative time of\nthe format \"now\" or \"now-[0-9]+[mhd]\" (where 'm' = minutes, 'h' = hours,\nand 'd' = days), or 0 for the earliest time. Examples:\n\"2016-01-02T15:34:26Z\"; \"1451748866\"; \"now-90m\"; \"0\". (default =\n<end time> - 1h)")
 	commandeer.cmd = cmd
 
 	return commandeer
 }
 
-func (ic *delCommandeer) delete() error {
+func (dc *delCommandeer) delete() error {
 
-	if err := ic.rootCommandeer.initialize(); err != nil {
+	if err := dc.rootCommandeer.initialize(); err != nil {
 		return err
 	}
 
-	if err := ic.rootCommandeer.startAdapter(); err != nil {
+	if err := dc.rootCommandeer.startAdapter(); err != nil {
 		return err
 	}
 
 	var err error
 	to := time.Now().Unix() * 1000
-	if ic.toTime != "" {
-		to, err = utils.Str2unixTime(ic.toTime)
+	if dc.toTime != "" {
+		to, err = utils.Str2unixTime(dc.toTime)
 		if err != nil {
 			return err
 		}
 	}
-	from := to - 1000*3600 // default of last hour
-	if ic.fromTime != "" {
-		from, err = utils.Str2unixTime(ic.fromTime)
+	from := to - 1000*3600 // Default start time = one hour before the end time
+	if dc.fromTime != "" {
+		from, err = utils.Str2unixTime(dc.fromTime)
 		if err != nil {
 			return err
 		}
 	}
 
-	if !ic.force {
+	if !dc.force {
 		confirmedByUser, err := getConfirmation(
-			fmt.Sprintf("You are about to delete the '%s' table. Are you sure?", ic.rootCommandeer.v3iocfg.TablePath))
+			fmt.Sprintf("You are about to delete TSDB table '%s' in container '%s'. Are you sure?", dc.rootCommandeer.v3iocfg.TablePath, dc.rootCommandeer.v3iocfg.Container))
 		if err != nil {
 			return err
 		}
 
 		if !confirmedByUser {
-			return errors.New("Cancelled by user")
+			return errors.New("Delete cancelled by the user.")
 		}
 	}
 
-	err = ic.rootCommandeer.adapter.DeleteDB(ic.deleteAll, ic.ignoreErrors, from, to)
+	err = dc.rootCommandeer.adapter.DeleteDB(dc.deleteAll, dc.ignoreErrors, from, to)
 	if err != nil {
-		return errors.Wrapf(err, "Failed to delete table '%s'", ic.rootCommandeer.v3iocfg.TablePath)
+		return errors.Wrapf(err, "Failed to delete TSDB table '%s' in container '%s'.", dc.rootCommandeer.v3iocfg.TablePath, dc.rootCommandeer.v3iocfg.Container)
 	}
-	fmt.Printf("Table '%s' has been deleted\n", ic.rootCommandeer.v3iocfg.TablePath)
+	fmt.Printf("Successfully deleted TSDB table '%s' from container '%s'.\n", dc.rootCommandeer.v3iocfg.TablePath, dc.rootCommandeer.v3iocfg.Container)
 
 	return nil
 }
@@ -122,7 +140,7 @@ func getConfirmation(prompt string) (bool, error) {
 
 		response, err := reader.ReadString('\n')
 		if err != nil {
-			errors.Wrap(err, "failed to get user input")
+			errors.Wrap(err, "Failed to get user input.")
 		}
 
 		response = strings.ToLower(strings.TrimSpace(response))

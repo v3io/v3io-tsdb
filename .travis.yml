@@ -6,6 +6,7 @@ go:
 script:
   - make test
   - make lint
+  - V3IO_TSDB_CONFIG="$TRAVIS_BUILD_DIR/travis_v3io.yaml" TSDB_TEST_TABLE_PATH="TSDB_INTEGRATION_TESTS/$TRAVIS_BUILD_NUMBER" make integration
 
 before_deploy:
   - GOOS=linux GOARCH=amd64 make build

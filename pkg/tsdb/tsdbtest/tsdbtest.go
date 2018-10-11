@@ -8,6 +8,8 @@ import (
 	. "github.com/v3io/v3io-tsdb/pkg/tsdb"
 	"github.com/v3io/v3io-tsdb/pkg/tsdb/tsdbtest/testutils"
 	"github.com/v3io/v3io-tsdb/pkg/utils"
+	"os"
+	"path"
 	"regexp"
 	"strings"
 	"testing"
@@ -35,12 +37,12 @@ type Sample struct {
 func DeleteTSDB(t testing.TB, v3ioConfig *config.V3ioConfig) {
 	adapter, err := NewV3ioAdapter(v3ioConfig, nil, nil)
 	if err != nil {
-		t.Fatalf("Failed to create adapter. reason: %s", err)
+		t.Fatalf("Failed to create an adapter. Reason: %s", err)
 	}
 
-	now := time.Now().Unix() * 1000 // now time in millis
+	now := time.Now().Unix() * 1000 // Current time (now) in milliseconds
 	if err := adapter.DeleteDB(true, true, 0, now); err != nil {
-		t.Fatalf("Failed to delete DB on teardown. reason: %s", err)
+		t.Fatalf("Failed to delete a TSDB instance (table) on teardown. Reason: %s", err)
 	}
 }
 
@@ -48,24 +50,24 @@ func CreateTestTSDB(t testing.TB, v3ioConfig *config.V3ioConfig) {
 	schema := testutils.CreateSchema(t, "*")
 	if err := CreateTSDB(v3ioConfig, schema); err != nil {
 		v3ioConfigAsJson, _ := json2.MarshalIndent(v3ioConfig, "", "  ")
-		t.Fatalf("Failed to create TSDB. Reason: %v\nConfiguration:\n%s", err, string(v3ioConfigAsJson))
+		t.Fatalf("Failed to create a TSDB instance (table). Reason: %v\nConfiguration:\n%s", err, string(v3ioConfigAsJson))
 	}
 }
 
 func SetUp(t testing.TB, v3ioConfig *config.V3ioConfig) func() {
-	v3ioConfig.TablePath = fmt.Sprintf("%s-%d", t.Name(), time.Now().Nanosecond())
+	v3ioConfig.TablePath = PrefixTablePath(fmt.Sprintf("%s-%d", t.Name(), time.Now().Nanosecond()))
 	CreateTestTSDB(t, v3ioConfig)
 
 	// Measure performance
 	metricReporter, err := performance.DefaultReporterInstance()
 	if err != nil {
-		t.Fatalf("unable to initialize performance metrics reporter. Reason: %v", err)
+		t.Fatalf("Unable to initialize the performance metrics reporter. Reason: %v", err)
 	}
 	metricReporter.Start()
 
 	return func() {
 		defer metricReporter.Stop()
-		// Don't delete the table if the test has failed
+		// Don't delete the TSDB table if the test failed
 		if !t.Failed() {
 			DeleteTSDB(t, v3ioConfig)
 		}
@@ -79,22 +81,22 @@ func SetUpWithData(t *testing.T, v3ioConfig *config.V3ioConfig, metricName strin
 }
 
 func SetUpWithDBConfig(t *testing.T, v3ioConfig *config.V3ioConfig, schema *config.Schema) func() {
-	v3ioConfig.TablePath = fmt.Sprintf("%s-%d", t.Name(), time.Now().Nanosecond())
+	v3ioConfig.TablePath = PrefixTablePath(fmt.Sprintf("%s-%d", t.Name(), time.Now().Nanosecond()))
 	if err := CreateTSDB(v3ioConfig, schema); err != nil {
 		v3ioConfigAsJson, _ := json2.MarshalIndent(v3ioConfig, "", "  ")
-		t.Fatalf("Failed to create TSDB. Reason: %s\nConfiguration:\n%s", err, string(v3ioConfigAsJson))
+		t.Fatalf("Failed to create a TSDB instance (table). Reason: %s\nConfiguration:\n%s", err, string(v3ioConfigAsJson))
 	}
 
 	// Measure performance
 	metricReporter, err := performance.DefaultReporterInstance()
 	if err != nil {
-		t.Fatalf("unable to initialize performance metrics reporter. Error: %v", err)
+		t.Fatalf("Unable to initialize the performance metrics reporter. Error: %v", err)
 	}
 	metricReporter.Start()
 
 	return func() {
 		defer metricReporter.Stop()
-		// Don't delete the table if the test has failed
+		// Don't delete the TSDB table if the test failed
 		if !t.Failed() {
 			DeleteTSDB(t, v3ioConfig)
 		}
@@ -104,12 +106,12 @@ func SetUpWithDBConfig(t *testing.T, v3ioConfig *config.V3ioConfig, schema *conf
 func InsertData(t *testing.T, v3ioConfig *config.V3ioConfig, metricName string, data []DataPoint, userLabels utils.Labels) *V3ioAdapter {
 	adapter, err := NewV3ioAdapter(v3ioConfig, nil, nil)
 	if err != nil {
-		t.Fatalf("Failed to create v3io adapter. reason: %s", err)
+		t.Fatalf("Failed to create a V3IO TSDB adapter. Reason: %s", err)
 	}
 
 	appender, err := adapter.Appender()
 	if err != nil {
-		t.Fatalf("Failed to get appender. reason: %s", err)
+		t.Fatalf("Failed to get an appender. Reason: %s", err)
 	}
 
 	labels := utils.Labels{utils.Label{Name: "__name__", Value: metricName}}
@@ -117,14 +119,14 @@ func InsertData(t *testing.T, v3ioConfig *config.V3ioConfig, metricName string, 
 
 	ref, err := appender.Add(labels, data[0].Time, data[0].Value)
 	if err != nil {
-		t.Fatalf("Failed to add data to appender. reason: %s", err)
+		t.Fatalf("Failed to add data to the TSDB appender. Reason: %s", err)
 	}
 	for _, curr := range data[1:] {
 		appender.AddFast(labels, ref, curr.Time, curr.Value)
 	}
 
 	if _, err := appender.WaitForCompletion(0); err != nil {
-		t.Fatalf("Failed to wait for appender completion. reason: %s", err)
+		t.Fatalf("Failed to wait for TSDB append completion. Reason: %s", err)
 	}
 
 	return adapter
@@ -137,7 +139,7 @@ func ValidateCountOfSamples(t testing.TB, adapter *V3ioAdapter, metricName strin
 		var err error
 		stepSize, err = utils.Str2duration("1h")
 		if err != nil {
-			t.Fatal(err, "failed to create step")
+			t.Fatal(err, "Failed to create an aggregation interval (step).")
 		}
 	} else {
 		stepSize = queryAggStep
@@ -145,7 +147,7 @@ func ValidateCountOfSamples(t testing.TB, adapter *V3ioAdapter, metricName strin
 
 	qry, err := adapter.Querier(nil, startTimeMs-stepSize, endTimeMs)
 	if err != nil {
-		t.Fatal(err, "failed to create Querier instance.")
+		t.Fatal(err, "Failed to create a Querier instance.")
 	}
 
 	set, err := qry.Select("", "count", stepSize, fmt.Sprintf("starts(__name__, '%v')", metricName))
@@ -153,14 +155,14 @@ func ValidateCountOfSamples(t testing.TB, adapter *V3ioAdapter, metricName strin
 	var actualCount int
 	for set.Next() {
 		if set.Err() != nil {
-			t.Fatal(set.Err(), "failed to get next element from result set")
+			t.Fatal(set.Err(), "Failed to get the next element from the result set.")
 		}
 
 		series := set.At()
 		iter := series.Iterator()
 		for iter.Next() {
 			if iter.Err() != nil {
-				t.Fatal(set.Err(), "failed to get next time-value pair from iterator")
+				t.Fatal(set.Err(), "Failed to get the next time-value pair from  the iterator.")
 			}
 			_, v := iter.At()
 			actualCount += int(v)
@@ -172,42 +174,43 @@ func ValidateCountOfSamples(t testing.TB, adapter *V3ioAdapter, metricName strin
 	}
 
 	if expected != actualCount {
-		t.Fatalf("Check failed: actualCount result is not as expected [%d(actualCount) != %d(expected)]", actualCount, expected)
+		t.Fatalf("Check failed: the metric samples' actual count isn't as expected [%d(actualCount) != %d(expected)].", actualCount, expected)
 	}
 
-	t.Logf("PASS: total count of samples, i.e. [%d(actualCount) == %d(expected)]", actualCount, expected)
+	t.Logf("PASS: the metric-samples actual count matches the expected total count [%d(actualCount) == %d(expected)].", actualCount, expected)
 }
 
 func ValidateRawData(t testing.TB, adapter *V3ioAdapter, metricName string, startTimeMs, endTimeMs int64, isValid func(*DataPoint, *DataPoint) bool) {
 
 	qry, err := adapter.Querier(nil, startTimeMs, endTimeMs)
 	if err != nil {
-		t.Fatal(err, "failed to create Querier instance.")
+		t.Fatal(err, "Failed to create a Querier instance.")
 	}
 
 	set, err := qry.Select(metricName, "", 0, "")
 
 	for set.Next() {
-		// start over for each label set
+		// Start over for each label set
 		var lastDataPoint = &DataPoint{Time: -1, Value: -1.0}
 
 		if set.Err() != nil {
-			t.Fatal(set.Err(), "failed to get next element from result set")
+			t.Fatal(set.Err(), "Failed to get the next element from a result set.")
 		}
 
 		series := set.At()
 		iter := series.Iterator()
 		for iter.Next() {
 			if iter.Err() != nil {
-				t.Fatal(set.Err(), "failed to get next time-value pair from iterator")
+				t.Fatal(set.Err(), "Failed to get the next time-value pair from an iterator.")
 			}
 			currentTime, currentValue := iter.At()
 			currentDataPoint := &DataPoint{Time: currentTime, Value: currentValue}
 
 			if lastDataPoint.Value >= 0 {
-				// Note, we cast float to integer to eliminate the risk of precision error
+				// Note: We cast float to integer to eliminate the risk of a
+				// precision error
 				if !isValid(lastDataPoint, currentDataPoint) {
-					t.Fatalf("Check for consistency of the raw data has failed: metric name: '%s'\n\tisValid(%v, %v) == false",
+					t.Fatalf("The raw-data consistency check failed: metric name='%s'\n\tisValid(%v, %v) == false",
 						metricName, lastDataPoint, currentDataPoint)
 				}
 			}
@@ -225,4 +228,12 @@ func NormalizePath(path string) string {
 	r := strings.Join(chars, "")
 	re := regexp.MustCompile("[" + r + "]+")
 	return re.ReplaceAllString(path, "_")
+}
+
+func PrefixTablePath(tablePath string) string {
+	base := os.Getenv("TSDB_TEST_TABLE_PATH")
+	if base == "" {
+		return tablePath
+	}
+	return path.Join(os.Getenv("TSDB_TEST_TABLE_PATH"), tablePath)
 }

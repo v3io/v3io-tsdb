@@ -38,12 +38,24 @@ func newTimeCommandeer(rootCommandeer *RootCommandeer) *timeCommandeer {
 	}
 
 	cmd := &cobra.Command{
-		Use:     "time [unix-time | time-RFC3339]",
-		Aliases: []string{"put"},
-		Short:   "returns current unix time or the unix/RFC3339 matching the provided RFC3339/unix",
+		Use:    "time [<time>]",
+		Hidden: true,
+		Short:  "Performs RFC3339 time/Unix timestamp conversions",
+		Long: `Converts an RFC3339 time string to a Unix timestamp in seconds, or vice versa.
+By default, returns the current time as a Unix timestamp.`,
+		Example: `- tsdbctl time
+- tsdcbtl time 2016-01-02T15:34:26Z
+- tsdcbtl time 1537971020
+
+Notes:
+- The global flags are not applicable to this command.
+
+Arguments:
+  <time> (string)  An RFC3339 time string or a Unix timestamp in seconds.
+                   By default, the command returns the Unix timestamp for the current time.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 
-			// if we got positional arguments
+			// Check for positional arguments
 			if len(args) == 0 {
 				fmt.Println(time.Now().Unix())
 				return nil
@@ -65,7 +77,6 @@ func newTimeCommandeer(rootCommandeer *RootCommandeer) *timeCommandeer {
 
 		},
 	}
-	cmd.Hidden = true
 
 	commandeer.cmd = cmd
 

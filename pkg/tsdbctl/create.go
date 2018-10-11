@@ -29,15 +29,15 @@ import (
 )
 
 type createCommandeer struct {
-	cmd             *cobra.Command
-	rootCommandeer  *RootCommandeer
-	path            string
-	storageClass    string
-	defaultRollups  string
-	rollupInterval  string
-	shardingBuckets int
-	sampleRetention int
-	sampleRate      string
+	cmd                    *cobra.Command
+	rootCommandeer         *RootCommandeer
+	path                   string
+	storageClass           string
+	defaultRollups         string
+	aggregationGranularity string
+	shardingBucketsCount   int
+	sampleRetention        int
+	samplesIngestionRate   string
 }
 
 func newCreateCommandeer(rootCommandeer *RootCommandeer) *createCommandeer {
@@ -47,7 +47,12 @@ func newCreateCommandeer(rootCommandeer *RootCommandeer) *createCommandeer {
 
 	cmd := &cobra.Command{
 		Use:   "create",
-		Short: "create a new TSDB in the specifies path",
+		Short: "Create a new TSDB instance",
+		Long:  `Create a new TSDB instance (table) according to the provided configuration.`,
+		Example: `- tsdbctl create -s 192.168.1.100:8081 -u myuser -p mypassword -c mycontainer -t my_tsdb -r 1/s
+- tsdbctl create -s 192.168.204.14:8081 -u janed -p OpenSesame -c bigdata -t my_dbs/metrics_table -r 60/m -a "min,avg,stddev" -i 3h
+- tsdbctl create -g ~/my_tsdb_cfg.yaml -u johnl -p "P@ssNoW!" -c admin_container -t perf_metrics -r "100/h"
+  (where ~/my_tsdb_cfg.yaml sets "webApiEndpoint" to the endpoint of the web-gateway service)`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 
 			return commandeer.create()
@@ -56,10 +61,16 @@ func newCreateCommandeer(rootCommandeer *RootCommandeer) *createCommandeer {
 	}
 
 	cmd.Flags().StringVarP(&commandeer.defaultRollups, "aggregates", "a", "",
-		"Default aggregation rollups, comma seperated: count,avg,sum,min,max,stddev")
-	cmd.Flags().StringVarP(&commandeer.rollupInterval, "aggregation-granularity", "i", config.DefaultAggregationGranularity, "aggregation interval")
-	cmd.Flags().IntVarP(&commandeer.shardingBuckets, "sharding-buckets", "b", config.DefaultShardingBuckets, "number of buckets to split key")
-	cmd.Flags().StringVarP(&commandeer.sampleRate, "ingestion-rate", "r", config.DefaultIngestionRate, "Metric-samples ingestion rate")
+		"Default aggregates to calculate in real time during\nthe samples ingestion, as a comma-separated list of\nsupported aggregation functions - count | avg | sum |\nmin | max | stddev | stdvar | last | rate.\nExample: \"sum,avg,max\".")
+	cmd.Flags().StringVarP(&commandeer.aggregationGranularity, "aggregation-granularity", "i", config.DefaultAggregationGranularity,
+		"Aggregation granularity - a time interval for applying\nthe aggregation functions (if  configured - see the\n-a|--aggregates flag), of the format \"[0-9]+[mhd]\"\n(where 'm' = minutes, 'h' = hours, and 'd' = days).\nExamples: \"2h\"; \"90m\".")
+	cmd.Flags().IntVarP(&commandeer.shardingBucketsCount, "sharding-buckets", "b", config.DefaultShardingBucketsCount,
+		"Number of storage buckets across which to split the\ndata of a single metric to optimize storage of\nnon-uniform data. Example: 10.")
+	// TODO: enable sample-retention when supported:
+	// cmd.Flags().IntVarP(&commandeer.sampleRetention, "sample-retention", "r", config.DefaultSampleRetentionHours,
+	//	"Metric-samples retention period, in hours. Example: 1 (retain samples for 1 hour).")
+	cmd.Flags().StringVarP(&commandeer.samplesIngestionRate, "ingestion-rate", "r", config.DefaultIngestionRate,
+		"[Required] Metric-samples ingestion rate - the maximum\ningestion rate for a single metric (calculated\naccording to the slowest expected ingestion rate) -\nof the format \"[0-9]+/[mhd]\" (where 'm' = minutes,\n'h' = hours, and 'd' = days). Examples: \"12/m\" (12\nsamples per minute); \"1s\" (one sample per second).")
 
 	commandeer.cmd = cmd
 
@@ -68,19 +79,19 @@ func newCreateCommandeer(rootCommandeer *RootCommandeer) *createCommandeer {
 
 func (cc *createCommandeer) create() error {
 
-	// initialize params
+	// Initialize parameters
 	if err := cc.rootCommandeer.initialize(); err != nil {
 		return err
 	}
 
 	dbSchema, err := schema.NewSchema(
 		cc.rootCommandeer.v3iocfg,
-		cc.sampleRate,
-		cc.rollupInterval,
+		cc.samplesIngestionRate,
+		cc.aggregationGranularity,
 		cc.defaultRollups)
 
 	if err != nil {
-		return errors.Wrap(err, "failed to create TSDB schema")
+		return errors.Wrap(err, "Failed to create a TSDB schema.")
 	}
 
 	return tsdb.CreateTSDB(cc.rootCommandeer.v3iocfg, dbSchema)
