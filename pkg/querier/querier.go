@@ -111,7 +111,7 @@ func (q *V3ioQuerier) selectQry(
 
 		sets := make([]SeriesSet, len(parts))
 		for i, part := range parts {
-			set, err := q.queryNumericPartition(part, name, functions, step, windows, filter)
+			set, err = q.queryNumericPartition(part, name, functions, step, windows, filter)
 			if err != nil {
 				set = nullSeriesSet{}
 				return
@@ -119,17 +119,19 @@ func (q *V3ioQuerier) selectQry(
 			sets[i] = set
 		}
 
-		// Sort each partition when not using range scan
-		if name == "" {
-			for i := 0; i < len(sets); i++ {
-				// TODO make it a Go routine per part
-				sorter, err := NewSetSorter(sets[i])
-				if err != nil {
-					set = nullSeriesSet{}
-					return
-				}
-				sets[i] = sorter
+		// Sort each partition
+		/* TODO: Removed condition that applies sorting only on non range scan queries to fix bug with series coming OOO when querying multi partitions,
+		Need to think of a better solution.
+		*/
+		for i := 0; i < len(sets); i++ {
+			// TODO make it a Go routine per part
+			sorter, error := NewSetSorter(sets[i])
+			if error != nil {
+				set = nullSeriesSet{}
+				err = error
+				return
 			}
+			sets[i] = sorter
 		}
 
 		set, err = newIterSortMerger(sets)
