@@ -192,7 +192,7 @@ func (rc *RootCommandeer) populateConfig(cfg *config.V3ioConfig) error {
 	if rc.logLevel != "" {
 		cfg.LogLevel = rc.logLevel
 	} else {
-		cfg.LogLevel = "info"
+		cfg.LogLevel = config.DefaultLogLevel
 	}
 
 	rc.v3iocfg = cfg
