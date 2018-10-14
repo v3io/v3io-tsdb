@@ -36,7 +36,7 @@ const (
 
 	defaultNumberOfIngestWorkers = 1
 	defaultNumberOfQueryWorkers  = 8
-	defaultBatchSize             = 32
+	defaultBatchSize             = 64
 	defaultTimeoutInSeconds      = 24 * 60 * 60 // 24 hours
 
 	defaultMaximumSampleSize    = 8       // bytes
