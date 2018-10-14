@@ -60,7 +60,7 @@ func newAddCommandeer(rootCommandeer *RootCommandeer) *addCommandeer {
 		Use:     "add [<metric>] [<labels>] [flags]",
 		Short:   "Add metric samples to a TSDB instance",
 		Long:    `Add (ingest) metric samples into a TSDB instance (table).`,
-		Example: `The examples assume that the endpoint of the web-gateway service, the login credentails, and
+		Example: `The examples assume that the endpoint of the web-gateway service, the login credentials, and
 the name of the data container are configured in the default configuration file (` + config.DefaultConfigurationFileName + `)
 instead of using the -s|--server, -u|--username, -p|--password, and -c|--container flags.
 - tsdbctl add temperature -t mytsdb -d 28 -m now-2h
@@ -107,7 +107,7 @@ Arguments:
 	}
 
 	cmd.Flags().StringVarP(&commandeer.tArr, "times", "m", "",
-		"An array of metric-sample times, as a comma-separated list of times\nspecified as Unix timestamps in milliseconds or as relative times of the\nformat \"now\" or \"now-[0-9]+[mhd]\" (where 'm' = minutes, 'h' = hours,\nand 'd' = \"days\"). Example: \"1537971020000,now,now-2d,now-95m\".\nThe default sample time is the current time (\"now\").")
+		"An array of metric-sample times, as a comma-separated list of times\nspecified as Unix timestamps in milliseconds or as relative times of the\nformat \"now\" or \"now-[0-9]+[mhd]\" (where 'm' = minutes, 'h' = hours,\nand 'd' = days). Note that an ingested sample time cannot be earlier\nthan the latest previously ingested sample time for the same metric.\nThis includes metrics ingested in the same command, so specify the\ningestion times in ascending chronological order. Example:\n\"1537971020000,now-2d,now-95m,now\".\nThe default sample time is the current time (\"now\").")
 	cmd.Flags().StringVarP(&commandeer.vArr, "values", "d", "",
 		"An array of metric-sample data values, as a comma-separated list of\ninteger or float values. Example: \"99.3,82.12,25.87,100\".\nThe command requires at least one metric value, which can be provided\nwith this flag or in a CSV file that is set with the -f|--file flag.")
 	cmd.Flags().StringVarP(&commandeer.inFile, "file", "f", "",
@@ -159,7 +159,7 @@ func (ac *addCommandeer) add() error {
 			return err
 		}
 
-		_, err = ac.appendMetric(appender, lset, tarray, varray, true)
+		_, err = ac.appendMetric(appender, lset, tarray, varray)
 		if err != nil {
 			return err
 		}
@@ -236,7 +236,7 @@ func (ac *addCommandeer) appendMetrics(append tsdb.Appender, lset utils.Labels) 
 			return err
 		}
 
-		_, err = ac.appendMetric(append, lset, tarray, varray, false)
+		_, err = ac.appendMetric(append, lset, tarray, varray)
 		if err != nil {
 			return err
 		}
@@ -247,13 +247,10 @@ func (ac *addCommandeer) appendMetrics(append tsdb.Appender, lset utils.Labels) 
 }
 
 func (ac *addCommandeer) appendMetric(
-	append tsdb.Appender, lset utils.Labels, tarray []int64, varray []float64, print bool) (uint64, error) {
+	append tsdb.Appender, lset utils.Labels, tarray []int64, varray []float64) (uint64, error) {
 
 	ac.rootCommandeer.logger.DebugWith("Adding a sample value to a metric.", "lset", lset, "t", tarray, "v", varray)
 
-	if print {
-		fmt.Println("add:", lset, tarray, varray)
-	}
 	ref, err := append.Add(lset, tarray[0], varray[0])
 	if err != nil {
 		return 0, errors.Wrap(err, "Failed to add a sample value to a metric.")

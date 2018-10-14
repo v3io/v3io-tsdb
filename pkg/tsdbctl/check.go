@@ -48,7 +48,7 @@ func newCheckCommandeer(rootCommandeer *RootCommandeer) *checkCommandeer {
 		Hidden: true,
 		Short:  "Get information about a TSDB metric item",
 		Long:   `Get information about a TSDB metric item.`,
-		Example: `The examples assume that the endpoint of the web-gateway service, the login credentails, and
+		Example: `The examples assume that the endpoint of the web-gateway service, the login credentials, and
 the name of the data container are configured in the default configuration file (` + config.DefaultConfigurationFileName + `)
 - tsdbctl check 1538265600/memo_1.c6b54e7ce82c2c11 -t my_tsdb -a _v12
 

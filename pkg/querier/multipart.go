@@ -92,7 +92,7 @@ func (im *IterSortMerger) Next() bool {
 		return false
 	}
 
-	im.currSeries = im.currSeries[:0]
+	im.currSeries = make([]Series, 0, len(im.iters))
 	for i, iter := range im.iters {
 		im.currInvalids[i] = true
 		if !im.done[i] {

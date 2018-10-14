@@ -56,19 +56,19 @@ func newQueryCommandeer(rootCommandeer *RootCommandeer) *queryCommandeer {
 		Use:     "query [<metric>] [flags]",
 		Short:   "Query a TSDB instance",
 		Long:    `Query a TSDB instance (table).`,
-		Example: `The examples assume that the endpoint of the web-gateway service, the login credentails, and
+		Example: `The examples assume that the endpoint of the web-gateway service, the login credentials, and
 the name of the data container are configured in the default configuration file (` + config.DefaultConfigurationFileName + `)
 instead of using the -s|--server, -u|--username, -p|--password, and -c|--container flags.
 - tsdbctl query temperature -t mytsdb
 - tsdbctl query -t performance -f "starts(__name__, 'cpu') AND os=='win'"
-- tsdbctl query metric2 -t pmertics -b 0 -e now-1h -a "sum,avg" -i 20m
+- tsdbctl query metric2 -t pmetrics -b 0 -e now-1h -a "sum,avg" -i 20m
 - tsdbctl query -t mytsdb -f "LabelA==8.1" -l 1d -o json
 - tsdbctl query noise -t my_tsdb -w "1,7,14" -i "1d" -a "count,sum,avg"
 
 Notes:
-- You must set the mertic-name argument (<metric>) and/or the query-filter flag (-f|--filter).
-- Queries that set the mertic-name argument (<metric>) use range scan and are therefore faster.
-  But you can't use such queries to scan multiple mertics.
+- You must set the metric-name argument (<metric>) and/or the query-filter flag (-f|--filter).
+- Queries that set the metric-name argument (<metric>) use range scan and are therefore faster.
+  But you can't use such queries to scan multiple metrics.
 - To query the full TSDB content, set the -f|--filter to a query filter that always evaluates
   to true (such as "1==1"), don't set the <metric> argument, and set the -b|--begin flag to 0.
 
@@ -88,9 +88,9 @@ Arguments:
 	}
 
 	cmd.Flags().StringVarP(&commandeer.to, "end", "e", "",
-		"End (maximum) time for the query, as a string containing an\nRFC3339 time string, a Unix timestamp in milliseconds, or\na relative time of the format \"now\" or \"now-[0-9]+[mhd]\"\n(where 'm' = minutes, 'h' = hours, and 'd' = \"days\").\nExamples: \"2018-09-26T14:10:20Z\"; \"1537971006000\";\n\"now-3h\"; \"now-7d\". (default \"now\")")
+		"End (maximum) time for the query, as a string containing an\nRFC3339 time string, a Unix timestamp in milliseconds, or\na relative time of the format \"now\" or \"now-[0-9]+[mhd]\"\n(where 'm' = minutes, 'h' = hours, and 'd' = days).\nExamples: \"2018-09-26T14:10:20Z\"; \"1537971006000\";\n\"now-3h\"; \"now-7d\". (default \"now\")")
 	cmd.Flags().StringVarP(&commandeer.from, "begin", "b", "",
-		"Start (minimum) time for the query, as a string containing\nan RFC3339 time, a Unix timestamp in milliseconds, a\nrelative time of the format \"now\" or \"now-[0-9]+[mhd]\"\n(where 'm' = minutes, 'h' = hours, and 'd' = \"days\"), or 0\nfor the earliest time. Examples: \"2016-01-02T15:34:26Z\";\n\"1451748866\"; \"now-90m\"; \"0\". (default = <end time> - 1h)")
+		"Start (minimum) time for the query, as a string containing\nan RFC3339 time, a Unix timestamp in milliseconds, a\nrelative time of the format \"now\" or \"now-[0-9]+[mhd]\"\n(where 'm' = minutes, 'h' = hours, and 'd' = days), or 0\nfor the earliest time. Examples: \"2016-01-02T15:34:26Z\";\n\"1451748866\"; \"now-90m\"; \"0\". (default = <end time> - 1h)")
 	cmd.Flags().StringVarP(&commandeer.output, "output", "o", formatter.DefaultOutputFormat,
 		"Output format in which to display the query results -\n\"text\" | \"csv\" | \"json\".")
 	cmd.Flags().StringVarP(&commandeer.filter, "filter", "f", "",
@@ -98,7 +98,7 @@ Arguments:
 	cmd.Flags().StringVarP(&commandeer.last, "last", "l", "",
 		"Return data for the specified time period before the\ncurrent time, of the format \"[0-9]+[mhd]\" (where\n'm' = minutes, 'h' = hours, and 'd' = days>). When setting\nthis flag, don't set the -b|--begin or -e|--end flags.\nExamples: \"1h\"; \"15m\"; \"30d\" to return data for the last\n1 hour, 15 minutes, or 30 days.")
 	cmd.Flags().StringVarP(&commandeer.windows, "windows", "w", "",
-		"Overlapping windows of time to which to apply the aggregation\nfunctions (if defined - see the -a|--aggregates flag), as a\ncomma separated list of integer values (\"[0-9]+\").\nThe duration of each window is calculated by multiplying the\nvalue from the windows flag with the aggregation interval\n(see -i|--aggregation-interval). The windows' end time is\nthe query's end time (see -e|--end and -l|--last). If the\nwindow's duration extends beyond the query's start time (see\n-b|--begin and -l|--last), it will be shortened to fit the\nstart time. Example: -w \"1,2\" with -i \"2h\", -b 0, and the\ndefault end time (\"now\") defines overlapping aggegration\nwindows for the last 2 hours and 4 hours.")
+		"Overlapping windows of time to which to apply the aggregation\nfunctions (if defined - see the -a|--aggregates flag), as a\ncomma separated list of integer values (\"[0-9]+\").\nThe duration of each window is calculated by multiplying the\nvalue from the windows flag with the aggregation interval\n(see -i|--aggregation-interval). The windows' end time is\nthe query's end time (see -e|--end and -l|--last). If the\nwindow's duration extends beyond the query's start time (see\n-b|--begin and -l|--last), it will be shortened to fit the\nstart time. Example: -w \"1,2\" with -i \"2h\", -b 0, and the\ndefault end time (\"now\") defines overlapping aggregation\nwindows for the last 2 hours and 4 hours.")
 	// The default aggregates list for an overlapping-windows query is "avg",
 	// provided the TSDB instance has the "count" and "sum" aggregates, which
 	// make up the "avg" aggregate; ("count" is added automatically when adding
@@ -107,7 +107,7 @@ Arguments:
 	cmd.Flags().StringVarP(&commandeer.functions, "aggregates", "a", "",
 		"Aggregation information to return, as a comma-separated\nlist of supported aggregation functions - count | avg |\nsum | min | max | stddev | stdvar | last | rate.\nExample: \"sum,min,max,count\".")
 	cmd.Flags().StringVarP(&commandeer.step, "aggregation-interval", "i", "",
-		"Aggregation interval for applying the aggregation functions\n(if set - see the -a|--aggregates flag), of the format\n\"[0-9]+[mhd]\" (where 'm' = minutes, 'h' = hours, and\n'd' = \"days\"). Examples: \"1h\"; \"150m\". (default =\n<end time> - <start time>)")
+		"Aggregation interval for applying the aggregation functions\n(if set - see the -a|--aggregates flag), of the format\n\"[0-9]+[mhd]\" (where 'm' = minutes, 'h' = hours, and\n'd' = days). Examples: \"1h\"; \"150m\". (default =\n<end time> - <start time>)")
 
 	commandeer.cmd = cmd
 

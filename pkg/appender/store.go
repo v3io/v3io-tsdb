@@ -306,7 +306,7 @@ func (cs *chunkStore) writeChunks(mc *MetricsCache, metric *MetricState) (hasPen
 			sampleTime := cs.pending[pendingSampleIndex].t
 
 			if sampleTime <= cs.initMaxTime && !mc.cfg.OverrideOld {
-				mc.logger.DebugWith("Time is less than the initialization end (max) time", "T", sampleTime, "InitMaxTime", cs.initMaxTime)
+				mc.logger.WarnWith("Omitting the sample - time is earlier than the last sample time for this metric", "metric", metric.Lset, "T", sampleTime, "InitMaxTime", cs.initMaxTime)
 				pendingSampleIndex++
 				continue
 			}

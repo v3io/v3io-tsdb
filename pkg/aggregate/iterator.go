@@ -28,7 +28,7 @@ import (
 )
 
 type AggregateSeries struct {
-	colName        string     // cloumn name ("v" in timeseries)
+	colName        string     // column name ("v" in timeseries)
 	functions      []AggrType // list of aggregation functions to return (count, avg, sum, ..)
 	aggrMask       AggrType   // the sum of aggregates (or between all aggregates)
 	rollupTime     int64      // time per bucket (cell in the array)
