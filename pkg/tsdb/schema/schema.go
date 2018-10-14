@@ -12,56 +12,56 @@ import (
 )
 
 const (
-	Version = 0
+	Version = 1
 )
 
-func NewSchema(v3ioCfg *config.V3ioConfig, sampleRate, aggregatorGranularity, aggregatesList string) (*config.Schema, error) {
+func NewSchema(v3ioCfg *config.V3ioConfig, samplesIngestionRate, aggregationGranularity, aggregatesList string) (*config.Schema, error) {
 	return newSchema(
-		sampleRate,
-		aggregatorGranularity,
+		samplesIngestionRate,
+		aggregationGranularity,
 		aggregatesList,
 		v3ioCfg.MinimumChunkSize,
 		v3ioCfg.MaximumChunkSize,
 		v3ioCfg.MaximumSampleSize,
 		v3ioCfg.MaximumPartitionSize,
 		config.DefaultSampleRetentionTime,
-		v3ioCfg.ShardingBuckets)
+		v3ioCfg.ShardingBucketsCount)
 }
 
-func newSchema(sampleRate, aggregatorGranularity, aggregatesList string, minChunkSize, maxChunkSize, maxSampleSize, maxPartitionSize, sampleRetention, shardingBuckets int) (*config.Schema, error) {
-	rateInHours, err := rateToHours(sampleRate)
+func newSchema(samplesIngestionRate, aggregationGranularity, aggregatesList string, minChunkSize, maxChunkSize, maxSampleSize, maxPartitionSize, sampleRetention, shardingBucketsCount int) (*config.Schema, error) {
+	rateInHours, err := rateToHours(samplesIngestionRate)
 	if err != nil {
-		return nil, errors.Wrap(err, "invalid sample race")
+		return nil, errors.Wrapf(err, "Invalid samples ingestion rate (%s).", samplesIngestionRate)
 	}
 
-	if err := validateAggregatorGranularity(aggregatorGranularity); err != nil {
-		return nil, errors.Wrap(err, "failed to parse aggregator granularity")
+	if err := validateAggregatesGranularity(aggregationGranularity); err != nil {
+		return nil, errors.Wrapf(err, "Failed to parse aggregation granularity '%s'.", aggregationGranularity)
 	}
 
 	chunkInterval, partitionInterval, err := calculatePartitionAndChunkInterval(rateInHours, minChunkSize, maxChunkSize, maxSampleSize, maxPartitionSize)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to calculate chunk interval")
+		return nil, errors.Wrap(err, "Failed to calculate the chunk interval.")
 	}
 
-	aggregates, err := aggregate.AggregatorsToStringList(aggregatesList)
+	aggregates, err := aggregate.AggregatesToStringList(aggregatesList)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to parse list of aggregates")
+		return nil, errors.Wrapf(err, "Failed to parse aggregates list '%s'.", aggregatesList)
 	}
 
 	defaultRollup := config.Rollup{
-		Aggregators:            []string{},
-		AggregatorsGranularity: aggregatorGranularity,
+		Aggregates:             []string{},
+		AggregationGranularity: aggregationGranularity,
 		StorageClass:           config.DefaultStorageClass,
 		SampleRetention:        sampleRetention,                  //TODO: make configurable
 		LayerRetentionTime:     config.DefaultLayerRetentionTime, //TODO: make configurable
 	}
 
 	tableSchema := config.TableSchema{
-		Version:             Version,
-		RollupLayers:        []config.Rollup{defaultRollup},
-		ShardingBuckets:     shardingBuckets,
-		PartitionerInterval: partitionInterval,
-		ChunckerInterval:    chunkInterval,
+		Version:              Version,
+		RollupLayers:         []config.Rollup{defaultRollup},
+		ShardingBucketsCount: shardingBucketsCount,
+		PartitionerInterval:  partitionInterval,
+		ChunckerInterval:     chunkInterval,
 	}
 
 	if len(aggregates) == 0 {
@@ -70,14 +70,14 @@ func newSchema(sampleRate, aggregatorGranularity, aggregatesList string, minChun
 
 	fields, err := aggregate.SchemaFieldFromString(aggregates, "v")
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to create list of aggregates from: '%s'", aggregates)
+		return nil, errors.Wrapf(err, "Failed to create an aggregates list from string '%s'.", aggregates)
 	}
 	fields = append(fields, config.SchemaField{Name: "_name", Type: "string", Nullable: false, Items: ""})
 
 	partitionSchema := config.PartitionSchema{
 		Version:                tableSchema.Version,
-		Aggregators:            aggregates,
-		AggregatorsGranularity: config.DefaultAggregationGranularity,
+		Aggregates:             aggregates,
+		AggregationGranularity: config.DefaultAggregationGranularity,
 		StorageClass:           config.DefaultStorageClass,
 		SampleRetention:        config.DefaultSampleRetentionTime,
 		ChunckerInterval:       tableSchema.ChunckerInterval,
@@ -100,13 +100,13 @@ func calculatePartitionAndChunkInterval(rateInHours, minChunkSize, maxChunkSize,
 
 	chunkInterval := maxNumberOfEventsPerChunk / rateInHours
 	if chunkInterval == 0 {
-		return "", "", errors.New("sample rate is too high")
+		return "", "", fmt.Errorf("The samples ingestion rate (%v/h) is too high.", rateInHours)
 	}
 
 	// Make sure the expected chunk size is greater then the supported minimum.
 	if chunkInterval < minNumberOfEventsPerChunk/rateInHours {
 		return "", "", fmt.Errorf(
-			"calculated chunk size is less than minimum, rate - %v/h, calculated chunk interval - %v, minimum size - %v",
+			"The calculated chunk size is smaller than the minimum: samples ingestion rate = %v/h, calculated chunk interval = %v, minimum size = %v",
 			rateInHours, chunkInterval, minChunkSize)
 	}
 
@@ -117,32 +117,32 @@ func calculatePartitionAndChunkInterval(rateInHours, minChunkSize, maxChunkSize,
 		numberOfChunksInPartition += 24
 	}
 	if numberOfChunksInPartition == 0 {
-		return "", "", errors.Errorf("given rate is too high, can not fit a partition in a day interval with the calculated chunk size %vh", chunkInterval)
+		return "", "", errors.Errorf("The samples ingestion rate (%v/h) is too high - cannot fit a partition in a day interval with the calculated chunk size (%v).", rateInHours, chunkInterval)
 	}
 
 	partitionInterval := numberOfChunksInPartition * chunkInterval
 	return strconv.Itoa(chunkInterval) + "h", strconv.Itoa(partitionInterval) + "h", nil
 }
 
-func rateToHours(sampleRate string) (int, error) {
-	parsingError := errors.New(`not a valid rate. Accepted pattern: [0-9]+/[hms]. Example: 12/m`)
+func rateToHours(samplesIngestionRate string) (int, error) {
+	parsingError := errors.New(`Invalid samples ingestion rate. The rate must be of the format "[0-9]+/[mhd]". For example, "12/m".`)
 
-	if len(sampleRate) < 3 {
+	if len(samplesIngestionRate) < 3 {
 		return 0, parsingError
 	}
-	if sampleRate[len(sampleRate)-2] != '/' {
+	if samplesIngestionRate[len(samplesIngestionRate)-2] != '/' {
 		return 0, parsingError
 	}
 
-	last := sampleRate[len(sampleRate)-1]
-	// get the number ignoring slash and time unit
-	sampleRate = sampleRate[:len(sampleRate)-2]
-	i, err := strconv.Atoi(sampleRate)
+	last := samplesIngestionRate[len(samplesIngestionRate)-1]
+	// Get the ingestion-rate samples number, ignoring the slash and time unit
+	samplesIngestionRate = samplesIngestionRate[:len(samplesIngestionRate)-2]
+	i, err := strconv.Atoi(samplesIngestionRate)
 	if err != nil {
 		return 0, errors.Wrap(err, parsingError.Error())
 	}
 	if i <= 0 {
-		return 0, errors.New("rate should be a positive number")
+		return 0, fmt.Errorf("Invalid samples ingestion rate (%s). The rate cannot have a negative number of samples.", samplesIngestionRate)
 	}
 	switch last {
 	case 's':
@@ -156,15 +156,15 @@ func rateToHours(sampleRate string) (int, error) {
 	}
 }
 
-func validateAggregatorGranularity(aggregatorGranularity string) error {
+func validateAggregatesGranularity(aggregationGranularity string) error {
 	dayMillis := 24 * int64(time.Hour/time.Millisecond)
-	duration, err := utils.Str2duration(aggregatorGranularity)
+	duration, err := utils.Str2duration(aggregationGranularity)
 	if err != nil {
 		return err
 	}
 
 	if dayMillis%duration != 0 && duration%dayMillis != 0 {
-		return errors.New("rollup interval should be a divisor or a dividend of 1 day. Example: 10m, 30m, 2h, etc.")
+		return errors.New("The aggregation granularity should be a divisor or a dividend of 1 day. Examples: \"10m\"; \"30m\"; \"2h\".")
 	}
 	return nil
 }

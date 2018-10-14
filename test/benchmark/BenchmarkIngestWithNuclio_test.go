@@ -30,15 +30,15 @@ func BenchmarkIngestWithNuclio(b *testing.B) {
 	log.SetOutput(ioutil.Discard)
 	testStartTimeNano := time.Now().UnixNano()
 
-	var count = 0 // count real number of samples to compare with query result
+	var count = 0 // Count of real number of samples to compare with the query result
 
 	testConfig, v3ioConfig, err := common.LoadBenchmarkIngestConfigs()
 	if err != nil {
 		b.Fatal(errors.Wrap(err, "unable to load configuration"))
 	}
 
-	// Create test path (tsdb instance)
-	tsdbPath = tsdbtest.NormalizePath(fmt.Sprintf("tsdb-%s-%d-%s", b.Name(), b.N, time.Now().Format(time.RFC3339)))
+	// Create a test TSDB instance (table) path)
+	tsdbPath = tsdbtest.PrefixTablePath(tsdbtest.NormalizePath(fmt.Sprintf("tsdb-%s-%d-%s", b.Name(), b.N, time.Now().Format(time.RFC3339))))
 
 	// Update TSDB instance path for this test
 	v3ioConfig.TablePath = tsdbPath
@@ -65,10 +65,10 @@ func BenchmarkIngestWithNuclio(b *testing.B) {
 		b.Fatal(err)
 	}
 
-	// run the runTest function b.N times
+	// Run the runTest function b.N times
 	relativeTimeOffsetMs, err := utils.Str2duration(testConfig.StartTimeOffset)
 	if err != nil {
-		b.Fatal("unable to resolve start time. Check configuration.")
+		b.Fatal("Unable to resolve start time. Check the configuration.")
 	}
 	testEndTimeMs := testStartTimeNano / int64(time.Millisecond)
 	testStartTimeMs := testEndTimeMs - relativeTimeOffsetMs
@@ -98,7 +98,7 @@ func BenchmarkIngestWithNuclio(b *testing.B) {
 	if err != nil {
 		b.Error(err)
 	}
-	// Wait for all responses, use default timeout from configuration or unlimited if not set
+	// Wait for all responses; use the configured timeout or the default unlimited timeout.
 	_, err = appender.WaitForCompletion(-1)
 	b.StopTimer()
 
@@ -106,7 +106,7 @@ func BenchmarkIngestWithNuclio(b *testing.B) {
 
 	queryStepSizeMs, err := utils.Str2duration(testConfig.QueryAggregateStep)
 	if err != nil {
-		b.Fatal("unable to resolve query aggregate step size. Check configuration.")
+		b.Fatal("Unable to resolve the query aggregate interval (step) size. Check the configuration.")
 	}
 
 	tsdbtest.ValidateCountOfSamples(b, v3ioAdapter, metricNamePrefix, count, testStartTimeMs, testEndTimeMs, queryStepSizeMs)
@@ -131,14 +131,14 @@ func runNuclioTest(tc *nutest.TestContext, sampleTemplateJson string, timestamp 
 	resp, err := tc.Invoke(&testEvent)
 
 	if err != nil {
-		errors.Wrap(err, fmt.Sprintf("request has failed. Response: %s\n", resp))
+		errors.Wrap(err, fmt.Sprintf("The request failed. Response: %s\n", resp))
 	}
 	count++
 
 	return count, err
 }
 
-// InitContext runs only once when the function runtime starts
+// InitContext runs only once, when the function runtime starts
 func initContext(context *nuclio.Context) error {
 	v3ioConfig, err := tsdbtest.LoadV3ioConfig()
 	if err != nil {
@@ -154,7 +154,7 @@ func initContext(context *nuclio.Context) error {
 		return errors.Wrap(err, "failed to create V3IO Adapter")
 	}
 
-	// Store adapter in user cache
+	// Store the adapter in the user-data cache
 	context.UserData = adapter
 
 	v3ioAdapter = adapter
@@ -177,18 +177,21 @@ func handler(context *nuclio.Context, event nuclio.Event) (interface{}, error) {
 		return "", err
 	}
 
-	// if time is not specified assume "now"
+	// If time isn't specified, assume "now" (default)
 	if sample.Time == "" {
 		sample.Time = "now"
 	}
 
-	// convert time string to time int, string can be: now, now-2h, int (unix milisec time), or RFC3339 date string
+	// Convert a time string to a Unix timestamp in milliseconds integer.
+	// The input time string can be of the format "now", "now-[0-9]+[mdh]"
+	// (for example, "now-2h"), "<Unix timestamp in milliseconds>", or
+	// "<RFC3339 time>" (for example, "2018-09-26T14:10:20Z").
 	t, err := utils.Str2unixTime(sample.Time)
 	if err != nil {
 		return "", err
 	}
 
-	// Append sample to metric
+	// Append a sample to a metric-samples set
 	_, err = appender.Add(sample.Lset, t, sample.Value)
 
 	return "", err

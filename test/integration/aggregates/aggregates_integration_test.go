@@ -27,6 +27,7 @@ import (
 	"github.com/nuclio/logger"
 	"github.com/stretchr/testify/assert"
 	"github.com/v3io/v3io-tsdb/internal/pkg/performance"
+	"github.com/v3io/v3io-tsdb/pkg/aggregate"
 	"github.com/v3io/v3io-tsdb/pkg/config"
 	"github.com/v3io/v3io-tsdb/pkg/tsdb"
 	"github.com/v3io/v3io-tsdb/pkg/tsdb/tsdbtest"
@@ -90,7 +91,7 @@ func t1Config(testCtx *testing.T) *TestConfig {
 		desc:          "Test case #1",
 		testEndTime:   currentRoundedTimeNano,
 		testStartTime: currentRoundedTimeNano - testDuration,
-		interval:      int64(10 * time.Second),
+		interval:      int64(10 * time.Minute),
 		testDuration:  testDuration,
 		numMetrics:    1,
 		numLabels:     1,
@@ -118,7 +119,7 @@ func setupFunc(testCtx *testing.T, testConfig *TestConfig) (*tsdb.V3ioAdapter, e
 		return nil, err, func() {}
 	}
 
-	v3ioConfig.TablePath = fmt.Sprintf("%s-%d", testCtx.Name(), time.Now().Nanosecond())
+	v3ioConfig.TablePath = tsdbtest.PrefixTablePath(fmt.Sprintf("%s-%d", testCtx.Name(), time.Now().Nanosecond()))
 	tsdbtest.CreateTestTSDB(testCtx, v3ioConfig)
 
 	adapter, err := tsdb.NewV3ioAdapter(v3ioConfig, nil, nil)
@@ -180,7 +181,7 @@ func testAggregatesCase(t *testing.T, testConfig *TestConfig) {
 
 		series := set.At()
 		lset := series.Labels()
-		aggr := lset.Get("Aggregator")
+		aggr := lset.Get(aggregate.AggregateLabel)
 		testConfig.logger.Debug(fmt.Sprintf("\nLables: %v", lset))
 
 		iter := series.Iterator()
@@ -228,7 +229,7 @@ func generateData(t *testing.T, testConfig *TestConfig, adapter *tsdb.V3ioAdapte
 	for m := 0; m < testConfig.numMetrics; m++ {
 		for l := 0; l < testConfig.numLabels; l++ {
 			metrics = append(metrics, &metricContext{
-				lset: utils.FromStrings(
+				lset: utils.LabelsFromStrings(
 					"__name__", fmt.Sprintf("metric%d", m), "label", fmt.Sprintf("lbl%d", l)),
 			})
 		}

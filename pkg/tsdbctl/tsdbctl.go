@@ -53,23 +53,34 @@ func NewRootCommandeer() *RootCommandeer {
 	commandeer := &RootCommandeer{}
 
 	cmd := &cobra.Command{
-		Use:          "tsdbctl [command]",
-		Short:        "V3IO TSDB command-line interface",
+		Use:          "tsdbctl [command] [arguments] [flags]",
+		Short:        "V3IO TSDB command-line interface (CLI)",
 		SilenceUsage: true,
 	}
 
 	defaultV3ioServer := os.Getenv("V3IO_SERVICE_URL")
 
-	cmd.PersistentFlags().StringVarP(&commandeer.logLevel, "log-level", "v", "", "Logging level")
-	cmd.PersistentFlags().Lookup("log-level").NoOptDefVal = "info"
-	cmd.PersistentFlags().StringVarP(&commandeer.dbPath, "table-path", "t", "", "sub path for the TSDB, inside the container")
-	cmd.PersistentFlags().StringVarP(&commandeer.v3ioPath, "server", "s", defaultV3ioServer, "V3IO Service URL - ip:port")
-	cmd.PersistentFlags().StringVarP(&commandeer.cfgFilePath, "config", "g", "", "path to yaml config file")
-	cmd.PersistentFlags().StringVarP(&commandeer.container, "container", "c", "", "container to use")
-	cmd.PersistentFlags().StringVarP(&commandeer.username, "username", "u", "", "user name")
-	cmd.PersistentFlags().StringVarP(&commandeer.password, "password", "p", "", "password")
+	cmd.PersistentFlags().StringVarP(&commandeer.logLevel, "log-level", "v", "",
+		"Verbose output. Add \"=<level>\" to set the log level -\ndebug | info | warn | error. For example: -v=warn.\n(default - \""+config.DefaultVerboseLevel+"\" when using the flag; \""+config.DefaultLogLevel+"\" otherwise)")
+	cmd.PersistentFlags().Lookup("log-level").NoOptDefVal = config.DefaultVerboseLevel
+	cmd.PersistentFlags().StringVarP(&commandeer.dbPath, "table-path", "t", "",
+		"[Required] Path to the TSDB table within the configured\ndata container. Examples: \"mytsdb\"; \"/my_tsdbs/tsdbd1\".")
+	// We don't enforce this flag (cmd.MarkFlagRequired("table-path")),
+	// although it's documented as Required, because this flag isn't required
+	// for the hidden `time` command + during internal tests we might want to
+	// configure the table path in a configuration file.
+	cmd.PersistentFlags().StringVarP(&commandeer.v3ioPath, "server", "s", defaultV3ioServer,
+		"Web-gateway (web-APIs) service endpoint of an instance of\nthe Iguazio Continuous Data Platform, of the format\n\"<IP address>:<port number=8081>\". Examples: \"localhost:8081\"\n(when running on the target platform); \"192.168.1.100:8081\".")
+	cmd.PersistentFlags().StringVarP(&commandeer.cfgFilePath, "config", "g", "",
+		"Path to a YAML TSDB configuration file. When this flag isn't\nset, the CLI checks for a "+config.DefaultConfigurationFileName+" configuration\nfile in the current directory. CLI flags override file\nconfigurations. Example: \"~/cfg/my_v3io_tsdb_cfg.yaml\".")
+	cmd.PersistentFlags().StringVarP(&commandeer.container, "container", "c", "",
+		"The name of an Iguazio Continuous Data Platform data container\nin which to create the TSDB table. Example: \"bigdata\".")
+	cmd.PersistentFlags().StringVarP(&commandeer.username, "username", "u", "",
+		"Username of an Iguazio Continuous Data Platform user.")
+	cmd.PersistentFlags().StringVarP(&commandeer.password, "password", "p", "",
+		"Password of the configured user (see -u|--username).")
 
-	// add children
+	// Add children
 	cmd.AddCommand(
 		newAddCommandeer(commandeer).cmd,
 		newQueryCommandeer(commandeer).cmd,
@@ -85,17 +96,17 @@ func NewRootCommandeer() *RootCommandeer {
 	return commandeer
 }
 
-// Execute uses os.Args to execute the command
+// Execute the command using os.Args
 func (rc *RootCommandeer) Execute() error {
 	return rc.cmd.Execute()
 }
 
-// GetCmd returns the underlying cobra command
+// Return the underlying Cobra command
 func (rc *RootCommandeer) GetCmd() *cobra.Command {
 	return rc.cmd
 }
 
-// CreateMarkdown generates MD files in the target path
+// Generate Markdown files in the target path
 func (rc *RootCommandeer) CreateMarkdown(path string) error {
 	return doc.GenMarkdownTree(rc.cmd, path)
 }
@@ -103,11 +114,11 @@ func (rc *RootCommandeer) CreateMarkdown(path string) error {
 func (rc *RootCommandeer) initialize() error {
 	cfg, err := config.GetOrLoadFromFile(rc.cfgFilePath)
 	if err != nil {
-		// if we couldn't load the file and its not the default
+		// Display an error if we fail to load a configuration file
 		if rc.cfgFilePath == "" {
-			return errors.Wrap(err, "Failed to load configuration")
+			return errors.Wrap(err, "Failed to load the TSDB configuration.")
 		} else {
-			return errors.Wrap(err, fmt.Sprintf("Failed to load config from '%s'", rc.cfgFilePath))
+			return errors.Wrap(err, fmt.Sprintf("Failed to load the TSDB configuration from '%s'.", rc.cfgFilePath))
 		}
 	}
 	return rc.populateConfig(cfg)
@@ -115,7 +126,7 @@ func (rc *RootCommandeer) initialize() error {
 
 func (rc *RootCommandeer) populateConfig(cfg *config.V3ioConfig) error {
 	// Initialize performance monitoring
-	// TODO: support custom report writers (file, syslog, prometheus, etc.)
+	// TODO: support custom report writers (file, syslog, Prometheus, etc.)
 	rc.Reporter = performance.ReporterInstanceFromConfig(cfg)
 
 	if rc.username != "" {
@@ -127,38 +138,41 @@ func (rc *RootCommandeer) populateConfig(cfg *config.V3ioConfig) error {
 	}
 
 	if rc.v3ioPath != "" {
-		// read username and password
+		// Check for username and password in the web-gateway service endpoint
+		// (supported for backwards compatibility)
 		if i := strings.LastIndex(rc.v3ioPath, "@"); i > 0 {
 			usernameAndPassword := rc.v3ioPath[0:i]
 			rc.v3ioPath = rc.v3ioPath[i+1:]
 			if userpass := strings.Split(usernameAndPassword, ":"); len(userpass) > 1 {
 				fmt.Printf("Debug: up0=%s up1=%s u=%s p=%s\n", userpass[0], userpass[1], rc.username, rc.password)
 				if userpass[0] != "" && rc.username != "" {
-					return fmt.Errorf("username should only be defined once")
+					return fmt.Errorf("Username should only be defined once.")
 				} else {
 					cfg.Username = userpass[0]
 				}
 
 				if userpass[1] != "" && rc.password != "" {
-					return fmt.Errorf("password should only be defined once")
+					return fmt.Errorf("Password should only be defined once.")
 				} else {
 					cfg.Password = userpass[1]
 				}
 			} else {
 				if usernameAndPassword != "" && rc.username != "" {
-					return fmt.Errorf("username should only be defined once")
+					return fmt.Errorf("Username should only be defined once.")
 				} else {
 					cfg.Username = usernameAndPassword
 				}
 			}
 		}
 
+		// Check for a container name in the in the web-gateway service endpoint
+		// (supported for backwards compatibility)
 		slash := strings.LastIndex(rc.v3ioPath, "/")
 		if slash == -1 || len(rc.v3ioPath) <= slash+1 {
 			if rc.container != "" {
 				cfg.Container = rc.container
 			} else if cfg.Container == "" {
-				return fmt.Errorf("missing container name in V3IO URL")
+				return fmt.Errorf("Missing the name of the TSDB's parent data container.")
 			}
 			cfg.WebApiEndpoint = rc.v3ioPath
 		} else {
@@ -173,10 +187,12 @@ func (rc *RootCommandeer) populateConfig(cfg *config.V3ioConfig) error {
 		cfg.TablePath = rc.dbPath
 	}
 	if cfg.WebApiEndpoint == "" || cfg.Container == "" || cfg.TablePath == "" {
-		return fmt.Errorf("user must provide V3IO URL, container name, and table path via the config file or flags")
+		return fmt.Errorf("Not all required configuration information was provided. The endpoint of the web-gateway service, related username and password authentication credentials, the name of the TSDB parent data container, and the path to the TSDB table within the container, must be defined as part of the CLI command or in a configuration file.")
 	}
 	if rc.logLevel != "" {
 		cfg.LogLevel = rc.logLevel
+	} else {
+		cfg.LogLevel = config.DefaultLogLevel
 	}
 
 	rc.v3iocfg = cfg
@@ -187,7 +203,7 @@ func (rc *RootCommandeer) startAdapter() error {
 	var err error
 	rc.adapter, err = tsdb.NewV3ioAdapter(rc.v3iocfg, nil, nil)
 	if err != nil {
-		return errors.Wrap(err, "Failed to start TSDB Adapter")
+		return errors.Wrap(err, "Failed to start the TSDB Adapter.")
 	}
 
 	rc.logger = rc.adapter.GetLogger("cli")

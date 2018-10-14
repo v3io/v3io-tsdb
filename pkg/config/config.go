@@ -30,8 +30,8 @@ import (
 )
 
 const (
-	V3ioConfigEnvironmentVariable = "V3IO_CONF"
-	DefaultConfigurationFileName  = "v3io.yaml"
+	V3ioConfigEnvironmentVariable = "V3IO_TSDB_CONFIG"
+	DefaultConfigurationFileName  = "v3io-tsdb-config.yaml"
 	SchemaConfigFileName          = ".schema"
 
 	defaultNumberOfIngestWorkers = 1
@@ -44,13 +44,15 @@ const (
 	defaultMinimumChunkSize     = 200     // bytes
 	defaultMaximumChunkSize     = 32000   // bytes
 
-	DefaultShardingBuckets        = 8
+	DefaultShardingBucketsCount   = 8
 	DefaultStorageClass           = "local"
 	DefaultIngestionRate          = ""
 	DefaultAggregates             = "" // no aggregates by default
 	DefaultAggregationGranularity = "1h"
 	DefaultLayerRetentionTime     = "1y"
 	DefaultSampleRetentionTime    = 0
+	DefaultLogLevel               = "info"
+	DefaultVerboseLevel           = "debug"
 )
 
 var (
@@ -64,73 +66,85 @@ func Error() error {
 }
 
 type V3ioConfig struct {
-	// V3IO Connection details: Url, Data container, relative path for this dataset, credentials
+	// V3IO TSDB connection information - web-gateway service endpoint,
+	// TSDB data container, relative TSDB table path within the container, and
+	// authentication credentials for the web-gateway service
 	WebApiEndpoint string `json:"webApiEndpoint"`
 	Container      string `json:"container"`
 	TablePath      string `json:"tablePath"`
 	Username       string `json:"username,omitempty"`
 	Password       string `json:"password,omitempty"`
 
-	// Disable is use in Prometheus to disable v3io and work with the internal TSDB
+	// Disabled = true disables the V3IO TSDB configuration in Prometheus and
+	// enables the internal Prometheus TSDB instead
 	Disabled bool `json:"disabled,omitempty"`
-	// Set logging level: debug | info | warn | error (info by default)
+	// Log level - "debug" | "info" | "warn" | "error"
 	LogLevel string `json:"logLevel,omitempty"`
 	// Number of parallel V3IO worker routines
 	Workers int `json:"workers"`
-	// Number of parallel V3IO worker routines for queries (default is min between 8 and Workers)
+	// Number of parallel V3IO worker routines for queries;
+	// default = the minimum value between 8 and Workers
 	QryWorkers int `json:"qryWorkers"`
 	// Max uncommitted (delayed) samples allowed per metric
 	MaxBehind int `json:"maxBehind"`
-	// Override last chunk (by default on restart it will append from the last point if possible)
+	// Override last chunk; by default, an append from the last point is attempted upon restart
 	OverrideOld bool `json:"overrideOld"`
-	// Default timeout duration in Seconds (if not set, 1 Hour timeout will be used )
+	// Default timeout duration, in seconds; default = 3,600 seconds (1 hour)
 	DefaultTimeoutInSeconds int `json:"timeout,omitempty"`
-	// The size of batch to use during ingestion
+	// Size of the samples batch to use during ingestion
 	BatchSize int `json:"batchSize,omitempty"`
-	// Sample size in bytes in worst compression scenario
+	// Maximum sample size, in bytes (for the worst compression scenario)
 	MaximumSampleSize int `json:"maximumSampleSize,omitempty"`
-	// Max size of a partition object
+	// Maximum size of a partition object
 	MaximumPartitionSize int `json:"maximumPartitionSize,omitempty"`
-	// Size of chunk in bytes for worst an best compression scenarios
+	// Minimum chunk size, in bytes (for the best compression scenario)
 	MinimumChunkSize int `json:"minimumChunkSize,omitempty"`
+	// Maximum chunk size, in bytes (for the worst compression scenario)
 	MaximumChunkSize int `json:"maximumChunkSize,omitempty"`
-	ShardingBuckets  int `json:"shardingBuckets,omitempty"`
-	// Metrics reporter configuration
+	// Number of sharding buckets
+	ShardingBucketsCount int `json:"shardingBucketsCount,omitempty"`
+	// Metrics-reporter configuration
 	MetricsReporter MetricsReporterConfig `json:"performance,omitempty"`
-	// dont aggregate from raw chuncks, for use when working as Prometheus TSDB lib
+	// Don't aggregate from raw chunks, for use when working as a Prometheus
+	// TSDB library
 	DisableClientAggr bool `json:"disableClientAggr,omitempty"`
 }
 
 type MetricsReporterConfig struct {
-	ReportOnShutdown   bool   `json:"reportOnShutdown,omitempty"`
-	Output             string `json:"output"` // stdout, stderr, syslog, etc.
-	ReportPeriodically bool   `json:"reportPeriodically,omitempty"`
-	RepotInterval      int    `json:"reportInterval"` // interval between consequence reports (in Seconds)
+	// Report on shutdown (Boolean)
+	ReportOnShutdown bool `json:"reportOnShutdown,omitempty"`
+	// Output destination - "stdout" or "stderr"
+	Output string `json:"output"`
+	// Report periodically (Boolean)
+	ReportPeriodically bool `json:"reportPeriodically,omitempty"`
+	// Interval between consequence reports (in seconds)
+	RepotInterval int `json:"reportInterval"`
 }
 
 type Rollup struct {
-	Aggregators            []string `json:"aggregators"`
-	AggregatorsGranularity string   `json:"aggregatorsGranularity"`
-	//["cloud","local"] for the aggregators and sample chunks
+	Aggregates             []string `json:"aggregates"`
+	AggregationGranularity string   `json:"aggregationGranularity"`
+	// Storage class for the aggregates and sample chunks - "cloud" | "local"
 	StorageClass string `json:"storageClass"`
-	//in hours. 0  means no need to save samples
+	// [FUTURE] Sample retention period, in hours. 0 means no need to save samples.
 	SampleRetention int `json:"sampleRetention"`
-	// format : 1m, 7d, 3h . Possible intervals: m/d/h
+	// Layer retention time, in months ('m'), days ('d'), or hours ('h').
+	// Format: "[0-9]+[hmd]". For example: "3h", "7d", "1m"
 	LayerRetentionTime string `json:"layerRetentionTime"`
 }
 
 type TableSchema struct {
-	Version             int      `json:"version"`
-	RollupLayers        []Rollup `json:"rollupLayers"`
-	ShardingBuckets     int      `json:"shardingBuckets"`
-	PartitionerInterval string   `json:"partitionerInterval"`
-	ChunckerInterval    string   `json:"chunckerInterval"`
+	Version              int      `json:"version"`
+	RollupLayers         []Rollup `json:"rollupLayers"`
+	ShardingBucketsCount int      `json:"shardingBucketsCount"`
+	PartitionerInterval  string   `json:"partitionerInterval"`
+	ChunckerInterval     string   `json:"chunckerInterval"`
 }
 
 type PartitionSchema struct {
 	Version                int      `json:"version"`
-	Aggregators            []string `json:"aggregators"`
-	AggregatorsGranularity string   `json:"aggregatorsGranularity"`
+	Aggregates             []string `json:"aggregates"`
+	AggregationGranularity string   `json:"aggregationGranularity"`
 	StorageClass           string   `json:"storageClass"`
 	SampleRetention        int      `json:"sampleRetention"`
 	PartitionerInterval    string   `json:"partitionerInterval"`
@@ -188,7 +202,7 @@ func GetOrLoadFromData(data []byte) (*V3ioConfig, error) {
 	return instance, failure
 }
 
-// update defaults when using config struct
+// Update the defaults when using a configuration structure
 func GetOrLoadFromStruct(cfg *V3ioConfig) (*V3ioConfig, error) {
 	once.Do(func() {
 		initDefaults(cfg)
@@ -221,7 +235,7 @@ func loadConfig(path string) (*V3ioConfig, error) {
 		if os.IsNotExist(err) {
 			data = []byte{}
 		} else {
-			return nil, errors.Wrap(err, "failed to read configuration")
+			return nil, errors.Wrap(err, "Failed to read the TSDB configuration.")
 		}
 	} else {
 		data, err = ioutil.ReadFile(resolvedPath)
@@ -230,7 +244,7 @@ func loadConfig(path string) (*V3ioConfig, error) {
 		}
 
 		if len(data) == 0 {
-			return nil, errors.Errorf("file '%s' exists but its content is not valid", resolvedPath)
+			return nil, errors.Errorf("Configuration file '%s' exists but its content is invalid.", resolvedPath)
 		}
 	}
 
@@ -251,12 +265,12 @@ func loadFromData(data []byte) (*V3ioConfig, error) {
 }
 
 func initDefaults(cfg *V3ioConfig) {
-	// Initialize default number of workers
+	// Initialize the default number of workers
 	if cfg.Workers == 0 {
 		cfg.Workers = defaultNumberOfIngestWorkers
 	}
 
-	// init default number Query workers if not set to Min(8,Workers)
+	// Initialize the default number of Query workers if not set to Min(8,Workers)
 	if cfg.QryWorkers == 0 {
 		if cfg.Workers < defaultNumberOfQueryWorkers {
 			cfg.QryWorkers = cfg.Workers
@@ -265,7 +279,7 @@ func initDefaults(cfg *V3ioConfig) {
 		}
 	}
 
-	// init default batch size
+	// Initialize the default batch size
 	if cfg.BatchSize <= 0 {
 		cfg.BatchSize = defaultBatchSize
 	}
@@ -290,7 +304,7 @@ func initDefaults(cfg *V3ioConfig) {
 		cfg.MaximumPartitionSize = defaultMaximumPartitionSize
 	}
 
-	if cfg.ShardingBuckets == 0 {
-		cfg.ShardingBuckets = DefaultShardingBuckets
+	if cfg.ShardingBucketsCount == 0 {
+		cfg.ShardingBucketsCount = DefaultShardingBucketsCount
 	}
 }

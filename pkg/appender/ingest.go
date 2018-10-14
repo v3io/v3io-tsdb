@@ -24,14 +24,13 @@ import (
 	"fmt"
 	"github.com/pkg/errors"
 	"github.com/v3io/v3io-go-http"
-	"github.com/v3io/v3io-tsdb/internal/pkg/performance"
 	"net/http"
 	"reflect"
 	"time"
 )
 
-// start event loops for handling metric updates (appends and Get/Update DB responses)
-// TODO: we can use multiple Go routines and spread the metrics across based on Hash LSB
+// Start event loops for handling metric updates (appends and Get/Update DB responses)
+// TODO: we can use multiple Go routines and spread the metrics across based on Hash LSB.
 func (mc *MetricsCache) start() error {
 
 	mc.nameUpdateRespLoop()
@@ -41,7 +40,7 @@ func (mc *MetricsCache) start() error {
 	return nil
 }
 
-// Reads data from append queue, push into per metric queues, and manage ingestion states
+// Read data from the append queue, push it into per-metric queues, and manage ingestion states
 func (mc *MetricsCache) metricFeed(index int) {
 
 	go func() {
@@ -53,11 +52,11 @@ func (mc *MetricsCache) metricFeed(index int) {
 		for {
 			select {
 			case inFlight = <-mc.updatesComplete:
-				// handle completion notifications from update loop
+				// Handle completion notifications from the update loop
 				length := mc.metricQueue.Length()
-				mc.logger.Debug(`Complete Update cycle - "inflight requests"=%d; "metric queue length""=%d\n`, inFlight, length)
+				mc.logger.Debug(`Complete update cycle - "in-flight requests"=%d; "metric queue length"=%d\n`, inFlight, length)
 
-				// if data was sent and the queue is empty mark as completion
+				// If data was sent and the queue is empty, mark as completion
 				if length == 0 && gotData {
 					gotCompletion = true
 					if completeChan != nil {
@@ -70,9 +69,9 @@ func (mc *MetricsCache) metricFeed(index int) {
 				dataQueued := 0
 				numPushed := 0
 			inLoop:
-				for i := 0; i <= maxSamplesBatchSize; i++ {
+				for i := 0; i <= mc.cfg.BatchSize; i++ {
 					if app.metric == nil {
-						// handle Completion update requests (metric == nil)
+						// Handle update completion requests (metric == nil)
 						completeChan = app.resp
 
 						length := mc.metricQueue.Length()
@@ -92,7 +91,7 @@ func (mc *MetricsCache) metricFeed(index int) {
 							numPushed++
 							dataQueued += metric.store.samplesQueueLength()
 
-							// if there are no in flight requests, add the metric to the queue and update state
+							// If there are no in-flight requests, add the metric to the queue and update state
 							if metric.isReady() || metric.getState() == storeStateInit {
 
 								if metric.getState() == storeStateInit {
@@ -111,8 +110,8 @@ func (mc *MetricsCache) metricFeed(index int) {
 						metric.Unlock()
 					}
 
-					// poll if we have more updates (accelerate the outer select)
-					if i < maxSamplesBatchSize {
+					// Poll if we have more updates (accelerate the outer select)
+					if i < mc.cfg.BatchSize {
 						select {
 						case app = <-mc.asyncAppendChan:
 						default:
@@ -120,13 +119,13 @@ func (mc *MetricsCache) metricFeed(index int) {
 						}
 					}
 				}
-				// notify update loop there are new metrics to process
+				// Notify the update loop that there are new metrics to process
 				if newMetrics > 0 {
 					mc.newUpdates <- newMetrics
 				}
 
 				// If we have too much work, stall the queue for some time
-				if numPushed > maxSamplesBatchSize/2 && dataQueued/numPushed > 64 {
+				if numPushed > mc.cfg.BatchSize/2 && dataQueued/numPushed > 64 {
 					switch {
 					case dataQueued/numPushed <= 96:
 						time.Sleep(queueStallTime)
@@ -141,7 +140,7 @@ func (mc *MetricsCache) metricFeed(index int) {
 	}()
 }
 
-// async loop which accept new metric updates or responses from previous updates and make new storage requests
+// An async loop that accepts new metric updates or responses from previous updates and makes new storage requests
 func (mc *MetricsCache) metricsUpdateLoop(index int) {
 
 	go func() {
@@ -162,26 +161,26 @@ func (mc *MetricsCache) metricsUpdateLoop(index int) {
 				}
 
 				if mc.updatesInFlight == 0 {
-					mc.logger.Info("Complete New Update cycle - inflight %d\n", mc.updatesInFlight)
+					mc.logger.Info("Complete new update cycle - in-flight %d.\n", mc.updatesInFlight)
 					mc.updatesComplete <- 0
 				}
 			case resp := <-mc.responseChan:
-				// Handle V3io async responses
+				// Handle V3IO async responses
 				nonQueued := mc.metricQueue.IsEmpty()
 
 			inLoop:
-				for i := 0; i <= maxSamplesBatchSize; i++ {
+				for i := 0; i <= mc.cfg.BatchSize; i++ {
 
 					mc.updatesInFlight--
 					counter++
 					if counter%3000 == 0 {
-						mc.logger.Info("Handle resp: inFly %d, Q %d", mc.updatesInFlight, mc.metricQueue.Length())
+						mc.logger.Info("Handle response: inFly %d, Q %d", mc.updatesInFlight, mc.metricQueue.Length())
 					}
 					metric := resp.Context.(*MetricState)
 					mc.handleResponse(metric, resp, nonQueued)
 
-					// poll if we have more responses (accelerate the outer select)
-					if i < maxSamplesBatchSize {
+					// Poll if we have more responses (accelerate the outer select)
+					if i < mc.cfg.BatchSize {
 						select {
 						case resp = <-mc.responseChan:
 						default:
@@ -204,7 +203,7 @@ func (mc *MetricsCache) metricsUpdateLoop(index int) {
 
 				// Notify the metric feeder when all in-flight tasks are done
 				if mc.updatesInFlight == 0 {
-					mc.logger.Debug("return to feed. Metric queue length: %d ", mc.metricQueue.Length())
+					mc.logger.Debug("Return to feed. Metric queue length: %d", mc.metricQueue.Length())
 					mc.updatesComplete <- 0
 				}
 			}
@@ -212,7 +211,8 @@ func (mc *MetricsCache) metricsUpdateLoop(index int) {
 	}()
 }
 
-// send request with chunk data to the DB, if in initial state read metric metadata from DB
+// Send a request with chunk data to the DB
+// If in the initial state, read metric metadata from the DB.
 func (mc *MetricsCache) postMetricUpdates(metric *MetricState) {
 
 	metric.Lock()
@@ -224,14 +224,9 @@ func (mc *MetricsCache) postMetricUpdates(metric *MetricState) {
 		sent, err = metric.store.getChunksState(mc, metric)
 		if err != nil {
 			// Count errors
-			counter, err := performance.ReporterInstanceFromConfig(mc.cfg).GetCounter("GetChunksStateError")
-			if err != nil {
-				mc.logger.Error("failed to create performance counter for GetChunksStateError. Error: %v", err)
-			} else {
-				counter.Inc(1)
-			}
+			mc.performanceReporter.IncrementCounter("GetChunksStateError", 1)
 
-			mc.logger.ErrorWith("failed to get item state", "metric", metric.Lset, "err", err)
+			mc.logger.ErrorWith("Failed to get item state", "metric", metric.Lset, "err", err)
 			setError(mc, metric, err)
 		} else {
 			metric.setState(storeStateGet)
@@ -241,15 +236,10 @@ func (mc *MetricsCache) postMetricUpdates(metric *MetricState) {
 		sent, err = metric.store.writeChunks(mc, metric)
 		if err != nil {
 			// Count errors
-			counter, err := performance.ReporterInstanceFromConfig(mc.cfg).GetCounter("WriteChunksError")
-			if err != nil {
-				mc.logger.Error("failed to create performance counter for WriteChunksError. Error: %v", err)
-			} else {
-				counter.Inc(1)
-			}
+			mc.performanceReporter.IncrementCounter("WriteChunksError", 1)
 
 			mc.logger.ErrorWith("Submit failed", "metric", metric.Lset, "err", err)
-			setError(mc, metric, errors.Wrap(err, "chunk write submit failed"))
+			setError(mc, metric, errors.Wrap(err, "Chunk write submit failed."))
 		} else if sent {
 			metric.setState(storeStateUpdate)
 		}
@@ -263,7 +253,8 @@ func (mc *MetricsCache) postMetricUpdates(metric *MetricState) {
 	}
 }
 
-// handle DB responses, if the backlog queue is empty and have data to send write more chunks to DB
+// Handle DB responses
+// If the backlog queue is empty and have data to send, write more chunks to the DB.
 func (mc *MetricsCache) handleResponse(metric *MetricState, resp *v3io.Response, canWrite bool) bool {
 	defer resp.Release()
 	metric.Lock()
@@ -273,11 +264,11 @@ func (mc *MetricsCache) handleResponse(metric *MetricState, resp *v3io.Response,
 
 	if resp.Error != nil && metric.getState() != storeStateGet {
 		req := reqInput.(*v3io.UpdateItemInput)
-		mc.logger.ErrorWith("failed IO", "id", resp.ID, "err", resp.Error, "key", metric.key,
-			"inflight", mc.updatesInFlight, "mqueue", mc.metricQueue.Length(),
+		mc.logger.ErrorWith("I/O failure", "id", resp.ID, "err", resp.Error, "key", metric.key,
+			"in-flight", mc.updatesInFlight, "mqueue", mc.metricQueue.Length(),
 			"numsamples", metric.store.samplesQueueLength(), "path", req.Path, "update expression", req.Expression)
 	} else {
-		mc.logger.DebugWith("IO resp", "id", resp.ID, "err", resp.Error, "key", metric.key, "request type",
+		mc.logger.DebugWith("I/O response", "id", resp.ID, "err", resp.Error, "key", metric.key, "request type",
 			reflect.TypeOf(reqInput), "request", reqInput)
 	}
 
@@ -288,7 +279,7 @@ func (mc *MetricsCache) handleResponse(metric *MetricState, resp *v3io.Response,
 	} else {
 		// Handle Update Expression responses
 		if resp.Error == nil {
-			// Set fields so next write will not include redundant info (bytes, lables, init_array)
+			// Set fields so next write won't include redundant info (bytes, labels, init_array)
 			metric.store.ProcessWriteResp()
 			metric.retryCount = 0
 		} else {
@@ -300,32 +291,22 @@ func (mc *MetricsCache) handleResponse(metric *MetricState, resp *v3io.Response,
 			}
 
 			// Count errors
-			counter, err := performance.ReporterInstanceFromConfig(mc.cfg).GetCounter("ChunkUpdateRetries")
-			if err != nil {
-				mc.logger.Error("failed to create performance counter for ChunkUpdateRetries. Error: %v", err)
-			} else {
-				counter.Inc(1)
-			}
+			mc.performanceReporter.IncrementCounter("ChunkUpdateRetries", 1)
 
 			// Metrics with too many update errors go into Error state
 			metric.retryCount++
 			if e, hasStatusCode := resp.Error.(v3io.ErrorWithStatusCode); hasStatusCode && e.StatusCode() != http.StatusServiceUnavailable {
-				mc.logger.ErrorWith(fmt.Sprintf("Chunk update failed with status code %d", e.StatusCode()))
-				setError(mc, metric, errors.Wrap(resp.Error, fmt.Sprintf("chunk update failed due to status code %d", e.StatusCode())))
+				mc.logger.ErrorWith(fmt.Sprintf("Chunk update failed with status code %d.", e.StatusCode()))
+				setError(mc, metric, errors.Wrap(resp.Error, fmt.Sprintf("Chunk update failed due to status code %d.", e.StatusCode())))
 				clear()
 				return false
 			} else if metric.retryCount == maxRetriesOnWrite {
 				mc.logger.ErrorWith(fmt.Sprintf("Chunk update failed - exceeded %d retries", maxRetriesOnWrite), "metric", metric.Lset)
-				setError(mc, metric, errors.Wrap(resp.Error, fmt.Sprintf("chunk update failed after %d retries", maxRetriesOnWrite)))
+				setError(mc, metric, errors.Wrap(resp.Error, fmt.Sprintf("Chunk update failed after %d retries.", maxRetriesOnWrite)))
 				clear()
 
 				// Count errors
-				counter, err := performance.ReporterInstanceFromConfig(mc.cfg).GetCounter("ChunkUpdateRetryExceededError")
-				if err != nil {
-					mc.logger.Error("failed to create performance counter for ChunkUpdateRetryExceededError. Error: %v", err)
-				} else {
-					counter.Inc(1)
-				}
+				mc.performanceReporter.IncrementCounter("ChunkUpdateRetryExceededError", 1)
 				return false
 			}
 		}
@@ -340,15 +321,10 @@ func (mc *MetricsCache) handleResponse(metric *MetricState, resp *v3io.Response,
 		sent, err = metric.store.writeChunks(mc, metric)
 		if err != nil {
 			// Count errors
-			counter, err := performance.ReporterInstanceFromConfig(mc.cfg).GetCounter("WriteChunksError")
-			if err != nil {
-				mc.logger.Error("failed to create performance counter for WriteChunksError. Error: %v", err)
-			} else {
-				counter.Inc(1)
-			}
+			mc.performanceReporter.IncrementCounter("WriteChunksError", 1)
 
 			mc.logger.ErrorWith("Submit failed", "metric", metric.Lset, "err", err)
-			setError(mc, metric, errors.Wrap(err, "chunk write submit failed"))
+			setError(mc, metric, errors.Wrap(err, "Chunk write submit failed."))
 		} else if sent {
 			metric.setState(storeStateUpdate)
 			mc.updatesInFlight++
@@ -362,29 +338,24 @@ func (mc *MetricsCache) handleResponse(metric *MetricState, resp *v3io.Response,
 	return sent
 }
 
-// handle responses for names table updates
+// Handle responses for names table updates
 func (mc *MetricsCache) nameUpdateRespLoop() {
 
 	go func() {
 		for {
 			resp := <-mc.nameUpdateChan
-			// Handle V3io putItem in names table
+			// Handle V3IO PutItem in names table
 
 			metric, ok := resp.Context.(*MetricState)
 			if ok {
 				metric.Lock()
 				if resp.Error != nil {
 					// Count errors
-					counter, err := performance.ReporterInstanceFromConfig(mc.cfg).GetCounter("UpdateNameError")
-					if err != nil {
-						mc.logger.Error("failed to create performance counter for UpdateNameError. Error: %v", err)
-					} else {
-						counter.Inc(1)
-					}
+					mc.performanceReporter.IncrementCounter("UpdateNameError", 1)
 
-					mc.logger.ErrorWith("Process Update name failed", "id", resp.ID, "name", metric.name)
+					mc.logger.ErrorWith("Update-name process failed", "id", resp.ID, "name", metric.name)
 				} else {
-					mc.logger.DebugWith("Process Update name resp", "id", resp.ID, "name", metric.name)
+					mc.logger.DebugWith("Update-name process response", "id", resp.ID, "name", metric.name)
 				}
 				metric.Unlock()
 			}

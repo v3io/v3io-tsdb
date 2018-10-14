@@ -28,7 +28,7 @@ import (
 )
 
 type AggregateSeries struct {
-	colName        string     // cloumn name ("v" in timeseries)
+	colName        string     // column name ("v" in timeseries)
 	functions      []AggrType // list of aggregation functions to return (count, avg, sum, ..)
 	aggrMask       AggrType   // the sum of aggregates (or between all aggregates)
 	rollupTime     int64      // time per bucket (cell in the array)
@@ -52,7 +52,7 @@ func NewAggregateSeries(functions, col string, buckets int, interval, rollupTime
 		aggrList = append(aggrList, aggr)
 	}
 
-	// Always have count Aggregator by default
+	// Always have count Aggregate by default
 	if aggrMask != 0 {
 		aggrMask |= aggrTypeCount
 	}
@@ -71,10 +71,10 @@ func NewAggregateSeries(functions, col string, buckets int, interval, rollupTime
 }
 
 func (as *AggregateSeries) CanAggregate(partitionAggr AggrType) bool {
-	// keep only real aggregators
+	// keep only real aggregates
 	aggrMask := 0x7f & as.aggrMask
-	// make sure the DB has all the aggregators we need (on bits in the mask)
-	// and that the requested interval is greater/eq to aggregator resolution and is an even divisor
+	// make sure the DB has all the aggregates we need (on bits in the mask)
+	// and that the requested interval is greater/eq to aggregate resolution and is an even divisor
 	// if interval and rollup are not even divisors we need higher resolution (3x) to smooth the graph
 	// when we add linear/spline graph projection we can reduce back to 1x
 	return ((aggrMask & partitionAggr) == aggrMask) &&
@@ -100,7 +100,7 @@ func (as *AggregateSeries) toAttrName(aggr AggrType) string {
 func (as *AggregateSeries) GetAttrNames() []string {
 	var names []string
 
-	for _, aggr := range rawAggregators {
+	for _, aggr := range rawAggregates {
 		if aggr&as.aggrMask != 0 {
 			names = append(names, as.toAttrName(aggr))
 		}
@@ -122,7 +122,7 @@ func (as *AggregateSeries) NewSetFromAttrs(
 		maxAligned = (maxt / as.interval) * as.interval
 	}
 
-	for _, aggr := range rawAggregators {
+	for _, aggr := range rawAggregates {
 		if aggr&as.aggrMask != 0 {
 			attrBlob, ok := (*attrs)[as.toAttrName(aggr)]
 			if !ok {
@@ -181,7 +181,7 @@ func (as *AggregateSeries) NewSetFromChunks(length int) *AggregateSet {
 	newAggregateSet := AggregateSet{length: length, interval: as.interval, overlapWin: as.overlapWindows}
 	dataArrays := map[AggrType][]float64{}
 
-	for _, aggr := range rawAggregators {
+	for _, aggr := range rawAggregates {
 		if aggr&as.aggrMask != 0 {
 			dataArrays[aggr] = make([]float64, length, length) // TODO: len/capacity & reuse (pool)
 			if aggr == aggrTypeMax || aggr == aggrTypeMin || aggr == aggrTypeLast {

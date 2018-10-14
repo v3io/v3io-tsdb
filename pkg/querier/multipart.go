@@ -55,7 +55,7 @@ type IterSortMerger struct {
 	err          error
 }
 
-// Merge sort multiple SeriesSets
+// Merge-sort multiple SeriesSets
 func newIterSortMerger(sets []SeriesSet) (SeriesSet, error) {
 	newMerger := IterSortMerger{}
 	newMerger.iters = sets
@@ -92,7 +92,7 @@ func (im *IterSortMerger) Next() bool {
 		return false
 	}
 
-	im.currSeries = im.currSeries[:0]
+	im.currSeries = make([]Series, 0, len(im.iters))
 	for i, iter := range im.iters {
 		im.currInvalids[i] = true
 		if !im.done[i] {
@@ -106,7 +106,7 @@ func (im *IterSortMerger) Next() bool {
 	return true
 }
 
-// return the current key and list of iterators containing it
+// Return the current key and a list of iterators containing this key
 func (im *IterSortMerger) At() Series {
 	newSeries := mergedSeries{series: im.currSeries}
 	return &newSeries
@@ -147,8 +147,8 @@ func newMergedSeriesIterator(s ...Series) *mergedSeriesIterator {
 }
 
 func (it *mergedSeriesIterator) Seek(t int64) bool {
-	// We just scan the merges series sequentially as they are already
-	// pre-selected by relevant time and should be accessed sequentially anyway.
+	// We just scan the merge series sequentially, as they are already
+	// pre-selected by time and should be accessed sequentially anyway.
 	for i, s := range it.series[it.i:] {
 		cur := s.Iterator()
 		if !cur.Seek(t) {

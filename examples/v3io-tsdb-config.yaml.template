@@ -1,4 +1,4 @@
-# File:         v3io.yaml.template
+# File:         v3io-tsdb-config.yaml
 # Description:  Template of a V3IO TSDB Configuration File
 
 # TODO: In your configuration file, delete the configuration keys that you
@@ -14,13 +14,11 @@ webApiEndpoint: "<IP address/host name>:8081"
 # Example: "bigdata"
 container: "<container name>"
 
-# Logging verbosity level
+# Log level
 # Valid values: "debug" | "info" | "warn" | "error"
-# Default value: "debug"
-verbose: "warn"
+logLevel: "warn"
 
 # Authentication credentials for the web-API service
-# Username
 username: "<username>"
-# Password
 password: "<password>"
+

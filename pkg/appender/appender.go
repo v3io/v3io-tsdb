@@ -25,6 +25,7 @@ import (
 	"github.com/nuclio/logger"
 	"github.com/pkg/errors"
 	"github.com/v3io/v3io-go-http"
+	"github.com/v3io/v3io-tsdb/internal/pkg/performance"
 	"github.com/v3io/v3io-tsdb/pkg/config"
 	"github.com/v3io/v3io-tsdb/pkg/partmgr"
 	"github.com/v3io/v3io-tsdb/pkg/utils"
@@ -34,8 +35,7 @@ import (
 
 // TODO: make configurable
 const maxRetriesOnWrite = 3
-const channelSize = 4048
-const maxSamplesBatchSize = 16
+const channelSize = 4096
 const queueStallTime = 1 * time.Millisecond
 
 const minimalUnixTimeMs = 0          // year 1970
@@ -119,7 +119,8 @@ type MetricsCache struct {
 
 	NameLabelMap map[string]bool // temp store all lable names
 
-	lastError error
+	lastError           error
+	performanceReporter *performance.MetricReporter
 }
 
 func NewMetricsCache(container *v3io.Container, logger logger.Logger, cfg *config.V3ioConfig,
@@ -138,6 +139,8 @@ func NewMetricsCache(container *v3io.Container, logger logger.Logger, cfg *confi
 	newCache.newUpdates = make(chan int, 1000)
 
 	newCache.NameLabelMap = map[string]bool{}
+	newCache.performanceReporter = performance.ReporterInstanceFromConfig(cfg)
+
 	return &newCache
 }
 
@@ -244,7 +247,7 @@ func (mc *MetricsCache) AddFast(ref uint64, t int64, v interface{}) error {
 
 func verifyTimeValid(t int64) error {
 	if t > maxUnixTimeMs || t < minimalUnixTimeMs {
-		return fmt.Errorf("time seems invalid (in unix milisec time), must be between years 1970-2400 - %d", t)
+		return fmt.Errorf("Time '%d' doesn't seem to be a valid Unix timesamp in milliseconds. The time must be in the years range 1970-2400.", t)
 	}
 	return nil
 }
@@ -256,20 +259,29 @@ func (mc *MetricsCache) WaitForCompletion(timeout time.Duration) (int, error) {
 	var maxWaitTime time.Duration = 0
 
 	if timeout == 0 {
-		maxWaitTime = 24 * time.Hour // almost infinite time
+		maxWaitTime = 24 * time.Hour // Almost-infinite time
 	} else if timeout > 0 {
 		maxWaitTime = timeout
 	} else {
-		// if negative - use default value from configuration
+		// If negative, use the default configured timeout value
 		maxWaitTime = time.Duration(mc.cfg.DefaultTimeoutInSeconds) * time.Second
 	}
 
-	select {
-	case res := <-waitChan:
-		lastError := mc.lastError
-		mc.lastError = nil
-		return res, lastError
-	case <-time.After(maxWaitTime):
-		return 0, errors.Errorf("the operation was timed out after %.2f seconds", maxWaitTime.Seconds())
-	}
+	var resultCount int
+	var err error
+
+	mc.performanceReporter.WithTimer("WaitForCompletionTimer", func() {
+		select {
+		case resultCount = <-waitChan:
+			err = mc.lastError
+			mc.lastError = nil
+			return
+		case <-time.After(maxWaitTime):
+			resultCount = 0
+			err = errors.Errorf("The operation timed out after %.2f seconds.", maxWaitTime.Seconds())
+			return
+		}
+	})
+
+	return resultCount, err
 }
