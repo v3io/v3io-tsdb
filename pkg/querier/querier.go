@@ -89,7 +89,7 @@ func (q *V3ioQuerier) selectQry(
 	set = nullSeriesSet{}
 
 	filter = strings.Replace(filter, "__name__", "_name", -1)
-	q.logger.DebugWith("Select query", "metric", name, "func", functions, "step", step, "filter", filter, "window", windows)
+	q.logger.DebugWith("Select query", "metric", name, "func", functions, "step", step, "filter", filter, "disableAllAggr", q.disableAllAggr, "disableClientAggr", q.disableClientAggr, "window", windows)
 	err = q.partitionMngr.ReadAndUpdateSchema()
 
 	if err != nil {
@@ -98,7 +98,6 @@ func (q *V3ioQuerier) selectQry(
 
 	q.performanceReporter.WithTimer("QueryTimer", func() {
 		filter = strings.Replace(filter, "__name__", "_name", -1)
-		q.logger.DebugWith("Select query", "metric", name, "func", functions, "step", step, "filter", filter, "window", windows)
 
 		parts := q.partitionMngr.PartsForRange(q.mint, q.maxt)
 		if len(parts) == 0 {
@@ -112,7 +111,7 @@ func (q *V3ioQuerier) selectQry(
 
 		sets := make([]SeriesSet, len(parts))
 		for i, part := range parts {
-			set, err := q.queryNumericPartition(part, name, functions, step, windows, filter)
+			set, err = q.queryNumericPartition(part, name, functions, step, windows, filter)
 			if err != nil {
 				set = nullSeriesSet{}
 				return
@@ -120,17 +119,19 @@ func (q *V3ioQuerier) selectQry(
 			sets[i] = set
 		}
 
-		// Sort each partition when not using range scan
-		if name == "" {
-			for i := 0; i < len(sets); i++ {
-				// TODO make it a Go routine per part
-				sorter, err := NewSetSorter(sets[i])
-				if err != nil {
-					set = nullSeriesSet{}
-					return
-				}
-				sets[i] = sorter
+		// Sort each partition
+		/* TODO: Removed condition that applies sorting only on non range scan queries to fix bug with series coming OOO when querying multi partitions,
+		Need to think of a better solution.
+		*/
+		for i := 0; i < len(sets); i++ {
+			// TODO make it a Go routine per part
+			sorter, error := NewSetSorter(sets[i])
+			if error != nil {
+				set = nullSeriesSet{}
+				err = error
+				return
 			}
+			sets[i] = sorter
 		}
 
 		set, err = newIterSortMerger(sets)

@@ -31,6 +31,7 @@ import (
 	"github.com/v3io/v3io-tsdb/pkg/config"
 	"github.com/v3io/v3io-tsdb/pkg/partmgr"
 	"github.com/v3io/v3io-tsdb/pkg/querier"
+	"github.com/v3io/v3io-tsdb/pkg/tsdb/schema"
 	"github.com/v3io/v3io-tsdb/pkg/utils"
 	pathUtil "path"
 	"time"
@@ -130,13 +131,18 @@ func (a *V3ioAdapter) connect() error {
 
 	}
 
-	schema := config.Schema{}
-	err = json.Unmarshal(resp.Body(), &schema)
+	tableSchema := config.Schema{}
+	err = json.Unmarshal(resp.Body(), &tableSchema)
 	if err != nil {
 		return errors.Wrapf(err, "Failed to unmarshal the TSDB schema at '%s'.", fullpath)
 	}
 
-	a.partitionMngr, err = partmgr.NewPartitionMngr(&schema, a.container, a.cfg)
+	if tableSchema.TableSchemaInfo.Version != schema.Version {
+		return errors.Errorf("Table Schema version mismatch - existing table schema version is %d while the tsdb library version is %d! Make sure to create the table with same library version",
+			tableSchema.TableSchemaInfo.Version, schema.Version)
+	}
+
+	a.partitionMngr, err = partmgr.NewPartitionMngr(&tableSchema, a.container, a.cfg)
 	if err != nil {
 		return errors.Wrapf(err, "Failed to create a TSDB partition manager at '%s'.", fullpath)
 	}
