@@ -61,7 +61,7 @@ func NewRootCommandeer() *RootCommandeer {
 	defaultV3ioServer := os.Getenv("V3IO_SERVICE_URL")
 
 	cmd.PersistentFlags().StringVarP(&commandeer.logLevel, "log-level", "v", "",
-		"Verbose output. You can provide one of the following logging\nlevels as an argument for this flag by using the assignment\noperator ('='): \"debug\" | \"info\" | \"warn\" | \"error\".\nFor example: -v=info. The default log level when using this\nflag without an argument is \""+config.DefaultVerboseLevel+"\".")
+		"Verbose output. Add \"=<level>\" to set the log level -\ndebug | info | warn | error. For example: -v=warn.\n(default - \""+config.DefaultVerboseLevel+"\" when using the flag; \""+config.DefaultLogLevel+"\" otherwise)")
 	cmd.PersistentFlags().Lookup("log-level").NoOptDefVal = config.DefaultVerboseLevel
 	cmd.PersistentFlags().StringVarP(&commandeer.dbPath, "table-path", "t", "",
 		"[Required] Path to the TSDB table within the configured\ndata container. Examples: \"mytsdb\"; \"/my_tsdbs/tsdbd1\".")
@@ -192,7 +192,7 @@ func (rc *RootCommandeer) populateConfig(cfg *config.V3ioConfig) error {
 	if rc.logLevel != "" {
 		cfg.LogLevel = rc.logLevel
 	} else {
-		cfg.LogLevel = "info"
+		cfg.LogLevel = config.DefaultLogLevel
 	}
 
 	rc.v3iocfg = cfg
