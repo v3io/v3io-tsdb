@@ -141,13 +141,14 @@ func (cs *chunkStore) getChunksState(mc *MetricsCache, metric *MetricState) (boo
 	getInput := v3io.GetItemInput{
 		Path: path, AttributeNames: []string{"_maxtime"}}
 
+	methodLogger := mc.logger.GetChild("getChunksState")
 	request, err := mc.container.GetItem(&getInput, metric, mc.responseChan)
 	if err != nil {
-		mc.logger.ErrorWith("Failed to send a GetItem request to the TSDB", "metric", metric.key, "err", err)
+		methodLogger.ErrorWith("Failed to send a GetItem request to the TSDB", "metric", metric.key, "err", err)
 		return false, err
 	}
 
-	mc.logger.DebugWith("Get metric state", "name", metric.name, "key", metric.key, "reqid", request.ID)
+	methodLogger.DebugWith("Get metric state", "name", metric.name, "key", metric.key, "reqid", request.ID)
 	return true, nil
 }
 
@@ -162,6 +163,7 @@ func (cs *chunkStore) processGetResp(mc *MetricsCache, metric *MetricState, resp
 
 	latencyNano := time.Now().UnixNano() - resp.Request().SendTimeNanoseconds
 	cs.performanceReporter.UpdateHistogram("UpdateMetricLatencyHistogram", latencyNano)
+	methodLogger := mc.logger.GetChild("processGetResp")
 
 	if resp.Error != nil {
 		if utils.IsNotExistsError(resp.Error) {
@@ -174,12 +176,13 @@ func (cs *chunkStore) processGetResp(mc *MetricsCache, metric *MetricState, resp
 					// Count errors
 					cs.performanceReporter.IncrementCounter("PutNameError", 1)
 
-					mc.logger.ErrorWith("Update-name PutItem failed", "metric", metric.key, "err", err)
+					methodLogger.ErrorWith("Update-name PutItem failed", "metric", metric.key, "err", err)
 				} else {
-					mc.logger.DebugWith("Update name", "name", metric.name, "key", metric.key, "reqid", request.ID)
+					methodLogger.DebugWith("Update name", "name", metric.name, "key", metric.key, "reqid", request.ID)
 				}
 			}
 		} else {
+			methodLogger.Error("Update metric has failed with error: %v", resp.Error)
 			// Count errors
 			cs.performanceReporter.IncrementCounter("UpdateMetricError", 1)
 		}
@@ -194,7 +197,7 @@ func (cs *chunkStore) processGetResp(mc *MetricsCache, metric *MetricState, resp
 	if val != nil {
 		maxTime = int64(val.(int))
 	}
-	mc.logger.DebugWith("Got metric item", "name", metric.name, "key", metric.key, "maxt", maxTime)
+	methodLogger.DebugWith("Got metric item", "name", metric.name, "key", metric.key, "maxt", maxTime)
 
 	if !mc.cfg.OverrideOld {
 		cs.maxTime = maxTime
