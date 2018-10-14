@@ -138,7 +138,7 @@ func (a *V3ioAdapter) connect() error {
 	}
 
 	if tableSchema.TableSchemaInfo.Version != schema.Version {
-		return errors.Errorf("Table Schema version mismatch - existing table schema version is %d while the tsdb library version is %d! Make sure to create the table with same library version",
+		return errors.Errorf("TSDB-schema version mismatch - the existing schema version is %d while the V3IO TSDB version is %d.",
 			tableSchema.TableSchemaInfo.Version, schema.Version)
 	}
 
@@ -151,7 +151,7 @@ func (a *V3ioAdapter) connect() error {
 		return errors.Wrapf(err, "Failed to initialize the TSDB partition manager at: %s", fullpath)
 	}
 
-	a.logger.Info("Starting the V3IO TSDB client for the TSDB instance at '%s'", fullpath)
+	a.logger.Info("Starting the V3IO TSDB client for the TSDB instance at '%s'.", fullpath)
 	a.logger.Debug("Running with the following TSDB configuration: %+v\n", a.cfg)
 
 	return nil
