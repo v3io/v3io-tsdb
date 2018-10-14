@@ -111,7 +111,7 @@ func (q *V3ioQuerier) selectQry(
 
 		sets := make([]SeriesSet, len(parts))
 		for i, part := range parts {
-			set, err := q.queryNumericPartition(part, name, functions, step, windows, filter)
+			set, err = q.queryNumericPartition(part, name, functions, step, windows, filter)
 			if err != nil {
 				set = nullSeriesSet{}
 				return
@@ -125,9 +125,10 @@ func (q *V3ioQuerier) selectQry(
 		*/
 		for i := 0; i < len(sets); i++ {
 			// TODO make it a Go routine per part
-			sorter, err := NewSetSorter(sets[i])
-			if err != nil {
+			sorter, error := NewSetSorter(sets[i])
+			if error != nil {
 				set = nullSeriesSet{}
+				err = error
 				return
 			}
 			sets[i] = sorter
