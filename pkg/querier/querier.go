@@ -120,8 +120,9 @@ func (q *V3ioQuerier) selectQry(
 		}
 
 		// Sort each partition
-		// todo: Removed condition that applies sorting only on non range scan queries, to fix bug with serieses coming OOO when querying multi partitions.
-		// todo: Think of a better solution.
+		/* TODO: Removed condition that applies sorting only on non range scan queries to fix bug with series coming OOO when querying multi partitions,
+		Need to think of a better solution.
+		*/
 		for i := 0; i < len(sets); i++ {
 			// TODO make it a Go routine per part
 			sorter, err := NewSetSorter(sets[i])
