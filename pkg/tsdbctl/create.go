@@ -63,14 +63,14 @@ func newCreateCommandeer(rootCommandeer *RootCommandeer) *createCommandeer {
 	cmd.Flags().StringVarP(&commandeer.defaultRollups, "aggregates", "a", "",
 		"Default aggregates to calculate in real time during\nthe samples ingestion, as a comma-separated list of\nsupported aggregation functions - count | avg | sum |\nmin | max | stddev | stdvar | last | rate.\nExample: \"sum,avg,max\".")
 	cmd.Flags().StringVarP(&commandeer.aggregationGranularity, "aggregation-granularity", "i", config.DefaultAggregationGranularity,
-		"Aggregation granularity - a time interval for applying\nthe aggregation functions (if  configured - see the\n-a|--aggregates flag), of the format \"[0-9]+[mh]\"\n(where 'm' = minutes and 'h' = hours).\nExamples: \"2h\"; \"90m\".")
+		"Aggregation granularity - a time interval for applying\nthe aggregation functions (if  configured - see the\n-a|--aggregates flag), of the format \"[0-9]+[mhd]\"\n(where 'm' = minutes, 'h' = hours, and 'd' = days).\nExamples: \"2h\"; \"90m\".")
 	cmd.Flags().IntVarP(&commandeer.shardingBucketsCount, "sharding-buckets", "b", config.DefaultShardingBucketsCount,
 		"Number of storage buckets across which to split the\ndata of a single metric to optimize storage of\nnon-uniform data. Example: 10.")
 	// TODO: enable sample-retention when supported:
 	// cmd.Flags().IntVarP(&commandeer.sampleRetention, "sample-retention", "r", config.DefaultSampleRetentionHours,
 	//	"Metric-samples retention period, in hours. Example: 1 (retain samples for 1 hour).")
 	cmd.Flags().StringVarP(&commandeer.samplesIngestionRate, "ingestion-rate", "r", config.DefaultIngestionRate,
-		"[Required] Metric-samples ingestion rate - the maximum\ningestion rate for a single metric (calculated\naccording to the slowest expecetd ingestion rate) -\nof the format \"[0-9]+/[mhd]\" (where 'm' = minutes,\n'h' = hours, and 'd' = days). Examples: \"12/m\" (12\nsamples per minute); \"1s\" (one sample per second).")
+		"[Required] Metric-samples ingestion rate - the maximum\ningestion rate for a single metric (calculated\naccording to the slowest expected ingestion rate) -\nof the format \"[0-9]+/[mhd]\" (where 'm' = minutes,\n'h' = hours, and 'd' = days). Examples: \"12/m\" (12\nsamples per minute); \"1s\" (one sample per second).")
 
 	commandeer.cmd = cmd
 

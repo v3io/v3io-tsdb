@@ -52,7 +52,7 @@ Notes:
 
 Arguments:
   <time> (string)  An RFC3339 time string or a Unix timestamp in seconds.
-                   By default, the command returns the Unix timstamp for the current time.`,
+                   By default, the command returns the Unix timestamp for the current time.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 
 			// Check for positional arguments

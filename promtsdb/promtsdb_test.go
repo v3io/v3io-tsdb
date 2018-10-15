@@ -109,7 +109,7 @@ func (suite *testPromTsdbSuite) TestMatch2filterRegexMultiple() {
 }
 
 func TestPromTsdbSuite(t *testing.T) {
-	log, err := utils.NewLogger(config.DefaultLoggingLevel)
+	log, err := utils.NewLogger(config.DefaultLogLevel)
 	if err != nil {
 		t.Fatalf("Unable to initialize logger. Error: %v", err)
 	}

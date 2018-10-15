@@ -106,7 +106,7 @@ func match2filter(oms []*labels.Matcher, logger logger.Logger) (string, string, 
 
 	if logger == nil {
 		// TODO: handle and return the error
-		logger, _ = utils.NewLogger(config.DefaultLoggingLevel)
+		logger, _ = utils.NewLogger(config.DefaultLogLevel)
 	}
 
 	for _, matcher := range oms {

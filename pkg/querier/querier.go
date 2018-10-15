@@ -87,17 +87,20 @@ func (q *V3ioQuerier) SelectOverlap(name, functions string, step int64, windows 
 func (q *V3ioQuerier) selectQry(
 	name, functions string, step int64, windows []int, filter string) (set SeriesSet, err error) {
 
-	set = nullSeriesSet{}
 	err = q.partitionMngr.ReadAndUpdateSchema()
-
 	if err != nil {
 		return nullSeriesSet{}, errors.Wrap(err, "Failed to read/update the TSDB schema.")
 	}
 
+	set = nullSeriesSet{}
+
+	q.logger.Debug("Select query:\n\tMetric: %s\n\tStart Time: %s\n\tEnd Time: %s\n\tFunction: %s\n\t"+
+		"Step: %d\n\tFilter: %s\n\tWindows: %v\n\tDisable All Aggr: %s\n\tDisable Client Aggr: %s",
+		name, time.Unix(q.mint/1000, 0).String(), time.Unix(q.maxt/1000, 0).String(), functions, step,
+		filter, windows, q.disableAllAggr, q.disableClientAggr)
+
 	q.performanceReporter.WithTimer("QueryTimer", func() {
 		filter = strings.Replace(filter, "__name__", "_name", -1)
-		q.logger.Debug("Select query:\n\tMetric: %s\n\tStart Time: %s\n\tEnd Time: %s\n\tFunction: %s\n\tStep: %d\n\tFilter: %s\n\tWindows: %v",
-			name, time.Unix(q.mint/1000, 0).String(), time.Unix(q.maxt/1000, 0).String(), functions, step, filter, windows)
 
 		parts := q.partitionMngr.PartsForRange(q.mint, q.maxt)
 		if len(parts) == 0 {
@@ -111,7 +114,7 @@ func (q *V3ioQuerier) selectQry(
 
 		sets := make([]SeriesSet, len(parts))
 		for i, part := range parts {
-			set, err := q.queryNumericPartition(part, name, functions, step, windows, filter)
+			set, err = q.queryNumericPartition(part, name, functions, step, windows, filter)
 			if err != nil {
 				set = nullSeriesSet{}
 				return
@@ -120,13 +123,15 @@ func (q *V3ioQuerier) selectQry(
 		}
 
 		// Sort each partition
-		// todo: Removed condition that applies sorting only on non range scan queries, to fix bug with serieses coming OOO when querying multi partitions.
-		// todo: Think of a better solution.
+		/* TODO: Removed condition that applies sorting only on non range scan queries to fix bug with series coming OOO when querying multi partitions,
+		Need to think of a better solution.
+		*/
 		for i := 0; i < len(sets); i++ {
 			// TODO make it a Go routine per part
-			sorter, err := NewSetSorter(sets[i])
-			if err != nil {
+			sorter, error := NewSetSorter(sets[i])
+			if error != nil {
 				set = nullSeriesSet{}
+				err = error
 				return
 			}
 			sets[i] = sorter
