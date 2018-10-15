@@ -147,9 +147,19 @@ func (it *v3ioSeriesIterator) Seek(t int64) bool {
 		t = it.mint
 	}
 
+	// Check the first element
+	t0, _ := it.iter.At()
+	if t0 > it.maxt {
+		return false
+	}
+	if t <= t0 {
+		// The cursor (t0) is either on t or just passed t
+		return true
+	}
+
 	for {
 		if it.iter.Next() {
-			t0, _ := it.At()
+			t0, _ := it.iter.At()
 			if t0 > it.maxt {
 				return false
 			}

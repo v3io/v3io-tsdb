@@ -94,9 +94,9 @@ func (q *V3ioQuerier) selectQry(
 
 	set = nullSeriesSet{}
 
-	q.logger.Debug("Select query:\n\tMetric: %s\n\tStart Time: %s\n\tEnd Time: %s\n\tFunction: %s\n\t"+
-		"Step: %d\n\tFilter: %s\n\tWindows: %v\n\tDisable All Aggr: %s\n\tDisable Client Aggr: %s",
-		name, time.Unix(q.mint/1000, 0).String(), time.Unix(q.maxt/1000, 0).String(), functions, step,
+	q.logger.Debug("Select query:\n\tMetric: %s\n\tStart Time: %s (%d)\n\tEnd Time: %s (%d)\n\tFunction: %s\n\t"+
+		"Step: %d\n\tFilter: %s\n\tWindows: %v\n\tDisable All Aggr: %t\n\tDisable Client Aggr: %t",
+		name, time.Unix(q.mint/1000, 0).String(), q.mint, time.Unix(q.maxt/1000, 0).String(), q.maxt, functions, step,
 		filter, windows, q.disableAllAggr, q.disableClientAggr)
 
 	q.performanceReporter.WithTimer("QueryTimer", func() {
