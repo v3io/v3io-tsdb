@@ -53,9 +53,9 @@ func newInfoCommandeer(rootCommandeer *RootCommandeer) *infoCommandeer {
 	}
 
 	cmd.Flags().BoolVarP(&commandeer.getNames, "names", "n", false,
-		"Display the names of the metrics contained in the TSDB.")
+		"Display the metric names in the TSDB.")
 	cmd.Flags().BoolVarP(&commandeer.getCount, "performance", "m", false,
-		"Display a count of the number of metric objects contained in the TSDB.")
+		"Display the number of metric items in the TSDB.")
 
 	commandeer.cmd = cmd
 
