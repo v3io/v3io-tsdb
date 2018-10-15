@@ -141,14 +141,13 @@ func (cs *chunkStore) getChunksState(mc *MetricsCache, metric *MetricState) (boo
 	getInput := v3io.GetItemInput{
 		Path: path, AttributeNames: []string{"_maxtime"}}
 
-	methodLogger := mc.logger.GetChild("getChunksState")
 	request, err := mc.container.GetItem(&getInput, metric, mc.responseChan)
 	if err != nil {
-		methodLogger.ErrorWith("Failed to send a GetItem request to the TSDB", "metric", metric.key, "err", err)
+		mc.logger.ErrorWith("Failed to send a GetItem request to the TSDB", "metric", metric.key, "err", err)
 		return false, err
 	}
 
-	methodLogger.DebugWith("Get metric state", "name", metric.name, "key", metric.key, "reqid", request.ID)
+	mc.logger.DebugWith("Get metric state", "name", metric.name, "key", metric.key, "reqid", request.ID)
 	return true, nil
 }
 
@@ -163,7 +162,6 @@ func (cs *chunkStore) processGetResp(mc *MetricsCache, metric *MetricState, resp
 
 	latencyNano := time.Now().UnixNano() - resp.Request().SendTimeNanoseconds
 	cs.performanceReporter.UpdateHistogram("UpdateMetricLatencyHistogram", latencyNano)
-	methodLogger := mc.logger.GetChild("processGetResp")
 
 	if resp.Error != nil {
 		if utils.IsNotExistsError(resp.Error) {
@@ -173,17 +171,14 @@ func (cs *chunkStore) processGetResp(mc *MetricsCache, metric *MetricState, resp
 
 				request, err := mc.container.PutItem(&putInput, metric, mc.nameUpdateChan)
 				if err != nil {
-					// Count errors
 					cs.performanceReporter.IncrementCounter("PutNameError", 1)
-
-					methodLogger.ErrorWith("Update-name PutItem failed", "metric", metric.key, "err", err)
+					mc.logger.ErrorWith("Update-name PutItem failed", "metric", metric.key, "err", err)
 				} else {
-					methodLogger.DebugWith("Update name", "name", metric.name, "key", metric.key, "reqid", request.ID)
+					mc.logger.DebugWith("Update name", "name", metric.name, "key", metric.key, "reqid", request.ID)
 				}
 			}
 		} else {
-			methodLogger.Error("Update metric has failed with error: %v", resp.Error)
-			// Count errors
+			mc.logger.Error("Update metric has failed with error: %v", resp.Error)
 			cs.performanceReporter.IncrementCounter("UpdateMetricError", 1)
 		}
 
@@ -197,7 +192,7 @@ func (cs *chunkStore) processGetResp(mc *MetricsCache, metric *MetricState, resp
 	if val != nil {
 		maxTime = int64(val.(int))
 	}
-	methodLogger.DebugWith("Got metric item", "name", metric.name, "key", metric.key, "maxt", maxTime)
+	mc.logger.DebugWith("Got metric item", "name", metric.name, "key", metric.key, "maxt", maxTime)
 
 	if !mc.cfg.OverrideOld {
 		cs.maxTime = maxTime
@@ -210,7 +205,6 @@ func (cs *chunkStore) processGetResp(mc *MetricsCache, metric *MetricState, resp
 
 	// Set Last TableId - indicate that there is no need to create metric object
 	cs.lastTid = cs.chunks[0].partition.GetStartTime()
-
 }
 
 // Append data to the right chunk and table based on the time and state
