@@ -147,9 +147,18 @@ func (it *v3ioSeriesIterator) Seek(t int64) bool {
 		t = it.mint
 	}
 
+	// Check the first element
+	t0, _ := it.iter.At()
+	if t0 > it.maxt {
+		return false
+	}
+	if t <= t0 {
+		return true
+	}
+
 	for {
 		if it.iter.Next() {
-			t0, _ := it.At()
+			t0, _ := it.iter.At()
 			if t0 > it.maxt {
 				return false
 			}
@@ -251,7 +260,7 @@ type aggrSeriesIterator struct {
 // Advance an iterator to the specified time (t)
 func (s *aggrSeriesIterator) Seek(t int64) bool {
 	if t <= s.set.baseTime {
-		s.index = 0
+		s.index = s.getNextValidCell(-1)
 		return true
 	}
 
@@ -266,12 +275,14 @@ func (s *aggrSeriesIterator) Seek(t int64) bool {
 // Advance an iterator to the next time interval/bucket
 func (s *aggrSeriesIterator) Next() bool {
 	// Advance the index to the next non-empty cell
-	var nextIndex int
-	for nextIndex = s.index + 1; nextIndex <= s.aggrSet.GetMaxCell() && !s.aggrSet.DoesCellHaveData(nextIndex); nextIndex++ {
-	}
-
-	s.index = nextIndex
+	s.index = s.getNextValidCell(s.index)
 	return s.index <= s.aggrSet.GetMaxCell()
+}
+
+func (s *aggrSeriesIterator) getNextValidCell(from int) (nextIndex int) {
+	for nextIndex = from + 1; nextIndex <= s.aggrSet.GetMaxCell() && !s.aggrSet.DoesCellHaveData(nextIndex); nextIndex++ {
+	}
+	return
 }
 
 // Return the time and value at the current bucket

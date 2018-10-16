@@ -31,6 +31,7 @@ import (
 	"github.com/v3io/v3io-tsdb/pkg/utils"
 	"sort"
 	"strings"
+	"time"
 )
 
 // Create a new Querier interface
@@ -86,15 +87,17 @@ func (q *V3ioQuerier) SelectOverlap(name, functions string, step int64, windows 
 func (q *V3ioQuerier) selectQry(
 	name, functions string, step int64, windows []int, filter string) (set SeriesSet, err error) {
 
-	set = nullSeriesSet{}
-
-	filter = strings.Replace(filter, "__name__", "_name", -1)
-	q.logger.DebugWith("Select query", "metric", name, "func", functions, "step", step, "filter", filter, "disableAllAggr", q.disableAllAggr, "disableClientAggr", q.disableClientAggr, "window", windows)
 	err = q.partitionMngr.ReadAndUpdateSchema()
-
 	if err != nil {
 		return nullSeriesSet{}, errors.Wrap(err, "Failed to read/update the TSDB schema.")
 	}
+
+	set = nullSeriesSet{}
+
+	q.logger.Debug("Select query:\n\tMetric: %s\n\tStart Time: %s (%d)\n\tEnd Time: %s (%d)\n\tFunction: %s\n\t"+
+		"Step: %d\n\tFilter: %s\n\tWindows: %v\n\tDisable All Aggr: %t\n\tDisable Client Aggr: %t",
+		name, time.Unix(q.mint/1000, 0).String(), q.mint, time.Unix(q.maxt/1000, 0).String(), q.maxt, functions, step,
+		filter, windows, q.disableAllAggr, q.disableClientAggr)
 
 	q.performanceReporter.WithTimer("QueryTimer", func() {
 		filter = strings.Replace(filter, "__name__", "_name", -1)

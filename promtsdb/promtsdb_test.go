@@ -23,18 +23,22 @@ such restriction.
 package promtsdb
 
 import (
+	"github.com/nuclio/logger"
 	"github.com/prometheus/prometheus/pkg/labels"
 	"github.com/stretchr/testify/suite"
+	"github.com/v3io/v3io-tsdb/pkg/config"
+	"github.com/v3io/v3io-tsdb/pkg/utils"
 	"testing"
 )
 
 type testPromTsdbSuite struct {
 	suite.Suite
+	logger logger.Logger
 }
 
 func (suite *testPromTsdbSuite) TestMatch2filterEmpty() {
 
-	name, filter, aggr := match2filter(nil)
+	name, filter, aggr := match2filter(nil, suite.logger)
 
 	suite.Require().Equal("", name)
 	suite.Require().Equal("", filter)
@@ -46,7 +50,7 @@ func (suite *testPromTsdbSuite) TestMatch2filterEqual() {
 	matchers := []*labels.Matcher{
 		{Type: labels.MatchEqual, Name: "field", Value: "literal"},
 	}
-	name, filter, aggr := match2filter(matchers)
+	name, filter, aggr := match2filter(matchers, suite.logger)
 
 	suite.Require().Equal("", name)
 	suite.Require().Equal("field=='literal'", filter)
@@ -59,7 +63,7 @@ func (suite *testPromTsdbSuite) TestMatch2filterMultiple() {
 		{Type: labels.MatchEqual, Name: "field1", Value: "literal1"},
 		{Type: labels.MatchNotEqual, Name: "field2", Value: "literal2"},
 	}
-	name, filter, aggr := match2filter(matchers)
+	name, filter, aggr := match2filter(matchers, suite.logger)
 
 	suite.Require().Equal("", name)
 	suite.Require().Equal("field1=='literal1' and field2!='literal2'", filter)
@@ -72,7 +76,7 @@ func (suite *testPromTsdbSuite) TestMatch2filterMultipleWithName() {
 		{Type: labels.MatchEqual, Name: "__name__", Value: "literal1"},
 		{Type: labels.MatchNotEqual, Name: "field2", Value: "literal2"},
 	}
-	name, filter, aggr := match2filter(matchers)
+	name, filter, aggr := match2filter(matchers, suite.logger)
 
 	suite.Require().Equal("literal1", name)
 	suite.Require().Equal("field2!='literal2'", filter)
@@ -84,7 +88,7 @@ func (suite *testPromTsdbSuite) TestMatch2filterRegex() {
 	matchers := []*labels.Matcher{
 		{Type: labels.MatchRegexp, Name: "field", Value: ".*"},
 	}
-	name, filter, aggr := match2filter(matchers)
+	name, filter, aggr := match2filter(matchers, suite.logger)
 
 	suite.Require().Equal("", name)
 	suite.Require().Equal(`regexp_instr(field,'.*') == 0`, filter)
@@ -97,7 +101,7 @@ func (suite *testPromTsdbSuite) TestMatch2filterRegexMultiple() {
 		{Type: labels.MatchRegexp, Name: "field1", Value: ".*"},
 		{Type: labels.MatchNotRegexp, Name: "field2", Value: "..."},
 	}
-	name, filter, aggr := match2filter(matchers)
+	name, filter, aggr := match2filter(matchers, suite.logger)
 
 	suite.Require().Equal("", name)
 	suite.Require().Equal(`regexp_instr(field1,'.*') == 0 and regexp_instr(field2,'...') != 0`, filter)
@@ -105,5 +109,12 @@ func (suite *testPromTsdbSuite) TestMatch2filterRegexMultiple() {
 }
 
 func TestPromTsdbSuite(t *testing.T) {
-	suite.Run(t, new(testPromTsdbSuite))
+	log, err := utils.NewLogger(config.DefaultLogLevel)
+	if err != nil {
+		t.Fatalf("Unable to initialize logger. Error: %v", err)
+	}
+
+	testSuit := new(testPromTsdbSuite)
+	testSuit.logger = log
+	suite.Run(t, testSuit)
 }

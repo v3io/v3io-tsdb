@@ -471,6 +471,81 @@ func testQueryDataOverlappingWindowCase(test *testing.T, v3ioConfig *config.V3io
 	}
 }
 
+// Calling Seek instead of next for the first time while iterating over data (TSDB-43)
+func TestIgnoreNaNWhenSeekingAggSeries(t *testing.T) {
+	v3ioConfig, err := tsdbtest.LoadV3ioConfig()
+	if err != nil {
+		t.Fatalf("unable to load configuration. Error: %v", err)
+	}
+	metricsName := "cpu"
+	baseTime := int64(1532940510000)
+	userLabels := utils.LabelsFromStrings("os", "linux", "iguaz", "yesplease")
+	data := []tsdbtest.DataPoint{{Time: baseTime, Value: 300.3},
+		{Time: baseTime + minuteInMillis, Value: 300.3},
+		{Time: baseTime + 2*minuteInMillis, Value: 100.4},
+		{Time: baseTime + 5*minuteInMillis, Value: 200.0}}
+	from := int64(baseTime - 60*minuteInMillis)
+	to := int64(baseTime + 6*minuteInMillis)
+	step := int64(2 * minuteInMillis)
+	agg := "avg"
+	expected := map[string][]tsdbtest.DataPoint{
+		"avg": {{baseTime, 300.3},
+			{baseTime + step, 100.4},
+			{baseTime + 2*step, 200}}}
+
+	adapter, teardown := tsdbtest.SetUpWithData(t, v3ioConfig, metricsName, data, userLabels)
+	defer teardown()
+
+	qry, err := adapter.Querier(nil, from, to)
+	if err != nil {
+		t.Fatalf("Failed to create Querier. reason: %v", err)
+	}
+
+	set, err := qry.Select(metricsName, agg, step, "")
+	if err != nil {
+		t.Fatalf("Failed to run Select. reason: %v", err)
+	}
+
+	var counter int
+	for counter = 0; set.Next(); counter++ {
+		if set.Err() != nil {
+			t.Fatalf("Failed to query metric. reason: %v", set.Err())
+		}
+
+		series := set.At()
+		agg := series.Labels().Get(aggregate.AggregateLabel)
+		iter := series.Iterator()
+		if iter.Err() != nil {
+			t.Fatalf("Failed to query data series. reason: %v", iter.Err())
+		}
+		if !iter.Seek(0) {
+			t.Fatal("Seek time returned false, iterator error:", iter.Err())
+		}
+		var actual []tsdbtest.DataPoint
+		t0, v0 := iter.At()
+		if iter.Err() != nil {
+			t.Fatal("error iterating over series", iter.Err())
+		}
+		actual = append(actual, tsdbtest.DataPoint{Time: t0, Value: v0})
+		for iter.Next() {
+			t1, v1 := iter.At()
+
+			if iter.Err() != nil {
+				t.Fatal("error iterating over series", iter.Err())
+			}
+			actual = append(actual, tsdbtest.DataPoint{Time: t1, Value: v1})
+		}
+		assert.ElementsMatch(t, expected[agg], actual)
+	}
+
+	if set.Err() != nil {
+		t.Fatalf("Failed to query metric. reason: %v", set.Err())
+	}
+	if counter == 0 && len(expected) > 0 {
+		t.Fatalf("No data was received")
+	}
+}
+
 func TestCreateTSDB(t *testing.T) {
 	v3ioConfig, err := tsdbtest.LoadV3ioConfig()
 	if err != nil {
