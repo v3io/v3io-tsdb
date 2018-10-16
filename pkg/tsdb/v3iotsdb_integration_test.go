@@ -478,19 +478,20 @@ func TestIgnoreNaNWhenSeekingAggSeries(t *testing.T) {
 		t.Fatalf("unable to load configuration. Error: %v", err)
 	}
 	metricsName := "cpu"
+	baseTime := int64(1532940510000)
 	userLabels := utils.LabelsFromStrings("os", "linux", "iguaz", "yesplease")
-	data := []tsdbtest.DataPoint{{Time: 1532940510000, Value: 300.3},
-		{Time: 1532940510000 + minuteInMillis, Value: 300.3},
-		{Time: 1532940510000 + 2*minuteInMillis, Value: 100.4},
-		{Time: 1532940510000 + 5*minuteInMillis, Value: 200.0}}
-	from := int64(1532940510000 - 60*minuteInMillis)
-	to := int64(1532940510000 + 6*minuteInMillis)
+	data := []tsdbtest.DataPoint{{Time: baseTime, Value: 300.3},
+		{Time: baseTime + minuteInMillis, Value: 300.3},
+		{Time: baseTime + 2*minuteInMillis, Value: 100.4},
+		{Time: baseTime + 5*minuteInMillis, Value: 200.0}}
+	from := int64(baseTime - 60*minuteInMillis)
+	to := int64(baseTime + 6*minuteInMillis)
 	step := int64(2 * minuteInMillis)
 	agg := "avg"
 	expected := map[string][]tsdbtest.DataPoint{
-		"avg": {{1532940510000, 300.3},
-			{1532940630000, 100.4},
-			{1532940750000, 200}}}
+		"avg": {{baseTime, 300.3},
+			{baseTime + step, 100.4},
+			{baseTime + 2*step, 200}}}
 
 	adapter, teardown := tsdbtest.SetUpWithData(t, v3ioConfig, metricsName, data, userLabels)
 	defer teardown()
