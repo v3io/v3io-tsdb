@@ -48,8 +48,6 @@ type TestConfig struct {
 	values        []float64
 	queryFunc     string
 	queryStep     int64
-	expectedMin   float64
-	expectedMax   float64
 	expectedCount int
 	expectedSum   float64
 	expectFail    bool
@@ -84,7 +82,7 @@ func TestAggregates(t *testing.T) {
 
 func t1Config(testCtx *testing.T) *TestConfig {
 	t := time.Now()
-	currentRoundedTimeNano := time.Date(t.Year(), t.Month(), t.Day(), t.Hour(), t.Minute(), t.Second(), 0, t.Location()).UnixNano()
+	currentRoundedTimeNano := time.Date(t.Year(), t.Month(), t.Day(), t.Hour(), 0, 0, 0, t.Location()).UnixNano()
 
 	testDuration := int64(80 * time.Hour)
 	testValues := []float64{1, 2, 3, 4, 5}
@@ -98,16 +96,12 @@ func t1Config(testCtx *testing.T) *TestConfig {
 		numMetrics:    1,
 		numLabels:     1,
 		values:        testValues,
-		expectedMin:   math.Inf(1),
-		expectedMax:   math.Inf(-1),
-		queryFunc:     "min,max,count,sum,avg",
+		queryFunc:     "count,sum,avg",
 		queryStep:     int64(1 * time.Hour),
 	}
 
 	for _, v := range testValues {
 		tc.expectedSum += v
-		tc.expectedMin = math.Min(tc.expectedMin, v)
-		tc.expectedMax = math.Max(tc.expectedMax, v)
 	}
 
 	tc.setup = func() (*tsdb.V3ioAdapter, error, func()) {
@@ -175,8 +169,6 @@ func testAggregatesCase(t *testing.T, testConfig *TestConfig) {
 		t.Fatal(err)
 	}
 
-	var actualMin float64
-	var actualMax float64
 	var actualCount int
 	var actualSum float64
 	var actualAvgResultsCount int
@@ -196,13 +188,9 @@ func testAggregatesCase(t *testing.T, testConfig *TestConfig) {
 		for iter.Next() {
 
 			tm, v := iter.At()
-			testConfig.logger.Warn(fmt.Sprintf("--> Aggregate: %s t=%d,v=%f\n", aggr, tm, v))
+			testConfig.logger.Debug(fmt.Sprintf("t=%d,v=%f\n", tm, v))
 
 			switch aggr {
-			case "min":
-				actualMin = math.Min(actualMin, v)
-			case "max":
-				actualMax = math.Max(actualMax, v)
 			case "count":
 				actualCount += int(v)
 			case "sum":
@@ -220,19 +208,15 @@ func testAggregatesCase(t *testing.T, testConfig *TestConfig) {
 		}
 	}
 
-	assert.Equal(t, testConfig.expectedMin, actualMin, "Minimal value is not as expected")
+	assert.Equal(t, testConfig.expectedCount, actualCount, "total count is not as expected")
 
-	assert.Equal(t, testConfig.expectedMax, actualMax, "Maximal value is not as expected")
-
-	assert.Equal(t, testConfig.expectedCount, actualCount, "Total count is not as expected")
-
-	assert.Equal(t, testConfig.expectedSum, actualSum, "Sum is not as expected")
+	assert.Equal(t, testConfig.expectedSum, actualSum, "total sum is not as expected")
 
 	assert.Equal(t, testConfig.expectedSum/float64(testConfig.expectedCount), actualSum/float64(actualCount),
 		"total average is not as expected")
 
 	assert.Equal(t, testConfig.expectedSum/float64(testConfig.expectedCount), actualAvgResultsSum/float64(actualAvgResultsCount),
-		"Average is not as expected")
+		"calculated total average is not as expected")
 }
 
 func nanosToMillis(nanos int64) int64 {
