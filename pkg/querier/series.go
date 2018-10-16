@@ -153,7 +153,6 @@ func (it *v3ioSeriesIterator) Seek(t int64) bool {
 		return false
 	}
 	if t <= t0 {
-		// The cursor (t0) is either on t or just passed t
 		return true
 	}
 
