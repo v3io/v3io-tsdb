@@ -251,7 +251,7 @@ type aggrSeriesIterator struct {
 // Advance an iterator to the specified time (t)
 func (s *aggrSeriesIterator) Seek(t int64) bool {
 	if t <= s.set.baseTime {
-		s.index = 0
+		s.index = s.getNextValidCell(-1)
 		return true
 	}
 
@@ -266,12 +266,14 @@ func (s *aggrSeriesIterator) Seek(t int64) bool {
 // Advance an iterator to the next time interval/bucket
 func (s *aggrSeriesIterator) Next() bool {
 	// Advance the index to the next non-empty cell
-	var nextIndex int
-	for nextIndex = s.index + 1; nextIndex <= s.aggrSet.GetMaxCell() && !s.aggrSet.DoesCellHaveData(nextIndex); nextIndex++ {
-	}
-
-	s.index = nextIndex
+	s.index = s.getNextValidCell(s.index)
 	return s.index <= s.aggrSet.GetMaxCell()
+}
+
+func (s *aggrSeriesIterator) getNextValidCell(from int) (nextIndex int) {
+	for nextIndex = from + 1; nextIndex <= s.aggrSet.GetMaxCell() && !s.aggrSet.DoesCellHaveData(nextIndex); nextIndex++ {
+	}
+	return
 }
 
 // Return the time and value at the current bucket
