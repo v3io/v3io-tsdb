@@ -151,7 +151,6 @@ func (a *V3ioAdapter) connect() error {
 		return errors.Wrapf(err, "Failed to initialize the TSDB partition manager at: %s", fullpath)
 	}
 
-	a.logger.Info("Starting the V3IO TSDB client for the TSDB instance at '%s'", fullpath)
 	a.logger.Debug("Running with the following TSDB configuration: %+v\n", a.cfg)
 
 	return nil
