@@ -121,6 +121,7 @@ func (a *MaxAggregate) Aggregate(t int64, v float64) {
 		a.val = v
 	}
 }
+
 func (a *MaxAggregate) UpdateExpr(col string, bucket int) string {
 	return fmt.Sprintf("_%s_%s[%d]=max(_%s_%s[%d],%s);", col, a.attr, bucket, col, a.attr, bucket,
 		utils.FloatToNormalizedScientificStr(a.val))
