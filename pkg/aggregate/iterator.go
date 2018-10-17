@@ -374,13 +374,13 @@ func createInitDataArray(aggrType AggrType, length int) []float64 {
 	// Prepare an array of NaN. Will be used for fast reset of data array instances
 	resultArray := make([]float64, length, length)
 
-	initWith := math.NaN()
+	var initWith float64
 	switch aggrType {
 	case aggrTypeMin:
 		initWith = math.Inf(1)
 	case aggrTypeMax:
 		initWith = math.Inf(-1)
-	case aggrTypeCount, aggrTypeSum:
+	default:
 		initWith = 0
 	}
 
