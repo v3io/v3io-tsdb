@@ -280,7 +280,7 @@ func (s *aggrSeriesIterator) Next() bool {
 }
 
 func (s *aggrSeriesIterator) getNextValidCell(from int) (nextIndex int) {
-	for nextIndex = from + 1; nextIndex <= s.aggrSet.GetMaxCell() && !s.aggrSet.DoesCellHaveData(nextIndex); nextIndex++ {
+	for nextIndex = from + 1; nextIndex <= s.aggrSet.GetMaxCell() && !s.aggrSet.HasData(nextIndex); nextIndex++ {
 	}
 	return
 }
