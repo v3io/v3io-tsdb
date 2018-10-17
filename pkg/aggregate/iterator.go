@@ -27,6 +27,9 @@ import (
 	"strings"
 )
 
+// Local cache of init arrays per aggregate type. Used to mimic memcopy and initialize data arrays with specific values
+var initDataArrayCache = map[AggrType][]float64{}
+
 type AggregateSeries struct {
 	colName        string     // column name ("v" in timeseries)
 	functions      []AggrType // list of aggregation functions to return (count, avg, sum, ..)
@@ -130,6 +133,8 @@ func (as *AggregateSeries) NewSetFromAttrs(
 			}
 			aggrArrays[aggr] = utils.AsInt64Array(attrBlob.([]byte))
 			dataArrays[aggr] = make([]float64, length, length)
+
+			copy(dataArrays[aggr], getOrCreateInitDataArray(aggr, length))
 		}
 	}
 
@@ -184,11 +189,8 @@ func (as *AggregateSeries) NewSetFromChunks(length int) *AggregateSet {
 	for _, aggr := range rawAggregates {
 		if aggr&as.aggrMask != 0 {
 			dataArrays[aggr] = make([]float64, length, length) // TODO: len/capacity & reuse (pool)
-			if aggr == aggrTypeMax || aggr == aggrTypeMin || aggr == aggrTypeLast {
-				for i := 0; i < length; i++ {
-					dataArrays[aggr][i] = math.NaN()
-				}
-			}
+			initArray := getOrCreateInitDataArray(aggr, length)
+			copy(dataArrays[aggr], initArray)
 		}
 	}
 
@@ -261,6 +263,7 @@ func (as *AggregateSet) updateCell(aggr AggrType, cell int, val float64) {
 		return
 	}
 
+	cellValue := as.dataArrays[aggr][cell]
 	switch aggr {
 	case aggrTypeCount:
 		as.dataArrays[aggr][cell] += 1
@@ -269,11 +272,11 @@ func (as *AggregateSet) updateCell(aggr AggrType, cell int, val float64) {
 	case aggrTypeSqr:
 		as.dataArrays[aggr][cell] += val * val
 	case aggrTypeMin:
-		if math.IsNaN(as.dataArrays[aggr][cell]) || val < as.dataArrays[aggr][cell] {
+		if val < cellValue {
 			as.dataArrays[aggr][cell] = val
 		}
 	case aggrTypeMax:
-		if math.IsNaN(as.dataArrays[aggr][cell]) || val > as.dataArrays[aggr][cell] {
+		if val > cellValue {
 			as.dataArrays[aggr][cell] = val
 		}
 	case aggrTypeLast:
@@ -347,11 +350,43 @@ func (as *AggregateSet) GetCellTime(base int64, index int) int64 {
 
 func (as *AggregateSet) Clear() {
 	as.maxCell = 0
+
 	for aggr := range as.dataArrays {
-		as.dataArrays[aggr] = as.dataArrays[aggr][:0]
+		initArray := getOrCreateInitDataArray(aggr, len(as.dataArrays[0]))
+		copy(as.dataArrays[aggr], initArray)
 	}
 }
 
 func (as *AggregateSet) DoesCellHaveData(cell int) bool {
+	// The assumption here is that we always maintain count aggregation and relay on the count value
 	return as.dataArrays[aggrTypeCount][cell] > 0
+}
+
+func getOrCreateInitDataArray(aggrType AggrType, length int) []float64 {
+	// Create once or override if required size is greater than existing array
+	if initDataArrayCache[aggrType] == nil || len(initDataArrayCache[aggrType]) < length {
+		initDataArrayCache[aggrType] = createInitDataArray(aggrType, length)
+	}
+	return initDataArrayCache[aggrType]
+}
+
+func createInitDataArray(aggrType AggrType, length int) []float64 {
+	// Prepare an array of NaN. Will be used for fast reset of data array instances
+	resultArray := make([]float64, length, length)
+
+	var initWith float64
+	switch aggrType {
+	case aggrTypeMin:
+		initWith = math.Inf(1)
+	case aggrTypeMax:
+		initWith = math.Inf(-1)
+	default:
+		initWith = 0
+	}
+
+	for i := range resultArray {
+		resultArray[i] = initWith
+	}
+
+	return resultArray
 }

@@ -47,7 +47,11 @@ func DeleteTSDB(t testing.TB, v3ioConfig *config.V3ioConfig) {
 }
 
 func CreateTestTSDB(t testing.TB, v3ioConfig *config.V3ioConfig) {
-	schema := testutils.CreateSchema(t, "*")
+	CreateTestTSDBWithAggregates(t, v3ioConfig, "*")
+}
+
+func CreateTestTSDBWithAggregates(t testing.TB, v3ioConfig *config.V3ioConfig, aggregates string) {
+	schema := testutils.CreateSchema(t, aggregates)
 	if err := CreateTSDB(v3ioConfig, schema); err != nil {
 		v3ioConfigAsJson, _ := json2.MarshalIndent(v3ioConfig, "", "  ")
 		t.Fatalf("Failed to create a TSDB instance (table). Reason: %v\nConfiguration:\n%s", err, string(v3ioConfigAsJson))
