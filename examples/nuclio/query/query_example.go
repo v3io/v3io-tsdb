@@ -50,7 +50,7 @@ func Handler(context *nuclio.Context, event nuclio.Event) (interface{}, error) {
 	// Convert time strings to Unix timestamp in milliseconds integers.
 	// The input time string can be of the format "now", "now-[0-9]+[mdh]"
 	// (for example, "now-2h"), "<Unix timestamp in milliseconds>", or
-	// "<RFC3339 time>" (for example, "2018-09-26T14:10:20Z").
+	// "<RFC 3339 time>" (for example, "2018-09-26T14:10:20Z").
 	from, to, step, err := utils.GetTimeFromRange(query.From, query.To, query.Last, query.Step)
 	if err != nil {
 		return nil, errors.Wrap(err, "Error parsing query time range.")
