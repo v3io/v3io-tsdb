@@ -77,9 +77,9 @@ Notes:
 	cmd.Flags().BoolVarP(&commandeer.force, "force", "f", false,
 		"Forceful deletion - don't display a delete-verification prompt.")
 	cmd.Flags().StringVarP(&commandeer.toTime, "end", "e", "",
-		"End (maximum) time for the delete operation, as a string containing an\nRFC3339 time string, a Unix timestamp in milliseconds, or a relative\ntime of the format \"now\" or \"now-[0-9]+[mhd]\" (where 'm' = minutes,\n'h' = hours, and 'd' = days). Examples: \"2018-09-26T14:10:20Z\";\n\"1537971006000\"; \"now-3h\"; \"now-7d\". (default \"now\")")
+		"End (maximum) time for the delete operation, as a string containing an\nRFC 3339 time string, a Unix timestamp in milliseconds, or a relative\ntime of the format \"now\" or \"now-[0-9]+[mhd]\" (where 'm' = minutes,\n'h' = hours, and 'd' = days). Examples: \"2018-09-26T14:10:20Z\";\n\"1537971006000\"; \"now-3h\"; \"now-7d\". (default \"now\")")
 	cmd.Flags().StringVarP(&commandeer.fromTime, "begin", "b", "",
-		"Start (minimum) time for the delete operation, as a string containing\nan RFC3339 time, a Unix timestamp in milliseconds, a relative time of\nthe format \"now\" or \"now-[0-9]+[mhd]\" (where 'm' = minutes, 'h' = hours,\nand 'd' = days), or 0 for the earliest time. Examples:\n\"2016-01-02T15:34:26Z\"; \"1451748866\"; \"now-90m\"; \"0\". (default =\n<end time> - 1h)")
+		"Start (minimum) time for the delete operation, as a string containing\nan RFC 3339 time, a Unix timestamp in milliseconds, a relative time of\nthe format \"now\" or \"now-[0-9]+[mhd]\" (where 'm' = minutes, 'h' = hours,\nand 'd' = days), or 0 for the earliest time. Examples:\n\"2016-01-02T15:34:26Z\"; \"1451748866\"; \"now-90m\"; \"0\". (default =\n<end time> - 1h)")
 	commandeer.cmd = cmd
 
 	return commandeer

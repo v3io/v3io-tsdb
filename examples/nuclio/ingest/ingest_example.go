@@ -46,7 +46,7 @@ func Handler(context *nuclio.Context, event nuclio.Event) (interface{}, error) {
 	// Convert a time string to a Unix timestamp in milliseconds integer.
 	// The input time string can be of the format "now", "now-[0-9]+[mdh]"
 	// (for example, "now-2h"), "<Unix timestamp in milliseconds>", or
-	// "<RFC3339 time>" (for example, "2018-09-26T14:10:20Z").
+	// "<RFC 3339 time>" (for example, "2018-09-26T14:10:20Z").
 	t, err := utils.Str2unixTime(sample.Time)
 	if err != nil {
 		return "", err
