@@ -38,23 +38,26 @@ import (
 )
 
 type TestConfig struct {
-	desc          string
-	testEndTime   int64
-	testStartTime int64
-	interval      int64
-	testDuration  int64
-	numMetrics    int
-	numLabels     int
-	values        []float64
-	queryFunc     string
-	queryStep     int64
-	expectedCount int
-	expectedSum   float64
-	expectFail    bool
-	ignoreReason  string
-	v3ioConfig    *config.V3ioConfig
-	logger        logger.Logger
-	setup         func() (*tsdb.V3ioAdapter, error, func())
+	desc           string
+	testEndTime    int64
+	testStartTime  int64
+	interval       int64
+	testDuration   int64
+	numMetrics     int
+	numLabels      int
+	values         []float64
+	queryFunc      string
+	queryStep      int64
+	expectedMin    float64
+	expectedMax    float64
+	expectedCount  int
+	expectedSum    float64
+	expectFail     bool
+	ignoreReason   string
+	v3ioConfig     *config.V3ioConfig
+	logger         logger.Logger
+	tsdbAggregates string
+	setup          func() (*tsdb.V3ioAdapter, error, func())
 }
 
 type metricContext struct {
@@ -66,6 +69,7 @@ func TestAggregates(t *testing.T) {
 	// TODO: consider replacing with test suite
 	testCases := []*TestConfig{
 		t1Config(t),
+		t2Config(t),
 	}
 
 	for _, testConfig := range testCases {
@@ -82,26 +86,71 @@ func TestAggregates(t *testing.T) {
 
 func t1Config(testCtx *testing.T) *TestConfig {
 	t := time.Now()
+	// Round the test time down to the closest hour to get predictable and consistent results
 	currentRoundedTimeNano := time.Date(t.Year(), t.Month(), t.Day(), t.Hour(), 0, 0, 0, t.Location()).UnixNano()
 
 	testDuration := int64(80 * time.Hour)
-	testValues := []float64{1, 2, 3, 4, 5}
+	testAggregates := "min,max,count,sum,avg"
+	testValues := []float64{-5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5, 6}
 
 	tc := &TestConfig{
-		desc:          "Test case #1",
-		testEndTime:   currentRoundedTimeNano,
-		testStartTime: currentRoundedTimeNano - testDuration,
-		interval:      int64(10 * time.Minute),
-		testDuration:  testDuration,
-		numMetrics:    1,
-		numLabels:     1,
-		values:        testValues,
-		queryFunc:     "count,sum,avg",
-		queryStep:     int64(1 * time.Hour),
+		desc:           fmt.Sprintf("Test with aggregates: Check [%s] with %v", testAggregates, testValues),
+		testEndTime:    currentRoundedTimeNano,
+		testStartTime:  currentRoundedTimeNano - testDuration,
+		interval:       int64(10 * time.Minute),
+		testDuration:   testDuration,
+		numMetrics:     1,
+		numLabels:      1,
+		values:         testValues,
+		expectedMin:    math.Inf(1),
+		expectedMax:    math.Inf(-1),
+		queryFunc:      testAggregates,
+		queryStep:      int64(time.Hour),
+		tsdbAggregates: testAggregates, // Create DB with all required aggregates
 	}
 
 	for _, v := range testValues {
 		tc.expectedSum += v
+		tc.expectedMin = math.Min(tc.expectedMin, v)
+		tc.expectedMax = math.Max(tc.expectedMax, v)
+	}
+
+	tc.setup = func() (*tsdb.V3ioAdapter, error, func()) {
+		return setupFunc(testCtx, tc)
+	}
+
+	return tc
+}
+
+func t2Config(testCtx *testing.T) *TestConfig {
+	t := time.Now()
+	// Round the test time down to the closest hour to get predictable and consistent results
+	currentRoundedTimeNano := time.Date(t.Year(), t.Month(), t.Day(), t.Hour(), 0, 0, 0, t.Location()).UnixNano()
+
+	testDuration := int64(96 * time.Hour)
+	testAggregates := "min,max,count,sum,avg"
+	testValues := []float64{-8, 0, 1, 2, 3, 4, 5, 6}
+
+	tc := &TestConfig{
+		desc:           fmt.Sprintf("Test with RAW data: Check [%s] with %v", testAggregates, testValues),
+		testEndTime:    currentRoundedTimeNano,
+		testStartTime:  currentRoundedTimeNano - testDuration,
+		interval:       int64(10 * time.Minute),
+		testDuration:   testDuration,
+		numMetrics:     1,
+		numLabels:      1,
+		values:         testValues,
+		expectedMin:    math.Inf(1),
+		expectedMax:    math.Inf(-1),
+		queryFunc:      testAggregates,
+		queryStep:      int64(time.Hour),
+		tsdbAggregates: "", // create DB without aggregates (use RAW data)
+	}
+
+	for _, v := range testValues {
+		tc.expectedSum += v
+		tc.expectedMin = math.Min(tc.expectedMin, v)
+		tc.expectedMax = math.Max(tc.expectedMax, v)
 	}
 
 	tc.setup = func() (*tsdb.V3ioAdapter, error, func()) {
@@ -120,7 +169,7 @@ func setupFunc(testCtx *testing.T, testConfig *TestConfig) (*tsdb.V3ioAdapter, e
 	}
 
 	v3ioConfig.TablePath = tsdbtest.PrefixTablePath(fmt.Sprintf("%s-%d", testCtx.Name(), time.Now().Nanosecond()))
-	tsdbtest.CreateTestTSDB(testCtx, v3ioConfig)
+	tsdbtest.CreateTestTSDBWithAggregates(testCtx, v3ioConfig, testConfig.tsdbAggregates)
 
 	adapter, err := tsdb.NewV3ioAdapter(v3ioConfig, nil, nil)
 	if err != nil {
@@ -169,6 +218,8 @@ func testAggregatesCase(t *testing.T, testConfig *TestConfig) {
 		t.Fatal(err)
 	}
 
+	var actualMin float64 = math.Inf(1)
+	var actualMax float64 = math.Inf(-1)
 	var actualCount int
 	var actualSum float64
 	var actualAvgResultsCount int
@@ -188,18 +239,20 @@ func testAggregatesCase(t *testing.T, testConfig *TestConfig) {
 		for iter.Next() {
 
 			tm, v := iter.At()
-			testConfig.logger.Debug(fmt.Sprintf("t=%d,v=%f\n", tm, v))
+			testConfig.logger.Debug(fmt.Sprintf("--> Aggregate: %s t=%d,v=%f\n", aggr, tm, v))
 
 			switch aggr {
+			case "min":
+				actualMin = math.Min(actualMin, v)
+			case "max":
+				actualMax = math.Max(actualMax, v)
 			case "count":
 				actualCount += int(v)
 			case "sum":
 				actualSum += v
 			case "avg":
-				if !math.IsNaN(v) {
-					actualAvgResultsCount += 1
-					actualAvgResultsSum = actualAvgResultsSum + v
-				}
+				actualAvgResultsCount += 1
+				actualAvgResultsSum = actualAvgResultsSum + v
 			}
 		}
 
@@ -208,15 +261,19 @@ func testAggregatesCase(t *testing.T, testConfig *TestConfig) {
 		}
 	}
 
-	assert.Equal(t, testConfig.expectedCount, actualCount, "total count is not as expected")
+	assert.Equal(t, testConfig.expectedMin, actualMin, "Minimal value is not as expected")
 
-	assert.Equal(t, testConfig.expectedSum, actualSum, "total sum is not as expected")
+	assert.Equal(t, testConfig.expectedMax, actualMax, "Maximal value is not as expected")
+
+	assert.Equal(t, testConfig.expectedCount, actualCount, "Count is not as expected")
+
+	assert.Equal(t, testConfig.expectedSum, actualSum, "Sum is not as expected")
 
 	assert.Equal(t, testConfig.expectedSum/float64(testConfig.expectedCount), actualSum/float64(actualCount),
-		"total average is not as expected")
+		"Average is not as expected. [1]")
 
 	assert.Equal(t, testConfig.expectedSum/float64(testConfig.expectedCount), actualAvgResultsSum/float64(actualAvgResultsCount),
-		"calculated total average is not as expected")
+		"Average is not as expected. [2] %f/%d != %f/%d", testConfig.expectedSum, testConfig.expectedCount, actualAvgResultsSum, actualAvgResultsCount)
 }
 
 func nanosToMillis(nanos int64) int64 {
