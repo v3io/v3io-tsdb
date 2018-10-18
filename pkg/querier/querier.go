@@ -49,13 +49,11 @@ func NewV3ioQuerier(container *v3io.Container, logger logger.Logger, mint, maxt 
 }
 
 type V3ioQuerier struct {
-	logger        logger.Logger
-	container     *v3io.Container
-	cfg           *config.V3ioConfig
-	mint, maxt    int64
-	partitionMngr *partmgr.PartitionManager
-	//disableClientAggr   bool
-	//disableAllAggr      bool
+	logger              logger.Logger
+	container           *v3io.Container
+	cfg                 *config.V3ioConfig
+	mint, maxt          int64
+	partitionMngr       *partmgr.PartitionManager
 	performanceReporter *performance.MetricReporter
 }
 
