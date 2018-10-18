@@ -21,6 +21,7 @@ such restriction.
 package utils
 
 import (
+	"fmt"
 	"github.com/pkg/errors"
 	"strconv"
 	"strings"
@@ -31,6 +32,13 @@ const (
 	OneMinuteMs = 60 * 1000
 	OneHourMs   = 3600 * 1000
 	OneDayMs    = 24 * 3600 * 1000
+)
+
+var (
+	TimeFormats = []string{
+		time.RFC3339,
+		time.RFC3339Nano,
+	}
 )
 
 // Convert a "[0-9]+[mhd]" duration string (for example, "24h") to a
@@ -88,7 +96,7 @@ func Str2unixTime(timeString string) (int64, error) {
 			} else if sign == "+" {
 				return CurrentTimeInMillis() + int64(t), nil
 			} else {
-				return 0, errors.Wrapf(err, "Unsupported time format:", timeString)
+				return 0, errors.Wrapf(err, "Unsupported time format: %q", timeString)
 			}
 		} else {
 			return CurrentTimeInMillis(), nil
@@ -100,11 +108,14 @@ func Str2unixTime(timeString string) (int64, error) {
 		return int64(tint), nil
 	}
 
-	t, err := time.Parse(time.RFC3339, timeString)
-	if err != nil {
-		return 0, errors.Wrap(err, "Invalid time string - not an RFC 3339 time format.")
+	for _, format := range TimeFormats {
+		t, err := time.Parse(format, timeString)
+		if err == nil {
+			return t.Unix() * 1000, nil
+		}
 	}
-	return t.Unix() * 1000, nil
+
+	return 0, fmt.Errorf("unsupported time format - %q", timeString)
 }
 
 func CurrentTimeInMillis() int64 {

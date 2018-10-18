@@ -106,6 +106,17 @@ func (suite *testTimeSuite) TestStr2unixTimeWithNowPlusMinus() {
 	suite.Require().Equal(expectedDuration, endTime-startTime)
 }
 
+func (suite *testTimeSuite) TestStr2unixTimeFRC() {
+	// RFC3339
+	t, err := Str2unixTime("2018-10-04T15:09:36+03:00")
+	suite.Require().Nil(err)
+	suite.Require().True(t != 0)
+	// RFC3339Nano
+	t, err = Str2unixTime("2018-10-04T15:08:53.229364634+03:00")
+	suite.Require().True(t != 0)
+	suite.Require().Nil(err)
+}
+
 func TestTimeSuite(t *testing.T) {
 	suite.Run(t, new(testTimeSuite))
 }
