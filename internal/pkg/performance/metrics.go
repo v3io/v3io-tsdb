@@ -20,7 +20,6 @@ const (
 
 var instance *MetricReporter
 var once sync.Once
-var sampleInstance metrics.Sample
 
 const (
 	STDOUT = "stdout"
@@ -64,7 +63,6 @@ func ReporterInstance(writeTo string, reportPeriodically bool, reportIntervalSec
 			writer = os.Stdout
 		}
 
-		sampleInstance = metrics.NewUniformSample(reservoirSize)
 		instance = newMetricReporter(writer, reportPeriodically, reportIntervalSeconds, reportOnShutdown)
 	})
 	return instance
@@ -134,7 +132,7 @@ func (mr *MetricReporter) UpdateMeter(name string, count int64) {
 
 func (mr *MetricReporter) UpdateHistogram(name string, value int64) {
 	if mr.isRunning() {
-		histogram := metrics.GetOrRegisterHistogram(name, mr.registry, sampleInstance)
+		histogram := metrics.GetOrRegisterHistogram(name, mr.registry, metrics.NewUniformSample(reservoirSize))
 		histogram.Update(value)
 	}
 }

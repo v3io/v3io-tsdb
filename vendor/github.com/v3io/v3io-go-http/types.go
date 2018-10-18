@@ -30,6 +30,8 @@ type Request struct {
 
 	// pointer to container
 	requestResponse *RequestResponse
+
+	SendTimeNanoseconds int64
 }
 
 type Response struct {
