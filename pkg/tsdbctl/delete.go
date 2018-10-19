@@ -72,7 +72,7 @@ Notes:
 
 	cmd.Flags().BoolVarP(&commandeer.deleteAll, "all", "a", false,
 		"Delete the TSDB table, including its configuration and all content.")
-	cmd.Flags().BoolVarP(&commandeer.ignoreErrors, "ignore-errors", "i", false,
+	cmd.Flags().BoolVarP(&commandeer.ignoreErrors, "ignore-errors", "i", true,
 		"Ignore errors - continue deleting even if some steps fail.")
 	cmd.Flags().BoolVarP(&commandeer.force, "force", "f", false,
 		"Forceful deletion - don't display a delete-verification prompt.")
