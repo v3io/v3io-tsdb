@@ -6,13 +6,11 @@ import (
 
 // data and metadata passed to the query processor workers via a channel
 type qryResults struct {
-	frame     *dataFrame
-	part      *partGetter
-	name      string
-	fields    *map[string]interface{}
-	partIndex int
-	encoding  int8
-	columns   *map[string][]columnMeta
+	frame    *dataFrame
+	query    *partQuery
+	name     string
+	fields   map[string]interface{}
+	encoding int16
 }
 
 type dataFrame struct {
@@ -26,7 +24,7 @@ type dataFrame struct {
 
 }
 
-// columns metadata for applying various functions and grouping on data
+// columns metadata for applying various functions and grouping on data WIP
 type functionType int16
 
 type columnMeta struct {
