@@ -13,17 +13,6 @@ type qryResults struct {
 	encoding int16
 }
 
-type dataFrame struct {
-	lset        utils.Labels
-	hash        uint64
-	columnNames []string
-	rawColumns  []Series
-
-	// bucketColumns
-	// indexColumn
-
-}
-
 // columns metadata for applying various functions and grouping on data WIP
 type functionType int16
 

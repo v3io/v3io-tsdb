@@ -76,7 +76,7 @@ func (q *V3ioQuerier) SelectQry(params *SelectParams) (set SeriesSet, err error)
 			return
 		}
 
-		err = selectContext.start(parts, params)
+		set, err = selectContext.start(parts, params)
 		if err != nil {
 			set = nullSeriesSet{}
 			return

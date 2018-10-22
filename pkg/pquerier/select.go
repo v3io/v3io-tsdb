@@ -29,47 +29,49 @@ type selectQueryContext struct {
 	windows         []int
 
 	// TODO: create columns spec from select query params
-	columnsSpec *map[string][]columnMeta
+	columnsSpec  *map[string][]columnMeta
+	totalColumns int
 
 	disableAllAggr    bool
 	disableClientAggr bool
 
 	queries         []*partQuery
 	dataFrames      map[uint64]*dataFrame
+	frameList       []*dataFrame
 	requestChannels []chan *qryResults
 	wg              sync.WaitGroup
 }
 
-func (s *selectQueryContext) start(parts []*partmgr.DBPartition, params *SelectParams) error {
+func (s *selectQueryContext) start(parts []*partmgr.DBPartition, params *SelectParams) (*frameIterator, error) {
 
 	queries := make([]*partQuery, len(parts))
 	for i, part := range parts {
 		var qry *partQuery
 		qry, err := s.queryPartition(part)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		queries[i] = qry
 	}
 
 	err := s.startCollectors()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	for _, query := range queries {
 		err = s.processQueryResults(query)
 		if err != nil {
-			return err
+			return nil, err
 		}
 	}
 
 	// wait for Go routines to complete
 	s.wg.Wait()
 
-	// TODO: create result sets & iterators
+	frameIter := NewFrameIterator(s)
 
-	return nil
+	return frameIter, nil
 }
 
 // Query a single partition
@@ -202,6 +204,9 @@ func (s *selectQueryContext) processQueryResults(query *partQuery) error {
 		if !ok {
 			frame = &dataFrame{lset: lset, hash: hash}
 			// TODO: init dataframe columns ..
+
+			s.dataFrames[hash] = frame
+			s.frameList = append(s.frameList, frame)
 		}
 
 		results.frame = frame
