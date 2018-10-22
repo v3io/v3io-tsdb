@@ -131,17 +131,6 @@ func (s *selectQueryContext) queryPartition(partition *partmgr.DBPartition) (*pa
 	return newQuery, err
 }
 
-// TODO: replace with a real collector implementation
-func dummyCollector(ctx *selectQueryContext, index int) {
-	defer ctx.wg.Done()
-
-	fmt.Println("starting collector:", index)
-	time.Sleep(5 * time.Second)
-
-	// collector should have a loop waiting on the s.requestChannels[index] and processing requests
-	// once the chan is closed or a fin request arrived we exit
-}
-
 func (s *selectQueryContext) startCollectors() error {
 
 	s.requestChannels = make([]chan *qryResults, s.workers)

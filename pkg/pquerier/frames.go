@@ -94,6 +94,13 @@ func (d *dataFrame) Names() []string {
 	return names
 }
 
+func (d *dataFrame) ColumnAt(i int) (Column, error) {
+	if i >= d.Len() {
+		return nil, fmt.Errorf("index %d out of bounds [0:%d]", i, d.Len())
+	}
+	return d.columns[i], nil
+}
+
 func (d *dataFrame) Columns() []Column {
 	return d.columns
 }

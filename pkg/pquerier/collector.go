@@ -1,5 +1,10 @@
 package pquerier
 
+import (
+	"fmt"
+	"time"
+)
+
 /* main query flow logic
 
 fire GetItems to all partitions and tables
@@ -48,3 +53,14 @@ once collectors are done (wg.done) return SeriesSet (prom compatible) or FrameSe
 	will allow main flow to continue and serve the results, no locks are required
 
 */
+
+// TODO: replace with a real collector implementation
+func dummyCollector(ctx *selectQueryContext, index int) {
+	defer ctx.wg.Done()
+
+	fmt.Println("starting collector:", index)
+	time.Sleep(5 * time.Second)
+
+	// collector should have a loop waiting on the s.requestChannels[index] and processing requests
+	// once the chan is closed or a fin request arrived we exit
+}
