@@ -12,7 +12,7 @@ import (
 )
 
 const (
-	Version = 1
+	Version = 2
 )
 
 func NewSchema(v3ioCfg *config.V3ioConfig, samplesIngestionRate, aggregationGranularity, aggregatesList string) (*config.Schema, error) {

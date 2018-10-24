@@ -1,6 +1,8 @@
 package v3io
 
 import (
+	"time"
+
 	"github.com/nuclio/logger"
 	"github.com/valyala/fasthttp"
 )
@@ -9,6 +11,7 @@ type SyncContext struct {
 	logger     logger.Logger
 	httpClient *fasthttp.HostClient
 	clusterURL string
+	Timeout    time.Duration
 }
 
 func newSyncContext(parentLogger logger.Logger, clusterURL string) (*SyncContext, error) {
@@ -25,10 +28,9 @@ func newSyncContext(parentLogger logger.Logger, clusterURL string) (*SyncContext
 
 func (sc *SyncContext) sendRequest(request *fasthttp.Request, response *fasthttp.Response) error {
 
-	err := sc.httpClient.Do(request, response)
-	if err != nil {
-		return err
+	if sc.Timeout <= 0 {
+		return sc.httpClient.Do(request, response)
+	} else {
+		return sc.httpClient.DoTimeout(request, response, sc.Timeout)
 	}
-
-	return nil
 }

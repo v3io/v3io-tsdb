@@ -2,6 +2,7 @@ package v3io
 
 import (
 	"sync/atomic"
+	"time"
 
 	"github.com/nuclio/logger"
 )
@@ -123,11 +124,12 @@ func (c *Container) sendRequest(input interface{},
 	// create a request/response (TODO: from pool)
 	requestResponse := &RequestResponse{
 		Request: Request{
-			ID:           id,
-			container:    c,
-			Input:        input,
-			Context:      context,
-			responseChan: responseChan,
+			ID:                  id,
+			container:           c,
+			Input:               input,
+			Context:             context,
+			responseChan:        responseChan,
+			SendTimeNanoseconds: time.Now().UnixNano(),
 		},
 	}
 

@@ -161,7 +161,7 @@ func (mc *MetricsCache) metricsUpdateLoop(index int) {
 				}
 
 				if mc.updatesInFlight == 0 {
-					mc.logger.Info("Complete new update cycle - in-flight %d.\n", mc.updatesInFlight)
+					mc.logger.Debug("Complete new update cycle - in-flight %d.\n", mc.updatesInFlight)
 					mc.updatesComplete <- 0
 				}
 			case resp := <-mc.responseChan:
@@ -174,7 +174,7 @@ func (mc *MetricsCache) metricsUpdateLoop(index int) {
 					mc.updatesInFlight--
 					counter++
 					if counter%3000 == 0 {
-						mc.logger.Info("Handle response: inFly %d, Q %d", mc.updatesInFlight, mc.metricQueue.Length())
+						mc.logger.Debug("Handle response: inFly %d, Q %d", mc.updatesInFlight, mc.metricQueue.Length())
 					}
 					metric := resp.Context.(*MetricState)
 					mc.handleResponse(metric, resp, nonQueued)
