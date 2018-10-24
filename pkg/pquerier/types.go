@@ -47,6 +47,8 @@ type Series interface {
 	Iterator() SeriesIterator
 	// Unique key for sorting
 	GetKey() uint64
+	// Add more chunks to an existing series
+	AddChunks(results *qryResults)
 }
 
 // SeriesIterator iterates over the data of a time series.

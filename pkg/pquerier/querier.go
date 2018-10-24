@@ -83,7 +83,6 @@ func (q *V3ioQuerier) SelectQry(params *SelectParams) (set SeriesSet, err error)
 		}
 
 		// TODO: return a proper set
-		set = nullSeriesSet{}
 		return
 	})
 

@@ -1,7 +1,6 @@
 package pquerier
 
 import (
-	"fmt"
 	"github.com/nuclio/logger"
 	"github.com/v3io/v3io-go-http"
 	"github.com/v3io/v3io-tsdb/pkg/aggregate"
@@ -10,7 +9,6 @@ import (
 	"sort"
 	"strings"
 	"sync"
-	"time"
 )
 
 type selectQueryContext struct {
@@ -29,7 +27,7 @@ type selectQueryContext struct {
 	windows         []int
 
 	// TODO: create columns spec from select query params
-	columnsSpec  *map[string][]columnMeta
+	columnsSpec  map[string][]columnMeta
 	totalColumns int
 
 	disableAllAggr    bool
@@ -43,10 +41,9 @@ type selectQueryContext struct {
 }
 
 func (s *selectQueryContext) start(parts []*partmgr.DBPartition, params *SelectParams) (*frameIterator, error) {
-
+	s.dataFrames = make(map[uint64]*dataFrame)
 	queries := make([]*partQuery, len(parts))
 	for i, part := range parts {
-		var qry *partQuery
 		qry, err := s.queryPartition(part)
 		if err != nil {
 			return nil, err
@@ -66,9 +63,14 @@ func (s *selectQueryContext) start(parts []*partmgr.DBPartition, params *SelectP
 		}
 	}
 
+	for i := 0; i < s.workers; i++ {
+		close(s.requestChannels[i])
+	}
+
 	// wait for Go routines to complete
 	s.wg.Wait()
 
+	s.totalColumns = s.frameList[0].Len()
 	frameIter := NewFrameIterator(s)
 
 	return frameIter, nil
@@ -141,10 +143,9 @@ func (s *selectQueryContext) startCollectors() error {
 
 		// Increment the WaitGroup counter.
 		s.wg.Add(1)
-
-		go func() {
-			dummyCollector(s, i)
-		}()
+		go func(index int) {
+			rawCollector(s, index)
+		}(i)
 	}
 
 	return nil
@@ -191,9 +192,16 @@ func (s *selectQueryContext) processQueryResults(query *partQuery) error {
 		// find or create data frame
 		frame, ok := s.dataFrames[hash]
 		if !ok {
-			frame = &dataFrame{lset: lset, hash: hash}
+			frame = &dataFrame{lset: lset, hash: hash, isRawSeries: s.functions == ""}
 			// TODO: init dataframe columns ..
-
+			var numberOfColumns int64
+			if !frame.isRawSeries {
+				numberOfColumns = (s.maxt-s.mint)/s.step + 1
+			} else {
+				numberOfColumns = 100
+			}
+			frame.columns = make([]Column, 0, numberOfColumns)
+			frame.byName = make(map[string]int, numberOfColumns)
 			s.dataFrames[hash] = frame
 			s.frameList = append(s.frameList, frame)
 		}
@@ -252,7 +260,7 @@ func (s *partQuery) getItems(ctx *selectQueryContext, name string) error {
 }
 
 func (s *partQuery) Next() bool {
-	return false
+	return s.iter.Next()
 }
 
 func (s *partQuery) GetField(name string) interface{} {

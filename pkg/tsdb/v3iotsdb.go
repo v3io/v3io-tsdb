@@ -35,6 +35,7 @@ import (
 	"github.com/v3io/v3io-tsdb/pkg/utils"
 	pathUtil "path"
 	"time"
+	"github.com/v3io/v3io-tsdb/pkg/pquerier"
 )
 
 type V3ioAdapter struct {
@@ -191,6 +192,14 @@ func (a *V3ioAdapter) Querier(_ context.Context, mint, maxt int64) (*querier.V3i
 		return nil, errors.Errorf("End time '%d' is lower than start time '%d'.", maxt, mint)
 	}
 	return querier.NewV3ioQuerier(a.container, a.logger, mint, maxt, a.cfg, a.partitionMngr), nil
+}
+
+// Create a Querier interface, used for time-series queries
+func (a *V3ioAdapter) QuerierV2(_ context.Context, mint, maxt int64) (*pquerier.V3ioQuerier, error) {
+	if maxt < mint {
+		return nil, errors.Errorf("End time '%d' is lower than start time '%d'.", maxt, mint)
+	}
+	return pquerier.NewV3ioQuerier(a.container, a.logger, mint, maxt, a.cfg, a.partitionMngr), nil
 }
 
 func (a *V3ioAdapter) DeleteDB(deleteAll bool, ignoreErrors bool, fromTime int64, toTime int64) error {

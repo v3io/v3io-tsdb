@@ -64,3 +64,17 @@ func dummyCollector(ctx *selectQueryContext, index int) {
 	// collector should have a loop waiting on the s.requestChannels[index] and processing requests
 	// once the chan is closed or a fin request arrived we exit
 }
+
+func rawCollector(ctx *selectQueryContext, index int) {
+	defer ctx.wg.Done()
+
+	for res := range ctx.requestChannels[index] {
+		frameIndex, ok := res.frame.byName[res.name]
+		if ok {
+			res.frame.rawColumns[frameIndex].AddChunks(res)
+		} else {
+			res.frame.rawColumns = append(res.frame.rawColumns, NewRawSeries(res))
+			res.frame.byName[res.name] = len(res.frame.rawColumns) - 1
+		}
+	}
+}

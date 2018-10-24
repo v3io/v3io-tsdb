@@ -4,6 +4,7 @@ import (
 	json2 "encoding/json"
 	"fmt"
 	"github.com/v3io/v3io-tsdb/internal/pkg/performance"
+	"github.com/v3io/v3io-tsdb/pkg/chunkenc"
 	"github.com/v3io/v3io-tsdb/pkg/config"
 	. "github.com/v3io/v3io-tsdb/pkg/tsdb"
 	"github.com/v3io/v3io-tsdb/pkg/tsdb/tsdbtest/testutils"
@@ -15,6 +16,10 @@ import (
 	"testing"
 	"time"
 )
+
+const MinuteInMillis = 60 * 1000
+const HoursInMillis = 60 * MinuteInMillis
+const DaysInMillis = 24 * HoursInMillis
 
 type DataPoint struct {
 	Time  int64
@@ -240,4 +245,16 @@ func PrefixTablePath(tablePath string) string {
 		return tablePath
 	}
 	return path.Join(os.Getenv("TSDB_TEST_TABLE_PATH"), tablePath)
+}
+
+func IteratorToSlice(it chunkenc.Iterator) ([]DataPoint, error) {
+	var result []DataPoint
+	for it.Next() {
+		t, v := it.At()
+		if it.Err() != nil {
+			return nil, it.Err()
+		}
+		result = append(result, DataPoint{Time: t, Value: v})
+	}
+	return result, nil
 }

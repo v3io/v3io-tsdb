@@ -27,7 +27,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/v3io/v3io-go-http"
 	"github.com/v3io/v3io-tsdb/pkg/aggregate"
-	"github.com/v3io/v3io-tsdb/pkg/chunkenc"
 	"github.com/v3io/v3io-tsdb/pkg/config"
 	. "github.com/v3io/v3io-tsdb/pkg/tsdb"
 	"github.com/v3io/v3io-tsdb/pkg/tsdb/tsdbtest"
@@ -38,8 +37,7 @@ import (
 	"time"
 )
 
-const minuteInMillis = 60 * 1000
-const defaultStepMs = 5 * minuteInMillis // 5 minutes
+const defaultStepMs = 5 * tsdbtest.MinuteInMillis // 5 minutes
 
 func TestIngestData(t *testing.T) {
 	v3ioConfig, err := tsdbtest.LoadV3ioConfig()
@@ -267,10 +265,10 @@ func TestQueryData(t *testing.T) {
 		{desc: "Should ingest and query aggregates with empty bucket", metricName: "cpu",
 			labels: utils.LabelsFromStrings("os", "linux", "iguaz", "yesplease"),
 			data: []tsdbtest.DataPoint{{Time: 1537972278402, Value: 300.3},
-				{Time: 1537972278402 + 8*minuteInMillis, Value: 300.3},
-				{Time: 1537972278402 + 9*minuteInMillis, Value: 100.4}},
-			from:       1537972278402 - 5*minuteInMillis,
-			to:         1537972278402 + 10*minuteInMillis,
+				{Time: 1537972278402 + 8*tsdbtest.MinuteInMillis, Value: 300.3},
+				{Time: 1537972278402 + 9*tsdbtest.MinuteInMillis, Value: 100.4}},
+			from:       1537972278402 - 5*tsdbtest.MinuteInMillis,
+			to:         1537972278402 + 10*tsdbtest.MinuteInMillis,
 			step:       defaultStepMs,
 			aggregates: "count",
 			expected: map[string][]tsdbtest.DataPoint{
@@ -280,10 +278,10 @@ func TestQueryData(t *testing.T) {
 		{desc: "Should ingest and query aggregates with few empty buckets in a row", metricName: "cpu",
 			labels: utils.LabelsFromStrings("os", "linux", "iguaz", "yesplease"),
 			data: []tsdbtest.DataPoint{{Time: 1537972278402, Value: 300.3},
-				{Time: 1537972278402 + 16*minuteInMillis, Value: 300.3},
-				{Time: 1537972278402 + 17*minuteInMillis, Value: 100.4}},
-			from:       1537972278402 - 5*minuteInMillis,
-			to:         1537972278402 + 18*minuteInMillis,
+				{Time: 1537972278402 + 16*tsdbtest.MinuteInMillis, Value: 300.3},
+				{Time: 1537972278402 + 17*tsdbtest.MinuteInMillis, Value: 100.4}},
+			from:       1537972278402 - 5*tsdbtest.MinuteInMillis,
+			to:         1537972278402 + 18*tsdbtest.MinuteInMillis,
 			step:       defaultStepMs,
 			aggregates: "count",
 			expected: map[string][]tsdbtest.DataPoint{
@@ -336,7 +334,7 @@ func testQueryDataCase(test *testing.T, v3ioConfig *config.V3ioConfig,
 			test.Fatalf("Failed to query data series. reason: %v", iter.Err())
 		}
 
-		actual, err := iteratorToSlice(iter)
+		actual, err := tsdbtest.IteratorToSlice(iter)
 		if err != nil {
 			test.Fatal(err)
 		}
@@ -453,7 +451,7 @@ func testQueryDataOverlappingWindowCase(test *testing.T, v3ioConfig *config.V3io
 			test.Fatalf("Failed to query data series. reason: %v", iter.Err())
 		}
 
-		actual, err := iteratorToSlice(iter)
+		actual, err := tsdbtest.IteratorToSlice(iter)
 		if err != nil {
 			test.Fatal(err)
 		}
@@ -481,12 +479,12 @@ func TestIgnoreNaNWhenSeekingAggSeries(t *testing.T) {
 	baseTime := int64(1532940510000)
 	userLabels := utils.LabelsFromStrings("os", "linux", "iguaz", "yesplease")
 	data := []tsdbtest.DataPoint{{Time: baseTime, Value: 300.3},
-		{Time: baseTime + minuteInMillis, Value: 300.3},
-		{Time: baseTime + 2*minuteInMillis, Value: 100.4},
-		{Time: baseTime + 5*minuteInMillis, Value: 200.0}}
-	from := int64(baseTime - 60*minuteInMillis)
-	to := int64(baseTime + 6*minuteInMillis)
-	step := int64(2 * minuteInMillis)
+		{Time: baseTime + tsdbtest.MinuteInMillis, Value: 300.3},
+		{Time: baseTime + 2*tsdbtest.MinuteInMillis, Value: 100.4},
+		{Time: baseTime + 5*tsdbtest.MinuteInMillis, Value: 200.0}}
+	from := int64(baseTime - 60*tsdbtest.MinuteInMillis)
+	to := int64(baseTime + 6*tsdbtest.MinuteInMillis)
+	step := int64(2 * tsdbtest.MinuteInMillis)
 	agg := "avg"
 	expected := map[string][]tsdbtest.DataPoint{
 		"avg": {{baseTime, 300.3},
@@ -617,16 +615,4 @@ func TestDeleteTSDB(t *testing.T) {
 	if res := <-responseChan; res.Error == nil {
 		t.Fatal("Did not delete TSDB properly")
 	}
-}
-
-func iteratorToSlice(it chunkenc.Iterator) ([]tsdbtest.DataPoint, error) {
-	var result []tsdbtest.DataPoint
-	for it.Next() {
-		t, v := it.At()
-		if it.Err() != nil {
-			return nil, it.Err()
-		}
-		result = append(result, tsdbtest.DataPoint{Time: t, Value: v})
-	}
-	return result, nil
 }

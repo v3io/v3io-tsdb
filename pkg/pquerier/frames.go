@@ -16,7 +16,7 @@ type frameIterator struct {
 
 // create new frame set iterator, frame iter has a SeriesSet interface (for Prometheus) plus columnar interfaces
 func NewFrameIterator(ctx *selectQueryContext) *frameIterator {
-	return &frameIterator{ctx: ctx, columnNum: ctx.totalColumns}
+	return &frameIterator{ctx: ctx, columnNum: ctx.totalColumns, setIndex: 0, seriesIndex: -1}
 }
 
 // advance to the next data frame
