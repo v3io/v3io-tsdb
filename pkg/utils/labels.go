@@ -122,6 +122,9 @@ func (ls Labels) Hash() uint64 {
 	b := make([]byte, 0, 1024)
 
 	for _, v := range ls {
+		if v.Name == "__name__" {
+			continue
+		}
 		b = append(b, v.Name...)
 		b = append(b, sep)
 		b = append(b, v.Value...)
