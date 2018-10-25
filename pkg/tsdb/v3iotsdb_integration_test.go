@@ -619,6 +619,91 @@ func TestDeleteTSDB(t *testing.T) {
 	}
 }
 
+func TestDeleteTable(t *testing.T) {
+	v3ioConfig, err := tsdbtest.LoadV3ioConfig()
+	if err != nil {
+		t.Fatalf("unable to load configuration. Error: %v", err)
+	}
+
+	testCases := []struct {
+		desc         string
+		deleteFrom   int64
+		deleteTo     int64
+		deleteAll	 bool
+		ignorErrors  bool
+		data         []tsdbtest.DataPoint
+		expected     map[string][]tsdbtest.DataPoint
+		ignoreReason string
+		expectFail   bool
+	}{
+		{desc: "Should delete all table",
+			deleteFrom:     1522222999,
+			deleteTo:       1544444000,
+			ignorErrors:	true,
+			data:     		[]tsdbtest.DataPoint{{Time: 1522222222, Value: 222.2},
+												{Time: 1533333333, Value: 333.3},
+												{Time: 1544444444, Value: 444.4}},
+			expected:		map[string][]tsdbtest.DataPoint{},
+			expectFail: 	true,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.desc, func(t *testing.T) {
+			if test.ignoreReason != "" {
+				t.Skip(test.ignoreReason)
+			}
+			testDeleteTSDBCase(t, v3ioConfig, "metricToDelete", utils.LabelsFromStrings("os","linux"),
+				test.data, test.deleteFrom, test.deleteTo, test.ignorErrors, test.expected, test.expectFail)
+		})
+	}
+}
+
+
+func testDeleteTSDBCase(test *testing.T, v3ioConfig *config.V3ioConfig, metricsName string, userLabels []utils.Label,
+	data []tsdbtest.DataPoint, deleteFrom int64, deleteTo int64, ignoreErrors bool,
+	expected map[string][]tsdbtest.DataPoint, expectFail bool) {
+
+
+	adapter, teardown := tsdbtest.SetUpWithData(test, v3ioConfig, metricsName, data, userLabels)
+	defer teardown()
+
+	if err := adapter.DeleteDB(false, ignoreErrors, deleteFrom, deleteTo); err != nil {
+		test.Fatalf("Failed to delete DB on teardown. reason: %s", err)
+	}
+
+	qry, err := adapter.Querier(nil, 0, 1999940510)
+	if err != nil {
+		if expectFail {
+			return
+		} else {
+			test.Fatalf("Failed to create Querier. reason: %v", err)
+		}
+	}
+
+	set, err := qry.Select(metricsName, "", 0, "")
+	if err != nil {
+		test.Fatalf("Failed to run Select. reason: %v", err)
+	}
+
+	set.Next()
+	if set.Err() != nil {
+		test.Fatalf("Failed to query metric. reason: %v", set.Err())
+	}
+
+	series := set.At()
+	iter := series.Iterator()
+	if iter.Err() != nil {
+		test.Fatalf("Failed to query data series. reason: %v", iter.Err())
+	}
+
+	actual, err := iteratorToSlice(iter)
+	if err != nil {
+		test.Fatal(err)
+	}
+	assert.ElementsMatch(test, expected["1"], actual)
+}
+
 func iteratorToSlice(it chunkenc.Iterator) ([]tsdbtest.DataPoint, error) {
 	var result []tsdbtest.DataPoint
 	for it.Next() {
