@@ -35,11 +35,12 @@ type V3ioQuerier struct {
 }
 
 type SelectParams struct {
-	Name      string
-	Functions string
-	Step      int64
-	Windows   []int
-	Filter    string
+	Name        string
+	Functions   string
+	Step        int64
+	Windows     []int
+	Filter      string
+	columnSpecs []columnMeta
 }
 
 // Base query function

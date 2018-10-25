@@ -78,3 +78,21 @@ func rawCollector(ctx *selectQueryContext, index int) {
 		}
 	}
 }
+
+func aggregateCollector(ctx *selectQueryContext, index int) {
+	defer ctx.wg.Done()
+
+	//for res := range ctx.requestChannels[index] {
+	//frameIndex, ok := res.frame.byName[res.name]
+	//if ok {
+	//	// res.frame.columns
+	//} else {
+	//	res.frame.columns = append(res.frame.columns, &dataColumn{})
+	//	res.frame.byName[res.name] = len(res.frame.columns) - 1
+	//
+	//	if ctx.isAllColumns {
+	//		ctx.AddColumnSpecByWildcard(res.name)
+	//	}
+	//}
+	//}
+}

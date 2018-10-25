@@ -222,3 +222,23 @@ func (a AggregatesList) Clear() {
 		aggr.Clear()
 	}
 }
+
+func GetHiddenAggregates(mask AggrType, requestedAggregates []AggrType) []AggrType {
+	var hiddenAggregates []AggrType
+
+	for _, aggr := range rawAggregates {
+		if aggr&mask == aggr && !contains(requestedAggregates, aggr) {
+			hiddenAggregates = append(hiddenAggregates, aggr)
+		}
+	}
+	return hiddenAggregates
+}
+
+func contains(list []AggrType, item AggrType) bool {
+	for _, v := range list {
+		if v == item {
+			return true
+		}
+	}
+	return false
+}

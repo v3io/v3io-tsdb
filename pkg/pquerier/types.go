@@ -1,6 +1,7 @@
 package pquerier
 
 import (
+	"github.com/v3io/v3io-tsdb/pkg/aggregate"
 	"github.com/v3io/v3io-tsdb/pkg/utils"
 )
 
@@ -13,15 +14,17 @@ type qryResults struct {
 	encoding int16
 }
 
-// columns metadata for applying various functions and grouping on data WIP
-type functionType int16
-
 type columnMeta struct {
+	metric         string
 	alias          string
-	function       functionType
+	function       aggregate.AggrType
 	functionParams []interface{}
 	interpolator   int8
+	isHidden       bool // real columns = columns the user has specifically requested. Hidden columns = columns needed to calculate the real columns but don't show to the user
 }
+
+// if a user specifies he wants all metrics
+func (c *columnMeta) isWildcard() bool { return c.metric == "*" }
 
 // SeriesSet contains a set of series.
 type SeriesSet interface {

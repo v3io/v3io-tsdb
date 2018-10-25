@@ -30,12 +30,12 @@ import (
 	"github.com/v3io/v3io-tsdb/pkg/appender"
 	"github.com/v3io/v3io-tsdb/pkg/config"
 	"github.com/v3io/v3io-tsdb/pkg/partmgr"
+	"github.com/v3io/v3io-tsdb/pkg/pquerier"
 	"github.com/v3io/v3io-tsdb/pkg/querier"
 	"github.com/v3io/v3io-tsdb/pkg/tsdb/schema"
 	"github.com/v3io/v3io-tsdb/pkg/utils"
 	pathUtil "path"
 	"time"
-	"github.com/v3io/v3io-tsdb/pkg/pquerier"
 )
 
 type V3ioAdapter struct {

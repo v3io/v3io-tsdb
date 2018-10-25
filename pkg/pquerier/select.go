@@ -2,6 +2,7 @@ package pquerier
 
 import (
 	"github.com/nuclio/logger"
+	"github.com/pkg/errors"
 	"github.com/v3io/v3io-go-http"
 	"github.com/v3io/v3io-tsdb/pkg/aggregate"
 	"github.com/v3io/v3io-tsdb/pkg/partmgr"
@@ -10,6 +11,8 @@ import (
 	"strings"
 	"sync"
 )
+
+const columnWildcard = "*"
 
 type selectQueryContext struct {
 	logger    logger.Logger
@@ -27,8 +30,10 @@ type selectQueryContext struct {
 	windows         []int
 
 	// TODO: create columns spec from select query params
-	columnsSpec  map[string][]columnMeta
-	totalColumns int
+	columnsSpec         []columnMeta
+	columnsSpecByMetric map[string][]columnMeta
+	isAllColumns        bool
+	totalColumns        int
 
 	disableAllAggr    bool
 	disableClientAggr bool
@@ -43,6 +48,13 @@ type selectQueryContext struct {
 func (s *selectQueryContext) start(parts []*partmgr.DBPartition, params *SelectParams) (*frameIterator, error) {
 	s.dataFrames = make(map[uint64]*dataFrame)
 	queries := make([]*partQuery, len(parts))
+
+	s.functions = params.Functions
+	err := s.createColumnSpecs(params)
+	if err != nil {
+		return nil, err
+	}
+
 	for i, part := range parts {
 		qry, err := s.queryPartition(part)
 		if err != nil {
@@ -51,7 +63,7 @@ func (s *selectQueryContext) start(parts []*partmgr.DBPartition, params *SelectP
 		queries[i] = qry
 	}
 
-	err := s.startCollectors()
+	err = s.startCollectors()
 	if err != nil {
 		return nil, err
 	}
@@ -213,6 +225,83 @@ func (s *selectQueryContext) processQueryResults(query *partQuery) error {
 	}
 
 	return query.Err()
+}
+
+func (s *selectQueryContext) createColumnSpecs(params *SelectParams) error {
+	s.columnsSpec = []columnMeta{}
+	s.columnsSpecByMetric = make(map[string][]columnMeta)
+
+	// Directly getting the column specs
+	if params.columnSpecs != nil && len(params.columnSpecs) > 0 {
+		s.columnsSpec = params.columnSpecs
+		// Creating map of column specs by metric name
+		for _, col := range params.columnSpecs {
+			_, ok := s.columnsSpecByMetric[col.metric]
+			if !ok {
+				s.columnsSpecByMetric[col.metric] = []columnMeta{}
+			}
+			s.columnsSpecByMetric[col.metric] = append(s.columnsSpecByMetric[col.metric], col)
+			s.isAllColumns = s.isAllColumns || col.metric == columnWildcard
+		}
+
+		// Adding hidden columns if needed
+		for metric, cols := range s.columnsSpecByMetric {
+			var metricMask aggregate.AggrType
+			var aggregates []aggregate.AggrType
+			for _, colSpec := range cols {
+				metricMask |= colSpec.function
+				aggregates = append(aggregates, colSpec.function)
+			}
+
+			hiddenColumns := aggregate.GetHiddenAggregates(metricMask, aggregates)
+			for _, hiddenAggr := range hiddenColumns {
+				hiddenCol := columnMeta{metric: metric, function: hiddenAggr, isHidden: true}
+				s.columnsSpec = append(s.columnsSpec, hiddenCol)
+				s.columnsSpecByMetric[metric] = append(cols, hiddenCol)
+			}
+		}
+		// Create column specs from metric name and aggregation
+	} else {
+		if params.Functions == "" {
+			s.columnsSpec = append(s.columnsSpec, columnMeta{metric: params.Name})
+		} else {
+			mask, aggregates, err := aggregate.StrToAggr(params.Functions)
+			if err != nil {
+				return err
+			}
+			for _, aggr := range aggregates {
+				s.columnsSpec = append(s.columnsSpec, columnMeta{metric: params.Name, function: aggr})
+			}
+
+			hiddenColumns := aggregate.GetHiddenAggregates(mask, aggregates)
+			for _, hiddenAggr := range hiddenColumns {
+				s.columnsSpec = append(s.columnsSpec, columnMeta{metric: params.Name, function: hiddenAggr, isHidden: true})
+			}
+		}
+
+		s.columnsSpecByMetric[params.Name] = s.columnsSpec
+		s.isAllColumns = params.Name == columnWildcard
+	}
+
+	if len(s.columnsSpec) == 0 {
+		return errors.Errorf("no Columns were specified for query: %v", params)
+	}
+	return nil
+}
+
+func (s *selectQueryContext) AddColumnSpecByWildcard(metricName string) {
+	_, ok := s.columnsSpecByMetric[metricName]
+	if !ok {
+		wantedColumns := s.columnsSpecByMetric[columnWildcard]
+		newCols := make([]columnMeta, len(wantedColumns))
+		for _, col := range wantedColumns {
+			newCol := col
+			newCol.metric = metricName
+			newCols = append(newCols, newCol)
+		}
+		s.columnsSpec = append(s.columnsSpec, newCols...)
+		s.columnsSpecByMetric[metricName] = newCols
+	}
 }
 
 // query object for a single partition (or name and partition in future optimizations)
