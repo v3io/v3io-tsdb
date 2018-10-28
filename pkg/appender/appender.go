@@ -95,6 +95,11 @@ func (m *MetricState) error() error {
 	return m.err
 }
 
+type cacheKey struct {
+	name string
+	hash uint64
+}
+
 // store the state and metadata for all the metrics
 type MetricsCache struct {
 	cfg           *config.V3ioConfig
@@ -114,8 +119,8 @@ type MetricsCache struct {
 	newUpdates      chan int
 
 	lastMetric     uint64
-	cacheMetricMap map[uint64]*MetricState // TODO: maybe use hash as key & combine w ref
-	cacheRefMap    map[uint64]*MetricState // TODO: maybe turn to list + free list, periodically delete old matrics
+	cacheMetricMap map[cacheKey]*MetricState // TODO: maybe use hash as key & combine w ref
+	cacheRefMap    map[uint64]*MetricState   // TODO: maybe turn to list + free list, periodically delete old matrics
 
 	NameLabelMap map[string]bool // temp store all lable names
 
@@ -127,7 +132,7 @@ func NewMetricsCache(container *v3io.Container, logger logger.Logger, cfg *confi
 	partMngr *partmgr.PartitionManager) *MetricsCache {
 
 	newCache := MetricsCache{container: container, logger: logger, cfg: cfg, partitionMngr: partMngr}
-	newCache.cacheMetricMap = map[uint64]*MetricState{}
+	newCache.cacheMetricMap = map[cacheKey]*MetricState{}
 	newCache.cacheRefMap = map[uint64]*MetricState{}
 
 	newCache.responseChan = make(chan *v3io.Response, channelSize)
@@ -161,11 +166,11 @@ func (mc *MetricsCache) Start() error {
 }
 
 // return metric struct by key
-func (mc *MetricsCache) getMetric(hash uint64) (*MetricState, bool) {
+func (mc *MetricsCache) getMetric(name string, hash uint64) (*MetricState, bool) {
 	mc.mtx.RLock()
 	defer mc.mtx.RUnlock()
 
-	metric, ok := mc.cacheMetricMap[hash]
+	metric, ok := mc.cacheMetricMap[cacheKey{name, hash}]
 	return metric, ok
 }
 
@@ -177,7 +182,7 @@ func (mc *MetricsCache) addMetric(hash uint64, name string, metric *MetricState)
 	mc.lastMetric++
 	metric.refId = mc.lastMetric
 	mc.cacheRefMap[mc.lastMetric] = metric
-	mc.cacheMetricMap[hash] = metric
+	mc.cacheMetricMap[cacheKey{name, hash}] = metric
 	if _, ok := mc.NameLabelMap[name]; !ok {
 		metric.newName = true
 		mc.NameLabelMap[name] = true
@@ -207,7 +212,7 @@ func (mc *MetricsCache) Add(lset utils.LabelsIfc, t int64, v interface{}) (uint6
 	}
 
 	name, key, hash := lset.GetKey()
-	metric, ok := mc.getMetric(hash)
+	metric, ok := mc.getMetric(name, hash)
 
 	if !ok {
 		metric = &MetricState{Lset: lset, key: key, name: name, hash: hash}

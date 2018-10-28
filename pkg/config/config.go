@@ -75,6 +75,8 @@ type V3ioConfig struct {
 	Username       string `json:"username,omitempty"`
 	Password       string `json:"password,omitempty"`
 
+	HttpTimeout string `json:"httpTimeout,omitempty"`
+
 	// Disabled = true disables the V3IO TSDB configuration in Prometheus and
 	// enables the internal Prometheus TSDB instead
 	Disabled bool `json:"disabled,omitempty"`
