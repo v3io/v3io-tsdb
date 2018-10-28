@@ -216,6 +216,12 @@ func GetOrLoadFromStruct(cfg *V3ioConfig) (*V3ioConfig, error) {
 	return instance, nil
 }
 
+// Update the defaults when using an existing configuration structure (custom configuration)
+func WithDefaults(cfg *V3ioConfig) (*V3ioConfig) {
+	initDefaults(cfg)
+	return cfg
+}
+
 // Create new configuration structure instance based on given instance.
 // All matching attributes within result structure will be overwritten with values of newCfg
 func (currentCfg *V3ioConfig) Merge(newCfg *V3ioConfig) (*V3ioConfig, error) {

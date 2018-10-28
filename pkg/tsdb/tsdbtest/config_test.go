@@ -127,7 +127,7 @@ func testGetV3ioConfigPathCase(t *testing.T, expected string, setup func() func(
 	assert.Equal(t, expected, path)
 }
 
-func TestUpdateConfig(t *testing.T) {
+func TestMergeConfig(t *testing.T) {
 	defaultCfg, err := config.GetOrDefaultConfig()
 	if err != nil {
 		t.Fatal("Failed to get default configuration", err)
@@ -163,4 +163,31 @@ func TestUpdateConfig(t *testing.T) {
 	assert.Equal(t, snapshot.TablePath, defaultCfg.TablePath)
 	assert.Equal(t, snapshot.MetricsReporter.ReportOnShutdown, defaultCfg.MetricsReporter.ReportOnShutdown)
 	assert.Equal(t, snapshot.MetricsReporter.RepotInterval, defaultCfg.MetricsReporter.RepotInterval)
+}
+
+func TestWithDefaults(t *testing.T) {
+	myCfg := &config.V3ioConfig{
+		BatchSize: 1024,
+		TablePath: "test-my-table",
+		MetricsReporter: config.MetricsReporterConfig{
+			ReportOnShutdown:   true,
+			RepotInterval:      180,
+			ReportPeriodically: true,
+		},
+	}
+
+	updatedCfg := config.WithDefaults(myCfg)
+
+	// Make sure it didn't override anything
+	assert.Equal(t, updatedCfg.BatchSize, myCfg.BatchSize)
+	assert.Equal(t, updatedCfg.TablePath, myCfg.TablePath)
+	assert.Equal(t, updatedCfg.MetricsReporter.ReportPeriodically, myCfg.MetricsReporter.ReportPeriodically)
+	assert.Equal(t, updatedCfg.MetricsReporter.RepotInterval, myCfg.MetricsReporter.RepotInterval)
+	assert.Equal(t, updatedCfg.MetricsReporter.ReportOnShutdown, myCfg.MetricsReporter.ReportOnShutdown)
+
+	// and default value is set for ShardingBucketsCount
+	assert.Equal(t, updatedCfg.ShardingBucketsCount, config.DefaultShardingBucketsCount)
+
+	// WithDefaults method does not create new configuration struct, therefore result object has the same address as myCfg
+	assert.Equal(t, myCfg, updatedCfg)
 }
