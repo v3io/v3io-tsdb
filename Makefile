@@ -10,6 +10,7 @@ endif
 
 GOOS ?= $(shell go env GOOS)
 GOARCH ?= $(shell go env GOARCH)
+GOPATH ?= $(shell go env GOPATH)
 CGO_ENABLED ?= $(shell go env CGO_ENABLED)
 GOHOSTOS ?= $(shell go env GOHOSTOS)
 
