@@ -10,8 +10,13 @@ endif
 
 GOOS ?= $(shell go env GOOS)
 GOARCH ?= $(shell go env GOARCH)
+CGO_ENABLED ?= $(shell go env CGO_ENABLED)
 
 TSDBCTL_BIN_NAME := tsdbctl-$(GIT_REVISION)-$(GOOS)-$(GOARCH)
+
+ifneq ($(CGO_ENABLED), 1)
+	TSDBCTL_BIN_NAME := $(TSDBCTL_BIN_NAME)-no-cgo
+endif
 
 .PHONY: get
 get:
