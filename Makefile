@@ -11,20 +11,8 @@ endif
 GOOS ?= $(shell go env GOOS)
 GOARCH ?= $(shell go env GOARCH)
 GOPATH ?= $(shell go env GOPATH)
-CGO_ENABLED ?= $(shell go env CGO_ENABLED)
-GOHOSTOS ?= $(shell go env GOHOSTOS)
 
 TSDBCTL_BIN_NAME := tsdbctl-$(GIT_REVISION)-$(GOOS)-$(GOARCH)
-
-ifeq ($(GOHOSTOS), $(GOOS))
-    ifeq ($(CGO_ENABLED), 0)
-        TSDBCTL_BIN_NAME := $(TSDBCTL_BIN_NAME)-no-cgo
-    endif
-else
-    ifeq ($(CGO_ENABLED), 1)
-        $(error CGO_ENABLED=$(CGO_ENABLED) is unsupported. Reason: The host OS [$(GOHOSTOS)] doesn't equal to target OS [$(GOOS)])
-    endif
-endif
 
 .PHONY: get
 get:
@@ -44,7 +32,7 @@ bench: get
 
 .PHONY: build
 build: get
-	go build -v -o "$(GOPATH)/bin/$(TSDBCTL_BIN_NAME)" ./cmd/tsdbctl
+	CGO_ENABLED=0 go build -v -o "$(GOPATH)/bin/$(TSDBCTL_BIN_NAME)" ./cmd/tsdbctl
 
 .PHONY: lint
 lint:
