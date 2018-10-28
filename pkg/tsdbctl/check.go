@@ -135,13 +135,6 @@ func (cc *checkCommandeer) check() error {
 			return errors.Wrapf(err, "failed to check using object path '%s'", cc.objPath)
 		}
 		respChans = []chan *v3io.Response{respChan}
-		objPath := path.Join("/", tablePath, cc.objPath)
-		allAttrs := append(cc.attrs, "__name", "_name", "_lset", "_maxtime")
-		input := v3io.GetItemInput{Path: objPath, AttributeNames: allAttrs}
-		_, err = container.GetItem(&input, nil, respChan)
-		if err != nil {
-			return errors.Wrap(err, "failed to send GetItem request")
-		}
 	} else {
 		respChans, err = cc.checkByName(container, tablePath)
 		if err != nil {
