@@ -1,6 +1,7 @@
 package pquerier
 
 import (
+	"fmt"
 	"github.com/v3io/v3io-tsdb/pkg/aggregate"
 	"github.com/v3io/v3io-tsdb/pkg/utils"
 )
@@ -14,6 +15,16 @@ type qryResults struct {
 	encoding int16
 }
 
+func (q *qryResults) IsRawQuery() bool { return q.query.aggrParams == nil }
+
+func (q *qryResults) IsServerAggregates() bool {
+	return q.query.aggrParams != nil && q.query.aggrParams.CanAggregate(q.query.partition.AggrType())
+}
+
+func (q *qryResults) IsClientAggregates() bool {
+	return q.query.aggrParams != nil && !q.query.aggrParams.CanAggregate(q.query.partition.AggrType())
+}
+
 type columnMeta struct {
 	metric         string
 	alias          string
@@ -25,6 +36,9 @@ type columnMeta struct {
 
 // if a user specifies he wants all metrics
 func (c *columnMeta) isWildcard() bool { return c.metric == "*" }
+func (c *columnMeta) getColumnName() string {
+	return fmt.Sprintf("%v(%v)", c.function.String(), c.metric)
+}
 
 // SeriesSet contains a set of series.
 type SeriesSet interface {
@@ -50,8 +64,6 @@ type Series interface {
 	Iterator() SeriesIterator
 	// Unique key for sorting
 	GetKey() uint64
-	// Add more chunks to an existing series
-	AddChunks(results *qryResults)
 }
 
 // SeriesIterator iterates over the data of a time series.

@@ -65,22 +65,36 @@ func dummyCollector(ctx *selectQueryContext, index int) {
 	// once the chan is closed or a fin request arrived we exit
 }
 
-func rawCollector(ctx *selectQueryContext, index int) {
+// Main collector which processes query results from a channel and then dispatches them according to query type.
+// Query types: raw data, server-side aggregates, client-side aggregates
+func mainCollector(ctx *selectQueryContext, index int) {
 	defer ctx.wg.Done()
 
 	for res := range ctx.requestChannels[index] {
-		frameIndex, ok := res.frame.byName[res.name]
-		if ok {
-			res.frame.rawColumns[frameIndex].AddChunks(res)
-		} else {
-			res.frame.rawColumns = append(res.frame.rawColumns, NewRawSeries(res))
-			res.frame.byName[res.name] = len(res.frame.rawColumns) - 1
+		if res.IsRawQuery() {
+			rawCollector(res)
+		} else if res.IsServerAggregates() {
+
+		} else if res.IsClientAggregates() {
+
 		}
 	}
 }
 
-func aggregateCollector(ctx *selectQueryContext, index int) {
-	defer ctx.wg.Done()
+func rawCollector(res *qryResults) {
+	frameIndex, ok := res.frame.byName[res.name]
+	if ok {
+		res.frame.rawColumns[frameIndex].(*V3ioRawSeries).AddChunks(res)
+	} else {
+		res.frame.rawColumns = append(res.frame.rawColumns, NewRawSeries(res))
+		res.frame.byName[res.name] = len(res.frame.rawColumns) - 1
+	}
+}
+
+func aggregateCollector(ctx *selectQueryContext, res *qryResults) {
+	for _, col := range ctx.columnsSpec {
+		_ = res.frame.byName[col.getColumnName()]
+	}
 
 	//for res := range ctx.requestChannels[index] {
 	//frameIndex, ok := res.frame.byName[res.name]

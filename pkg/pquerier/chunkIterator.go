@@ -10,7 +10,6 @@ import (
 // Chunk-list series iterator
 type rawChunkIterator struct {
 	mint, maxt int64
-	err        error
 
 	chunks []chunkenc.Chunk
 
@@ -18,6 +17,9 @@ type rawChunkIterator struct {
 	chunksMax  []int64
 	iter       chunkenc.Iterator
 	log        logger.Logger
+
+	prevT int64
+	prevV float64
 }
 
 func newRawChunkIterator(item qryResults, log logger.Logger) SeriesIterator {
@@ -64,6 +66,7 @@ func (it *rawChunkIterator) Seek(t int64) bool {
 	}
 
 	for {
+		it.prevT, it.prevV = it.At()
 		if it.iter.Next() {
 			t0, _ := it.iter.At()
 			if t0 > it.maxt {
@@ -94,6 +97,7 @@ func (it *rawChunkIterator) Seek(t int64) bool {
 
 // Move to the next iterator item
 func (it *rawChunkIterator) Next() bool {
+	it.prevT, it.prevV = it.At()
 	if it.iter.Next() {
 		t, _ := it.iter.At()
 		if t < it.mint {
@@ -160,6 +164,8 @@ func (it *rawChunkIterator) AddChunks(item qryResults) {
 	it.chunksMax = append(it.chunksMax, chunksMax...)
 }
 
+func (it *rawChunkIterator) PeakBack() (t int64, v float64) { return it.prevT, it.prevV }
+
 // Null-series iterator
 type nullSeriesIterator struct {
 	err error
@@ -173,7 +179,7 @@ func (s nullSeriesIterator) Err() error               { return s.err }
 func NewRawSeries(results *qryResults) Series {
 	newSeries := V3ioRawSeries{fields: results.fields}
 	newSeries.initLabels()
-	newSeries.iter = newRawChunkIterator(*results, nil)
+	newSeries.iter = newBucketedRawChunkIterator(*results, nil)
 	return &newSeries
 }
 
@@ -197,7 +203,7 @@ func (s *V3ioRawSeries) GetKey() uint64 {
 func (s *V3ioRawSeries) Iterator() SeriesIterator { return s.iter }
 
 func (s *V3ioRawSeries) AddChunks(results *qryResults) {
-	s.iter.(*rawChunkIterator).AddChunks(*results)
+	s.iter.(*bucketedRawChunkIterator).AddChunks(results)
 }
 
 // Initialize the label set from _lset and _name attributes
@@ -225,4 +231,59 @@ func (s *V3ioRawSeries) initLabels() {
 	}
 
 	s.lset = lset
+}
+
+// Chunk-list series iterator
+type bucketedRawChunkIterator struct {
+	iter          SeriesIterator
+	log           logger.Logger
+	mint, step    int64
+	currentBucket int
+}
+
+func newBucketedRawChunkIterator(item qryResults, log logger.Logger) SeriesIterator {
+	newIterator := bucketedRawChunkIterator{log: log, step: item.query.step, mint: item.query.mint, currentBucket: -1}
+	newIterator.iter = newRawChunkIterator(item, log)
+
+	return &newIterator
+}
+
+// Advance the iterator to the specified chunk and time
+func (it *bucketedRawChunkIterator) Seek(t int64) bool {
+	return it.iter.Seek(t)
+}
+
+// Move to the next iterator item
+func (it *bucketedRawChunkIterator) Next() bool {
+	if it.step != 0 {
+		it.currentBucket++
+		return it.iter.Seek(it.mint + it.step*int64(it.currentBucket))
+	} else {
+		return it.iter.Next()
+	}
+}
+
+// Read the time and value at the current location
+func (it *bucketedRawChunkIterator) At() (int64, float64) {
+	if it.step != 0 {
+		prevT, prevV := it.iter.(*rawChunkIterator).PeakBack()
+		nextT, nextV := it.iter.At()
+		if nextT-it.currentBucketTime() > it.step {
+			it.currentBucket = int((nextT - it.mint) / it.step)
+		}
+		interpolatedT, interpolatedV := GetInterpolateFunc(interpolateNext)(prevT, nextT, it.currentBucketTime(), prevV, nextV)
+		return interpolatedT, interpolatedV
+	} else {
+		return it.iter.At()
+	}
+}
+
+func (it *bucketedRawChunkIterator) currentBucketTime() int64 {
+	return it.mint + it.step*int64(it.currentBucket)
+}
+
+func (it *bucketedRawChunkIterator) Err() error { return it.iter.Err() }
+
+func (it *bucketedRawChunkIterator) AddChunks(results *qryResults) {
+	it.iter.(*rawChunkIterator).AddChunks(*results)
 }

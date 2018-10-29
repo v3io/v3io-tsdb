@@ -119,10 +119,11 @@ func (d *dataFrame) Index() Column {
 }
 
 func (d *dataFrame) TimeSeries(i int) Series {
-
-	// TODO: wrap Columns as Series interface in case of non raw
-
-	return d.rawColumns[i]
+	if d.isRawSeries {
+		return d.rawColumns[i]
+	} else {
+		return nil // TODO - convert columns to series
+	}
 }
 
 // Column object, store a single value or index column/array

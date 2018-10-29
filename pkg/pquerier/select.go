@@ -102,7 +102,7 @@ func (s *selectQueryContext) queryPartition(partition *partmgr.DBPartition) (*pa
 		mint = s.mint
 	}
 
-	newQuery := &partQuery{mint: mint, maxt: maxt, partition: partition}
+	newQuery := &partQuery{mint: mint, maxt: maxt, partition: partition, step: step}
 	functions := s.functions
 	if functions == "" && step > 0 && step >= partition.RollupTime() && partition.AggrType().HasAverage() {
 		functions = "avg"
@@ -121,7 +121,7 @@ func (s *selectQueryContext) queryPartition(partition *partmgr.DBPartition) (*pa
 			step = partition.RollupTime()
 		}
 
-		newAggrSeries, err := aggregate.NewAggregateSeries(functions,
+		aggregationParams, err := aggregate.NewAggregationParams(functions,
 			"v",
 			partition.AggrBuckets(),
 			step,
@@ -133,9 +133,9 @@ func (s *selectQueryContext) queryPartition(partition *partmgr.DBPartition) (*pa
 		}
 
 		// TODO: init/use a new aggr objects
-		newQuery.preAggregated = newAggrSeries.CanAggregate(partition.AggrType())
+		newQuery.preAggregated = aggregationParams.CanAggregate(partition.AggrType())
 		if newQuery.preAggregated || !s.disableClientAggr {
-			newQuery.aggrSeries = newAggrSeries
+			newQuery.aggrParams = aggregationParams
 		}
 	}
 
@@ -156,7 +156,7 @@ func (s *selectQueryContext) startCollectors() error {
 		// Increment the WaitGroup counter.
 		s.wg.Add(1)
 		go func(index int) {
-			rawCollector(s, index)
+			mainCollector(s, index)
 		}(i)
 	}
 
@@ -213,6 +213,7 @@ func (s *selectQueryContext) processQueryResults(query *partQuery) error {
 				numberOfColumns = 100
 			}
 			frame.columns = make([]Column, 0, numberOfColumns)
+
 			frame.byName = make(map[string]int, numberOfColumns)
 			s.dataFrames[hash] = frame
 			s.frameList = append(s.frameList, frame)
@@ -304,6 +305,26 @@ func (s *selectQueryContext) AddColumnSpecByWildcard(metricName string) {
 	}
 }
 
+func (s *selectQueryContext) createDataFrame(lset utils.Labels, hash uint64) *dataFrame {
+	var df *dataFrame
+	// is raw query
+	if s.functions == "" {
+		df = &dataFrame{lset: lset, hash: hash, isRawSeries: s.functions == ""}
+		df.byName = make(map[string]int, 100)
+	} else {
+		df.byName = make(map[string]int, len(s.columnsSpec))
+		df.columns = make([]Column, 0, len(s.columnsSpec))
+		if !s.isAllColumns {
+			for i, col := range s.columnsSpec {
+				df.columns = append(df.columns, &dataColumn{name: col.getColumnName()})
+				df.byName[col.getColumnName()] = i
+			}
+		}
+	}
+
+	return df
+}
+
 // query object for a single partition (or name and partition in future optimizations)
 
 type partQuery struct {
@@ -314,11 +335,12 @@ type partQuery struct {
 	baseTime   int64
 	mint, maxt int64
 	attrs      []string
+	step       int64
 
 	chunk0Time    int64
 	chunkTime     int64
 	preAggregated bool
-	aggrSeries    *aggregate.AggregateSeries
+	aggrParams    *aggregate.AggregationParams
 }
 
 func (s *partQuery) getItems(ctx *selectQueryContext, name string) error {
@@ -331,7 +353,7 @@ func (s *partQuery) getItems(ctx *selectQueryContext, name string) error {
 	attrs := []string{"_lset", "_enc", "_name", "_maxtime"}
 
 	if s.preAggregated {
-		s.attrs = s.aggrSeries.GetAttrNames()
+		s.attrs = s.aggrParams.GetAttrNames()
 	} else {
 		s.attrs, s.chunk0Time = s.partition.Range2Attrs("v", s.mint, s.maxt)
 	}

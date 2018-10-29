@@ -148,7 +148,6 @@ func (suite *testQuerySuite) TestRawDataMultiplePartitions() {
 		seriesCount++
 		iter := set.At().Iterator()
 		data, err := tsdbtest.IteratorToSlice(iter)
-		fmt.Println("actual data is: ", data)
 		if err != nil {
 			suite.T().Fatal(err)
 		}
@@ -157,6 +156,53 @@ func (suite *testQuerySuite) TestRawDataMultiplePartitions() {
 	}
 
 	assert.Equal(suite.T(), 2, seriesCount, "series count didn't match expected")
+}
+
+func (suite *testQuerySuite) TestRawDataSinglePartitionWithDownSample() {
+	adapter, err := tsdb.NewV3ioAdapter(suite.v3ioConfig, nil, nil)
+	if err != nil {
+		suite.T().Fatalf("failed to create v3io adapter. reason: %s", err)
+	}
+	metricName := "cpu"
+	labels1 := utils.LabelsFromStrings("__name__", metricName, "os", "linux")
+	numberOfEvents := 10
+	eventsInterval := 60 * 1000
+	baseTime := time.Now().UnixNano()/1000000 - int64(numberOfEvents*eventsInterval)
+	ingestData := []tsdbtest.DataPoint{{baseTime, 10},
+		{int64(baseTime + tsdbtest.MinuteInMillis), 20},
+		{baseTime + 6*tsdbtest.MinuteInMillis, 30},
+		{baseTime + 9*tsdbtest.MinuteInMillis, 40}}
+	tsdbtest.InsertData(suite.T(), suite.v3ioConfig, metricName,
+		ingestData,
+		labels1)
+	expectedData := []tsdbtest.DataPoint{{baseTime, 10},
+		{baseTime + 6*tsdbtest.MinuteInMillis, 30},
+		{baseTime + 8*tsdbtest.MinuteInMillis, 40}}
+
+	querierV2, err := adapter.QuerierV2(nil, baseTime, baseTime+int64(numberOfEvents*eventsInterval))
+	if err != nil {
+		suite.T().Fatalf("Failed to create querier v2, err: %v", err)
+	}
+
+	params := &pquerier.SelectParams{Name: "cpu", Step: 2 * int64(tsdbtest.MinuteInMillis)}
+	set, err := querierV2.SelectQry(params)
+	if err != nil {
+		suite.T().Fatalf("Failed to exeute query, err: %v", err)
+	}
+
+	var seriesCount int
+	for set.Next() {
+		seriesCount++
+		iter := set.At().Iterator()
+		data, err := tsdbtest.IteratorToSlice(iter)
+		if err != nil {
+			suite.T().Fatal(err)
+		}
+
+		assert.Equal(suite.T(), expectedData, data, "queried data does not match expected")
+	}
+
+	assert.Equal(suite.T(), 1, seriesCount, "series count didn't match expected")
 }
 
 func TestQueryV2Suite(t *testing.T) {
