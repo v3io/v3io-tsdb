@@ -238,7 +238,6 @@ func (cc *checkCommandeer) printResponse(resp *v3io.Response) error {
 						return err
 					}
 				}
-
 			}
 		}
 	}
