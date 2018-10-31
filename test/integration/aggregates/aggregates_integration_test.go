@@ -70,6 +70,7 @@ func TestAggregates(t *testing.T) {
 	testCases := []*TestConfig{
 		t1Config(t),
 		t2Config(t),
+		t3Config(t),
 	}
 
 	for _, testConfig := range testCases {
@@ -144,6 +145,44 @@ func t2Config(testCtx *testing.T) *TestConfig {
 		expectedMax:    math.Inf(-1),
 		queryFunc:      testAggregates,
 		queryStep:      int64(time.Hour),
+		tsdbAggregates: "", // create DB without aggregates (use RAW data)
+	}
+
+	for _, v := range testValues {
+		tc.expectedSum += v
+		tc.expectedMin = math.Min(tc.expectedMin, v)
+		tc.expectedMax = math.Max(tc.expectedMax, v)
+	}
+
+	tc.setup = func() (*tsdb.V3ioAdapter, error, func()) {
+		return setupFunc(testCtx, tc)
+	}
+
+	return tc
+}
+
+func t3Config(testCtx *testing.T) *TestConfig {
+	t := time.Now()
+	// Round the test time down to the closest hour to get predictable and consistent results
+	currentRoundedTimeNano := time.Date(t.Year(), t.Month(), t.Day(), t.Hour(), 0, 0, 0, t.Location()).UnixNano()
+
+	testDuration := int64(7 * time.Minute)
+	testAggregates := "min,max,sum,count,avg"
+	testValues := []float64{0.07, 0.07, 0.13, 0.07, 0.07, 0.20, 0.07, 0.07, 0.20, 0.07, 0.13, 0.13, 0.00, 0.07, 0.07, 0.00, 0.07, 0.13, 0.00, 0.07, 0.27, 0.07}
+
+	tc := &TestConfig{
+		desc:           fmt.Sprintf("Test with RAW data: Check [%s] with %v", testAggregates, testValues),
+		testEndTime:    currentRoundedTimeNano,
+		testStartTime:  currentRoundedTimeNano - testDuration,
+		interval:       int64(20 * time.Second),
+		testDuration:   testDuration,
+		numMetrics:     1,
+		numLabels:      1,
+		values:         testValues,
+		expectedMin:    0.07,
+		expectedMax:    0.27,
+		queryFunc:      testAggregates,
+		queryStep:      int64(time.Minute),
 		tsdbAggregates: "", // create DB without aggregates (use RAW data)
 	}
 
@@ -239,7 +278,13 @@ func testAggregatesCase(t *testing.T, testConfig *TestConfig) {
 		for iter.Next() {
 
 			tm, v := iter.At()
-			testConfig.logger.Debug(fmt.Sprintf("--> Aggregate: %s t=%d,v=%f\n", aggr, tm, v))
+			sTime := time.Unix(int64(tm/1000), 0).Format(time.RFC3339)
+
+			if err != nil {
+				t.Errorf("Unable to parse timestamp. Time: %d", tm)
+			}
+
+			testConfig.logger.Debug(fmt.Sprintf("--> Aggregate: %s t=%d [%s], v=%f\n", aggr, tm, sTime, v))
 
 			switch aggr {
 			case "min":
@@ -263,17 +308,30 @@ func testAggregatesCase(t *testing.T, testConfig *TestConfig) {
 
 	assert.Equal(t, testConfig.expectedMin, actualMin, "Minimal value is not as expected")
 
-	assert.Equal(t, testConfig.expectedMax, actualMax, "Maximal value is not as expected")
+	assert.Equal(t, toPrecision(testConfig.expectedMax), toPrecision(actualMax), "Maximal value is not as expected")
 
 	assert.Equal(t, testConfig.expectedCount, actualCount, "Count is not as expected")
 
-	assert.Equal(t, testConfig.expectedSum, actualSum, "Sum is not as expected")
+	assert.Equal(t, toPrecision(testConfig.expectedSum), toPrecision(actualSum), "Sum is not as expected")
 
-	assert.Equal(t, testConfig.expectedSum/float64(testConfig.expectedCount), actualSum/float64(actualCount),
+	assert.Equal(t, toPrecision(testConfig.expectedSum/float64(testConfig.expectedCount)), toPrecision(actualSum/float64(actualCount)),
 		"Average is not as expected. [1]")
 
-	assert.Equal(t, testConfig.expectedSum/float64(testConfig.expectedCount), actualAvgResultsSum/float64(actualAvgResultsCount),
+	assert.Equal(t, toPrecision(testConfig.expectedSum/float64(testConfig.expectedCount)), toPrecision(actualAvgResultsSum/float64(actualAvgResultsCount)),
 		"Average is not as expected. [2] %f/%d != %f/%d", testConfig.expectedSum, testConfig.expectedCount, actualAvgResultsSum, actualAvgResultsCount)
+}
+
+func round(num float64) int {
+	return int(num + math.Copysign(0.5, num))
+}
+
+func toFixedPrecision(num float64, precision int) float64 {
+	output := math.Pow(10, float64(precision))
+	return float64(round(num*output)) / output
+}
+
+func toPrecision(num float64) float64 {
+	return toFixedPrecision(num, 6)
 }
 
 func nanosToMillis(nanos int64) int64 {
@@ -323,8 +381,10 @@ func generateData(t *testing.T, testConfig *TestConfig, adapter *tsdb.V3ioAdapte
 }
 
 func writeNext(app tsdb.Appender, metrics []*metricContext, t int64, v float64) error {
-
 	for _, metric := range metrics {
+		// Debug
+		// st := time.Unix(t/1000, 0).Format(time.RFC3339)
+		// fmt.Printf("%d [%s] -> %f\n", t, st, v)
 		if metric.ref == 0 {
 			ref, err := app.Add(metric.lset, t, v)
 			if err != nil {
