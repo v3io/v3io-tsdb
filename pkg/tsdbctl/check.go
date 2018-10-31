@@ -230,16 +230,31 @@ func (cc *checkCommandeer) printResponse(resp *v3io.Response) error {
 
 			if values != nil {
 				bytes := values.([]byte)
-				err := cc.printValues(bytes)
-				if err != nil {
-					return err
+				if strings.HasPrefix(attr, "_v_") {
+					cc.printArrays(bytes)
+				} else {
+					err := cc.printValues(bytes)
+					if err != nil {
+						return err
+					}
 				}
+
 			}
 		}
 	}
 	return nil
 }
 
+func (cc *checkCommandeer) printArrays(bytes []byte) {
+	fmt.Print("[")
+	for i, a := range utils.AsInt64Array(bytes) {
+		if i != 0 {
+			fmt.Print(",")
+		}
+		fmt.Print(math.Float64frombits(a))
+	}
+	fmt.Print("]\n")
+}
 func (cc *checkCommandeer) printValues(bytes []byte) error {
 	chunk, err := chunkenc.FromData(cc.rootCommandeer.logger, chunkenc.EncXOR, bytes, 0)
 	if err != nil {
