@@ -33,7 +33,7 @@ LabelsValueDiversity: 5
 AppendOneByOne: true
 
 # Batch size - used by the test to fire a specific amount of samples at once
-BatchSize: 512
+BatchSize: 1024
 
 # Cleanup the data after each test
 CleanupAfterTest: true
