@@ -6,4 +6,4 @@ password: "99c11228cf25d9093a7c11eeac147114"
 batchSize: 1024
 
 performance:
-  reportOnShutdown: true
+  reportOnShutdown: false
