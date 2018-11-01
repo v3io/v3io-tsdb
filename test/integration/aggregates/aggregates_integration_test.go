@@ -91,6 +91,7 @@ func t1Config(testCtx *testing.T) *TestConfig {
 	// Round the test time down to the closest hour to get predictable and consistent results
 	currentRoundedTimeNano := time.Date(t.Year(), t.Month(), t.Day(), t.Hour(), 0, 0, 0, t.Location()).UnixNano()
 
+	// Note, test duration, suery step and interval between samples must be aligned (must divide without remainder)
 	testDuration := int64(80 * time.Hour)
 	queryStep := int64(time.Hour)
 	interval := int64(10 * time.Minute)
@@ -130,6 +131,7 @@ func t2Config(testCtx *testing.T) *TestConfig {
 	// Round the test time down to the closest hour to get predictable and consistent results
 	currentRoundedTimeNano := time.Date(t.Year(), t.Month(), t.Day(), t.Hour(), 0, 0, 0, t.Location()).UnixNano()
 
+	// Note, test duration, suery step and interval between samples must be aligned (must divide without remainder)
 	testDuration := int64(96 * time.Hour)
 	queryStep := int64(time.Hour)
 	interval := int64(10 * time.Minute)
@@ -169,6 +171,7 @@ func t3Config(testCtx *testing.T) *TestConfig {
 	// Round the test time down to the closest hour to get predictable and consistent results
 	currentRoundedTimeNano := time.Date(t.Year(), t.Month(), t.Day(), t.Hour(), 0, 0, 0, t.Location()).UnixNano()
 
+	// Note, test duration, suery step and interval between samples must be aligned (must divide without remainder)
 	testDuration := int64(8 * time.Minute)
 	queryStep := int64(time.Minute)
 	interval := int64(20 * time.Second)
