@@ -52,6 +52,7 @@ type TestConfig struct {
 	expectedMax    []float64
 	expectedCount  []int
 	expectedSum    []float64
+	expectedAvg    []float64
 	expectFail     bool
 	ignoreReason   string
 	v3ioConfig     *config.V3ioConfig
@@ -111,6 +112,7 @@ func t1Config(testCtx *testing.T) *TestConfig {
 		expectedMin:    makeAndInitFloatArray(math.Inf(1), numOfBuckets),
 		expectedMax:    makeAndInitFloatArray(math.Inf(-1), numOfBuckets),
 		expectedSum:    make([]float64, numOfBuckets),
+		expectedAvg:    make([]float64, numOfBuckets),
 		queryFunc:      testAggregates,
 		queryStep:      queryStep,
 		tsdbAggregates: testAggregates, // Create DB with all required aggregates
@@ -149,6 +151,7 @@ func t2Config(testCtx *testing.T) *TestConfig {
 		expectedMin:    makeAndInitFloatArray(math.Inf(1), numOfBuckets),
 		expectedMax:    makeAndInitFloatArray(math.Inf(-1), numOfBuckets),
 		expectedSum:    make([]float64, numOfBuckets),
+		expectedAvg:    make([]float64, numOfBuckets),
 		queryFunc:      testAggregates,
 		queryStep:      queryStep,
 		tsdbAggregates: "", // create DB without aggregates (use RAW data)
@@ -187,6 +190,7 @@ func t3Config(testCtx *testing.T) *TestConfig {
 		expectedMin:    makeAndInitFloatArray(math.Inf(1), numOfBuckets),
 		expectedMax:    makeAndInitFloatArray(math.Inf(-1), numOfBuckets),
 		expectedSum:    make([]float64, numOfBuckets),
+		expectedAvg:    make([]float64, numOfBuckets),
 		queryFunc:      testAggregates,
 		queryStep:      queryStep,
 		tsdbAggregates: "", // create DB without aggregates (use RAW data)
@@ -263,8 +267,7 @@ func testAggregatesCase(t *testing.T, testConfig *TestConfig) {
 
 	actualCount := make([]int, numOfBuckets)
 	actualSum := makeAndInitFloatArray(0.0, numOfBuckets)
-	actualAvgResultsCount := make([]int, numOfBuckets)
-	actualAvgResultsSum := makeAndInitFloatArray(0.0, numOfBuckets)
+	actualAvg := makeAndInitFloatArray(0.0, numOfBuckets)
 
 	for set.Next() {
 		if set.Err() != nil {
@@ -277,7 +280,6 @@ func testAggregatesCase(t *testing.T, testConfig *TestConfig) {
 		testConfig.logger.Debug(fmt.Sprintf("\nLables: %v", lset))
 
 		bucket := 0
-		i := 0
 		iter := series.Iterator()
 		for iter.Next() {
 
@@ -291,7 +293,6 @@ func testAggregatesCase(t *testing.T, testConfig *TestConfig) {
 			msg := fmt.Sprintf("--> Aggregate: %s t=%d [%s], v=%f\n", aggr, tm, sTime, v)
 			testConfig.logger.Debug(msg)
 
-			bucket = i
 			switch aggr {
 			case "min":
 				actualMin[bucket] = v
@@ -302,10 +303,10 @@ func testAggregatesCase(t *testing.T, testConfig *TestConfig) {
 			case "sum":
 				actualSum[bucket] = v
 			case "avg":
-				actualAvgResultsCount[bucket] = actualAvgResultsCount[bucket] + 1
-				actualAvgResultsSum[bucket] = actualAvgResultsSum[bucket] + v
+				actualAvg[bucket] = v
 			}
-			i++
+
+			bucket++
 		}
 
 		if iter.Err() != nil {
@@ -313,22 +314,11 @@ func testAggregatesCase(t *testing.T, testConfig *TestConfig) {
 		}
 	}
 
-	for i := 0; i < numOfBuckets; i++ {
-		assert.Equal(t, testConfig.expectedMin[i], actualMin[i], "Minimal value for bucket [%d] is not as expected", i)
-
-		assert.Equal(t, testConfig.expectedMax[i], actualMax[i], "Maximal value for bucket [%d] is not as expected", i)
-
-		assert.Equal(t, testConfig.expectedCount[i], actualCount[i], "Count for bucket [%d] is not as expected", i)
-
-		assert.Equal(t, testConfig.expectedSum[i], actualSum[i], "Sum for bucket [%d] is not as expected", i)
-
-		assert.Equal(t, testConfig.expectedSum[i]/float64(testConfig.expectedCount[i]), actualSum[i]/float64(actualCount[i]),
-			"Average #1 for bucket [%d] is not as expected", i)
-
-		assert.Equal(t, testConfig.expectedSum[i]/float64(testConfig.expectedCount[i]), actualAvgResultsSum[i]/float64(actualAvgResultsCount[i]),
-			"Average #2 for bucket [%d] is not as expected. i.e. %f/%d != %f/%d",
-			testConfig.expectedSum[i], testConfig.expectedCount[i], actualAvgResultsSum[i], actualAvgResultsCount[i])
-	}
+	assert.ElementsMatch(t, testConfig.expectedMin, actualMin, "Minimal value is not as expected")
+	assert.ElementsMatch(t, testConfig.expectedMax, actualMax, "Maximal value is not as expected")
+	assert.ElementsMatch(t, testConfig.expectedCount, actualCount, "Count value is not as expected")
+	assert.ElementsMatch(t, testConfig.expectedSum, actualSum, "Sum value is not as expected")
+	assert.ElementsMatch(t, testConfig.expectedAvg, actualAvg, "Average value is not as expected")
 }
 
 func nanosToMillis(nanos int64) int64 {
@@ -369,6 +359,7 @@ func generateData(t *testing.T, testConfig *TestConfig, adapter *tsdb.V3ioAdapte
 		testConfig.expectedSum[i] = testConfig.expectedSum[i] + v
 		testConfig.expectedMin[i] = math.Min(testConfig.expectedMin[i], v)
 		testConfig.expectedMax[i] = math.Max(testConfig.expectedMax[i], v)
+		testConfig.expectedAvg[i] = testConfig.expectedSum[i] / float64(testConfig.expectedCount[i])
 
 		index = (index + 1) % numTestValues
 		j++
@@ -387,9 +378,6 @@ func generateData(t *testing.T, testConfig *TestConfig, adapter *tsdb.V3ioAdapte
 
 func writeNext(app tsdb.Appender, metrics []*metricContext, t int64, v float64) error {
 	for _, metric := range metrics {
-		// Debug
-		// st := time.Unix(t/1000, 0).Format(time.RFC3339)
-		// fmt.Printf("%d [%s] -> %f\n", t, st, v)
 		if metric.ref == 0 {
 			ref, err := app.Add(metric.lset, t, v)
 			if err != nil {
