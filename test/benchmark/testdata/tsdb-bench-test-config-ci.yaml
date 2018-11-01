@@ -5,7 +5,7 @@ Verbose: false
 
 # Relative start time as "[0-9]+[mhd]" (default = "48h")
 # The start time will be calculated as now() - startTimeOffset.
-StartTimeOffset: "48h"
+StartTimeOffset: "96h"
 
 # Aggregation interval in milliseconds between samples
 SampleStepSize: 30000
