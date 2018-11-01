@@ -1,5 +1,5 @@
 container: "bigdata"
-workers: 100
+workers: 16
 webApiEndpoint: "webapi.iguazio.app.tsdb-integration-alternate-2.dev.trl.iguazio.com:8081"
 username: "iguazio"
 password: "99c11228cf25d9093a7c11eeac147114"
