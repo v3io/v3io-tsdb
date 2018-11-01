@@ -637,12 +637,12 @@ func TestDeleteTable(t *testing.T) {
 		expectFail   bool
 	}{
 		{desc: "Should delete all table",
-			deleteFrom:     1522222999,
-			deleteTo:       1544444000,
+			deleteFrom:     1522222999000,
+			deleteTo:       1544444000000,
 			ignorErrors:	true,
-			data:     		[]tsdbtest.DataPoint{{Time: 1522222222, Value: 222.2},
-												{Time: 1533333333, Value: 333.3},
-												{Time: 1544444444, Value: 444.4}},
+			data:     		[]tsdbtest.DataPoint{{Time: 1522222222000, Value: 222.2},
+												{Time: 1533333333000, Value: 333.3},
+												{Time: 1544444444000, Value: 444.4}},
 			expected:		map[string][]tsdbtest.DataPoint{},
 			expectFail: 	true,
 		},
@@ -692,16 +692,22 @@ func testDeleteTSDBCase(test *testing.T, v3ioConfig *config.V3ioConfig, metricsN
 	}
 
 	series := set.At()
-	iter := series.Iterator()
-	if iter.Err() != nil {
-		test.Fatalf("Failed to query data series. reason: %v", iter.Err())
-	}
+	if series == nil && len(expected) == 0 {
+		//table is expected to be empty
+	} else if series != nil {
+		iter := series.Iterator()
+		if iter.Err() != nil {
+			test.Fatalf("Failed to query data series. reason: %v", iter.Err())
+		}
 
-	actual, err := iteratorToSlice(iter)
-	if err != nil {
-		test.Fatal(err)
+		actual, err := iteratorToSlice(iter)
+		if err != nil {
+			test.Fatal(err)
+		}
+		assert.ElementsMatch(test, expected["1"], actual)
+	} else {
+		test.Fatalf("Result series is empty while expected result set is not!")
 	}
-	assert.ElementsMatch(test, expected["1"], actual)
 }
 
 func iteratorToSlice(it chunkenc.Iterator) ([]tsdbtest.DataPoint, error) {

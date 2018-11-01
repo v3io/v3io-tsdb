@@ -200,7 +200,7 @@ func (a *V3ioAdapter) DeleteDB(deleteAll bool, ignoreErrors bool, fromTime int64
 		toTime = time.Now().Unix() * 1000
 	}
 
-	partitions := a.partitionMngr.PartsForRange(fromTime, toTime)
+	partitions := a.partitionMngr.PartsForRange(fromTime, toTime, false)
 	for _, part := range partitions {
 		pStart, pEnd := part.GetPartitionRange()
 		if pStart >= fromTime && pEnd <= toTime {

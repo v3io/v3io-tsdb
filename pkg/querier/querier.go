@@ -102,7 +102,7 @@ func (q *V3ioQuerier) selectQry(
 	q.performanceReporter.WithTimer("QueryTimer", func() {
 		filter = strings.Replace(filter, "__name__", "_name", -1)
 
-		parts := q.partitionMngr.PartsForRange(q.mint, q.maxt)
+		parts := q.partitionMngr.PartsForRange(q.mint, q.maxt, true)
 		if len(parts) == 0 {
 			return
 		}
