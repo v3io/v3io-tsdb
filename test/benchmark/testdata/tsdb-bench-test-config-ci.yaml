@@ -11,7 +11,7 @@ StartTimeOffset: "96h"
 SampleStepSize: 30000
 
 # Metric-names count - should be within the range [1..26] (for [A..Z])
-NamesCount: 26
+NamesCount: 10
 
 # Name diversity - pattern = Name_[A..Z][_[1..200]]
 NamesDiversity: 5
@@ -33,7 +33,7 @@ LabelsValueDiversity: 5
 AppendOneByOne: true
 
 # Batch size - used by the test to fire a specific amount of samples at once
-BatchSize: 1024
+BatchSize: 2048
 
 # Cleanup the data after each test
 CleanupAfterTest: true
