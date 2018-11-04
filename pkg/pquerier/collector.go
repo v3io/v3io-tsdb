@@ -2,6 +2,7 @@ package pquerier
 
 import (
 	"fmt"
+	"github.com/v3io/v3io-tsdb/pkg/aggregate"
 	"time"
 )
 
@@ -74,7 +75,7 @@ func mainCollector(ctx *selectQueryContext, index int) {
 		if res.IsRawQuery() {
 			rawCollector(res)
 		} else if res.IsServerAggregates() {
-
+			aggregateCollector(ctx, res)
 		} else if res.IsClientAggregates() {
 
 		}
@@ -92,21 +93,14 @@ func rawCollector(res *qryResults) {
 }
 
 func aggregateCollector(ctx *selectQueryContext, res *qryResults) {
-	for _, col := range ctx.columnsSpec {
-		_ = res.frame.byName[col.getColumnName()]
+	agg, ok := res.frame.aggregates[res.name]
+	if !ok {
+		aggrLength := (ctx.maxt-ctx.mint)/ctx.step + 1
+		agg = aggregate.NewRawAggregatedSeries(int(aggrLength),
+			ctx.mint,
+			ctx.maxt,
+			*res.query.aggregationParams)
+		res.frame.aggregates[res.name] = agg
 	}
-
-	//for res := range ctx.requestChannels[index] {
-	//frameIndex, ok := res.frame.byName[res.name]
-	//if ok {
-	//	// res.frame.columns
-	//} else {
-	//	res.frame.columns = append(res.frame.columns, &dataColumn{})
-	//	res.frame.byName[res.name] = len(res.frame.columns) - 1
-	//
-	//	if ctx.isAllColumns {
-	//		ctx.AddColumnSpecByWildcard(res.name)
-	//	}
-	//}
-	//}
+	agg.AggregateData(res.fields, res.query.partition.GetStartTime())
 }

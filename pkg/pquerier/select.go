@@ -43,6 +43,8 @@ type selectQueryContext struct {
 	frameList       []*dataFrame
 	requestChannels []chan *qryResults
 	wg              sync.WaitGroup
+
+	timeColumn Column
 }
 
 func (s *selectQueryContext) start(parts []*partmgr.DBPartition, params *SelectParams) (*frameIterator, error) {
@@ -81,6 +83,10 @@ func (s *selectQueryContext) start(parts []*partmgr.DBPartition, params *SelectP
 
 	// wait for Go routines to complete
 	s.wg.Wait()
+
+	for _, df := range s.frameList {
+		df.CalculateColumns()
+	}
 
 	s.totalColumns = s.frameList[0].Len()
 	frameIter := NewFrameIterator(s)
@@ -135,7 +141,7 @@ func (s *selectQueryContext) queryPartition(partition *partmgr.DBPartition) (*pa
 		// TODO: init/use a new aggr objects
 		newQuery.preAggregated = aggregationParams.CanAggregate(partition.AggrType())
 		if newQuery.preAggregated || !s.disableClientAggr {
-			newQuery.aggrParams = aggregationParams
+			newQuery.aggregationParams = aggregationParams
 		}
 	}
 
@@ -204,17 +210,7 @@ func (s *selectQueryContext) processQueryResults(query *partQuery) error {
 		// find or create data frame
 		frame, ok := s.dataFrames[hash]
 		if !ok {
-			frame = &dataFrame{lset: lset, hash: hash, isRawSeries: s.functions == ""}
-			// TODO: init dataframe columns ..
-			var numberOfColumns int64
-			if !frame.isRawSeries {
-				numberOfColumns = (s.maxt-s.mint)/s.step + 1
-			} else {
-				numberOfColumns = 100
-			}
-			frame.columns = make([]Column, 0, numberOfColumns)
-
-			frame.byName = make(map[string]int, numberOfColumns)
+			frame = NewDataFrame(s.columnsSpec, s.getOrCreateTimeColumn(), lset, hash, s.isRawQuery(), s.isAllColumns)
 			s.dataFrames[hash] = frame
 			s.frameList = append(s.frameList, frame)
 		}
@@ -256,7 +252,7 @@ func (s *selectQueryContext) createColumnSpecs(params *SelectParams) error {
 
 			hiddenColumns := aggregate.GetHiddenAggregates(metricMask, aggregates)
 			for _, hiddenAggr := range hiddenColumns {
-				hiddenCol := columnMeta{metric: metric, function: hiddenAggr, isHidden: true}
+				hiddenCol := columnMeta{metric: metric, function: hiddenAggr, isHidden: true, isConcrete: true}
 				s.columnsSpec = append(s.columnsSpec, hiddenCol)
 				s.columnsSpecByMetric[metric] = append(cols, hiddenCol)
 			}
@@ -271,12 +267,12 @@ func (s *selectQueryContext) createColumnSpecs(params *SelectParams) error {
 				return err
 			}
 			for _, aggr := range aggregates {
-				s.columnsSpec = append(s.columnsSpec, columnMeta{metric: params.Name, function: aggr})
+				s.columnsSpec = append(s.columnsSpec, columnMeta{metric: params.Name, function: aggr, isConcrete: aggregate.IsRawAggregate(aggr)})
 			}
 
 			hiddenColumns := aggregate.GetHiddenAggregates(mask, aggregates)
 			for _, hiddenAggr := range hiddenColumns {
-				s.columnsSpec = append(s.columnsSpec, columnMeta{metric: params.Name, function: hiddenAggr, isHidden: true})
+				s.columnsSpec = append(s.columnsSpec, columnMeta{metric: params.Name, function: hiddenAggr, isHidden: true, isConcrete: aggregate.IsRawAggregate(hiddenAggr)})
 			}
 		}
 
@@ -305,25 +301,32 @@ func (s *selectQueryContext) AddColumnSpecByWildcard(metricName string) {
 	}
 }
 
-func (s *selectQueryContext) createDataFrame(lset utils.Labels, hash uint64) *dataFrame {
-	var df *dataFrame
-	// is raw query
-	if s.functions == "" {
-		df = &dataFrame{lset: lset, hash: hash, isRawSeries: s.functions == ""}
-		df.byName = make(map[string]int, 100)
-	} else {
-		df.byName = make(map[string]int, len(s.columnsSpec))
-		df.columns = make([]Column, 0, len(s.columnsSpec))
-		if !s.isAllColumns {
-			for i, col := range s.columnsSpec {
-				df.columns = append(df.columns, &dataColumn{name: col.getColumnName()})
-				df.byName[col.getColumnName()] = i
-			}
-		}
+func (s *selectQueryContext) getOrCreateTimeColumn() Column {
+	// When querying for raw data we don't need to generate a time column since we return the raw time
+	if s.isRawQuery() {
+		return nil
+	}
+	if s.timeColumn == nil {
+		s.timeColumn = s.generateTimeColumn()
 	}
 
-	return df
+	return s.timeColumn
 }
+
+func (s *selectQueryContext) generateTimeColumn() Column {
+	size := int((s.maxt-s.mint)/s.step + 1)
+	timeBuckets := make([]int64, size)
+	i := 0
+	for t := s.mint; t <= s.maxt; t += s.step {
+		timeBuckets[i] = t
+		i++
+	}
+
+	columnMeta := columnMeta{isConcrete: true, metric: "time"}
+	return &dataColumn{data: timeBuckets, name: "time", size: size, spec: columnMeta}
+}
+
+func (s *selectQueryContext) isRawQuery() bool { return s.functions == "" }
 
 // query object for a single partition (or name and partition in future optimizations)
 
@@ -337,10 +340,10 @@ type partQuery struct {
 	attrs      []string
 	step       int64
 
-	chunk0Time    int64
-	chunkTime     int64
-	preAggregated bool
-	aggrParams    *aggregate.AggregationParams
+	chunk0Time        int64
+	chunkTime         int64
+	preAggregated     bool
+	aggregationParams *aggregate.AggregationParams
 }
 
 func (s *partQuery) getItems(ctx *selectQueryContext, name string) error {
@@ -353,7 +356,7 @@ func (s *partQuery) getItems(ctx *selectQueryContext, name string) error {
 	attrs := []string{"_lset", "_enc", "_name", "_maxtime"}
 
 	if s.preAggregated {
-		s.attrs = s.aggrParams.GetAttrNames()
+		s.attrs = s.aggregationParams.GetAttrNames()
 	} else {
 		s.attrs, s.chunk0Time = s.partition.Range2Attrs("v", s.mint, s.maxt)
 	}

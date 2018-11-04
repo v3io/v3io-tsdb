@@ -242,3 +242,7 @@ func contains(list []AggrType, item AggrType) bool {
 	}
 	return false
 }
+
+func IsRawAggregate(item AggrType) bool { return contains(rawAggregates, item) }
+
+func IsCountAggregate(aggr AggrType) bool { return aggr == aggrTypeCount }

@@ -2,6 +2,7 @@ package pquerier
 
 import (
 	"fmt"
+	"github.com/v3io/v3io-tsdb/pkg/aggregate"
 	"github.com/v3io/v3io-tsdb/pkg/utils"
 	"reflect"
 )
@@ -36,6 +37,9 @@ func (fi *frameIterator) Next() bool {
 	// can advance series within a frame
 	if fi.seriesIndex < fi.columnNum-1 {
 		fi.seriesIndex++
+		if fi.isCurrentSeriesHidden() {
+			return fi.Next()
+		}
 		return true
 	}
 
@@ -46,13 +50,31 @@ func (fi *frameIterator) Next() bool {
 
 	fi.setIndex++
 	fi.seriesIndex = 0
+	if fi.isCurrentSeriesHidden() {
+		return fi.Next()
+	}
 	return true
 }
 
 // get current time series (for Prometheus mode)
 func (fi *frameIterator) At() Series {
-	return fi.ctx.frameList[fi.setIndex].TimeSeries(fi.seriesIndex)
+	s, err := fi.ctx.frameList[fi.setIndex].TimeSeries(fi.seriesIndex)
+	if err != nil {
+		fi.err = err
+	}
+	return s
+}
 
+func (fi *frameIterator) isCurrentSeriesHidden() bool {
+	if fi.ctx.isRawQuery() {
+		return false
+	}
+	col, err := fi.ctx.frameList[fi.setIndex].ColumnAt(fi.seriesIndex)
+	if err != nil {
+		fi.err = err
+	}
+
+	return col.GetColumnSpec().isHidden
 }
 
 func (fi *frameIterator) Err() error {
@@ -60,6 +82,28 @@ func (fi *frameIterator) Err() error {
 }
 
 // data frame, holds multiple value columns and an index (time) column
+func NewDataFrame(columnsSpec []columnMeta, indexColumn Column, lset utils.Labels, hash uint64, isRawQuery, isAllColumnWildcard bool) *dataFrame {
+	df := &dataFrame{lset: lset, hash: hash, isRawSeries: isRawQuery}
+	// is raw query
+	if isRawQuery {
+		df.byName = make(map[string]int, 100)
+	} else {
+		numOfColumns := len(columnsSpec)
+		df.index = indexColumn
+		df.byName = make(map[string]int, numOfColumns)
+		df.columns = make([]Column, 0, numOfColumns)
+		df.aggregates = make(map[string]*aggregate.RawAggregatedSeries, numOfColumns)
+		df.metricToCountColumn = map[string]Column{}
+		if !isAllColumnWildcard {
+			for i, col := range columnsSpec {
+				df.columns = append(df.columns, &dataColumn{name: col.getColumnName(), spec: col})
+				df.byName[col.getColumnName()] = i
+			}
+		}
+	}
+
+	return df
+}
 
 type dataFrame struct {
 	lset utils.Labels
@@ -71,6 +115,19 @@ type dataFrame struct {
 	columns []Column
 	index   Column
 	byName  map[string]int // name -> index in columns
+
+	aggregates          map[string]*aggregate.RawAggregatedSeries // metric to aggregates
+	metricToCountColumn map[string]Column
+}
+
+func (d *dataFrame) CalculateColumns() {
+	for _, col := range d.columns {
+		aggrData := d.aggregates[col.GetColumnSpec().metric].GetAggregate(col.GetColumnSpec().function)
+		col.SetData(aggrData, len(aggrData))
+		if aggregate.IsCountAggregate(col.GetColumnSpec().function) {
+			d.metricToCountColumn[col.GetColumnSpec().metric] = col
+		}
+	}
 }
 
 func (d *dataFrame) Len() int {
@@ -118,11 +175,19 @@ func (d *dataFrame) Index() Column {
 	return d.index
 }
 
-func (d *dataFrame) TimeSeries(i int) Series {
+func (d *dataFrame) TimeSeries(i int) (Series, error) {
 	if d.isRawSeries {
-		return d.rawColumns[i]
+		return d.rawColumns[i], nil
 	} else {
-		return nil // TODO - convert columns to series
+		currentColumn, err := d.ColumnAt(i)
+		if err != nil {
+			return nil, err
+		}
+		return NewDataFrameColumnSeries(d.index,
+			currentColumn,
+			d.metricToCountColumn[currentColumn.GetColumnSpec().metric],
+			d.Labels(),
+			d.hash), nil
 	}
 }
 
@@ -137,6 +202,8 @@ type Column interface {
 	FloatAt(i int) (float64, error) // Float value at index i
 	StringAt(i int) (string, error) // String value at index i
 	TimeAt(i int) (int64, error)    // time value at index i
+	GetColumnSpec() columnMeta      // Get the column's metadata
+	SetData(interface{}, int)
 }
 
 // DType is data type
@@ -146,6 +213,7 @@ type dataColumn struct {
 	name string
 	size int
 	data interface{}
+	spec columnMeta
 }
 
 // Name returns the column name
@@ -165,7 +233,7 @@ func (dc *dataColumn) DType() DType {
 
 // FloatAt returns float64 value at index i
 func (dc *dataColumn) FloatAt(i int) (float64, error) {
-	if i >= 0 && i < dc.Len() {
+	if !dc.isValidIndex(i) {
 		return 0, fmt.Errorf("index %d out of bounds [0:%d]", i, dc.size)
 	}
 
@@ -179,7 +247,7 @@ func (dc *dataColumn) FloatAt(i int) (float64, error) {
 
 // StringAt returns string value at index i
 func (dc *dataColumn) StringAt(i int) (string, error) {
-	if i >= 0 && i < dc.Len() {
+	if !dc.isValidIndex(i) {
 		return "", fmt.Errorf("index %d out of bounds [0:%d]", i, dc.size)
 	}
 
@@ -193,7 +261,7 @@ func (dc *dataColumn) StringAt(i int) (string, error) {
 
 // TimeAt returns time.Time value at index i
 func (dc *dataColumn) TimeAt(i int) (int64, error) {
-	if i >= 0 && i < dc.Len() {
+	if !dc.isValidIndex(i) {
 		return 0, fmt.Errorf("index %d out of bounds [0:%d]", i, dc.size)
 	}
 
@@ -203,4 +271,12 @@ func (dc *dataColumn) TimeAt(i int) (int64, error) {
 	}
 
 	return typedCol[i], nil
+}
+func (dc *dataColumn) isValidIndex(i int) bool { return i >= 0 && i < dc.Len() }
+
+func (dc *dataColumn) GetColumnSpec() columnMeta { return dc.spec }
+
+func (dc *dataColumn) SetData(d interface{}, size int) {
+	dc.data = d
+	dc.size = size
 }

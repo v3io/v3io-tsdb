@@ -12,13 +12,12 @@ import (
 )
 
 // Create a new Querier interface
-func NewV3ioQuerier(container *v3io.Container, logger logger.Logger, mint, maxt int64,
+func NewV3ioQuerier(container *v3io.Container, logger logger.Logger,
 	cfg *config.V3ioConfig, partMngr *partmgr.PartitionManager) *V3ioQuerier {
 	newQuerier := V3ioQuerier{
 		container: container,
-		mint:      mint, maxt: maxt,
-		logger: logger.GetChild("Querier"),
-		cfg:    cfg,
+		logger:    logger.GetChild("Querier"),
+		cfg:       cfg,
 	}
 	newQuerier.partitionMngr = partMngr
 	newQuerier.performanceReporter = performance.ReporterInstanceFromConfig(cfg)
@@ -29,22 +28,24 @@ type V3ioQuerier struct {
 	logger              logger.Logger
 	container           *v3io.Container
 	cfg                 *config.V3ioConfig
-	mint, maxt          int64
 	partitionMngr       *partmgr.PartitionManager
 	performanceReporter *performance.MetricReporter
 }
 
 type SelectParams struct {
-	Name        string
-	Functions   string
-	Step        int64
-	Windows     []int
-	Filter      string
-	columnSpecs []columnMeta
+	Name           string
+	Functions      string
+	From, To, Step int64
+	Windows        []int
+	Filter         string
+	columnSpecs    []columnMeta
 }
 
 // Base query function
 func (q *V3ioQuerier) SelectQry(params *SelectParams) (set SeriesSet, err error) {
+	if params.To < params.From {
+		return nil, errors.Errorf("End time '%d' is lower than start time '%d'.", params.To, params.From)
+	}
 
 	err = q.partitionMngr.ReadAndUpdateSchema()
 	if err != nil {
@@ -58,21 +59,21 @@ func (q *V3ioQuerier) SelectQry(params *SelectParams) (set SeriesSet, err error)
 
 	set = nullSeriesSet{}
 	selectContext := selectQueryContext{
-		mint: q.mint, maxt: q.maxt, step: params.Step, filter: params.Filter,
+		mint: params.From, maxt: params.To, step: params.Step, filter: params.Filter,
 		container: q.container, logger: q.logger, workers: q.cfg.QryWorkers,
 		disableClientAggr: q.cfg.DisableClientAggr,
 	}
 
 	q.logger.Debug("Select query:\n\tMetric: %s\n\tStart Time: %s (%d)\n\tEnd Time: %s (%d)\n\tFunction: %s\n\t"+
 		"Step: %d\n\tFilter: %s\n\tWindows: %v\n\tDisable All Aggr: %t\n\tDisable Client Aggr: %t",
-		params.Name, time.Unix(q.mint/1000, 0).String(), q.mint, time.Unix(q.maxt/1000, 0).String(),
-		q.maxt, params.Functions, params.Step,
+		params.Name, time.Unix(params.From/1000, 0).String(), params.From, time.Unix(params.To/1000, 0).String(),
+		params.To, params.Functions, params.Step,
 		params.Filter, params.Windows, selectContext.disableAllAggr, selectContext.disableClientAggr)
 
 	q.performanceReporter.WithTimer("QueryTimer", func() {
 		params.Filter = strings.Replace(params.Filter, "__name__", "_name", -1)
 
-		parts := q.partitionMngr.PartsForRange(q.mint, q.maxt)
+		parts := q.partitionMngr.PartsForRange(params.From, params.To)
 		if len(parts) == 0 {
 			return
 		}

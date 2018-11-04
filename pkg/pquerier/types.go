@@ -15,14 +15,14 @@ type qryResults struct {
 	encoding int16
 }
 
-func (q *qryResults) IsRawQuery() bool { return q.query.aggrParams == nil }
+func (q *qryResults) IsRawQuery() bool { return q.query.aggregationParams == nil }
 
 func (q *qryResults) IsServerAggregates() bool {
-	return q.query.aggrParams != nil && q.query.aggrParams.CanAggregate(q.query.partition.AggrType())
+	return q.query.aggregationParams != nil && q.query.aggregationParams.CanAggregate(q.query.partition.AggrType())
 }
 
 func (q *qryResults) IsClientAggregates() bool {
-	return q.query.aggrParams != nil && !q.query.aggrParams.CanAggregate(q.query.partition.AggrType())
+	return q.query.aggregationParams != nil && !q.query.aggregationParams.CanAggregate(q.query.partition.AggrType())
 }
 
 type columnMeta struct {
@@ -32,6 +32,7 @@ type columnMeta struct {
 	functionParams []interface{}
 	interpolator   int8
 	isHidden       bool // real columns = columns the user has specifically requested. Hidden columns = columns needed to calculate the real columns but don't show to the user
+	isConcrete     bool // Concrete Column = has real data behind it, Virtual column = described as a function on top of concrete columns
 }
 
 // if a user specifies he wants all metrics
