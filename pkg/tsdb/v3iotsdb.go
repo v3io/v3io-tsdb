@@ -202,18 +202,15 @@ func (a *V3ioAdapter) DeleteDB(deleteAll bool, ignoreErrors bool, fromTime int64
 
 	partitions := a.partitionMngr.PartsForRange(fromTime, toTime, false)
 	for _, part := range partitions {
-		pStart, pEnd := part.GetPartitionRange()
-		if pStart >= fromTime && pEnd <= toTime {
-			a.logger.Info("Delete partition '%s'.", part.GetTablePath())
-			err := utils.DeleteTable(a.logger, a.container, part.GetTablePath(), "", a.cfg.QryWorkers)
-			if err != nil && !ignoreErrors {
-				return errors.Wrapf(err, "Failed to delete partition '%s'.", part.GetTablePath())
-			}
-			// Delete the Directory object
-			err = a.container.Sync.DeleteObject(&v3io.DeleteObjectInput{Path: part.GetTablePath()})
-			if err != nil && !ignoreErrors {
-				return errors.Wrapf(err, "Failed to delete partition object '%s'.", part.GetTablePath())
-			}
+		a.logger.Info("Deleting partition '%s'.", part.GetTablePath())
+		err := utils.DeleteTable(a.logger, a.container, part.GetTablePath(), "", a.cfg.QryWorkers)
+		if err != nil && !ignoreErrors {
+			return errors.Wrapf(err, "Failed to delete partition '%s'.", part.GetTablePath())
+		}
+		// Delete the Directory object
+		err = a.container.Sync.DeleteObject(&v3io.DeleteObjectInput{Path: part.GetTablePath()})
+		if err != nil && !ignoreErrors {
+			return errors.Wrapf(err, "Failed to delete partition object '%s'.", part.GetTablePath())
 		}
 	}
 	a.partitionMngr.DeletePartitionsFromSchema(partitions)

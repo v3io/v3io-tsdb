@@ -632,19 +632,61 @@ func TestDeleteTable(t *testing.T) {
 		deleteAll	 bool
 		ignorErrors  bool
 		data         []tsdbtest.DataPoint
-		expected     map[string][]tsdbtest.DataPoint
+		expected     []tsdbtest.DataPoint
 		ignoreReason string
 		expectFail   bool
 	}{
 		{desc: "Should delete all table",
-			deleteFrom:     1522222999000,
-			deleteTo:       1544444000000,
+			deleteFrom:     0,
+			deleteTo:       1599999999999,
 			ignorErrors:	true,
-			data:     		[]tsdbtest.DataPoint{{Time: 1522222222000, Value: 222.2},
-												{Time: 1533333333000, Value: 333.3},
-												{Time: 1544444444000, Value: 444.4}},
-			expected:		map[string][]tsdbtest.DataPoint{},
-			expectFail: 	true,
+			data:     		[]tsdbtest.DataPoint{{Time: 1538580053000, Value: 222.2},
+				{Time: 1538925653000, Value: 333.3},
+				{Time: 1539271253000, Value: 444.4}},
+			expected:		[]tsdbtest.DataPoint{},
+			expectFail: 	false,
+		},
+		{desc: "Should skip partial partition at begining",
+			deleteFrom:     1538580050000,
+			deleteTo:       1999271259000,
+			ignorErrors:	true,
+			data:     		[]tsdbtest.DataPoint{{Time: 1538580053000, Value: 222.2},
+				{Time: 1538925653000, Value: 333.3},
+				{Time: 1539271253000, Value: 444.4}},
+			expected:     	[]tsdbtest.DataPoint{{Time: 1538580053000, Value: 222.2}},
+			expectFail: 	false,
+		},
+		{desc: "Should skip partial partition at end",
+			deleteFrom:     0,
+			deleteTo:       1539271259000,
+			ignorErrors:	true,
+			data:     		[]tsdbtest.DataPoint{{Time: 1538580053000, Value: 222.2},
+				{Time: 1538925653000, Value: 333.3},
+				{Time: 1539271253000, Value: 444.4}},
+			expected:     	[]tsdbtest.DataPoint{{Time: 1539271253000, Value: 444.4}},
+			expectFail: 	false,
+		},
+		{desc: "Should skip partial partition at beginning and end not in range",
+			deleteFrom:     1538580054000,
+			deleteTo:       1539271252000,
+			ignorErrors:	true,
+			data:     		[]tsdbtest.DataPoint{{Time: 1538580053000, Value: 222.2},
+				{Time: 1538925653000, Value: 333.3},
+				{Time: 1539271253000, Value: 444.4}},
+			expected:     	[]tsdbtest.DataPoint{{Time: 1538580053000, Value: 222.2},
+				{Time: 1539271253000, Value: 444.4}},
+			expectFail: 	false,
+		},
+		{desc: "Should skip partial partition at beginning and end although in range",
+			deleteFrom:     1538580050000,
+			deleteTo:       1539271259000,
+			ignorErrors:	true,
+			data:     		[]tsdbtest.DataPoint{{Time: 1538580053000, Value: 222.2},
+				{Time: 1538925653000, Value: 333.3},
+				{Time: 1539271253000, Value: 444.4}},
+			expected:     	[]tsdbtest.DataPoint{{Time: 1538580053000, Value: 222.2},
+				{Time: 1539271253000, Value: 444.4}},
+			expectFail: 	false,
 		},
 	}
 
@@ -662,7 +704,7 @@ func TestDeleteTable(t *testing.T) {
 
 func testDeleteTSDBCase(test *testing.T, v3ioConfig *config.V3ioConfig, metricsName string, userLabels []utils.Label,
 	data []tsdbtest.DataPoint, deleteFrom int64, deleteTo int64, ignoreErrors bool,
-	expected map[string][]tsdbtest.DataPoint, expectFail bool) {
+	expected []tsdbtest.DataPoint, expectFail bool) {
 
 
 	adapter, teardown := tsdbtest.SetUpWithData(test, v3ioConfig, metricsName, data, userLabels)
@@ -672,7 +714,7 @@ func testDeleteTSDBCase(test *testing.T, v3ioConfig *config.V3ioConfig, metricsN
 		test.Fatalf("Failed to delete DB on teardown. reason: %s", err)
 	}
 
-	qry, err := adapter.Querier(nil, 0, 1999940510)
+	qry, err := adapter.Querier(nil, 0, time.Now().Unix() * 1000)
 	if err != nil {
 		if expectFail {
 			return
@@ -704,7 +746,7 @@ func testDeleteTSDBCase(test *testing.T, v3ioConfig *config.V3ioConfig, metricsN
 		if err != nil {
 			test.Fatal(err)
 		}
-		assert.ElementsMatch(test, expected["1"], actual)
+		assert.ElementsMatch(test, expected, actual)
 	} else {
 		test.Fatalf("Result series is empty while expected result set is not!")
 	}
