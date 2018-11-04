@@ -5,16 +5,16 @@ Verbose: false
 
 # Relative start time as "[0-9]+[mhd]" (default = "48h")
 # The start time will be calculated as now() - startTimeOffset.
-StartTimeOffset: "48h"
+StartTimeOffset: "96h"
 
 # Aggregation interval in milliseconds between samples
-SampleStepSize: 5000
+SampleStepSize: 30000
 
 # Metric-names count - should be within the range [1..26] (for [A..Z])
-NamesCount: 26
+NamesCount: 10
 
 # Name diversity - pattern = Name_[A..Z][_[1..200]]
-NamesDiversity: 10
+NamesDiversity: 5
 
 # should be in range [1..26]
 LabelsCount: 1
@@ -26,14 +26,14 @@ LabelsDiversity: 3
 LabelValuesCount: 1
 
 # Label-values diversity - pattern = [A..Z][_[1..10]]
-LabelsValueDiversity: 10
+LabelsValueDiversity: 5
 
 # Select how the benchmark test will produce the data. If "AppendOneByOne=true",
 # the test will produce one sample per test cycle.
 AppendOneByOne: true
 
 # Batch size - used by the test to fire a specific amount of samples at once
-BatchSize: 32
+BatchSize: 2048
 
 # Cleanup the data after each test
 CleanupAfterTest: true
