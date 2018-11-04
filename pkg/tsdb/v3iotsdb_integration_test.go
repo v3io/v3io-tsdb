@@ -29,6 +29,7 @@ import (
 	"github.com/v3io/v3io-tsdb/pkg/aggregate"
 	"github.com/v3io/v3io-tsdb/pkg/chunkenc"
 	"github.com/v3io/v3io-tsdb/pkg/config"
+	"github.com/v3io/v3io-tsdb/pkg/partmgr"
 	. "github.com/v3io/v3io-tsdb/pkg/tsdb"
 	"github.com/v3io/v3io-tsdb/pkg/tsdb/tsdbtest"
 	"github.com/v3io/v3io-tsdb/pkg/tsdb/tsdbtest/testutils"
@@ -629,64 +630,58 @@ func TestDeleteTable(t *testing.T) {
 		desc         string
 		deleteFrom   int64
 		deleteTo     int64
-		deleteAll	 bool
-		ignorErrors  bool
+		deleteAll    bool
+		ignoreErrors bool
 		data         []tsdbtest.DataPoint
 		expected     []tsdbtest.DataPoint
 		ignoreReason string
-		expectFail   bool
 	}{
 		{desc: "Should delete all table",
 			deleteFrom:     0,
 			deleteTo:       1599999999999,
-			ignorErrors:	true,
+			ignoreErrors:	true,
 			data:     		[]tsdbtest.DataPoint{{Time: 1538580053000, Value: 222.2},
 				{Time: 1538925653000, Value: 333.3},
 				{Time: 1539271253000, Value: 444.4}},
 			expected:		[]tsdbtest.DataPoint{},
-			expectFail: 	false,
 		},
 		{desc: "Should skip partial partition at begining",
 			deleteFrom:     1538580050000,
 			deleteTo:       1999271259000,
-			ignorErrors:	true,
+			ignoreErrors:	true,
 			data:     		[]tsdbtest.DataPoint{{Time: 1538580053000, Value: 222.2},
 				{Time: 1538925653000, Value: 333.3},
 				{Time: 1539271253000, Value: 444.4}},
 			expected:     	[]tsdbtest.DataPoint{{Time: 1538580053000, Value: 222.2}},
-			expectFail: 	false,
 		},
 		{desc: "Should skip partial partition at end",
 			deleteFrom:     0,
 			deleteTo:       1539271259000,
-			ignorErrors:	true,
+			ignoreErrors:	true,
 			data:     		[]tsdbtest.DataPoint{{Time: 1538580053000, Value: 222.2},
 				{Time: 1538925653000, Value: 333.3},
 				{Time: 1539271253000, Value: 444.4}},
 			expected:     	[]tsdbtest.DataPoint{{Time: 1539271253000, Value: 444.4}},
-			expectFail: 	false,
 		},
 		{desc: "Should skip partial partition at beginning and end not in range",
 			deleteFrom:     1538580054000,
 			deleteTo:       1539271252000,
-			ignorErrors:	true,
+			ignoreErrors:	true,
 			data:     		[]tsdbtest.DataPoint{{Time: 1538580053000, Value: 222.2},
 				{Time: 1538925653000, Value: 333.3},
 				{Time: 1539271253000, Value: 444.4}},
 			expected:     	[]tsdbtest.DataPoint{{Time: 1538580053000, Value: 222.2},
 				{Time: 1539271253000, Value: 444.4}},
-			expectFail: 	false,
 		},
 		{desc: "Should skip partial partition at beginning and end although in range",
 			deleteFrom:     1538580050000,
 			deleteTo:       1539271259000,
-			ignorErrors:	true,
+			ignoreErrors:	true,
 			data:     		[]tsdbtest.DataPoint{{Time: 1538580053000, Value: 222.2},
 				{Time: 1538925653000, Value: 333.3},
 				{Time: 1539271253000, Value: 444.4}},
 			expected:     	[]tsdbtest.DataPoint{{Time: 1538580053000, Value: 222.2},
 				{Time: 1539271253000, Value: 444.4}},
-			expectFail: 	false,
 		},
 	}
 
@@ -696,7 +691,7 @@ func TestDeleteTable(t *testing.T) {
 				t.Skip(test.ignoreReason)
 			}
 			testDeleteTSDBCase(t, v3ioConfig, "metricToDelete", utils.LabelsFromStrings("os","linux"),
-				test.data, test.deleteFrom, test.deleteTo, test.ignorErrors, test.expected, test.expectFail)
+				test.data, test.deleteFrom, test.deleteTo, test.ignoreErrors, test.expected)
 		})
 	}
 }
@@ -704,23 +699,30 @@ func TestDeleteTable(t *testing.T) {
 
 func testDeleteTSDBCase(test *testing.T, v3ioConfig *config.V3ioConfig, metricsName string, userLabels []utils.Label,
 	data []tsdbtest.DataPoint, deleteFrom int64, deleteTo int64, ignoreErrors bool,
-	expected []tsdbtest.DataPoint, expectFail bool) {
+	expected []tsdbtest.DataPoint) {
 
 
 	adapter, teardown := tsdbtest.SetUpWithData(test, v3ioConfig, metricsName, data, userLabels)
 	defer teardown()
 
+	pm, err := partmgr.NewPartitionMngr(adapter.GetSchema(), nil, v3ioConfig)
+
+	initiaPartitions := pm.PartsForRange(0, time.Now().Unix() * 1000, true)
+	initialNumberOfPartitions := len(initiaPartitions)
+
+	partitionsToDelete := pm.PartsForRange(deleteFrom, deleteTo, false)
+
 	if err := adapter.DeleteDB(false, ignoreErrors, deleteFrom, deleteTo); err != nil {
 		test.Fatalf("Failed to delete DB on teardown. reason: %s", err)
 	}
 
+	pm1, err := partmgr.NewPartitionMngr(adapter.GetSchema(), nil, v3ioConfig)
+	remainingParts := pm1.PartsForRange(0, time.Now().Unix() * 1000, false)
+	assert.Equal(test, len(remainingParts),  initialNumberOfPartitions - len(partitionsToDelete))
+
 	qry, err := adapter.Querier(nil, 0, time.Now().Unix() * 1000)
 	if err != nil {
-		if expectFail {
-			return
-		} else {
-			test.Fatalf("Failed to create Querier. reason: %v", err)
-		}
+		test.Fatalf("Failed to create Querier. reason: %v", err)
 	}
 
 	set, err := qry.Select(metricsName, "", 0, "")
