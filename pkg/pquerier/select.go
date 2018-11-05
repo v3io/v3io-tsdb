@@ -311,7 +311,9 @@ func (s *selectQueryContext) generateTimeColumn() Column {
 	}
 
 	columnMeta := columnMeta{metric: "time"}
-	return &dataColumn{data: timeBuckets, name: "time", size: size, spec: columnMeta}
+	timeColumn := NewDataColumn("time", columnMeta)
+	timeColumn.SetData(timeBuckets, size)
+	return timeColumn
 }
 
 func (s *selectQueryContext) isRawQuery() bool { return s.functions == "" }

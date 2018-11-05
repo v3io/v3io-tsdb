@@ -2,6 +2,7 @@ package pquerier
 
 import (
 	"fmt"
+	"github.com/pkg/errors"
 	"github.com/v3io/v3io-tsdb/pkg/aggregate"
 	"github.com/v3io/v3io-tsdb/pkg/utils"
 	"reflect"
@@ -96,7 +97,13 @@ func NewDataFrame(columnsSpec []columnMeta, indexColumn Column, lset utils.Label
 		df.metricToCountColumn = map[string]Column{}
 		if !isAllColumnWildcard {
 			for i, col := range columnsSpec {
-				df.columns = append(df.columns, &dataColumn{name: col.getColumnName(), spec: col})
+				var column Column
+				if col.function != 0 {
+					column = NewAggregatedColumn(col.getColumnName(), col)
+				} else {
+					column = NewDataColumn(col.getColumnName(), col)
+				}
+				df.columns = append(df.columns, column)
 				df.byName[col.getColumnName()] = i
 			}
 		}
@@ -121,10 +128,8 @@ type dataFrame struct {
 }
 
 func (d *dataFrame) CalculateColumns() {
-	// TODO - Create AggregatedColumn and use it instead of copying
 	for _, col := range d.columns {
-		aggrData := d.aggregates[col.GetColumnSpec().metric].GetAggregate(col.GetColumnSpec().function)
-		col.SetData(aggrData, len(aggrData))
+		col.(*aggregatedColumn).SetData(d.aggregates[col.GetColumnSpec().metric], col.GetColumnSpec().function)
 		if aggregate.IsCountAggregate(col.GetColumnSpec().function) {
 			d.metricToCountColumn[col.GetColumnSpec().metric] = col
 		}
@@ -204,27 +209,38 @@ type Column interface {
 	StringAt(i int) (string, error) // String value at index i
 	TimeAt(i int) (int64, error)    // time value at index i
 	GetColumnSpec() columnMeta      // Get the column's metadata
-	SetData(interface{}, int)
 }
 
-// DType is data type
-type DType reflect.Type
-
-type dataColumn struct {
+type basicColumn struct {
 	name string
 	size int
-	data interface{}
 	spec columnMeta
 }
 
 // Name returns the column name
-func (dc *dataColumn) Name() string {
-	return dc.name
+func (c *basicColumn) Name() string {
+	return c.name
 }
 
 // Len returns the number of elements
-func (dc *dataColumn) Len() int {
-	return dc.size
+func (c *basicColumn) Len() int {
+	return c.size
+}
+
+func (c *basicColumn) isValidIndex(i int) bool { return i >= 0 && i < c.size }
+
+func (c *basicColumn) GetColumnSpec() columnMeta { return c.spec }
+
+// DType is data type
+type DType reflect.Type
+
+func NewDataColumn(name string, colSpec columnMeta) *dataColumn {
+	return &dataColumn{basicColumn: basicColumn{name: name, spec: colSpec}}
+}
+
+type dataColumn struct {
+	basicColumn
+	data interface{}
 }
 
 // DType returns the data type
@@ -273,11 +289,41 @@ func (dc *dataColumn) TimeAt(i int) (int64, error) {
 
 	return typedCol[i], nil
 }
-func (dc *dataColumn) isValidIndex(i int) bool { return i >= 0 && i < dc.Len() }
-
-func (dc *dataColumn) GetColumnSpec() columnMeta { return dc.spec }
 
 func (dc *dataColumn) SetData(d interface{}, size int) {
 	dc.data = d
 	dc.size = size
+}
+
+func NewAggregatedColumn(name string, colSpec columnMeta) *aggregatedColumn {
+	return &aggregatedColumn{basicColumn: basicColumn{name: name, spec: colSpec}}
+}
+
+type aggregatedColumn struct {
+	basicColumn
+	aggregations *aggregate.RawAggregatedSeries
+	wantedAggr   aggregate.AggrType
+}
+
+func (c *aggregatedColumn) DType() DType {
+	var a float64
+	return reflect.TypeOf(a)
+}
+func (c *aggregatedColumn) FloatAt(i int) (float64, error) {
+	if !c.isValidIndex(i) {
+		return 0, fmt.Errorf("index %d out of bounds [0:%d]", i, c.size)
+	}
+	return c.aggregations.GetAggregate(c.wantedAggr)[i], nil
+}
+func (c *aggregatedColumn) StringAt(i int) (string, error) {
+	return "", errors.New("aggregated column does not support string type")
+}
+func (c *aggregatedColumn) TimeAt(i int) (int64, error) {
+	return 0, errors.New("aggregated column does not support time type")
+}
+
+func (c *aggregatedColumn) SetData(aggregations *aggregate.RawAggregatedSeries, wantedAggr aggregate.AggrType) {
+	c.aggregations = aggregations
+	c.wantedAggr = wantedAggr
+	c.size = len(c.aggregations.GetAggregate(c.wantedAggr))
 }
