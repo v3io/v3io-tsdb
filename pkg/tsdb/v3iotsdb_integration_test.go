@@ -626,12 +626,12 @@ func TestDeleteTable(t *testing.T) {
 		t.Fatalf("unable to load configuration. Error: %v", err)
 	}
 
-	ta,_ := time.Parse(time.RFC3339, "2018-10-03T05:00:00Z")
-	t1 := ta.Unix()*1000
-	tb,_ := time.Parse(time.RFC3339, "2018-10-07T05:00:00Z")
-	t2 := tb.Unix()*1000
-	tc,_ := time.Parse(time.RFC3339, "2018-10-11T05:00:00Z")
-	t3 :=  tc.Unix()*1000
+	ta, _ := time.Parse(time.RFC3339, "2018-10-03T05:00:00Z")
+	t1 := ta.Unix() * 1000
+	tb, _ := time.Parse(time.RFC3339, "2018-10-07T05:00:00Z")
+	t2 := tb.Unix() * 1000
+	tc, _ := time.Parse(time.RFC3339, "2018-10-11T05:00:00Z")
+	t3 := tc.Unix() * 1000
 
 	testCases := []struct {
 		desc         string
@@ -645,7 +645,7 @@ func TestDeleteTable(t *testing.T) {
 	}{
 		{desc: "Should delete all table",
 			deleteFrom:   0,
-			deleteTo: 	  9999999999999,
+			deleteTo:     9999999999999,
 			ignoreErrors: true,
 			data: []tsdbtest.DataPoint{{Time: t1, Value: 222.2},
 				{Time: t2, Value: 333.3},
