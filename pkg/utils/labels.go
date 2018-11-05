@@ -118,6 +118,22 @@ func (ls *Labels) UnmarshalJSON(b []byte) error {
 }
 
 // Hash returns a hash value for the label set.
+func (ls Labels) HashWithMetricName() uint64 {
+	b := make([]byte, 0, 1024)
+
+	for _, v := range ls {
+		b = append(b, v.Name...)
+		b = append(b, sep)
+		b = append(b, v.Value...)
+		b = append(b, sep)
+	}
+
+	hash := xxhash.New()
+	hash.Write(b)
+	return hash.Sum64()
+}
+
+// Hash returns a hash value for the label set.
 func (ls Labels) Hash() uint64 {
 	b := make([]byte, 0, 1024)
 
