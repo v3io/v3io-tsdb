@@ -23,7 +23,6 @@ such restriction.
 package tsdb_test
 
 import (
-	"fmt"
 	"github.com/stretchr/testify/suite"
 	"github.com/v3io/v3io-tsdb/pkg/tsdb"
 	"github.com/v3io/v3io-tsdb/pkg/tsdb/tsdbtest"
@@ -87,7 +86,6 @@ func (suite *testTsdbSuite) TestAppend() {
 			samples[tv{t: t, v: v}] = struct{}{}
 		}
 		result[key] = samples
-		fmt.Println(key, result[key])
 	}
 
 	expected := map[string]map[tv]struct{}{
