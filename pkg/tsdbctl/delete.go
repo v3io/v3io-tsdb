@@ -129,7 +129,7 @@ func (dc *delCommandeer) delete() error {
 
 	err = dc.rootCommandeer.adapter.DeleteDB(dc.deleteAll, dc.ignoreErrors, from, to)
 	if err != nil {
-		return errors.Wrapf(err, "Failed to delete%s TSDB table '%s' in container '%s'.", partialMsg, dc.rootCommandeer.v3iocfg.TablePath, dc.rootCommandeer.v3iocfg.Container)
+		return errors.Wrapf(err, "Failed to delete %s TSDB table '%s' in container '%s'.", partialMsg, dc.rootCommandeer.v3iocfg.TablePath, dc.rootCommandeer.v3iocfg.Container)
 	}
 	fmt.Printf("Successfully deleted %s TSDB table '%s' from container '%s'.\n", partialMsg, dc.rootCommandeer.v3iocfg.TablePath, dc.rootCommandeer.v3iocfg.Container)
 
