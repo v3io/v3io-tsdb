@@ -227,7 +227,7 @@ func (as *AggregateSet) AppendAllCells(cell int, val float64) {
 	}
 }
 
-// append/merge (v3io) aggregation values into aggregation per requested interval/step
+// append/merge server aggregation values into aggregation per requested interval/step
 // if the requested step interval is higher than stored interval we need to collapse multiple cells to one
 func (as *AggregateSet) mergeArrayCell(aggr AggrType, cell int, val uint64) {
 
@@ -243,7 +243,12 @@ func (as *AggregateSet) mergeArrayCell(aggr AggrType, cell int, val uint64) {
 		as.dataArrays[aggr][cell] += float64(val)
 	} else {
 		float := math.Float64frombits(val)
-		as.updateCell(aggr, cell, float)
+		// When getting already aggregated sqr aggregate we just need to sum.
+		if aggr == aggrTypeSqr {
+			as.dataArrays[aggr][cell] += float
+		} else {
+			as.updateCell(aggr, cell, float)
+		}
 	}
 }
 
