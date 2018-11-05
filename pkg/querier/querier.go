@@ -132,7 +132,7 @@ func (q *V3ioQuerier) selectQry(params *SelectParams) (set SeriesSet, err error)
 	q.performanceReporter.WithTimer("QueryTimer", func() {
 		params.Filter = strings.Replace(params.Filter, "__name__", "_name", -1)
 
-		parts := q.partitionMngr.PartsForRange(q.mint, q.maxt)
+		parts := q.partitionMngr.PartsForRange(q.mint, q.maxt, true)
 		if len(parts) == 0 {
 			return
 		}
