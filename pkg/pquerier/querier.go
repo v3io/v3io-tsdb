@@ -73,8 +73,8 @@ func (q *V3ioQuerier) SelectQry(params *SelectParams) (set SeriesSet, err error)
 
 	set = nullSeriesSet{}
 	selectContext := selectQueryContext{
-		mint:              params.From, maxt: params.To, step: params.Step, filter: params.Filter,
-		container:         q.container, logger: q.logger, workers: q.cfg.QryWorkers,
+		mint: params.From, maxt: params.To, step: params.Step, filter: params.Filter,
+		container: q.container, logger: q.logger, workers: q.cfg.QryWorkers,
 		disableClientAggr: q.cfg.DisableClientAggr,
 	}
 
