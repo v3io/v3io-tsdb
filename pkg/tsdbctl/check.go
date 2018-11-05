@@ -231,7 +231,7 @@ func (cc *checkCommandeer) printResponse(resp *v3io.Response) error {
 			if values != nil {
 				bytes := values.([]byte)
 				if strings.HasPrefix(attr, "_v_") {
-					cc.printArrays(bytes)
+					cc.printArrays(attr, bytes)
 				} else {
 					err := cc.printValues(bytes)
 					if err != nil {
@@ -244,15 +244,23 @@ func (cc *checkCommandeer) printResponse(resp *v3io.Response) error {
 	return nil
 }
 
-func (cc *checkCommandeer) printArrays(bytes []byte) {
-	fmt.Print("[")
-	for i, a := range utils.AsInt64Array(bytes) {
+func (cc *checkCommandeer) printArrays(attr string, bytes []byte) {
+	var result strings.Builder
+
+	result.WriteString("[")
+	for i, val := range utils.AsInt64Array(bytes) {
 		if i != 0 {
-			fmt.Print(",")
+			result.WriteString(",")
 		}
-		fmt.Print(math.Float64frombits(a))
+		// Count arrays are integers, while all other aggregates are floats
+		if strings.Contains(attr, "count") {
+			result.WriteString(fmt.Sprintf("%v", val))
+		} else {
+			result.WriteString(fmt.Sprintf("%v", math.Float64frombits(val)))
+		}
 	}
-	fmt.Print("]\n")
+	result.WriteString("]")
+	fmt.Println(result.String())
 }
 func (cc *checkCommandeer) printValues(bytes []byte) error {
 	chunk, err := chunkenc.FromData(cc.rootCommandeer.logger, chunkenc.EncXOR, bytes, 0)
