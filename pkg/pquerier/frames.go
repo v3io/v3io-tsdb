@@ -121,6 +121,7 @@ type dataFrame struct {
 }
 
 func (d *dataFrame) CalculateColumns() {
+	// TODO - Create AggregatedColumn and use it instead of copying
 	for _, col := range d.columns {
 		aggrData := d.aggregates[col.GetColumnSpec().metric].GetAggregate(col.GetColumnSpec().function)
 		col.SetData(aggrData, len(aggrData))

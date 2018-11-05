@@ -271,6 +271,7 @@ func (it *bucketedRawChunkIterator) At() (int64, float64) {
 		if nextT-it.currentBucketTime() > it.step {
 			it.currentBucket = int((nextT - it.mint) / it.step)
 		}
+		// TODO: Get interpolation from column spec + tolerance
 		interpolatedT, interpolatedV := GetInterpolateFunc(interpolateNext)(prevT, nextT, it.currentBucketTime(), prevV, nextV)
 		return interpolatedT, interpolatedV
 	} else {

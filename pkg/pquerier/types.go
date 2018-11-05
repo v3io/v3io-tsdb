@@ -25,6 +25,13 @@ func (q *qryResults) IsClientAggregates() bool {
 	return q.query.aggregationParams != nil && !q.query.aggregationParams.CanAggregate(q.query.partition.AggrType())
 }
 
+type RequestedColumn struct {
+	metric       string
+	alias        string
+	function     string
+	interpolator string
+}
+
 type columnMeta struct {
 	metric         string
 	alias          string
@@ -32,11 +39,13 @@ type columnMeta struct {
 	functionParams []interface{}
 	interpolator   int8
 	isHidden       bool // real columns = columns the user has specifically requested. Hidden columns = columns needed to calculate the real columns but don't show to the user
-	isConcrete     bool // Concrete Column = has real data behind it, Virtual column = described as a function on top of concrete columns
 }
 
 // if a user specifies he wants all metrics
 func (c *columnMeta) isWildcard() bool { return c.metric == "*" }
+
+// Concrete Column = has real data behind it, Virtual column = described as a function on top of concrete columns
+func (c *columnMeta) isConcrete() bool { return aggregate.IsRawAggregate(c.function) }
 func (c *columnMeta) getColumnName() string {
 	return fmt.Sprintf("%v(%v)", c.function.String(), c.metric)
 }

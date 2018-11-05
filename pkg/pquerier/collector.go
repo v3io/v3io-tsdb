@@ -71,6 +71,7 @@ func dummyCollector(ctx *selectQueryContext, index int) {
 func mainCollector(ctx *selectQueryContext, index int) {
 	defer ctx.wg.Done()
 
+	// TODO: Move if to select.go
 	for res := range ctx.requestChannels[index] {
 		if res.IsRawQuery() {
 			rawCollector(res)

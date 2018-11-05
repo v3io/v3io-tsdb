@@ -38,7 +38,21 @@ type SelectParams struct {
 	From, To, Step int64
 	Windows        []int
 	Filter         string
-	columnSpecs    []columnMeta
+	columnSpecs    []RequestedColumn
+}
+
+func (s *SelectParams) getRequestedColumns() []RequestedColumn {
+	if s.columnSpecs != nil {
+		return s.columnSpecs
+	}
+	functions := strings.Split(s.Functions, ",")
+	columns := make([]RequestedColumn, len(functions))
+	for i, function := range functions {
+		trimmed := strings.TrimSpace(function)
+		newCol := RequestedColumn{function: trimmed, metric: s.Name, interpolator: "replace me"}
+		columns[i] = newCol
+	}
+	return columns
 }
 
 // Base query function

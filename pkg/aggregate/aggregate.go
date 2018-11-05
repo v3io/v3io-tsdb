@@ -147,6 +147,15 @@ func AggrsFromString(split []string) (AggrType, error) {
 	return aggrList, nil
 }
 
+func AggregateFromString(aggrString string) (AggrType, error) {
+	trimmed := strings.TrimSpace(aggrString)
+	aggr, ok := aggrTypeString[trimmed]
+	if !ok {
+		return 0, fmt.Errorf("no aggregate named %v", trimmed)
+	}
+	return aggr, nil
+}
+
 // Create a list of aggregate objects from an aggregates mask
 func NewAggregatesList(aggrType AggrType) *AggregatesList {
 	list := AggregatesList{}
@@ -232,6 +241,11 @@ func GetHiddenAggregates(mask AggrType, requestedAggregates []AggrType) []AggrTy
 		}
 	}
 	return hiddenAggregates
+}
+
+func GetHiddenAggregatesWithCount(mask AggrType, requestedAggregates []AggrType) []AggrType {
+	mask |= aggrTypeCount
+	return GetHiddenAggregates(mask, requestedAggregates)
 }
 
 func contains(list []AggrType, item AggrType) bool {

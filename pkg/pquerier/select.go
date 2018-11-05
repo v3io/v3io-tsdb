@@ -228,56 +228,44 @@ func (s *selectQueryContext) createColumnSpecs(params *SelectParams) error {
 	s.columnsSpec = []columnMeta{}
 	s.columnsSpecByMetric = make(map[string][]columnMeta)
 
-	// Directly getting the column specs
-	if params.columnSpecs != nil && len(params.columnSpecs) > 0 {
-		s.columnsSpec = params.columnSpecs
-		// Creating map of column specs by metric name
-		for _, col := range params.columnSpecs {
-			_, ok := s.columnsSpecByMetric[col.metric]
-			if !ok {
-				s.columnsSpecByMetric[col.metric] = []columnMeta{}
-			}
-			s.columnsSpecByMetric[col.metric] = append(s.columnsSpecByMetric[col.metric], col)
-			s.isAllColumns = s.isAllColumns || col.metric == columnWildcard
+	for _, col := range params.getRequestedColumns() {
+		_, ok := s.columnsSpecByMetric[col.metric]
+		if !ok {
+			s.columnsSpecByMetric[col.metric] = []columnMeta{}
 		}
 
-		// Adding hidden columns if needed
-		for metric, cols := range s.columnsSpecByMetric {
-			var metricMask aggregate.AggrType
-			var aggregates []aggregate.AggrType
-			for _, colSpec := range cols {
-				metricMask |= colSpec.function
-				aggregates = append(aggregates, colSpec.function)
-			}
+		colMeta := columnMeta{metric: col.metric, alias: col.alias, interpolator: 0} // todo - change interpolator
 
-			hiddenColumns := aggregate.GetHiddenAggregates(metricMask, aggregates)
-			for _, hiddenAggr := range hiddenColumns {
-				hiddenCol := columnMeta{metric: metric, function: hiddenAggr, isHidden: true, isConcrete: true}
-				s.columnsSpec = append(s.columnsSpec, hiddenCol)
-				s.columnsSpecByMetric[metric] = append(cols, hiddenCol)
-			}
-		}
-		// Create column specs from metric name and aggregation
-	} else {
-		if params.Functions == "" {
-			s.columnsSpec = append(s.columnsSpec, columnMeta{metric: params.Name})
-		} else {
-			mask, aggregates, err := aggregate.StrToAggr(params.Functions)
+		if col.function != "" {
+			aggr, err := aggregate.AggregateFromString(col.function)
 			if err != nil {
 				return err
 			}
-			for _, aggr := range aggregates {
-				s.columnsSpec = append(s.columnsSpec, columnMeta{metric: params.Name, function: aggr, isConcrete: aggregate.IsRawAggregate(aggr)})
-			}
+			colMeta.function = aggr
+		}
+		s.columnsSpecByMetric[col.metric] = append(s.columnsSpecByMetric[col.metric], colMeta)
+		s.columnsSpec = append(s.columnsSpec, colMeta)
+		s.isAllColumns = s.isAllColumns || col.metric == columnWildcard
+	}
 
-			hiddenColumns := aggregate.GetHiddenAggregates(mask, aggregates)
-			for _, hiddenAggr := range hiddenColumns {
-				s.columnsSpec = append(s.columnsSpec, columnMeta{metric: params.Name, function: hiddenAggr, isHidden: true, isConcrete: aggregate.IsRawAggregate(hiddenAggr)})
-			}
+	// Adding hidden columns if needed
+	for metric, cols := range s.columnsSpecByMetric {
+		var aggregatesMask aggregate.AggrType
+		var aggregates []aggregate.AggrType
+		for _, colSpec := range cols {
+			aggregatesMask |= colSpec.function
+			aggregates = append(aggregates, colSpec.function)
 		}
 
-		s.columnsSpecByMetric[params.Name] = s.columnsSpec
-		s.isAllColumns = params.Name == columnWildcard
+		// Add hidden aggregates only if there the user specified aggregations
+		if aggregatesMask != 0 {
+			hiddenColumns := aggregate.GetHiddenAggregatesWithCount(aggregatesMask, aggregates)
+			for _, hiddenAggr := range hiddenColumns {
+				hiddenCol := columnMeta{metric: metric, function: hiddenAggr, isHidden: true}
+				s.columnsSpec = append(s.columnsSpec, hiddenCol)
+				s.columnsSpecByMetric[metric] = append(s.columnsSpecByMetric[metric], hiddenCol)
+			}
+		}
 	}
 
 	if len(s.columnsSpec) == 0 {
@@ -322,7 +310,7 @@ func (s *selectQueryContext) generateTimeColumn() Column {
 		i++
 	}
 
-	columnMeta := columnMeta{isConcrete: true, metric: "time"}
+	columnMeta := columnMeta{metric: "time"}
 	return &dataColumn{data: timeBuckets, name: "time", size: size, spec: columnMeta}
 }
 
