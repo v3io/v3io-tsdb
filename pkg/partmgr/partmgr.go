@@ -279,10 +279,11 @@ func (p *PartitionManager) updatePartitionsFromSchema(schema *config.Schema) err
 	return nil
 }
 
-func (p *PartitionManager) PartsForRange(mint, maxt int64) []*DBPartition {
+//if inclusive is true than partial partitions (not fully in range) will be retireved as well
+func (p *PartitionManager) PartsForRange(mint, maxt int64, inclusive bool) []*DBPartition {
 	var parts []*DBPartition
 	for _, part := range p.partitions {
-		if part.InRange(mint) || part.InRange(maxt) || (mint < part.GetStartTime() && maxt > part.GetEndTime()) {
+		if (mint < part.GetStartTime() && maxt > part.GetEndTime()) || (inclusive && (part.InRange(mint) || part.InRange(maxt))) {
 			parts = append(parts, part)
 		}
 	}

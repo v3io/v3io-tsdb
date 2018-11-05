@@ -73,8 +73,8 @@ func (q *V3ioQuerier) SelectQry(params *SelectParams) (set SeriesSet, err error)
 
 	set = nullSeriesSet{}
 	selectContext := selectQueryContext{
-		mint: params.From, maxt: params.To, step: params.Step, filter: params.Filter,
-		container: q.container, logger: q.logger, workers: q.cfg.QryWorkers,
+		mint:              params.From, maxt: params.To, step: params.Step, filter: params.Filter,
+		container:         q.container, logger: q.logger, workers: q.cfg.QryWorkers,
 		disableClientAggr: q.cfg.DisableClientAggr,
 	}
 
@@ -87,7 +87,7 @@ func (q *V3ioQuerier) SelectQry(params *SelectParams) (set SeriesSet, err error)
 	q.performanceReporter.WithTimer("QueryTimer", func() {
 		params.Filter = strings.Replace(params.Filter, "__name__", "_name", -1)
 
-		parts := q.partitionMngr.PartsForRange(params.From, params.To)
+		parts := q.partitionMngr.PartsForRange(params.From, params.To, true)
 		if len(parts) == 0 {
 			return
 		}

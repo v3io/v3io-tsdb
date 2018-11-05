@@ -47,7 +47,7 @@ func (s *V3ioSeries) Labels() utils.Labels { return s.lset }
 // Get the unique series key for sorting
 func (s *V3ioSeries) GetKey() uint64 {
 	if s.hash == 0 {
-		s.hash = s.lset.Hash()
+		s.hash = s.lset.HashWithMetricName()
 	}
 	return s.hash
 }

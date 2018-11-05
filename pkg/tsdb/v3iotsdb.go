@@ -50,8 +50,7 @@ type V3ioAdapter struct {
 func CreateTSDB(v3iocfg *config.V3ioConfig, schema *config.Schema) error {
 
 	lgr, _ := utils.NewLogger(v3iocfg.LogLevel)
-	container, err := utils.CreateContainer(
-		lgr, v3iocfg.WebApiEndpoint, v3iocfg.Container, v3iocfg.Username, v3iocfg.Password, v3iocfg.Workers)
+	container, err := utils.CreateContainer(lgr, v3iocfg)
 	if err != nil {
 		return errors.Wrap(err, "Failed to create a data container.")
 	}
@@ -95,8 +94,7 @@ func NewV3ioAdapter(cfg *config.V3ioConfig, container *v3io.Container, logger lo
 	if container != nil {
 		newV3ioAdapter.container = container
 	} else {
-		newV3ioAdapter.container, err = utils.CreateContainer(newV3ioAdapter.logger,
-			cfg.WebApiEndpoint, cfg.Container, cfg.Username, cfg.Password, cfg.Workers)
+		newV3ioAdapter.container, err = utils.CreateContainer(newV3ioAdapter.logger, cfg)
 		if err != nil {
 			return nil, errors.Wrap(err, "Failed to create V3IO data container")
 		}
@@ -206,9 +204,9 @@ func (a *V3ioAdapter) DeleteDB(deleteAll bool, ignoreErrors bool, fromTime int64
 		toTime = time.Now().Unix() * 1000
 	}
 
-	partitions := a.partitionMngr.PartsForRange(fromTime, toTime)
+	partitions := a.partitionMngr.PartsForRange(fromTime, toTime, false)
 	for _, part := range partitions {
-		a.logger.Info("Delete partition '%s'.", part.GetTablePath())
+		a.logger.Info("Deleting partition '%s'.", part.GetTablePath())
 		err := utils.DeleteTable(a.logger, a.container, part.GetTablePath(), "", a.cfg.QryWorkers)
 		if err != nil && !ignoreErrors {
 			return errors.Wrapf(err, "Failed to delete partition '%s'.", part.GetTablePath())

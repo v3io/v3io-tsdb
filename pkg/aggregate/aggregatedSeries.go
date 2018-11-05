@@ -5,8 +5,6 @@ import (
 	"math"
 )
 
-var initDataArrayCache = map[AggrType][]float64{}
-
 type RawAggregatedSeries struct {
 	params AggregationParams
 
@@ -132,30 +130,4 @@ func (as *RawAggregatedSeries) toAttrName(aggr AggrType) string {
 func (as *RawAggregatedSeries) isValidCell(cellIndex int) bool {
 	return cellIndex >= 0 &&
 		cellIndex < as.length
-}
-
-func getOrCreateInitDataArray(aggrType AggrType, length int) []float64 {
-	// Create once or override if required size is greater than existing array
-	if initDataArrayCache[aggrType] == nil || len(initDataArrayCache[aggrType]) < length {
-		initDataArrayCache[aggrType] = createInitDataArray(aggrType, length)
-	}
-	return initDataArrayCache[aggrType]
-}
-
-func createInitDataArray(aggrType AggrType, length int) []float64 {
-	// Prepare "clean" array for fastest reset of "uninitialized" data arrays
-	resultArray := make([]float64, length, length)
-	var initWith float64
-	switch aggrType {
-	case aggrTypeMin:
-		initWith = math.Inf(1)
-	case aggrTypeMax:
-		initWith = math.Inf(-1)
-	default:
-		// NOP - default is 0
-	}
-	for i := range resultArray {
-		resultArray[i] = initWith
-	}
-	return resultArray
 }
