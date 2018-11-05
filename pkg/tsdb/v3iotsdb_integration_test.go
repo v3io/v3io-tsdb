@@ -626,6 +626,13 @@ func TestDeleteTable(t *testing.T) {
 		t.Fatalf("unable to load configuration. Error: %v", err)
 	}
 
+	ta,_ := time.Parse(time.RFC3339, "2018-10-03T05:00:00Z")
+	t1 := ta.Unix()*1000
+	tb,_ := time.Parse(time.RFC3339, "2018-10-07T05:00:00Z")
+	t2 := tb.Unix()*1000
+	tc,_ := time.Parse(time.RFC3339, "2018-10-11T05:00:00Z")
+	t3 :=  tc.Unix()*1000
+
 	testCases := []struct {
 		desc         string
 		deleteFrom   int64
@@ -638,50 +645,50 @@ func TestDeleteTable(t *testing.T) {
 	}{
 		{desc: "Should delete all table",
 			deleteFrom:   0,
-			deleteTo:     1599999999999,
+			deleteTo: 	  9999999999999,
 			ignoreErrors: true,
-			data: []tsdbtest.DataPoint{{Time: 1538580053000, Value: 222.2},
-				{Time: 1538925653000, Value: 333.3},
-				{Time: 1539271253000, Value: 444.4}},
+			data: []tsdbtest.DataPoint{{Time: t1, Value: 222.2},
+				{Time: t2, Value: 333.3},
+				{Time: t3, Value: 444.4}},
 			expected: []tsdbtest.DataPoint{},
 		},
 		{desc: "Should skip partial partition at begining",
-			deleteFrom:   1538580050000,
-			deleteTo:     1999271259000,
+			deleteFrom:   t1 - 10000,
+			deleteTo:     9999999999999,
 			ignoreErrors: true,
-			data: []tsdbtest.DataPoint{{Time: 1538580053000, Value: 222.2},
-				{Time: 1538925653000, Value: 333.3},
-				{Time: 1539271253000, Value: 444.4}},
-			expected: []tsdbtest.DataPoint{{Time: 1538580053000, Value: 222.2}},
+			data: []tsdbtest.DataPoint{{Time: t1, Value: 222.2},
+				{Time: t2, Value: 333.3},
+				{Time: t3, Value: 444.4}},
+			expected: []tsdbtest.DataPoint{{Time: t1, Value: 222.2}},
 		},
 		{desc: "Should skip partial partition at end",
 			deleteFrom:   0,
-			deleteTo:     1539271259000,
+			deleteTo:     t3 + 10000,
 			ignoreErrors: true,
-			data: []tsdbtest.DataPoint{{Time: 1538580053000, Value: 222.2},
-				{Time: 1538925653000, Value: 333.3},
-				{Time: 1539271253000, Value: 444.4}},
-			expected: []tsdbtest.DataPoint{{Time: 1539271253000, Value: 444.4}},
+			data: []tsdbtest.DataPoint{{Time: t1, Value: 222.2},
+				{Time: t2, Value: 333.3},
+				{Time: t3, Value: 444.4}},
+			expected: []tsdbtest.DataPoint{{Time: t3, Value: 444.4}},
 		},
 		{desc: "Should skip partial partition at beginning and end not in range",
-			deleteFrom:   1538580054000,
-			deleteTo:     1539271252000,
+			deleteFrom:   t1 + 10000,
+			deleteTo:     t3 - 10000,
 			ignoreErrors: true,
-			data: []tsdbtest.DataPoint{{Time: 1538580053000, Value: 222.2},
-				{Time: 1538925653000, Value: 333.3},
-				{Time: 1539271253000, Value: 444.4}},
-			expected: []tsdbtest.DataPoint{{Time: 1538580053000, Value: 222.2},
-				{Time: 1539271253000, Value: 444.4}},
+			data: []tsdbtest.DataPoint{{Time: t1, Value: 222.2},
+				{Time: t2, Value: 333.3},
+				{Time: t3, Value: 444.4}},
+			expected: []tsdbtest.DataPoint{{Time: t1, Value: 222.2},
+				{Time: t3, Value: 444.4}},
 		},
 		{desc: "Should skip partial partition at beginning and end although in range",
-			deleteFrom:   1538580050000,
-			deleteTo:     1539271259000,
+			deleteFrom:   t1 - 10000,
+			deleteTo:     t3 + 10000,
 			ignoreErrors: true,
-			data: []tsdbtest.DataPoint{{Time: 1538580053000, Value: 222.2},
-				{Time: 1538925653000, Value: 333.3},
-				{Time: 1539271253000, Value: 444.4}},
-			expected: []tsdbtest.DataPoint{{Time: 1538580053000, Value: 222.2},
-				{Time: 1539271253000, Value: 444.4}},
+			data: []tsdbtest.DataPoint{{Time: t1, Value: 222.2},
+				{Time: t2, Value: 333.3},
+				{Time: t3, Value: 444.4}},
+			expected: []tsdbtest.DataPoint{{Time: t1, Value: 222.2},
+				{Time: t3, Value: 444.4}},
 		},
 	}
 
