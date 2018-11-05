@@ -289,6 +289,22 @@ func TestQueryData(t *testing.T) {
 			expected: map[string][]tsdbtest.DataPoint{
 				"count": {{Time: 1537972158402, Value: 1},
 					{Time: 1537973058402, Value: 2}}}},
+
+		{desc: "Should ingest and query server-side aggregates", metricName: "cpu",
+			labels: utils.LabelsFromStrings("os", "linux", "iguaz", "yesplease"),
+			data: []tsdbtest.DataPoint{{Time: 1532940510, Value: 300.3},
+				{Time: 1532940510 + 5, Value: 300.3},
+				{Time: 1532940510 + 10, Value: 100.4}},
+			from:       1532940510,
+			to:         1532940510 + 11,
+			step:       60 * minuteInMillis,
+			aggregates: "sum,count,min,max,sqr,last",
+			expected: map[string][]tsdbtest.DataPoint{"sum": {{Time: 1532940510, Value: 701.0}},
+				"count": {{Time: 1532940510, Value: 3}},
+				"min":   {{Time: 1532940510, Value: 100.4}},
+				"max":   {{Time: 1532940510, Value: 300.3}},
+				"sqr":   {{Time: 1532940510, Value: 190440.3}},
+				"last":  {{Time: 1532940510, Value: 100.4}}}},
 	}
 
 	for _, test := range testCases {
@@ -297,14 +313,14 @@ func TestQueryData(t *testing.T) {
 				t.Skip(test.ignoreReason)
 			}
 			testQueryDataCase(t, v3ioConfig, test.metricName, test.labels,
-				test.data, test.filter, test.aggregates, test.from, test.to, test.expected, test.expectFail)
+				test.data, test.filter, test.aggregates, test.from, test.to, test.step, test.expected, test.expectFail)
 		})
 	}
 }
 
 func testQueryDataCase(test *testing.T, v3ioConfig *config.V3ioConfig,
 	metricsName string, userLabels []utils.Label, data []tsdbtest.DataPoint, filter string, agg string,
-	from int64, to int64, expected map[string][]tsdbtest.DataPoint, expectFail bool) {
+	from int64, to int64, step int64, expected map[string][]tsdbtest.DataPoint, expectFail bool) {
 	adapter, teardown := tsdbtest.SetUpWithData(test, v3ioConfig, metricsName, data, userLabels)
 	defer teardown()
 
@@ -317,7 +333,6 @@ func testQueryDataCase(test *testing.T, v3ioConfig *config.V3ioConfig,
 		}
 	}
 
-	step := int64(5 * 60 * 1000) // 5 minutes
 	set, err := qry.Select(metricsName, agg, step, filter)
 	if err != nil {
 		test.Fatalf("Failed to run Select. reason: %v", err)
