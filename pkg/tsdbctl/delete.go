@@ -117,7 +117,7 @@ func (dc *delCommandeer) delete() error {
 	}
 	if !dc.force {
 		confirmedByUser, err := getConfirmation(
-			fmt.Sprintf("You are about to delete%s TSDB table '%s' in container '%s'. Are you sure?", partialMsg, dc.rootCommandeer.v3iocfg.TablePath, dc.rootCommandeer.v3iocfg.Container))
+			fmt.Sprintf("You are about to delete %s TSDB table '%s' in container '%s'. Are you sure?", partialMsg, dc.rootCommandeer.v3iocfg.TablePath, dc.rootCommandeer.v3iocfg.Container))
 		if err != nil {
 			return err
 		}
