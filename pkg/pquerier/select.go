@@ -19,15 +19,13 @@ type selectQueryContext struct {
 	container *v3io.Container
 	workers   int
 
-	mint, maxt  int64
-	step        int64
-	filter      string
-	shardId     int // TODO: for query sharding/distribution
-	totalShards int
+	mint, maxt int64
+	step       int64
+	filter     string
 
 	// to remove later, replace w column definitions
-	functions, name string
-	windows         []int
+	functions string
+	windows   []int
 
 	// TODO: create columns spec from select query params
 	columnsSpec         []columnMeta
@@ -38,7 +36,6 @@ type selectQueryContext struct {
 	disableAllAggr    bool
 	disableClientAggr bool
 
-	queries         []*partQuery
 	dataFrames      map[uint64]*dataFrame
 	frameList       []*dataFrame
 	requestChannels []chan *qryResults
@@ -49,20 +46,27 @@ type selectQueryContext struct {
 
 func (s *selectQueryContext) start(parts []*partmgr.DBPartition, params *SelectParams) (*frameIterator, error) {
 	s.dataFrames = make(map[uint64]*dataFrame)
-	queries := make([]*partQuery, len(parts))
 
 	s.functions = params.Functions
-	err := s.createColumnSpecs(params)
+	var err error
+	s.columnsSpec, s.columnsSpecByMetric, err = s.createColumnSpecs(params)
 	if err != nil {
 		return nil, err
 	}
 
-	for i, part := range parts {
-		qry, err := s.queryPartition(part)
+	// We query every partition for every requested metric
+	queries := make([]*partQuery, len(parts)*len(s.columnsSpecByMetric))
+
+	var queryIndex int
+	for _, part := range parts {
+		currQueries, err := s.queryPartition(part)
 		if err != nil {
 			return nil, err
 		}
-		queries[i] = qry
+		for _, q := range currQueries {
+			queries[queryIndex] = q
+			queryIndex++
+		}
 	}
 
 	err = s.startCollectors()
@@ -95,7 +99,7 @@ func (s *selectQueryContext) start(parts []*partmgr.DBPartition, params *SelectP
 }
 
 // Query a single partition
-func (s *selectQueryContext) queryPartition(partition *partmgr.DBPartition) (*partQuery, error) {
+func (s *selectQueryContext) queryPartition(partition *partmgr.DBPartition) ([]*partQuery, error) {
 
 	mint, maxt := partition.GetPartitionRange()
 	step := s.step
@@ -108,7 +112,7 @@ func (s *selectQueryContext) queryPartition(partition *partmgr.DBPartition) (*pa
 		mint = s.mint
 	}
 
-	newQuery := &partQuery{mint: mint, maxt: maxt, partition: partition, step: step}
+	var aggregationParams *aggregate.AggregationParams
 	functions := s.functions
 	if functions == "" && step > 0 && step >= partition.RollupTime() && partition.AggrType().HasAverage() {
 		functions = "avg"
@@ -127,7 +131,7 @@ func (s *selectQueryContext) queryPartition(partition *partmgr.DBPartition) (*pa
 			step = partition.RollupTime()
 		}
 
-		aggregationParams, err := aggregate.NewAggregationParams(functions,
+		params, err := aggregate.NewAggregationParams(functions,
 			"v",
 			partition.AggrBuckets(),
 			step,
@@ -137,18 +141,28 @@ func (s *selectQueryContext) queryPartition(partition *partmgr.DBPartition) (*pa
 		if err != nil {
 			return nil, err
 		}
+		aggregationParams = params
 
-		// TODO: init/use a new aggr objects
-		newQuery.preAggregated = aggregationParams.CanAggregate(partition.AggrType())
-		if newQuery.preAggregated || !s.disableClientAggr {
-			newQuery.aggregationParams = aggregationParams
-		}
 	}
 
 	// TODO: name may become a list and separated to multiple GetItems range queries
-	err := newQuery.getItems(s, s.name)
 
-	return newQuery, err
+	var queries []*partQuery
+	var err error
+	for metric := range s.columnsSpecByMetric {
+		newQuery := &partQuery{mint: mint, maxt: maxt, partition: partition, step: step}
+		if aggregationParams != nil {
+			newQuery.preAggregated = aggregationParams.CanAggregate(partition.AggrType())
+			if newQuery.preAggregated || !s.disableClientAggr {
+				newQuery.aggregationParams = aggregationParams
+			}
+		}
+
+		err = newQuery.getItems(s, metric)
+		queries = append(queries, newQuery)
+	}
+
+	return queries, err
 }
 
 func (s *selectQueryContext) startCollectors() error {
@@ -224,14 +238,14 @@ func (s *selectQueryContext) processQueryResults(query *partQuery) error {
 	return query.Err()
 }
 
-func (s *selectQueryContext) createColumnSpecs(params *SelectParams) error {
-	s.columnsSpec = []columnMeta{}
-	s.columnsSpecByMetric = make(map[string][]columnMeta)
+func (s *selectQueryContext) createColumnSpecs(params *SelectParams) ([]columnMeta, map[string][]columnMeta, error) {
+	var columnsSpec []columnMeta
+	columnsSpecByMetric := make(map[string][]columnMeta)
 
 	for _, col := range params.getRequestedColumns() {
-		_, ok := s.columnsSpecByMetric[col.metric]
+		_, ok := columnsSpecByMetric[col.metric]
 		if !ok {
-			s.columnsSpecByMetric[col.metric] = []columnMeta{}
+			columnsSpecByMetric[col.metric] = []columnMeta{}
 		}
 
 		colMeta := columnMeta{metric: col.metric, alias: col.alias, interpolator: 0} // todo - change interpolator
@@ -239,17 +253,17 @@ func (s *selectQueryContext) createColumnSpecs(params *SelectParams) error {
 		if col.function != "" {
 			aggr, err := aggregate.AggregateFromString(col.function)
 			if err != nil {
-				return err
+				return nil, nil, err
 			}
 			colMeta.function = aggr
 		}
-		s.columnsSpecByMetric[col.metric] = append(s.columnsSpecByMetric[col.metric], colMeta)
-		s.columnsSpec = append(s.columnsSpec, colMeta)
+		columnsSpecByMetric[col.metric] = append(columnsSpecByMetric[col.metric], colMeta)
+		columnsSpec = append(columnsSpec, colMeta)
 		s.isAllColumns = s.isAllColumns || col.metric == columnWildcard
 	}
 
 	// Adding hidden columns if needed
-	for metric, cols := range s.columnsSpecByMetric {
+	for metric, cols := range columnsSpecByMetric {
 		var aggregatesMask aggregate.AggrType
 		var aggregates []aggregate.AggrType
 		for _, colSpec := range cols {
@@ -262,16 +276,16 @@ func (s *selectQueryContext) createColumnSpecs(params *SelectParams) error {
 			hiddenColumns := aggregate.GetHiddenAggregatesWithCount(aggregatesMask, aggregates)
 			for _, hiddenAggr := range hiddenColumns {
 				hiddenCol := columnMeta{metric: metric, function: hiddenAggr, isHidden: true}
-				s.columnsSpec = append(s.columnsSpec, hiddenCol)
-				s.columnsSpecByMetric[metric] = append(s.columnsSpecByMetric[metric], hiddenCol)
+				columnsSpec = append(columnsSpec, hiddenCol)
+				columnsSpecByMetric[metric] = append(columnsSpecByMetric[metric], hiddenCol)
 			}
 		}
 	}
 
-	if len(s.columnsSpec) == 0 {
-		return errors.Errorf("no Columns were specified for query: %v", params)
+	if len(columnsSpec) == 0 {
+		return nil, nil, errors.Errorf("no Columns were specified for query: %v", params)
 	}
-	return nil
+	return columnsSpec, columnsSpecByMetric, nil
 }
 
 func (s *selectQueryContext) AddColumnSpecByWildcard(metricName string) {
@@ -339,7 +353,7 @@ type partQuery struct {
 func (s *partQuery) getItems(ctx *selectQueryContext, name string) error {
 
 	path := s.partition.GetTablePath()
-	shardingKeys := []string{}
+	var shardingKeys []string
 	if name != "" {
 		shardingKeys = s.partition.GetShardingKeys(name)
 	}

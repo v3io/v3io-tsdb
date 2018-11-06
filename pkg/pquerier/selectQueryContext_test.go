@@ -64,13 +64,14 @@ func TestCreateColumnSpecs(t *testing.T) {
 	for _, test := range testCases {
 		t.Run(test.desc, func(t *testing.T) {
 			ctx := selectQueryContext{}
-			err := ctx.createColumnSpecs(&test.params)
+
+			columnsSpec, columnsSpecByMetric, err := ctx.createColumnSpecs(&test.params)
 
 			if err != nil {
 				t.Fatal(err)
 			}
-			assert.ElementsMatch(t, test.expectedSpecs, ctx.columnsSpec)
-			assert.Equal(t, test.expectedSpecsMap, ctx.columnsSpecByMetric)
+			assert.ElementsMatch(t, test.expectedSpecs, columnsSpec)
+			assert.Equal(t, test.expectedSpecsMap, columnsSpecByMetric)
 		})
 	}
 }
