@@ -195,7 +195,8 @@ func (a *V3ioAdapter) DeleteDB(deleteAll bool, ignoreErrors bool, fromTime int64
 	if deleteAll {
 		// Ignore time boundaries
 		fromTime = 0
-		toTime = time.Now().Unix() * 1000
+		partitionInterval, _ := utils.Str2duration(a.partitionMngr.GetConfig().PartitionSchemaInfo.PartitionerInterval)
+		toTime = time.Now().Unix()*1000 + partitionInterval
 	}
 
 	partitions := a.partitionMngr.PartsForRange(fromTime, toTime, false)
