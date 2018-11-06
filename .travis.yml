@@ -4,10 +4,11 @@ go:
   - "1.10.x"
 
 script:
+  - "travis_wait 30 sleep 1800 &"
   - make test
   - make lint
-  - travis_wait 15 V3IO_TSDB_CONFIG="$TRAVIS_BUILD_DIR/travis_v3io.yaml" TSDB_TEST_TABLE_PATH="TSDB_INTEGRATION_TESTS/$TRAVIS_BUILD_NUMBER" make integration
-  - travis_wait 15 V3IO_TSDB_CONFIG="$TRAVIS_BUILD_DIR/travis_v3io_bench.yaml" TSDB_TEST_TABLE_PATH="TSDB_INTEGRATION_TESTS/$TRAVIS_BUILD_NUMBER" TSDB_BENCH_INGEST_CONFIG="$TRAVIS_BUILD_DIR/test/benchmark/testdata/tsdb-bench-test-config-ci.yaml" make bench
+  - V3IO_TSDB_CONFIG="$TRAVIS_BUILD_DIR/travis_v3io.yaml" TSDB_TEST_TABLE_PATH="TSDB_INTEGRATION_TESTS/$TRAVIS_BUILD_NUMBER" make integration
+  - V3IO_TSDB_CONFIG="$TRAVIS_BUILD_DIR/travis_v3io_bench.yaml" TSDB_TEST_TABLE_PATH="TSDB_INTEGRATION_TESTS/$TRAVIS_BUILD_NUMBER" TSDB_BENCH_INGEST_CONFIG="$TRAVIS_BUILD_DIR/test/benchmark/testdata/tsdb-bench-test-config-ci.yaml" make bench
 
 before_deploy:
   - GOOS=linux GOARCH=amd64 make build
