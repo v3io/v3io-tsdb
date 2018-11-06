@@ -33,6 +33,7 @@ import (
 	"github.com/v3io/v3io-tsdb/pkg/querier"
 	"github.com/v3io/v3io-tsdb/pkg/tsdb/schema"
 	"github.com/v3io/v3io-tsdb/pkg/utils"
+	"math"
 	pathUtil "path"
 	"time"
 )
@@ -195,12 +196,12 @@ func (a *V3ioAdapter) DeleteDB(deleteAll bool, ignoreErrors bool, fromTime int64
 	if deleteAll {
 		// Ignore time boundaries
 		fromTime = 0
-		toTime = time.Now().Unix() * 1000
+		toTime = math.MaxInt64
 	}
 
-	partitions := a.partitionMngr.PartsForRange(fromTime, toTime)
+	partitions := a.partitionMngr.PartsForRange(fromTime, toTime, false)
 	for _, part := range partitions {
-		a.logger.Info("Delete partition '%s'.", part.GetTablePath())
+		a.logger.Info("Deleting partition '%s'.", part.GetTablePath())
 		err := utils.DeleteTable(a.logger, a.container, part.GetTablePath(), "", a.cfg.QryWorkers)
 		if err != nil && !ignoreErrors {
 			return errors.Wrapf(err, "Failed to delete partition '%s'.", part.GetTablePath())

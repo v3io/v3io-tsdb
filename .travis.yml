@@ -7,6 +7,7 @@ script:
   - make test
   - make lint
   - V3IO_TSDB_CONFIG="$TRAVIS_BUILD_DIR/travis_v3io.yaml" TSDB_TEST_TABLE_PATH="TSDB_INTEGRATION_TESTS/$TRAVIS_BUILD_NUMBER" make integration
+  - V3IO_TSDB_CONFIG="$TRAVIS_BUILD_DIR/travis_v3io_bench.yaml" TSDB_TEST_TABLE_PATH="TSDB_INTEGRATION_TESTS/$TRAVIS_BUILD_NUMBER" TSDB_BENCH_INGEST_CONFIG="$TRAVIS_BUILD_DIR/test/benchmark/testdata/tsdb-bench-test-config-ci.yaml" make bench
 
 before_deploy:
   - GOOS=linux GOARCH=amd64 make build

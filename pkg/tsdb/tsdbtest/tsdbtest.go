@@ -72,7 +72,7 @@ func SetUp(t testing.TB, v3ioConfig *config.V3ioConfig) func() {
 	return func() {
 		defer metricReporter.Stop()
 		// Don't delete the TSDB table if the test failed
-		if !t.Failed() {
+		if !t.Failed() && !t.Skipped() {
 			DeleteTSDB(t, v3ioConfig)
 		}
 	}

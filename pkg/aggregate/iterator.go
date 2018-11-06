@@ -27,6 +27,9 @@ import (
 	"strings"
 )
 
+// Local cache of init arrays per aggregate type. Used to mimic memcopy and initialize data arrays with specific values
+var initDataArrayCache = map[AggrType][]float64{}
+
 type AggregateSeries struct {
 	colName        string     // column name ("v" in timeseries)
 	functions      []AggrType // list of aggregation functions to return (count, avg, sum, ..)
@@ -129,7 +132,9 @@ func (as *AggregateSeries) NewSetFromAttrs(
 				return nil, fmt.Errorf("aggregation attribute %s was not found", as.toAttrName(aggr))
 			}
 			aggrArrays[aggr] = utils.AsInt64Array(attrBlob.([]byte))
+
 			dataArrays[aggr] = make([]float64, length, length)
+			copy(dataArrays[aggr], getOrCreateInitDataArray(aggr, length))
 		}
 	}
 
@@ -184,6 +189,8 @@ func (as *AggregateSeries) NewSetFromChunks(length int) *AggregateSet {
 	for _, aggr := range rawAggregates {
 		if aggr&as.aggrMask != 0 {
 			dataArrays[aggr] = make([]float64, length, length) // TODO: len/capacity & reuse (pool)
+			initArray := getOrCreateInitDataArray(aggr, length)
+			copy(dataArrays[aggr], initArray)
 		}
 	}
 
@@ -220,7 +227,7 @@ func (as *AggregateSet) AppendAllCells(cell int, val float64) {
 	}
 }
 
-// append/merge (v3io) aggregation values into aggregation per requested interval/step
+// append/merge server aggregation values into aggregation per requested interval/step
 // if the requested step interval is higher than stored interval we need to collapse multiple cells to one
 func (as *AggregateSet) mergeArrayCell(aggr AggrType, cell int, val uint64) {
 
@@ -236,7 +243,12 @@ func (as *AggregateSet) mergeArrayCell(aggr AggrType, cell int, val uint64) {
 		as.dataArrays[aggr][cell] += float64(val)
 	} else {
 		float := math.Float64frombits(val)
-		as.updateCell(aggr, cell, float)
+		// When getting already aggregated sqr aggregate we just need to sum.
+		if aggr == aggrTypeSqr {
+			as.dataArrays[aggr][cell] += float
+		} else {
+			as.updateCell(aggr, cell, float)
+		}
 	}
 }
 
@@ -252,6 +264,7 @@ func (as *AggregateSet) updateCell(aggr AggrType, cell int, val float64) {
 		return
 	}
 
+	cellValue := as.dataArrays[aggr][cell]
 	switch aggr {
 	case aggrTypeCount:
 		as.dataArrays[aggr][cell] += 1
@@ -260,11 +273,11 @@ func (as *AggregateSet) updateCell(aggr AggrType, cell int, val float64) {
 	case aggrTypeSqr:
 		as.dataArrays[aggr][cell] += val * val
 	case aggrTypeMin:
-		if !as.HasData(cell) || val < as.dataArrays[aggr][cell] {
+		if val < cellValue {
 			as.dataArrays[aggr][cell] = val
 		}
 	case aggrTypeMax:
-		if !as.HasData(cell) || val > as.dataArrays[aggr][cell] {
+		if val > cellValue {
 			as.dataArrays[aggr][cell] = val
 		}
 	case aggrTypeLast:
@@ -339,11 +352,41 @@ func (as *AggregateSet) GetCellTime(base int64, index int) int64 {
 func (as *AggregateSet) Clear() {
 	as.maxCell = 0
 	for aggr := range as.dataArrays {
-		as.dataArrays[aggr] = as.dataArrays[aggr][:0]
+		initArray := getOrCreateInitDataArray(aggr, len(as.dataArrays[0]))
+		copy(as.dataArrays[aggr], initArray)
 	}
 }
 
 // Check if cell has data. Assumes that count is always present
 func (as *AggregateSet) HasData(cell int) bool {
 	return as.dataArrays[aggrTypeCount][cell] > 0
+}
+
+func getOrCreateInitDataArray(aggrType AggrType, length int) []float64 {
+	// Create once or override if required size is greater than existing array
+	if initDataArrayCache[aggrType] == nil || len(initDataArrayCache[aggrType]) < length {
+		initDataArrayCache[aggrType] = createInitDataArray(aggrType, length)
+	}
+	return initDataArrayCache[aggrType]
+}
+
+func createInitDataArray(aggrType AggrType, length int) []float64 {
+	// Prepare "clean" array for fastest reset of "uninitialized" data arrays
+	resultArray := make([]float64, length, length)
+
+	var initWith float64
+	switch aggrType {
+	case aggrTypeMin:
+		initWith = math.Inf(1)
+	case aggrTypeMax:
+		initWith = math.Inf(-1)
+	default:
+		// NOP - default is 0
+	}
+
+	for i := range resultArray {
+		resultArray[i] = initWith
+	}
+
+	return resultArray
 }

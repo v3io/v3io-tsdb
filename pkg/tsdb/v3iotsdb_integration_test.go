@@ -29,10 +29,12 @@ import (
 	"github.com/v3io/v3io-tsdb/pkg/aggregate"
 	"github.com/v3io/v3io-tsdb/pkg/chunkenc"
 	"github.com/v3io/v3io-tsdb/pkg/config"
+	"github.com/v3io/v3io-tsdb/pkg/partmgr"
 	. "github.com/v3io/v3io-tsdb/pkg/tsdb"
 	"github.com/v3io/v3io-tsdb/pkg/tsdb/tsdbtest"
 	"github.com/v3io/v3io-tsdb/pkg/tsdb/tsdbtest/testutils"
 	"github.com/v3io/v3io-tsdb/pkg/utils"
+	"math"
 	"sort"
 	"testing"
 	"time"
@@ -289,6 +291,22 @@ func TestQueryData(t *testing.T) {
 			expected: map[string][]tsdbtest.DataPoint{
 				"count": {{Time: 1537972158402, Value: 1},
 					{Time: 1537973058402, Value: 2}}}},
+
+		{desc: "Should ingest and query server-side aggregates", metricName: "cpu",
+			labels: utils.LabelsFromStrings("os", "linux", "iguaz", "yesplease"),
+			data: []tsdbtest.DataPoint{{Time: 1532940510, Value: 300.3},
+				{Time: 1532940510 + 5, Value: 300.3},
+				{Time: 1532940510 + 10, Value: 100.4}},
+			from:       1532940510,
+			to:         1532940510 + 11,
+			step:       60 * minuteInMillis,
+			aggregates: "sum,count,min,max,sqr,last",
+			expected: map[string][]tsdbtest.DataPoint{"sum": {{Time: 1532940510, Value: 701.0}},
+				"count": {{Time: 1532940510, Value: 3}},
+				"min":   {{Time: 1532940510, Value: 100.4}},
+				"max":   {{Time: 1532940510, Value: 300.3}},
+				"sqr":   {{Time: 1532940510, Value: 190440.3}},
+				"last":  {{Time: 1532940510, Value: 100.4}}}},
 	}
 
 	for _, test := range testCases {
@@ -297,14 +315,14 @@ func TestQueryData(t *testing.T) {
 				t.Skip(test.ignoreReason)
 			}
 			testQueryDataCase(t, v3ioConfig, test.metricName, test.labels,
-				test.data, test.filter, test.aggregates, test.from, test.to, test.expected, test.expectFail)
+				test.data, test.filter, test.aggregates, test.from, test.to, test.step, test.expected, test.expectFail)
 		})
 	}
 }
 
 func testQueryDataCase(test *testing.T, v3ioConfig *config.V3ioConfig,
 	metricsName string, userLabels []utils.Label, data []tsdbtest.DataPoint, filter string, agg string,
-	from int64, to int64, expected map[string][]tsdbtest.DataPoint, expectFail bool) {
+	from int64, to int64, step int64, expected map[string][]tsdbtest.DataPoint, expectFail bool) {
 	adapter, teardown := tsdbtest.SetUpWithData(test, v3ioConfig, metricsName, data, userLabels)
 	defer teardown()
 
@@ -317,7 +335,6 @@ func testQueryDataCase(test *testing.T, v3ioConfig *config.V3ioConfig,
 		}
 	}
 
-	step := int64(5 * 60 * 1000) // 5 minutes
 	set, err := qry.Select(metricsName, agg, step, filter)
 	if err != nil {
 		test.Fatalf("Failed to run Select. reason: %v", err)
@@ -616,6 +633,175 @@ func TestDeleteTSDB(t *testing.T) {
 	container.ListBucket(&v3io.ListBucketInput{Path: v3ioConfig.TablePath}, 30, responseChan)
 	if res := <-responseChan; res.Error == nil {
 		t.Fatal("Did not delete TSDB properly")
+	}
+}
+
+func TestDeleteTable(t *testing.T) {
+	v3ioConfig, err := tsdbtest.LoadV3ioConfig()
+	if err != nil {
+		t.Fatalf("unable to load configuration. Error: %v", err)
+	}
+
+	ta, _ := time.Parse(time.RFC3339, "2018-10-03T05:00:00Z")
+	t1 := ta.Unix() * 1000
+	tb, _ := time.Parse(time.RFC3339, "2018-10-07T05:00:00Z")
+	t2 := tb.Unix() * 1000
+	tc, _ := time.Parse(time.RFC3339, "2018-10-11T05:00:00Z")
+	t3 := tc.Unix() * 1000
+	td, _ := time.Parse(time.RFC3339, "now + 1w")
+	futurePoint := td.Unix() * 1000
+
+	testCases := []struct {
+		desc         string
+		deleteFrom   int64
+		deleteTo     int64
+		deleteAll    bool
+		ignoreErrors bool
+		data         []tsdbtest.DataPoint
+		expected     []tsdbtest.DataPoint
+		ignoreReason string
+	}{
+		{desc: "Should delete all table by time",
+			deleteFrom:   0,
+			deleteTo:     9999999999999,
+			deleteAll:    false,
+			ignoreErrors: true,
+			data: []tsdbtest.DataPoint{{Time: t1, Value: 222.2},
+				{Time: t2, Value: 333.3},
+				{Time: t3, Value: 444.4}},
+			expected: []tsdbtest.DataPoint{},
+		},
+		{desc: "Should delete all table by deleteAll",
+			deleteFrom:   0,
+			deleteTo:     0,
+			deleteAll:    true,
+			ignoreErrors: true,
+			data: []tsdbtest.DataPoint{{Time: t1, Value: 222.2},
+				{Time: t2, Value: 333.3},
+				{Time: t3, Value: 444.4},
+				{Time: futurePoint, Value: 555.5}},
+			expected: []tsdbtest.DataPoint{},
+		},
+		{desc: "Should skip partial partition at begining",
+			deleteFrom:   t1 - 10000,
+			deleteTo:     9999999999999,
+			deleteAll:    false,
+			ignoreErrors: true,
+			data: []tsdbtest.DataPoint{{Time: t1, Value: 222.2},
+				{Time: t2, Value: 333.3},
+				{Time: t3, Value: 444.4}},
+			expected: []tsdbtest.DataPoint{{Time: t1, Value: 222.2}},
+		},
+		{desc: "Should skip partial partition at end",
+			deleteFrom:   0,
+			deleteTo:     t3 + 10000,
+			deleteAll:    false,
+			ignoreErrors: true,
+			data: []tsdbtest.DataPoint{{Time: t1, Value: 222.2},
+				{Time: t2, Value: 333.3},
+				{Time: t3, Value: 444.4}},
+			expected: []tsdbtest.DataPoint{{Time: t3, Value: 444.4}},
+		},
+		{desc: "Should skip partial partition at beginning and end not in range",
+			deleteFrom:   t1 + 10000,
+			deleteTo:     t3 - 10000,
+			deleteAll:    false,
+			ignoreErrors: true,
+			data: []tsdbtest.DataPoint{{Time: t1, Value: 222.2},
+				{Time: t2, Value: 333.3},
+				{Time: t3, Value: 444.4}},
+			expected: []tsdbtest.DataPoint{{Time: t1, Value: 222.2},
+				{Time: t3, Value: 444.4}},
+		},
+		{desc: "Should skip partial partition at beginning and end although in range",
+			deleteFrom:   t1 - 10000,
+			deleteTo:     t3 + 10000,
+			deleteAll:    false,
+			ignoreErrors: true,
+			data: []tsdbtest.DataPoint{{Time: t1, Value: 222.2},
+				{Time: t2, Value: 333.3},
+				{Time: t3, Value: 444.4}},
+			expected: []tsdbtest.DataPoint{{Time: t1, Value: 222.2},
+				{Time: t3, Value: 444.4}},
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.desc, func(t *testing.T) {
+			if test.ignoreReason != "" {
+				t.Skip(test.ignoreReason)
+			}
+			testDeleteTSDBCase(t, v3ioConfig, "metricToDelete", utils.LabelsFromStrings("os", "linux"),
+				test.data, test.deleteFrom, test.deleteTo, test.ignoreErrors, test.deleteAll, test.expected)
+		})
+	}
+}
+
+func testDeleteTSDBCase(test *testing.T, v3ioConfig *config.V3ioConfig, metricsName string, userLabels []utils.Label,
+	data []tsdbtest.DataPoint, deleteFrom int64, deleteTo int64, ignoreErrors bool, deleteAll bool,
+	expected []tsdbtest.DataPoint) {
+
+	adapter, teardown := tsdbtest.SetUpWithData(test, v3ioConfig, metricsName, data, userLabels)
+	defer teardown()
+
+	pm, err := partmgr.NewPartitionMngr(adapter.GetSchema(), nil, v3ioConfig)
+	if err != nil {
+		test.Fatalf("Failed to create new partition manager. reason: %s", err)
+	}
+
+	initiaPartitions := pm.PartsForRange(0, math.MaxInt64, true)
+	initialNumberOfPartitions := len(initiaPartitions)
+
+	partitionsToDelete := pm.PartsForRange(deleteFrom, deleteTo, false)
+
+	if err := adapter.DeleteDB(deleteAll, ignoreErrors, deleteFrom, deleteTo); err != nil {
+		test.Fatalf("Failed to delete DB. reason: %s", err)
+	}
+
+	if deleteAll {
+		_, err := NewV3ioAdapter(v3ioConfig, nil, nil)
+		if err == nil {
+			test.Fatalf("Table was deleted - failure to create adapter is expected...")
+		}
+		test.Skip("skipping tearDown since table is completely deleted")
+	} else {
+		pm1, err := partmgr.NewPartitionMngr(adapter.GetSchema(), nil, v3ioConfig)
+		remainingParts := pm1.PartsForRange(0, math.MaxInt64, false)
+		assert.Equal(test, len(remainingParts), initialNumberOfPartitions-len(partitionsToDelete))
+
+		qry, err := adapter.Querier(nil, 0, math.MaxInt64)
+		if err != nil {
+			test.Fatalf("Failed to create Querier. reason: %v", err)
+		}
+
+		set, err := qry.Select(metricsName, "", 0, "")
+		if err != nil {
+			test.Fatalf("Failed to run Select. reason: %v", err)
+		}
+
+		set.Next()
+		if set.Err() != nil {
+			test.Fatalf("Failed to query metric. reason: %v", set.Err())
+		}
+
+		series := set.At()
+		if series == nil && len(expected) == 0 {
+			//table is expected to be empty
+		} else if series != nil {
+			iter := series.Iterator()
+			if iter.Err() != nil {
+				test.Fatalf("Failed to query data series. reason: %v", iter.Err())
+			}
+
+			actual, err := iteratorToSlice(iter)
+			if err != nil {
+				test.Fatal(err)
+			}
+			assert.ElementsMatch(test, expected, actual)
+		} else {
+			test.Fatalf("Result series is empty while expected result set is not!")
+		}
+
 	}
 }
 

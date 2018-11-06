@@ -104,20 +104,29 @@ func TestPartsForRange(tst *testing.T) {
 	}
 	assert.Equal(tst, numPartitions, len(manager.partitions))
 	// Get all partitions
-	assert.Equal(tst, manager.partitions, manager.PartsForRange(0, interval*int64(numPartitions+1)))
+	assert.Equal(tst, manager.partitions, manager.PartsForRange(0, interval*int64(numPartitions+1), true))
 	// Get no partitions
-	assert.Equal(tst, 0, len(manager.PartsForRange(0, interval-1)))
+	assert.Equal(tst, 0, len(manager.PartsForRange(0, interval-1, true)), true)
 	// Get the first 2 partitions
-	parts := manager.PartsForRange(0, interval*2+1)
+	parts := manager.PartsForRange(0, interval*2+1, true)
 	assert.Equal(tst, 2, len(parts))
 	assert.Equal(tst, manager.partitions[0], parts[0])
 	assert.Equal(tst, manager.partitions[1], parts[1])
 	// Get the middle 3 partitions
-	parts = manager.PartsForRange(interval*2, interval*4+1)
+	parts = manager.PartsForRange(interval*2, interval*4+1, true)
 	assert.Equal(tst, 3, len(parts))
 	assert.Equal(tst, manager.partitions[1], parts[0])
 	assert.Equal(tst, manager.partitions[2], parts[1])
 	assert.Equal(tst, manager.partitions[3], parts[2])
+	// Get the middle partition by inclusive=false
+	parts = manager.PartsForRange(interval*2+1, interval*4+1, false)
+	assert.Equal(tst, 1, len(parts))
+	assert.Equal(tst, manager.partitions[2], parts[0])
+	// Get the middle partition by inclusive=false
+	parts = manager.PartsForRange(interval*2-1, interval*4+1, false)
+	assert.Equal(tst, 2, len(parts))
+	assert.Equal(tst, manager.partitions[1], parts[0])
+	assert.Equal(tst, manager.partitions[2], parts[1])
 }
 
 func TestTime2Bucket(tst *testing.T) {
