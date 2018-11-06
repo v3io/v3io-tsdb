@@ -22,6 +22,7 @@ package config
 
 import (
 	"github.com/ghodss/yaml"
+	"github.com/imdario/mergo"
 	"github.com/pkg/errors"
 	"io/ioutil"
 	"os"
@@ -213,6 +214,31 @@ func GetOrLoadFromStruct(cfg *V3ioConfig) (*V3ioConfig, error) {
 	})
 
 	return instance, nil
+}
+
+// Update the defaults when using an existing configuration structure (custom configuration)
+func WithDefaults(cfg *V3ioConfig) *V3ioConfig {
+	initDefaults(cfg)
+	return cfg
+}
+
+// Create new configuration structure instance based on given instance.
+// All matching attributes within result structure will be overwritten with values of newCfg
+func (currentCfg *V3ioConfig) Merge(newCfg *V3ioConfig) (*V3ioConfig, error) {
+	resultCfg, err := currentCfg.merge(newCfg)
+	if err != nil {
+		return nil, err
+	}
+
+	return resultCfg, nil
+}
+
+func (*V3ioConfig) merge(cfg *V3ioConfig) (*V3ioConfig, error) {
+	mergedCfg := V3ioConfig{}
+	if err := mergo.Merge(&mergedCfg, cfg, mergo.WithOverride); err != nil {
+		return nil, errors.Wrap(err, "Unable to merge configurations.")
+	}
+	return &mergedCfg, nil
 }
 
 func loadConfig(path string) (*V3ioConfig, error) {
