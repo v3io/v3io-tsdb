@@ -51,6 +51,8 @@ type MetricState struct {
 	hash  uint64
 	refId uint64
 
+	aggrs []*MetricState
+
 	store      *chunkStore
 	err        error
 	retryCount uint8
@@ -214,16 +216,34 @@ func (mc *MetricsCache) Add(lset utils.LabelsIfc, t int64, v interface{}) (uint6
 	name, key, hash := lset.GetKey()
 	metric, ok := mc.getMetric(name, hash)
 
+	var aggrMetrics []*MetricState
 	if !ok {
-		metric = &MetricState{Lset: lset, key: key, name: name, hash: hash}
+		for _, layer := range mc.partitionMngr.GetConfig().TableSchemaInfo.RollupLayers {
+			for _, preAggr := range layer.PreAggregates {
+				subLset := lset.Filter(preAggr.Labels)
+				_, _, hash := subLset.GetKey()
+				aggrMetric, ok := mc.getMetric(name, hash)
+				if !ok {
+					aggrMetric = &MetricState{Lset: lset, key: key, name: name, hash: hash}
+					mc.addMetric(hash, name, aggrMetric)
+					aggrMetrics = append(aggrMetrics, aggrMetric)
+				}
+			}
+		}
+		metric = &MetricState{Lset: lset, key: key, name: name, hash: hash, aggrs: aggrMetrics}
 		metric.store = NewChunkStore(mc.logger)
 		mc.addMetric(hash, name, metric)
+	} else {
+		aggrMetrics = metric.aggrs
 	}
 
 	err = metric.error()
 	metric.setError(nil)
 
 	mc.appendTV(metric, t, v)
+	for _, aggrMetric := range aggrMetrics {
+		mc.appendTV(aggrMetric, t, v)
+	}
 
 	return metric.refId, err
 }

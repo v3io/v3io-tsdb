@@ -37,6 +37,11 @@ type Label struct {
 	Name, Value string
 }
 
+type LabelIfc interface {
+	GetName() string
+	GetValue() string
+}
+
 // Labels is a sorted set of labels. Order has to be guaranteed upon
 // instantiation.
 type Labels []Label
@@ -44,6 +49,19 @@ type Labels []Label
 type LabelsIfc interface {
 	GetKey() (string, string, uint64)
 	GetExpr() string
+	Filter([]string) LabelsIfc
+}
+
+func (ls Labels) Filter(keep []string) LabelsIfc {
+	var res Labels
+	for _, l := range ls {
+		for _, keepLabel := range keep {
+			if l.Name == keepLabel {
+				res = append(res, l)
+			}
+		}
+	}
+	return res
 }
 
 // convert Label set to a string in the form key1=v1,key2=v2.. + name + hash
