@@ -38,7 +38,7 @@ type TestOption struct {
 	Value interface{}
 }
 
-func NewTestParams(t testing.TB, opts ... TestOption) TestParams {
+func NewTestParams(t testing.TB, opts ...TestOption) TestParams {
 	initialSize := len(opts)
 	testOpts := make(TestParams, initialSize)
 
@@ -51,6 +51,8 @@ func NewTestParams(t testing.TB, opts ... TestOption) TestParams {
 	if err != nil {
 		t.Fatalf("Unable to get V3IO configuration.\nError: %v", err)
 	}
+
+	//defaultV3ioConfig.TablePath = PrefixTablePath(t.Name())
 	testOpts[OptV3ioConfig] = defaultV3ioConfig
 
 	for _, opt := range opts {

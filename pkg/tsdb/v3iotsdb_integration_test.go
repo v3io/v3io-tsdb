@@ -35,6 +35,7 @@ import (
 	"github.com/v3io/v3io-tsdb/pkg/tsdb/tsdbtest/testutils"
 	"github.com/v3io/v3io-tsdb/pkg/utils"
 	"math"
+	"path"
 	"sort"
 	"testing"
 	"time"
@@ -492,7 +493,8 @@ func testQueryDataCase(test *testing.T, testParams tsdbtest.TestParams, filter s
 			if err != nil {
 				test.Fatal(err)
 			}
-			assert.ElementsMatch(test, expected[currentAggregate], actual, "Check failed for aggregate='%s'. Query aggregates: %s", currentAggregate, queryAggregates)
+			assert.ElementsMatch(test, expected[currentAggregate], actual,
+				"Check failed for aggregate='%s'. Query aggregates: %s", currentAggregate, queryAggregates)
 		}
 
 		if set.Err() != nil {
@@ -908,42 +910,67 @@ func testDeleteTSDBCase(test *testing.T, testParams tsdbtest.TestParams, deleteF
 		test.Fatalf("Failed to delete DB. reason: %s", err)
 	}
 
-	pm1, err := partmgr.NewPartitionMngr(adapter.GetSchema(), nil, testParams.V3ioConfig())
-	remainingParts := pm1.PartsForRange(0, math.MaxInt64, false)
-	assert.Equal(test, len(remainingParts), initialNumberOfPartitions-len(partitionsToDelete))
+	if !deleteAll {
+		pm1, err := partmgr.NewPartitionMngr(adapter.GetSchema(), nil, testParams.V3ioConfig())
+		remainingParts := pm1.PartsForRange(0, math.MaxInt64, false)
+		assert.Equal(test, len(remainingParts), initialNumberOfPartitions-len(partitionsToDelete))
 
-	qry, err := adapter.Querier(nil, 0, math.MaxInt64)
-	if err != nil {
-		test.Fatalf("Failed to create Querier. reason: %v", err)
-	}
-
-	for _, metric := range testParams.TimeSeries() {
-		set, err := qry.Select(metric.Name, "", 0, "")
+		qry, err := adapter.Querier(nil, 0, math.MaxInt64)
 		if err != nil {
-			test.Fatalf("Failed to run Select. reason: %v", err)
+			test.Fatalf("Failed to create Querier. reason: %v", err)
 		}
 
-		set.Next()
-		if set.Err() != nil {
-			test.Fatalf("Failed to query metric. reason: %v", set.Err())
-		}
-
-		series := set.At()
-		if series == nil && len(expected) == 0 {
-			//table is expected to be empty
-		} else if series != nil {
-			iter := series.Iterator()
-			if iter.Err() != nil {
-				test.Fatalf("Failed to query data series. reason: %v", iter.Err())
-			}
-
-			actual, err := iteratorToSlice(iter)
+		for _, metric := range testParams.TimeSeries() {
+			set, err := qry.Select(metric.Name, "", 0, "")
 			if err != nil {
-				test.Fatal(err)
+				test.Fatalf("Failed to run Select. reason: %v", err)
 			}
-			assert.ElementsMatch(test, expected, actual)
-		} else {
-			test.Fatalf("Result series is empty while expected result set is not!")
+
+			set.Next()
+			if set.Err() != nil {
+				test.Fatalf("Failed to query metric. reason: %v", set.Err())
+			}
+
+			series := set.At()
+			if series == nil && len(expected) == 0 {
+				//table is expected to be empty
+			} else if series != nil {
+				iter := series.Iterator()
+				if iter.Err() != nil {
+					test.Fatalf("Failed to query data series. reason: %v", iter.Err())
+				}
+
+				actual, err := iteratorToSlice(iter)
+				if err != nil {
+					test.Fatal(err)
+				}
+				assert.ElementsMatch(test, expected, actual)
+			} else {
+				test.Fatalf("Result series is empty while expected result set is not!")
+			}
+		}
+	} else {
+		container, tablePath := adapter.GetContainer()
+		tableSchemaPath := path.Join(tablePath, config.SchemaConfigFileName)
+
+		// Validate: schema does not exist
+		_, err := container.Sync.GetObject(&v3io.GetObjectInput{Path: tableSchemaPath})
+		if err != nil {
+			if utils.IsNotExistsError(err) {
+				// OK - expected
+			} else {
+				test.Fatalf("Failed to read a TSDB schema from '%s'.\nError: %v", tableSchemaPath, err)
+			}
+		}
+
+		// Validate: table does not exist
+		_, err = container.Sync.GetObject(&v3io.GetObjectInput{Path: tablePath})
+		if err != nil {
+			if utils.IsNotExistsError(err) {
+				// OK - expected
+			} else {
+				test.Fatalf("Failed to read a TSDB schema from '%s'.\nError: %v", tablePath, err)
+			}
 		}
 	}
 }
