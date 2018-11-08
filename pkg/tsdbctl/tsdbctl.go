@@ -21,8 +21,6 @@ such restriction.
 package tsdbctl
 
 import (
-	"os"
-
 	"fmt"
 	"github.com/nuclio/logger"
 	"github.com/pkg/errors"
@@ -31,26 +29,38 @@ import (
 	"github.com/v3io/v3io-tsdb/internal/pkg/performance"
 	"github.com/v3io/v3io-tsdb/pkg/config"
 	"github.com/v3io/v3io-tsdb/pkg/tsdb"
+	"os"
 	"strings"
 )
 
 type RootCommandeer struct {
-	adapter     *tsdb.V3ioAdapter
-	logger      logger.Logger
-	v3iocfg     *config.V3ioConfig
-	cmd         *cobra.Command
-	v3ioPath    string
-	dbPath      string
-	cfgFilePath string
-	logLevel    string
-	container   string
-	username    string
-	password    string
-	Reporter    *performance.MetricReporter
+	adapter      *tsdb.V3ioAdapter
+	logger       logger.Logger
+	v3iocfg      *config.V3ioConfig
+	cmd          *cobra.Command
+	v3ioPath     string
+	dbPath       string
+	cfgFilePath  string
+	logLevel     string
+	container    string
+	username     string
+	password     string
+	Reporter     *performance.MetricReporter
+	os           string
+	architecture string
+	version      string
+	revision     string
+	branch       string
 }
 
-func NewRootCommandeer() *RootCommandeer {
-	commandeer := &RootCommandeer{}
+func NewRootCommandeer(opsys, architecture, version, revision, branch string) *RootCommandeer {
+	commandeer := &RootCommandeer{
+		os:           opsys,
+		architecture: architecture,
+		version:      version,
+		revision:     revision,
+		branch:       branch,
+	}
 
 	cmd := &cobra.Command{
 		Use:          "tsdbctl [command] [arguments] [flags]",
@@ -89,6 +99,7 @@ func NewRootCommandeer() *RootCommandeer {
 		newInfoCommandeer(commandeer).cmd,
 		newDeleteCommandeer(commandeer).cmd,
 		newCheckCommandeer(commandeer).cmd,
+		newVersionCommandeer(commandeer).cmd,
 	)
 
 	commandeer.cmd = cmd

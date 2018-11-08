@@ -5,6 +5,13 @@ import (
 	"os"
 )
 
+// Note, following variables set by make
+var opsys string
+var arch string
+var version string
+var revision string
+var branch string
+
 func main() {
 	if err := Run(); err != nil {
 		os.Exit(1)
@@ -13,7 +20,7 @@ func main() {
 }
 
 func Run() error {
-	rootCmd := tsdbctl.NewRootCommandeer()
+	rootCmd := tsdbctl.NewRootCommandeer(opsys, arch, version, revision, branch)
 	defer tearDown(rootCmd)
 	return rootCmd.Execute()
 }
