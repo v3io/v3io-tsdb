@@ -38,6 +38,14 @@ import (
 	"time"
 )
 
+type BuildInfo struct {
+	Os           string
+	Architecture string
+	Version      string
+	Revision     string
+	Branch       string
+}
+
 type V3ioAdapter struct {
 	startTimeMargin int64
 	logger          logger.Logger

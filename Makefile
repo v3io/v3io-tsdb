@@ -20,7 +20,7 @@ GOPATH ?= $(shell go env GOPATH)
 
 TSDBCTL_BIN_NAME := tsdbctl-$(GIT_REVISION)-$(GOOS)-$(GOARCH)
 
-BUILD_OPTS := -ldflags "-X main.opsys=$(GOOS) -X main.arch=$(GOARCH) -X main.version=$(GIT_REVISION) -X main.revision=$(GIT_SHA_SHORT) -X main.branch=$(GIT_BRANCH)" \
+BUILD_OPTS := -ldflags "-X main.opSys=$(GOOS) -X main.arch=$(GOARCH) -X main.version=$(GIT_REVISION) -X main.revision=$(GIT_SHA_SHORT) -X main.branch=$(GIT_BRANCH)" \
  -v -o "$(GOPATH)/bin/$(TSDBCTL_BIN_NAME)"
 
 .PHONY: get

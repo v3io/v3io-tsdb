@@ -34,32 +34,24 @@ import (
 )
 
 type RootCommandeer struct {
-	adapter      *tsdb.V3ioAdapter
-	logger       logger.Logger
-	v3iocfg      *config.V3ioConfig
-	cmd          *cobra.Command
-	v3ioPath     string
-	dbPath       string
-	cfgFilePath  string
-	logLevel     string
-	container    string
-	username     string
-	password     string
-	Reporter     *performance.MetricReporter
-	os           string
-	architecture string
-	version      string
-	revision     string
-	branch       string
+	adapter     *tsdb.V3ioAdapter
+	logger      logger.Logger
+	v3iocfg     *config.V3ioConfig
+	cmd         *cobra.Command
+	v3ioPath    string
+	dbPath      string
+	cfgFilePath string
+	logLevel    string
+	container   string
+	username    string
+	password    string
+	Reporter    *performance.MetricReporter
+	BuildInfo   *tsdb.BuildInfo
 }
 
-func NewRootCommandeer(opsys, architecture, version, revision, branch string) *RootCommandeer {
+func NewRootCommandeer(buildInfo *tsdb.BuildInfo) *RootCommandeer {
 	commandeer := &RootCommandeer{
-		os:           opsys,
-		architecture: architecture,
-		version:      version,
-		revision:     revision,
-		branch:       branch,
+		BuildInfo: buildInfo,
 	}
 
 	cmd := &cobra.Command{
