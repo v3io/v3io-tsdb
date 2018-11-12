@@ -34,6 +34,7 @@ import (
 	"github.com/v3io/v3io-tsdb/pkg/querier"
 	"github.com/v3io/v3io-tsdb/pkg/tsdb/schema"
 	"github.com/v3io/v3io-tsdb/pkg/utils"
+	"math"
 	pathUtil "path"
 	"time"
 )
@@ -201,7 +202,7 @@ func (a *V3ioAdapter) DeleteDB(deleteAll bool, ignoreErrors bool, fromTime int64
 	if deleteAll {
 		// Ignore time boundaries
 		fromTime = 0
-		toTime = time.Now().Unix() * 1000
+		toTime = math.MaxInt64
 	}
 
 	partitions := a.partitionMngr.PartsForRange(fromTime, toTime, false)

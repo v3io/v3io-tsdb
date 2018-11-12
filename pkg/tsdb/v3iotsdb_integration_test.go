@@ -34,6 +34,7 @@ import (
 	"github.com/v3io/v3io-tsdb/pkg/tsdb/tsdbtest"
 	"github.com/v3io/v3io-tsdb/pkg/tsdb/tsdbtest/testutils"
 	"github.com/v3io/v3io-tsdb/pkg/utils"
+	"math"
 	"sort"
 	"testing"
 	"time"
@@ -646,6 +647,8 @@ func TestDeleteTable(t *testing.T) {
 	t2 := tb.Unix() * 1000
 	tc, _ := time.Parse(time.RFC3339, "2018-10-11T05:00:00Z")
 	t3 := tc.Unix() * 1000
+	td, _ := time.Parse(time.RFC3339, "now + 1w")
+	futurePoint := td.Unix() * 1000
 
 	testCases := []struct {
 		desc         string
@@ -657,18 +660,31 @@ func TestDeleteTable(t *testing.T) {
 		expected     []tsdbtest.DataPoint
 		ignoreReason string
 	}{
-		{desc: "Should delete all table",
+		{desc: "Should delete all table by time",
 			deleteFrom:   0,
 			deleteTo:     9999999999999,
+			deleteAll:    false,
 			ignoreErrors: true,
 			data: []tsdbtest.DataPoint{{Time: t1, Value: 222.2},
 				{Time: t2, Value: 333.3},
 				{Time: t3, Value: 444.4}},
 			expected: []tsdbtest.DataPoint{},
 		},
+		{desc: "Should delete all table by deleteAll",
+			deleteFrom:   0,
+			deleteTo:     0,
+			deleteAll:    true,
+			ignoreErrors: true,
+			data: []tsdbtest.DataPoint{{Time: t1, Value: 222.2},
+				{Time: t2, Value: 333.3},
+				{Time: t3, Value: 444.4},
+				{Time: futurePoint, Value: 555.5}},
+			expected: []tsdbtest.DataPoint{},
+		},
 		{desc: "Should skip partial partition at begining",
 			deleteFrom:   t1 - 10000,
 			deleteTo:     9999999999999,
+			deleteAll:    false,
 			ignoreErrors: true,
 			data: []tsdbtest.DataPoint{{Time: t1, Value: 222.2},
 				{Time: t2, Value: 333.3},
@@ -678,6 +694,7 @@ func TestDeleteTable(t *testing.T) {
 		{desc: "Should skip partial partition at end",
 			deleteFrom:   0,
 			deleteTo:     t3 + 10000,
+			deleteAll:    false,
 			ignoreErrors: true,
 			data: []tsdbtest.DataPoint{{Time: t1, Value: 222.2},
 				{Time: t2, Value: 333.3},
@@ -687,6 +704,7 @@ func TestDeleteTable(t *testing.T) {
 		{desc: "Should skip partial partition at beginning and end not in range",
 			deleteFrom:   t1 + 10000,
 			deleteTo:     t3 - 10000,
+			deleteAll:    false,
 			ignoreErrors: true,
 			data: []tsdbtest.DataPoint{{Time: t1, Value: 222.2},
 				{Time: t2, Value: 333.3},
@@ -697,6 +715,7 @@ func TestDeleteTable(t *testing.T) {
 		{desc: "Should skip partial partition at beginning and end although in range",
 			deleteFrom:   t1 - 10000,
 			deleteTo:     t3 + 10000,
+			deleteAll:    false,
 			ignoreErrors: true,
 			data: []tsdbtest.DataPoint{{Time: t1, Value: 222.2},
 				{Time: t2, Value: 333.3},
@@ -712,64 +731,76 @@ func TestDeleteTable(t *testing.T) {
 				t.Skip(test.ignoreReason)
 			}
 			testDeleteTSDBCase(t, v3ioConfig, "metricToDelete", utils.LabelsFromStrings("os", "linux"),
-				test.data, test.deleteFrom, test.deleteTo, test.ignoreErrors, test.expected)
+				test.data, test.deleteFrom, test.deleteTo, test.ignoreErrors, test.deleteAll, test.expected)
 		})
 	}
 }
 
 func testDeleteTSDBCase(test *testing.T, v3ioConfig *config.V3ioConfig, metricsName string, userLabels []utils.Label,
-	data []tsdbtest.DataPoint, deleteFrom int64, deleteTo int64, ignoreErrors bool,
+	data []tsdbtest.DataPoint, deleteFrom int64, deleteTo int64, ignoreErrors bool, deleteAll bool,
 	expected []tsdbtest.DataPoint) {
 
 	adapter, teardown := tsdbtest.SetUpWithData(test, v3ioConfig, metricsName, data, userLabels)
 	defer teardown()
 
 	pm, err := partmgr.NewPartitionMngr(adapter.GetSchema(), nil, v3ioConfig)
+	if err != nil {
+		test.Fatalf("Failed to create new partition manager. reason: %s", err)
+	}
 
-	initiaPartitions := pm.PartsForRange(0, time.Now().Unix()*1000, true)
+	initiaPartitions := pm.PartsForRange(0, math.MaxInt64, true)
 	initialNumberOfPartitions := len(initiaPartitions)
 
 	partitionsToDelete := pm.PartsForRange(deleteFrom, deleteTo, false)
 
-	if err := adapter.DeleteDB(false, ignoreErrors, deleteFrom, deleteTo); err != nil {
-		test.Fatalf("Failed to delete DB on teardown. reason: %s", err)
+	if err := adapter.DeleteDB(deleteAll, ignoreErrors, deleteFrom, deleteTo); err != nil {
+		test.Fatalf("Failed to delete DB. reason: %s", err)
 	}
 
-	pm1, err := partmgr.NewPartitionMngr(adapter.GetSchema(), nil, v3ioConfig)
-	remainingParts := pm1.PartsForRange(0, time.Now().Unix()*1000, false)
-	assert.Equal(test, len(remainingParts), initialNumberOfPartitions-len(partitionsToDelete))
-
-	qry, err := adapter.Querier(nil, 0, time.Now().Unix()*1000)
-	if err != nil {
-		test.Fatalf("Failed to create Querier. reason: %v", err)
-	}
-
-	set, err := qry.Select(metricsName, "", 0, "")
-	if err != nil {
-		test.Fatalf("Failed to run Select. reason: %v", err)
-	}
-
-	set.Next()
-	if set.Err() != nil {
-		test.Fatalf("Failed to query metric. reason: %v", set.Err())
-	}
-
-	series := set.At()
-	if series == nil && len(expected) == 0 {
-		//table is expected to be empty
-	} else if series != nil {
-		iter := series.Iterator()
-		if iter.Err() != nil {
-			test.Fatalf("Failed to query data series. reason: %v", iter.Err())
+	if deleteAll {
+		_, err := NewV3ioAdapter(v3ioConfig, nil, nil)
+		if err == nil {
+			test.Fatalf("Table was deleted - failure to create adapter is expected...")
 		}
-
-		actual, err := iteratorToSlice(iter)
-		if err != nil {
-			test.Fatal(err)
-		}
-		assert.ElementsMatch(test, expected, actual)
+		test.Skip("skipping tearDown since table is completely deleted")
 	} else {
-		test.Fatalf("Result series is empty while expected result set is not!")
+		pm1, err := partmgr.NewPartitionMngr(adapter.GetSchema(), nil, v3ioConfig)
+		remainingParts := pm1.PartsForRange(0, math.MaxInt64, false)
+		assert.Equal(test, len(remainingParts), initialNumberOfPartitions-len(partitionsToDelete))
+
+		qry, err := adapter.Querier(nil, 0, math.MaxInt64)
+		if err != nil {
+			test.Fatalf("Failed to create Querier. reason: %v", err)
+		}
+
+		set, err := qry.Select(metricsName, "", 0, "")
+		if err != nil {
+			test.Fatalf("Failed to run Select. reason: %v", err)
+		}
+
+		set.Next()
+		if set.Err() != nil {
+			test.Fatalf("Failed to query metric. reason: %v", set.Err())
+		}
+
+		series := set.At()
+		if series == nil && len(expected) == 0 {
+			//table is expected to be empty
+		} else if series != nil {
+			iter := series.Iterator()
+			if iter.Err() != nil {
+				test.Fatalf("Failed to query data series. reason: %v", iter.Err())
+			}
+
+			actual, err := iteratorToSlice(iter)
+			if err != nil {
+				test.Fatal(err)
+			}
+			assert.ElementsMatch(test, expected, actual)
+		} else {
+			test.Fatalf("Result series is empty while expected result set is not!")
+		}
+
 	}
 }
 
