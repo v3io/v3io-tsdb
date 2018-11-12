@@ -112,7 +112,7 @@ func aggregateClientAggregates(ctx *selectQueryContext, res *qryResults) {
 
 func aggregateServerAggregates(ctx *selectQueryContext, res *qryResults) {
 	for _, col := range res.frame.columns {
-		if col.GetColumnSpec().metric == res.name {
+		if col.GetColumnSpec().metric == res.name && col.GetColumnSpec().isConcrete() {
 			array, ok := res.fields[aggregate.ToAttrName(col.GetColumnSpec().function)]
 			if !ok {
 				ctx.logger.Error("requested function %v was not found in response", col.GetColumnSpec().function)
