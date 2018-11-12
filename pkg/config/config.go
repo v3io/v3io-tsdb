@@ -56,10 +56,31 @@ const (
 	DefaultVerboseLevel           = "debug"
 )
 
+type BuildInfo struct {
+	BuildTime    string `json:"os,omitempty"`
+	Os           string `json:"os,omitempty"`
+	Architecture string `json:"architecture,omitempty"`
+	Version      string `json:"version,omitempty"`
+	Revision     string `json:"revision,omitempty"`
+	Branch       string `json:"branch,omitempty"`
+}
+
 var (
+	// Note, following variables set by make
+	osys, architecture, version, revision, branch, buildTime string
+
 	instance *V3ioConfig
 	once     sync.Once
 	failure  error
+
+	BuildMetadta = &BuildInfo{
+		BuildTime:    buildTime,
+		Os:           osys,
+		Architecture: architecture,
+		Version:      version,
+		Revision:     revision,
+		Branch:       branch,
+	}
 )
 
 func Error() error {
@@ -111,6 +132,8 @@ type V3ioConfig struct {
 	// Don't aggregate from raw chunks, for use when working as a Prometheus
 	// TSDB library
 	DisableClientAggr bool `json:"disableClientAggr,omitempty"`
+	// Build Info
+	BuildInfo *BuildInfo `json:"buildInfo,omitempty"`
 }
 
 type MetricsReporterConfig struct {
@@ -280,7 +303,9 @@ func loadConfig(path string) (*V3ioConfig, error) {
 }
 
 func loadFromData(data []byte) (*V3ioConfig, error) {
-	cfg := V3ioConfig{}
+	cfg := V3ioConfig{
+		BuildInfo: BuildMetadta,
+	}
 	err := yaml.Unmarshal(data, &cfg)
 
 	if err != nil {

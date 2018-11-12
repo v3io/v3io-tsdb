@@ -46,12 +46,12 @@ type RootCommandeer struct {
 	username    string
 	password    string
 	Reporter    *performance.MetricReporter
-	BuildInfo   *tsdb.BuildInfo
+	BuildInfo   *config.BuildInfo
 }
 
-func NewRootCommandeer(buildInfo *tsdb.BuildInfo) *RootCommandeer {
+func NewRootCommandeer() *RootCommandeer {
 	commandeer := &RootCommandeer{
-		BuildInfo: buildInfo,
+		BuildInfo: config.BuildMetadta,
 	}
 
 	cmd := &cobra.Command{

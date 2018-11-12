@@ -1,20 +1,9 @@
 package main
 
 import (
-	"github.com/v3io/v3io-tsdb/pkg/tsdb"
 	"github.com/v3io/v3io-tsdb/pkg/tsdbctl"
 	"os"
 )
-
-// Note, following variables set by make
-var opSys, arch, version, revision, branch string
-var buildInfo = &tsdb.BuildInfo{
-	Os:           opSys,
-	Architecture: arch,
-	Version:      version,
-	Revision:     revision,
-	Branch:       branch,
-}
 
 func main() {
 	if err := Run(); err != nil {
@@ -24,7 +13,7 @@ func main() {
 }
 
 func Run() error {
-	rootCmd := tsdbctl.NewRootCommandeer(buildInfo)
+	rootCmd := tsdbctl.NewRootCommandeer()
 	defer tearDown(rootCmd)
 	return rootCmd.Execute()
 }

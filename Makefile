@@ -5,7 +5,7 @@ TOPLEVEL_DIRS_GOFMT_SYNTAX=`ls -d ./*/. | grep -v '^./vendor/.$$'`
 GIT_SHA_SHORT := $(shell git rev-parse HEAD)
 GIT_BRANCH=$(shell git rev-parse --abbrev-ref HEAD)
 ifeq ($(GIT_BRANCH),)
-	GIT_BRANCH="NA"
+	GIT_BRANCH="N/A"
 endif
 
 ifneq ($(TRAVIS_TAG),)
@@ -20,7 +20,16 @@ GOPATH ?= $(shell go env GOPATH)
 
 TSDBCTL_BIN_NAME := tsdbctl-$(GIT_REVISION)-$(GOOS)-$(GOARCH)
 
-BUILD_OPTS := -ldflags "-X main.opSys=$(GOOS) -X main.arch=$(GOARCH) -X main.version=$(GIT_REVISION) -X main.revision=$(GIT_SHA_SHORT) -X main.branch=$(GIT_BRANCH)" \
+BUILD_TIME := $(shell date +%FT%T%z)
+CONFIG_PKG=github.com/v3io/v3io-tsdb/pkg/config
+
+BUILD_OPTS := -ldflags " \
+  -X $(CONFIG_PKG).osys=$(GOOS) \
+  -X $(CONFIG_PKG).architecture=$(GOARCH) \
+  -X $(CONFIG_PKG).version=$(GIT_REVISION) \
+  -X $(CONFIG_PKG).revision=$(GIT_SHA_SHORT) \
+  -X $(CONFIG_PKG).branch=$(GIT_BRANCH) \
+  -X $(CONFIG_PKG).buildTime=$(BUILD_TIME)" \
  -v -o "$(GOPATH)/bin/$(TSDBCTL_BIN_NAME)"
 
 .PHONY: get
