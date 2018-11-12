@@ -5,7 +5,18 @@ import (
 	"github.com/pkg/errors"
 	"github.com/v3io/v3io-tsdb/pkg/aggregate"
 	"github.com/v3io/v3io-tsdb/pkg/utils"
+	"math"
 	"reflect"
+	"time"
+)
+
+// Possible data types
+var (
+	IntType    DType = reflect.TypeOf([]int64{})
+	FloatType  DType = reflect.TypeOf([]float64{})
+	StringType DType = reflect.TypeOf([]string{})
+	TimeType   DType = reflect.TypeOf([]time.Time{})
+	BoolType   DType = reflect.TypeOf([]bool{})
 )
 
 type frameIterator struct {
@@ -83,15 +94,15 @@ func (fi *frameIterator) Err() error {
 }
 
 // data frame, holds multiple value columns and an index (time) column
-func NewDataFrame(columnsSpec []columnMeta, indexColumn Column, lset utils.Labels, hash uint64, isRawQuery, isAllColumnWildcard bool) *dataFrame {
+func NewDataFrame(columnsSpec []columnMeta, indexColumn Column, lset utils.Labels, hash uint64, isRawQuery, isAllColumnWildcard bool, columnSize int, useServerAggregates bool) (*dataFrame, error) {
 	df := &dataFrame{lset: lset, hash: hash, isRawSeries: isRawQuery}
 	// is raw query
 	if isRawQuery {
-		df.byName = make(map[string]int, 100)
+		df.columnByName = make(map[string]int, 100)
 	} else {
 		numOfColumns := len(columnsSpec)
 		df.index = indexColumn
-		df.byName = make(map[string]int, numOfColumns)
+		df.columnByName = make(map[string]int, numOfColumns)
 		df.columns = make([]Column, 0, numOfColumns)
 		df.aggregates = make(map[string]*aggregate.RawAggregatedSeries, numOfColumns)
 		df.metricToCountColumn = map[string]Column{}
@@ -99,17 +110,79 @@ func NewDataFrame(columnsSpec []columnMeta, indexColumn Column, lset utils.Label
 			for i, col := range columnsSpec {
 				var column Column
 				if col.function != 0 {
-					column = NewAggregatedColumn(col.getColumnName(), col)
+					if col.isConcrete() {
+						function, err := getAggreagteFunction(col.function, useServerAggregates)
+						if err != nil {
+							return nil, err
+						}
+						column = NewConcreteColumn(col.getColumnName(), col, columnSize, function)
+						if aggregate.IsCountAggregate(col.function) {
+							df.metricToCountColumn[col.metric] = column
+						}
+						//column = NewAggregatedColumn(col.getColumnName(), col)
+					} else {
+						function, err := getVirtualColumnFunction(col.function)
+						if err != nil {
+							return nil, err
+						}
+
+						column = NewVirtualColumn(col.getColumnName(), col, columnSize, function)
+					}
 				} else {
-					column = NewDataColumn(col.getColumnName(), col)
+					column = NewDataColumn(col.getColumnName(), col, columnSize, FloatType)
 				}
 				df.columns = append(df.columns, column)
-				df.byName[col.getColumnName()] = i
+				df.columnByName[col.getColumnName()] = i
+			}
+
+			for _, col := range df.columns {
+				if !col.GetColumnSpec().isConcrete() {
+					fillDependantColumns(col, df)
+				}
 			}
 		}
 	}
 
-	return df
+	return df, nil
+}
+
+func getAggreagteFunction(aggrType aggregate.AggrType, useServerAggregates bool) (func(interface{}, interface{}) interface{}, error) {
+	if useServerAggregates {
+		return aggregate.GetServerAggregationsFunction(aggrType)
+	} else {
+		return aggregate.GetClientAggregationsFunction(aggrType)
+	}
+}
+
+func fillDependantColumns(wantedColumn Column, df *dataFrame) {
+	wantedAggregations := aggregate.GetDependantAggregates(wantedColumn.GetColumnSpec().function)
+	var columns []Column
+	for _, col := range df.columns {
+		if col.GetColumnSpec().metric == wantedColumn.GetColumnSpec().metric &&
+			aggregate.ContainsAggregate(wantedAggregations, col.GetColumnSpec().function) {
+			columns = append(columns, col)
+		}
+	}
+	wantedColumn.(*virtualColumn).dependantColumns = columns
+}
+
+func getVirtualColumnFunction(aggrType aggregate.AggrType) (func([]Column, int) (interface{}, error), error) {
+	function, err := aggregate.GetServerVirtualAggregationFunction(aggrType)
+	if err != nil {
+		return nil, err
+	}
+	return func(columns []Column, index int) (interface{}, error) {
+		data := make([]float64, len(columns))
+		for i, c := range columns {
+			v, err := c.FloatAt(index)
+			if err != nil {
+				return nil, err
+			}
+
+			data[i] = v
+		}
+		return function(data), nil
+	}, nil
 }
 
 type dataFrame struct {
@@ -119,9 +192,9 @@ type dataFrame struct {
 	isRawSeries bool
 	rawColumns  []Series
 
-	columns []Column
-	index   Column
-	byName  map[string]int // name -> index in columns
+	columns      []Column
+	index        Column
+	columnByName map[string]int // name -> index in columns
 
 	aggregates          map[string]*aggregate.RawAggregatedSeries // metric to aggregates
 	metricToCountColumn map[string]Column
@@ -169,7 +242,7 @@ func (d *dataFrame) Columns() []Column {
 }
 
 func (d *dataFrame) Column(name string) (Column, error) {
-	i, ok := d.byName[name]
+	i, ok := d.columnByName[name]
 	if !ok {
 		return nil, fmt.Errorf("column %q not found", name)
 	}
@@ -209,6 +282,7 @@ type Column interface {
 	StringAt(i int) (string, error) // String value at index i
 	TimeAt(i int) (int64, error)    // time value at index i
 	GetColumnSpec() columnMeta      // Get the column's metadata
+	SetDataAt(i int, value interface{}) error
 }
 
 type basicColumn struct {
@@ -231,16 +305,36 @@ func (c *basicColumn) isValidIndex(i int) bool { return i >= 0 && i < c.size }
 
 func (c *basicColumn) GetColumnSpec() columnMeta { return c.spec }
 
+func (c *basicColumn) SetDataAt(i int, value interface{}) error { return nil }
+
 // DType is data type
 type DType reflect.Type
 
-func NewDataColumn(name string, colSpec columnMeta) *dataColumn {
-	return &dataColumn{basicColumn: basicColumn{name: name, spec: colSpec}}
+func NewDataColumn(name string, colSpec columnMeta, size int, datatype DType) *dataColumn {
+	dc := &dataColumn{basicColumn: basicColumn{name: name, spec: colSpec, size: size}}
+	dc.initializeData(datatype)
+	return dc
+
 }
 
 type dataColumn struct {
 	basicColumn
 	data interface{}
+}
+
+func (dc *dataColumn) initializeData(dataType DType) {
+	switch dataType {
+	case IntType:
+		dc.data = make([]int64, dc.size)
+	case FloatType:
+		dc.data = make([]float64, dc.size)
+	case StringType:
+		dc.data = make([]string, dc.size)
+	case TimeType:
+		dc.data = make([]time.Time, dc.size)
+	case BoolType:
+		dc.data = make([]bool, dc.size)
+	}
 }
 
 // DType returns the data type
@@ -295,6 +389,26 @@ func (dc *dataColumn) SetData(d interface{}, size int) {
 	dc.size = size
 }
 
+func (dc *dataColumn) SetDataAt(i int, value interface{}) error {
+	if !dc.isValidIndex(i) {
+		return fmt.Errorf("index %d out of bounds [0:%d]", i, dc.size)
+	}
+
+	switch reflect.TypeOf(dc.data) {
+	case IntType:
+		dc.data.([]int64)[i] = value.(int64)
+	case FloatType:
+		dc.data.([]float64)[i] = value.(float64)
+	case StringType:
+		dc.data.([]string)[i] = value.(string)
+	case TimeType:
+		dc.data.([]time.Time)[i] = value.(time.Time)
+	case BoolType:
+		dc.data.([]bool)[i] = value.(bool)
+	}
+	return nil
+}
+
 func NewAggregatedColumn(name string, colSpec columnMeta) *aggregatedColumn {
 	return &aggregatedColumn{basicColumn: basicColumn{name: name, spec: colSpec}}
 }
@@ -326,4 +440,93 @@ func (c *aggregatedColumn) SetData(aggregations *aggregate.RawAggregatedSeries, 
 	c.aggregations = aggregations
 	c.wantedAggr = wantedAggr
 	c.size = len(c.aggregations.GetAggregate(c.wantedAggr))
+}
+
+func NewConcreteColumn(name string, colSpec columnMeta, size int, setFunc func(old, new interface{}) interface{}) *ConcreteColumn {
+	col := &ConcreteColumn{basicColumn: basicColumn{name: name, spec: colSpec, size: size}, setFunc: setFunc}
+	col.data = make([]interface{}, size)
+	return col
+}
+
+type ConcreteColumn struct {
+	basicColumn
+	setFunc func(old, new interface{}) interface{}
+	data    []interface{}
+}
+
+func (c *ConcreteColumn) DType() DType {
+	var a float64
+	return reflect.TypeOf(a)
+}
+func (c *ConcreteColumn) FloatAt(i int) (float64, error) {
+	if !c.isValidIndex(i) {
+		return 0, fmt.Errorf("index %d out of bounds [0:%d]", i, c.size)
+	}
+	if c.data[i] == nil {
+		return math.NaN(), nil
+	}
+	return c.data[i].(float64), nil
+}
+func (c *ConcreteColumn) StringAt(i int) (string, error) {
+	return "", errors.New("aggregated column does not support string type")
+}
+func (c *ConcreteColumn) TimeAt(i int) (int64, error) {
+	return 0, errors.New("aggregated column does not support time type")
+}
+func (c *ConcreteColumn) SetDataAt(i int, val interface{}) error {
+	if !c.isValidIndex(i) {
+		return fmt.Errorf("index %d out of bounds [0:%d]", i, c.size)
+	}
+
+	c.data[i] = c.setFunc(c.data[i], val)
+	return nil
+}
+
+func NewVirtualColumn(name string, colSpec columnMeta, size int, function func([]Column, int) (interface{}, error)) Column {
+	col := &virtualColumn{basicColumn: basicColumn{name: name, spec: colSpec, size: size}, function: function}
+	return col
+}
+
+type virtualColumn struct {
+	basicColumn
+	dependantColumns []Column
+	function         func([]Column, int) (interface{}, error)
+}
+
+func (c *virtualColumn) DType() DType {
+	return nil
+}
+func (c *virtualColumn) FloatAt(i int) (float64, error) {
+	if !c.isValidIndex(i) {
+		return 0, fmt.Errorf("index %d out of bounds [0:%d]", i, c.size)
+	}
+
+	value, err := c.function(c.dependantColumns, i)
+
+	if err != nil {
+		return 0, err
+	}
+	return value.(float64), nil
+}
+func (c *virtualColumn) StringAt(i int) (string, error) {
+	if !c.isValidIndex(i) {
+		return "", fmt.Errorf("index %d out of bounds [0:%d]", i, c.size)
+	}
+
+	value, err := c.function(c.dependantColumns, i)
+	if err != nil {
+		return "", err
+	}
+	return value.(string), nil
+}
+func (c *virtualColumn) TimeAt(i int) (int64, error) {
+	if !c.isValidIndex(i) {
+		return 0, fmt.Errorf("index %d out of bounds [0:%d]", i, c.size)
+	}
+
+	value, err := c.function(c.dependantColumns, i)
+	if err != nil {
+		return 0, err
+	}
+	return value.(int64), nil
 }

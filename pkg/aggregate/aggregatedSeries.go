@@ -1,6 +1,7 @@
 package aggregate
 
 import (
+	"fmt"
 	"github.com/v3io/v3io-tsdb/pkg/utils"
 	"math"
 )
@@ -24,7 +25,7 @@ func NewRawAggregatedSeries(length int, mint, maxt int64, params AggregationPara
 	for _, aggr := range rawAggregates {
 		if aggr&params.aggrMask != 0 {
 			series.aggregates[aggr] = make([]float64, length, length)
-			copy(series.aggregates[aggr], getOrCreateInitDataArray(aggr, length))
+			copy(series.aggregates[aggr], GetOrCreateInitDataArray(aggr, length))
 		}
 	}
 
@@ -130,4 +131,112 @@ func (as *RawAggregatedSeries) toAttrName(aggr AggrType) string {
 func (as *RawAggregatedSeries) isValidCell(cellIndex int) bool {
 	return cellIndex >= 0 &&
 		cellIndex < as.length
+}
+
+func ToAttrName(aggr AggrType) string {
+	return "_v_" + aggr.String()
+}
+
+func GetServerAggregationsFunction(aggr AggrType) (func(interface{}, interface{}) interface{}, error) {
+	switch aggr {
+	case aggrTypeCount:
+		return func(old, next interface{}) interface{} {
+			if old == nil {
+				return next
+			}
+			return old.(float64) + next.(float64)
+		}, nil
+	case aggrTypeSum:
+		return func(old, next interface{}) interface{} {
+			if old == nil {
+				return next
+			}
+			return old.(float64) + next.(float64)
+		}, nil
+	case aggrTypeSqr:
+		return func(old, next interface{}) interface{} {
+			if old == nil {
+				return next
+			}
+			return old.(float64) + next.(float64)
+		}, nil
+	case aggrTypeMin:
+		return func(old, next interface{}) interface{} {
+			if old == nil {
+				return next
+			}
+			return math.Min(old.(float64), next.(float64))
+		}, nil
+	case aggrTypeMax:
+		return func(old, next interface{}) interface{} {
+			if old == nil {
+				return next
+			}
+			return math.Max(old.(float64), next.(float64))
+		}, nil
+	case aggrTypeLast:
+		return func(_, next interface{}) interface{} {
+			return next
+		}, nil
+	default:
+		return nil, fmt.Errorf("cannot aggregate %v", aggrToString[aggr])
+	}
+}
+
+func GetServerVirtualAggregationFunction(aggr AggrType) (func([]float64) float64, error) {
+	switch aggr {
+	case aggrTypeAvg:
+		return func(data []float64) float64 {
+			count := data[0]
+			sum := data[1]
+			return sum / count
+		}, nil
+	case aggrTypeStddev:
+		return func(data []float64) float64 {
+			count := data[0]
+			sum := data[1]
+			sqr := data[2]
+			return math.Sqrt((count*sqr - sum*sum) / (count * (count - 1)))
+		}, nil
+	case aggrTypeStdvar:
+		return func(data []float64) float64 {
+			count := data[0]
+			sum := data[1]
+			sqr := data[2]
+			return (count*sqr - sum*sum) / (count * (count - 1))
+		}, nil
+	default:
+		return nil, fmt.Errorf("cannot aggregate %v", aggrToString[aggr])
+	}
+}
+
+func GetClientAggregationsFunction(aggr AggrType) (func(interface{}, interface{}) interface{}, error) {
+	switch aggr {
+	case aggrTypeCount:
+		return func(old, next interface{}) interface{} {
+			if old == nil {
+				return 1.0
+			}
+			return old.(float64) + 1.0
+		}, nil
+	case aggrTypeSqr:
+		return func(old, next interface{}) interface{} {
+			if old == nil {
+				return next.(float64) * next.(float64)
+			}
+			return old.(float64) + next.(float64)*next.(float64)
+		}, nil
+	default:
+		return GetServerAggregationsFunction(aggr)
+	}
+}
+
+func GetDependantAggregates(aggr AggrType) []AggrType {
+	var aggregates []AggrType
+	for _, rawAggr := range rawAggregates {
+		if aggr&rawAggr == rawAggr {
+			aggregates = append(aggregates, rawAggr)
+		}
+	}
+	return aggregates
 }

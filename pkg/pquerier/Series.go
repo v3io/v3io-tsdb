@@ -3,6 +3,7 @@ package pquerier
 import (
 	"github.com/v3io/v3io-tsdb/pkg/aggregate"
 	"github.com/v3io/v3io-tsdb/pkg/utils"
+	"math"
 )
 
 func NewDataFrameColumnSeries(indexColumn, dataColumn, countColumn Column, labels utils.Labels, hash uint64) *DataFrameColumnSeries {
@@ -83,6 +84,14 @@ func (it *DataFrameColumnSeriesIterator) getNextValidCell(from int) (nextIndex i
 }
 
 func (it *DataFrameColumnSeriesIterator) doesCellHasData(cell int) bool {
+	if it.countColumn == nil {
+		f, err := it.dataColumn.FloatAt(cell)
+		if err != nil {
+			it.err = err
+			return false
+		}
+		return !math.IsNaN(f)
+	}
 	val, err := it.countColumn.FloatAt(cell)
 	if err != nil {
 		it.err = err

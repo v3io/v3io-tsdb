@@ -44,7 +44,7 @@ type selectQueryContext struct {
 	timeColumn Column
 }
 
-func (s *selectQueryContext) start(parts []*partmgr.DBPartition, params *SelectParams) (*frameIterator, error) {
+func (s *selectQueryContext) start(parts []*partmgr.DBPartition, params *SelectParams) (SeriesSet, error) {
 	s.dataFrames = make(map[uint64]*dataFrame)
 
 	s.functions = params.Functions
@@ -88,14 +88,13 @@ func (s *selectQueryContext) start(parts []*partmgr.DBPartition, params *SelectP
 	// wait for Go routines to complete
 	s.wg.Wait()
 
-	for _, df := range s.frameList {
-		df.CalculateColumns()
+	if len(s.frameList) > 0 {
+		s.totalColumns = s.frameList[0].Len()
+		frameIter := NewFrameIterator(s)
+		return frameIter, nil
+	} else {
+		return nullSeriesSet{}, nil
 	}
-
-	s.totalColumns = s.frameList[0].Len()
-	frameIter := NewFrameIterator(s)
-
-	return frameIter, nil
 }
 
 // Query a single partition
@@ -224,7 +223,11 @@ func (s *selectQueryContext) processQueryResults(query *partQuery) error {
 		// find or create data frame
 		frame, ok := s.dataFrames[hash]
 		if !ok {
-			frame = NewDataFrame(s.columnsSpec, s.getOrCreateTimeColumn(), lset, hash, s.isRawQuery(), s.isAllColumns)
+			var err error
+			frame, err = NewDataFrame(s.columnsSpec, s.getOrCreateTimeColumn(), lset, hash, s.isRawQuery(), s.isAllColumns, s.getResultBucketsSize(), results.IsServerAggregates())
+			if err != nil {
+				return err
+			}
 			s.dataFrames[hash] = frame
 			s.frameList = append(s.frameList, frame)
 		}
@@ -248,7 +251,11 @@ func (s *selectQueryContext) createColumnSpecs(params *SelectParams) ([]columnMe
 			columnsSpecByMetric[col.metric] = []columnMeta{}
 		}
 
-		colMeta := columnMeta{metric: col.metric, alias: col.alias, interpolator: 0} // todo - change interpolator
+		inter, err := StrToInterpolateType(col.interpolator)
+		if err != nil {
+			return nil, nil, err
+		}
+		colMeta := columnMeta{metric: col.metric, alias: col.alias, interpolationFunction: GetInterpolateFunc(inter)}
 
 		if col.function != "" {
 			aggr, err := aggregate.AggregateFromString(col.function)
@@ -316,21 +323,24 @@ func (s *selectQueryContext) getOrCreateTimeColumn() Column {
 }
 
 func (s *selectQueryContext) generateTimeColumn() Column {
-	size := int((s.maxt-s.mint)/s.step + 1)
-	timeBuckets := make([]int64, size)
+	columnMeta := columnMeta{metric: "time"}
+	timeColumn := NewDataColumn("time", columnMeta, s.getResultBucketsSize(), IntType)
 	i := 0
 	for t := s.mint; t <= s.maxt; t += s.step {
-		timeBuckets[i] = t
+		timeColumn.SetDataAt(i, t)
 		i++
 	}
-
-	columnMeta := columnMeta{metric: "time"}
-	timeColumn := NewDataColumn("time", columnMeta)
-	timeColumn.SetData(timeBuckets, size)
 	return timeColumn
 }
 
-func (s *selectQueryContext) isRawQuery() bool { return s.functions == "" }
+func (s *selectQueryContext) isRawQuery() bool { return s.functions == "" && s.step == 0 }
+
+func (s *selectQueryContext) getResultBucketsSize() int {
+	if s.isRawQuery() {
+		return 0
+	}
+	return int((s.maxt-s.mint)/s.step + 1)
+}
 
 // query object for a single partition (or name and partition in future optimizations)
 

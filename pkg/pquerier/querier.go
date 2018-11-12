@@ -49,7 +49,7 @@ func (s *SelectParams) getRequestedColumns() []RequestedColumn {
 	columns := make([]RequestedColumn, len(functions))
 	for i, function := range functions {
 		trimmed := strings.TrimSpace(function)
-		newCol := RequestedColumn{function: trimmed, metric: s.Name, interpolator: "replace me"}
+		newCol := RequestedColumn{function: trimmed, metric: s.Name, interpolator: "next"}
 		columns[i] = newCol
 	}
 	return columns
@@ -93,6 +93,7 @@ func (q *V3ioQuerier) SelectQry(params *SelectParams) (set SeriesSet, err error)
 		}
 
 		set, err = selectContext.start(parts, params)
+
 		if err != nil {
 			set = nullSeriesSet{}
 			return

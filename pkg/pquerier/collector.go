@@ -3,6 +3,8 @@ package pquerier
 import (
 	"fmt"
 	"github.com/v3io/v3io-tsdb/pkg/aggregate"
+	"github.com/v3io/v3io-tsdb/pkg/utils"
+	"math"
 	"time"
 )
 
@@ -71,37 +73,159 @@ func dummyCollector(ctx *selectQueryContext, index int) {
 func mainCollector(ctx *selectQueryContext, index int) {
 	defer ctx.wg.Done()
 
-	// TODO: Move if to select.go
 	for res := range ctx.requestChannels[index] {
 		if res.IsRawQuery() {
 			rawCollector(res)
 		} else if res.IsServerAggregates() {
-			aggregateCollector(ctx, res)
+			aggregateServerAggregates(ctx, res)
 		} else if res.IsClientAggregates() {
-
+			aggregateClientAggregates(ctx, res)
+		} else if res.IsDownsample() {
+			downsampleRawData(ctx, res)
 		}
 	}
 }
 
 func rawCollector(res *qryResults) {
-	frameIndex, ok := res.frame.byName[res.name]
+	frameIndex, ok := res.frame.columnByName[res.name]
 	if ok {
 		res.frame.rawColumns[frameIndex].(*V3ioRawSeries).AddChunks(res)
 	} else {
 		res.frame.rawColumns = append(res.frame.rawColumns, NewRawSeries(res))
-		res.frame.byName[res.name] = len(res.frame.rawColumns) - 1
+		res.frame.columnByName[res.name] = len(res.frame.rawColumns) - 1
 	}
 }
 
-func aggregateCollector(ctx *selectQueryContext, res *qryResults) {
-	agg, ok := res.frame.aggregates[res.name]
-	if !ok {
-		aggrLength := (ctx.maxt-ctx.mint)/ctx.step + 1
-		agg = aggregate.NewRawAggregatedSeries(int(aggrLength),
-			ctx.mint,
-			ctx.maxt,
-			*res.query.aggregationParams)
-		res.frame.aggregates[res.name] = agg
+func collector(ctx *selectQueryContext, res *qryResults) {
+	if res.IsDownsample() {
+		it := newRawChunkIterator(*res, nil).(*rawChunkIterator)
+		col := res.frame.columns[res.frame.columnByName[res.name]]
+		for currBucket := 0; currBucket < col.Len(); currBucket++ {
+			currBucketTime := int64(currBucket)*ctx.step + ctx.mint
+			//fmt.Println("searching time: ", currBucketTime)
+			if it.Seek(currBucketTime) {
+				t, v := it.At()
+				if t == currBucketTime {
+					col.SetDataAt(currBucket, v)
+				} else {
+					prevT, prevV := it.PeakBack()
+					//fmt.Printf("current t:%v, v:%v   --  previous t:%v, v:%v\n", t, v, prevT, prevV)
+
+					tollerance := 2 * res.query.step
+					if prevT != 0 && t-prevT > tollerance {
+						col.SetDataAt(currBucket, math.NaN())
+					} else {
+						_, interpolatedV := col.GetColumnSpec().interpolationFunction(prevT, t, currBucketTime, prevV, v)
+						col.SetDataAt(currBucket, interpolatedV)
+					}
+				}
+			} else {
+				col.SetDataAt(currBucket, math.NaN())
+			}
+		}
+	} else if res.IsServerAggregates() {
+		for _, col := range res.frame.columns {
+			if col.GetColumnSpec().metric == res.name {
+				array, ok := res.fields[aggregate.ToAttrName(col.GetColumnSpec().function)]
+				if !ok {
+					// return error
+				} else {
+					arrayData := utils.AsInt64Array(array.([]byte))
+					for i, val := range arrayData {
+						currentValueTime := res.query.partition.GetStartTime() + int64(i+1)*res.query.aggregationParams.RollupTime
+						currentCell := (currentValueTime - ctx.mint) / res.query.aggregationParams.Interval
+
+						var floatVal float64
+						if aggregate.IsCountAggregate(col.GetColumnSpec().function) {
+							floatVal = float64(val)
+						} else {
+							floatVal = math.Float64frombits(val)
+						}
+						col.SetDataAt(int(currentCell), floatVal)
+					}
+				}
+
+			}
+		}
+	} else if res.IsClientAggregates() {
+		it := newRawChunkIterator(*res, nil)
+		for it.Next() {
+			t, v := it.At()
+			currentCell := (t - ctx.mint) / res.query.aggregationParams.Interval
+
+			for _, col := range res.frame.columns {
+				if col.GetColumnSpec().metric == res.name {
+					col.SetDataAt(int(currentCell), v)
+				}
+			}
+		}
 	}
-	agg.AggregateData(res.fields, res.query.partition.GetStartTime())
+}
+
+func aggregateClientAggregates(ctx *selectQueryContext, res *qryResults) {
+	it := newRawChunkIterator(*res, nil)
+	for it.Next() {
+		t, v := it.At()
+		currentCell := (t - ctx.mint) / res.query.aggregationParams.Interval
+
+		for _, col := range res.frame.columns {
+			if col.GetColumnSpec().metric == res.name {
+				col.SetDataAt(int(currentCell), v)
+			}
+		}
+	}
+}
+
+func aggregateServerAggregates(ctx *selectQueryContext, res *qryResults) {
+	for _, col := range res.frame.columns {
+		if col.GetColumnSpec().metric == res.name {
+			array, ok := res.fields[aggregate.ToAttrName(col.GetColumnSpec().function)]
+			if !ok {
+				// return error
+			} else {
+				arrayData := utils.AsInt64Array(array.([]byte))
+				for i, val := range arrayData {
+					currentValueTime := res.query.partition.GetStartTime() + int64(i+1)*res.query.aggregationParams.RollupTime
+					currentCell := (currentValueTime - ctx.mint) / res.query.aggregationParams.Interval
+
+					var floatVal float64
+					if aggregate.IsCountAggregate(col.GetColumnSpec().function) {
+						floatVal = float64(val)
+					} else {
+						floatVal = math.Float64frombits(val)
+					}
+					col.SetDataAt(int(currentCell), floatVal)
+				}
+			}
+
+		}
+	}
+}
+
+func downsampleRawData(ctx *selectQueryContext, res *qryResults) {
+	it := newRawChunkIterator(*res, nil).(*rawChunkIterator)
+	col := res.frame.columns[res.frame.columnByName[res.name]]
+	for currBucket := 0; currBucket < col.Len(); currBucket++ {
+		currBucketTime := int64(currBucket)*ctx.step + ctx.mint
+		//fmt.Println("searching time: ", currBucketTime)
+		if it.Seek(currBucketTime) {
+			t, v := it.At()
+			if t == currBucketTime {
+				col.SetDataAt(currBucket, v)
+			} else {
+				prevT, prevV := it.PeakBack()
+				//fmt.Printf("current t:%v, v:%v   --  previous t:%v, v:%v\n", t, v, prevT, prevV)
+
+				tollerance := 2 * res.query.step
+				if prevT != 0 && t-prevT > tollerance {
+					col.SetDataAt(currBucket, math.NaN())
+				} else {
+					_, interpolatedV := col.GetColumnSpec().interpolationFunction(prevT, t, currBucketTime, prevV, v)
+					col.SetDataAt(currBucket, interpolatedV)
+				}
+			}
+		} else {
+			col.SetDataAt(currBucket, math.NaN())
+		}
+	}
 }

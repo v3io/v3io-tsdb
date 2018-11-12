@@ -236,7 +236,7 @@ func GetHiddenAggregates(mask AggrType, requestedAggregates []AggrType) []AggrTy
 	var hiddenAggregates []AggrType
 
 	for _, aggr := range rawAggregates {
-		if aggr&mask == aggr && !contains(requestedAggregates, aggr) {
+		if aggr&mask == aggr && !ContainsAggregate(requestedAggregates, aggr) {
 			hiddenAggregates = append(hiddenAggregates, aggr)
 		}
 	}
@@ -248,7 +248,7 @@ func GetHiddenAggregatesWithCount(mask AggrType, requestedAggregates []AggrType)
 	return GetHiddenAggregates(mask, requestedAggregates)
 }
 
-func contains(list []AggrType, item AggrType) bool {
+func ContainsAggregate(list []AggrType, item AggrType) bool {
 	for _, v := range list {
 		if v == item {
 			return true
@@ -257,6 +257,6 @@ func contains(list []AggrType, item AggrType) bool {
 	return false
 }
 
-func IsRawAggregate(item AggrType) bool { return contains(rawAggregates, item) }
+func IsRawAggregate(item AggrType) bool { return ContainsAggregate(rawAggregates, item) }
 
 func IsCountAggregate(aggr AggrType) bool { return aggr == aggrTypeCount }

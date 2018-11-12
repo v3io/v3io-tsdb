@@ -156,7 +156,7 @@ func (as *AggregateSeries) NewSetFromAttrs(
 			aggrArrays[aggr] = utils.AsInt64Array(attrBlob.([]byte))
 
 			dataArrays[aggr] = make([]float64, length, length)
-			copy(dataArrays[aggr], getOrCreateInitDataArray(aggr, length))
+			copy(dataArrays[aggr], GetOrCreateInitDataArray(aggr, length))
 		}
 	}
 
@@ -211,7 +211,7 @@ func (as *AggregateSeries) NewSetFromChunks(length int) *AggregateSet {
 	for _, aggr := range rawAggregates {
 		if aggr&as.aggrMask != 0 {
 			dataArrays[aggr] = make([]float64, length, length) // TODO: len/capacity & reuse (pool)
-			initArray := getOrCreateInitDataArray(aggr, length)
+			initArray := GetOrCreateInitDataArray(aggr, length)
 			copy(dataArrays[aggr], initArray)
 		}
 	}
@@ -374,7 +374,7 @@ func (as *AggregateSet) GetCellTime(base int64, index int) int64 {
 func (as *AggregateSet) Clear() {
 	as.maxCell = 0
 	for aggr := range as.dataArrays {
-		initArray := getOrCreateInitDataArray(aggr, len(as.dataArrays[0]))
+		initArray := GetOrCreateInitDataArray(aggr, len(as.dataArrays[0]))
 		copy(as.dataArrays[aggr], initArray)
 	}
 }
@@ -384,7 +384,7 @@ func (as *AggregateSet) HasData(cell int) bool {
 	return as.dataArrays[aggrTypeCount][cell] > 0
 }
 
-func getOrCreateInitDataArray(aggrType AggrType, length int) []float64 {
+func GetOrCreateInitDataArray(aggrType AggrType, length int) []float64 {
 	// Create once or override if required size is greater than existing array
 	if initDataArrayCache[aggrType] == nil || len(initDataArrayCache[aggrType]) < length {
 		initDataArrayCache[aggrType] = createInitDataArray(aggrType, length)

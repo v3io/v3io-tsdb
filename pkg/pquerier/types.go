@@ -15,7 +15,9 @@ type qryResults struct {
 	encoding int16
 }
 
-func (q *qryResults) IsRawQuery() bool { return q.query.aggregationParams == nil }
+func (q *qryResults) IsRawQuery() bool { return q.query.aggregationParams == nil && q.query.step == 0 }
+
+func (q *qryResults) IsDownsample() bool { return q.query.aggregationParams == nil && q.query.step != 0 }
 
 func (q *qryResults) IsServerAggregates() bool {
 	return q.query.aggregationParams != nil && q.query.aggregationParams.CanAggregate(q.query.partition.AggrType())
@@ -33,19 +35,19 @@ type RequestedColumn struct {
 }
 
 type columnMeta struct {
-	metric         string
-	alias          string
-	function       aggregate.AggrType
-	functionParams []interface{}
-	interpolator   int8
-	isHidden       bool // real columns = columns the user has specifically requested. Hidden columns = columns needed to calculate the real columns but don't show to the user
+	metric                string
+	alias                 string
+	function              aggregate.AggrType
+	functionParams        []interface{}
+	interpolationFunction InterpolationFunction
+	isHidden              bool // real columns = columns the user has specifically requested. Hidden columns = columns needed to calculate the real columns but don't show to the user
 }
 
 // if a user specifies he wants all metrics
 func (c *columnMeta) isWildcard() bool { return c.metric == "*" }
 
 // Concrete Column = has real data behind it, Virtual column = described as a function on top of concrete columns
-func (c *columnMeta) isConcrete() bool { return aggregate.IsRawAggregate(c.function) }
+func (c columnMeta) isConcrete() bool { return c.function == 0 || aggregate.IsRawAggregate(c.function) }
 func (c *columnMeta) getColumnName() string {
 	return fmt.Sprintf("%v(%v)", c.function.String(), c.metric)
 }
