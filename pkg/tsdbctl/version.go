@@ -39,8 +39,7 @@ func newVersionCommandeer(rc *RootCommandeer) *versionCommandeer {
 		Aliases: []string{"ver"},
 		Use:     "version",
 		Hidden:  false,
-		Short:   "Displays version",
-		Long:    "Displays version information",
+		Short:   "Displays version information",
 		Example: "- tsdbctl version",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			fmt.Printf("tsdbctl build information:\n  Build time: %s\n  OS: %s\n  Architecture: %s\n  Version: %s\n  SHA: %s\n  Branch: %s\n",

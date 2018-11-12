@@ -163,6 +163,9 @@ func TestMergeConfig(t *testing.T) {
 	assert.Equal(t, snapshot.TablePath, defaultCfg.TablePath)
 	assert.Equal(t, snapshot.MetricsReporter.ReportOnShutdown, defaultCfg.MetricsReporter.ReportOnShutdown)
 	assert.Equal(t, snapshot.MetricsReporter.RepotInterval, defaultCfg.MetricsReporter.RepotInterval)
+
+	assert.NotNil(t, defaultCfg.BuildInfo)
+	assert.NotNil(t, defaultCfg.BuildInfo.String())
 }
 
 func TestWithDefaults(t *testing.T) {
@@ -190,4 +193,7 @@ func TestWithDefaults(t *testing.T) {
 
 	// WithDefaults method does not create new configuration struct, therefore result object has the same address as myCfg
 	assert.Equal(t, myCfg, updatedCfg)
+
+	assert.NotNil(t, updatedCfg.BuildInfo)
+	assert.NotNil(t, updatedCfg.BuildInfo.String())
 }

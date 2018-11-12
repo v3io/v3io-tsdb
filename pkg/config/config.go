@@ -21,6 +21,7 @@ such restriction.
 package config
 
 import (
+	"fmt"
 	"github.com/ghodss/yaml"
 	"github.com/imdario/mergo"
 	"github.com/pkg/errors"
@@ -57,7 +58,7 @@ const (
 )
 
 type BuildInfo struct {
-	BuildTime    string `json:"os,omitempty"`
+	BuildTime    string `json:"buildTime,omitempty"`
 	Os           string `json:"os,omitempty"`
 	Architecture string `json:"architecture,omitempty"`
 	Version      string `json:"version,omitempty"`
@@ -65,9 +66,19 @@ type BuildInfo struct {
 	Branch       string `json:"branch,omitempty"`
 }
 
+func (bi *BuildInfo) String() string {
+	return fmt.Sprintf("Build time: %s\nOS: %s\nArchitecture: %s\nVersion: %s\nSHA: %s\nBranch: %s\n",
+		bi.BuildTime,
+		bi.Os,
+		bi.Architecture,
+		bi.Version,
+		bi.Revision,
+		bi.Branch)
+}
+
 var (
 	// Note, following variables set by make
-	osys, architecture, version, revision, branch, buildTime string
+	buildTime, osys, architecture, version, revision, branch string
 
 	instance *V3ioConfig
 	once     sync.Once
@@ -318,6 +329,10 @@ func loadFromData(data []byte) (*V3ioConfig, error) {
 }
 
 func initDefaults(cfg *V3ioConfig) {
+	if cfg.BuildInfo == nil {
+		cfg.BuildInfo = BuildMetadta
+	}
+
 	// Initialize the default number of workers
 	if cfg.Workers == 0 {
 		cfg.Workers = defaultNumberOfIngestWorkers
