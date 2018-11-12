@@ -1,9 +1,9 @@
 package pquerier
 
 import (
+	"encoding/binary"
 	"fmt"
 	"github.com/v3io/v3io-tsdb/pkg/aggregate"
-	"github.com/v3io/v3io-tsdb/pkg/utils"
 	"math"
 	"time"
 )
@@ -117,9 +117,12 @@ func aggregateServerAggregates(ctx *selectQueryContext, res *qryResults) {
 			if !ok {
 				ctx.logger.Error("requested function %v was not found in response", col.GetColumnSpec().function)
 			} else {
-				arrayData := utils.AsInt64Array(array.([]byte))
-				for i, val := range arrayData {
-					currentValueTime := res.query.partition.GetStartTime() + int64(i+1)*res.query.aggregationParams.RollupTime
+				// go over the byte array and convert each uint as we go to save memory
+				bytes := array.([]byte)
+				for i := 16; i+8 <= len(bytes); i += 8 {
+					val := binary.LittleEndian.Uint64(bytes[i : i+8])
+					currentValueIndex := (i - 16) / 8
+					currentValueTime := res.query.partition.GetStartTime() + int64(currentValueIndex+1)*res.query.aggregationParams.RollupTime
 					currentCell := (currentValueTime - ctx.mint) / res.query.aggregationParams.Interval
 
 					var floatVal float64
