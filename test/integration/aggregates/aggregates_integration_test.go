@@ -24,6 +24,10 @@ package aggregates
 
 import (
 	"fmt"
+	"math"
+	"testing"
+	"time"
+
 	"github.com/nuclio/logger"
 	"github.com/stretchr/testify/assert"
 	"github.com/v3io/v3io-tsdb/internal/pkg/performance"
@@ -32,9 +36,6 @@ import (
 	"github.com/v3io/v3io-tsdb/pkg/tsdb"
 	"github.com/v3io/v3io-tsdb/pkg/tsdb/tsdbtest"
 	"github.com/v3io/v3io-tsdb/pkg/utils"
-	"math"
-	"testing"
-	"time"
 )
 
 type TestConfig struct {

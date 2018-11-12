@@ -2,13 +2,14 @@ package common
 
 import (
 	"fmt"
+	"io/ioutil"
+	"os"
+	"path/filepath"
+
 	"github.com/ghodss/yaml"
 	"github.com/pkg/errors"
 	"github.com/v3io/v3io-tsdb/pkg/config"
 	"github.com/v3io/v3io-tsdb/pkg/tsdb/tsdbtest"
-	"io/ioutil"
-	"os"
-	"path/filepath"
 )
 
 const TsdbBenchIngestConfig = "TSDB_BENCH_INGEST_CONFIG"

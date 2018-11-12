@@ -3,17 +3,18 @@ package tsdbtest
 import (
 	json2 "encoding/json"
 	"fmt"
-	"github.com/v3io/v3io-tsdb/internal/pkg/performance"
-	"github.com/v3io/v3io-tsdb/pkg/config"
-	. "github.com/v3io/v3io-tsdb/pkg/tsdb"
-	"github.com/v3io/v3io-tsdb/pkg/tsdb/tsdbtest/testutils"
-	"github.com/v3io/v3io-tsdb/pkg/utils"
 	"os"
 	"path"
 	"regexp"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/v3io/v3io-tsdb/internal/pkg/performance"
+	"github.com/v3io/v3io-tsdb/pkg/config"
+	. "github.com/v3io/v3io-tsdb/pkg/tsdb"
+	"github.com/v3io/v3io-tsdb/pkg/tsdb/tsdbtest/testutils"
+	"github.com/v3io/v3io-tsdb/pkg/utils"
 )
 
 type DataPoint struct {

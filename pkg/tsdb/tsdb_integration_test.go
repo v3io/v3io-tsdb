@@ -23,13 +23,14 @@ such restriction.
 package tsdb_test
 
 import (
+	"math"
+	"testing"
+	"time"
+
 	"github.com/stretchr/testify/suite"
 	"github.com/v3io/v3io-tsdb/pkg/tsdb"
 	"github.com/v3io/v3io-tsdb/pkg/tsdb/tsdbtest"
 	"github.com/v3io/v3io-tsdb/pkg/utils"
-	"math"
-	"testing"
-	"time"
 )
 
 type testTsdbSuite struct {

@@ -16,10 +16,11 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"github.com/cespare/xxhash"
 	"sort"
 	"strconv"
 	"strings"
+
+	"github.com/cespare/xxhash"
 )
 
 const sep = '\xff'
