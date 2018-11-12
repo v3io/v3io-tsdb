@@ -16,27 +16,27 @@ func TestCreateColumnSpecs(t *testing.T) {
 		expectedSpecsMap map[string][]columnMeta
 	}{
 		{params: SelectParams{Name: "cpu"},
-			expectedSpecs:    []columnMeta{{metric: "cpu"}},
-			expectedSpecsMap: map[string][]columnMeta{"cpu": {{metric: "cpu"}}}},
+			expectedSpecs:    []columnMeta{{metric: "cpu", interpolationType: interpolateNext}},
+			expectedSpecsMap: map[string][]columnMeta{"cpu": {{metric: "cpu", interpolationType: interpolateNext}}}},
 
 		{params: SelectParams{Name: "cpu", Functions: "count"},
-			expectedSpecs:    []columnMeta{{metric: "cpu", function: toAggr("count")}},
-			expectedSpecsMap: map[string][]columnMeta{"cpu": {{metric: "cpu", function: toAggr("count")}}}},
+			expectedSpecs:    []columnMeta{{metric: "cpu", function: toAggr("count"), interpolationType: interpolateNext}},
+			expectedSpecsMap: map[string][]columnMeta{"cpu": {{metric: "cpu", function: toAggr("count"), interpolationType: interpolateNext}}}},
 
 		{params: SelectParams{Name: "cpu", Functions: "avg"},
-			expectedSpecs: []columnMeta{{metric: "cpu", function: toAggr("avg")},
+			expectedSpecs: []columnMeta{{metric: "cpu", function: toAggr("avg"), interpolationType: interpolateNext},
 				{metric: "cpu", function: toAggr("count"), isHidden: true},
 				{metric: "cpu", function: toAggr("sum"), isHidden: true}},
-			expectedSpecsMap: map[string][]columnMeta{"cpu": {{metric: "cpu", function: toAggr("avg")},
+			expectedSpecsMap: map[string][]columnMeta{"cpu": {{metric: "cpu", function: toAggr("avg"), interpolationType: interpolateNext},
 				{metric: "cpu", function: toAggr("count"), isHidden: true},
 				{metric: "cpu", function: toAggr("sum"), isHidden: true}}}},
 
 		{params: SelectParams{Name: "cpu", Functions: "avg,count"},
-			expectedSpecs: []columnMeta{{metric: "cpu", function: toAggr("avg")},
-				{metric: "cpu", function: toAggr("count")},
+			expectedSpecs: []columnMeta{{metric: "cpu", function: toAggr("avg"), interpolationType: interpolateNext},
+				{metric: "cpu", function: toAggr("count"), interpolationType: interpolateNext},
 				{metric: "cpu", function: toAggr("sum"), isHidden: true}},
-			expectedSpecsMap: map[string][]columnMeta{"cpu": {{metric: "cpu", function: toAggr("avg")},
-				{metric: "cpu", function: toAggr("count")},
+			expectedSpecsMap: map[string][]columnMeta{"cpu": {{metric: "cpu", function: toAggr("avg"), interpolationType: interpolateNext},
+				{metric: "cpu", function: toAggr("count"), interpolationType: interpolateNext},
 				{metric: "cpu", function: toAggr("sum"), isHidden: true}}}},
 
 		{params: SelectParams{columnSpecs: []RequestedColumn{{metric: "cpu", function: "count"}}},
