@@ -342,8 +342,12 @@ func (p *DBPartition) GetShardingKeys(name string) []string {
 }
 
 // Return the full path to the specified metric item
-func (p *DBPartition) GetMetricPath(name string, hash uint64) string {
-	return fmt.Sprintf("%s%s_%x.%016x", p.path, name, int(hash%uint64(p.GetHashingBuckets())), hash)
+func (p *DBPartition) GetMetricPath(name string, hash uint64, isAggr bool) string {
+	agg := ""
+	if isAggr {
+		agg = "agg/"
+	}
+	return fmt.Sprintf("%s%s%s_%x.%016x", p.path, agg, name, int(hash%uint64(p.GetHashingBuckets())), hash)
 }
 
 func (p *DBPartition) AggrType() aggregate.AggrType {

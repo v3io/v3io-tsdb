@@ -279,13 +279,15 @@ func (mc *MetricsCache) handleResponse(metric *MetricState, resp *v3io.Response,
 	} else {
 		// Handle Update Expression responses
 		if resp.Error == nil {
-			// Set fields so next write won't include redundant info (bytes, labels, init_array)
-			metric.store.ProcessWriteResp()
+			if metric.store.chunks[0] != nil {
+				// Set fields so next write won't include redundant info (bytes, labels, init_array)
+				metric.store.ProcessWriteResp()
+			}
 			metric.retryCount = 0
 		} else {
 			clear := func() {
 				resp.Release()
-				metric.store = NewChunkStore(mc.logger)
+				metric.store = NewChunkStore(mc.logger, metric.store.chunks[0] == nil)
 				metric.retryCount = 0
 				metric.setState(storeStateInit)
 			}

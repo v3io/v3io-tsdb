@@ -225,13 +225,14 @@ func (mc *MetricsCache) Add(lset utils.LabelsIfc, t int64, v interface{}) (uint6
 				aggrMetric, ok := mc.getMetric(name, hash)
 				if !ok {
 					aggrMetric = &MetricState{Lset: lset, key: key, name: name, hash: hash}
+					aggrMetric.store = NewChunkStore(mc.logger, true)
 					mc.addMetric(hash, name, aggrMetric)
 					aggrMetrics = append(aggrMetrics, aggrMetric)
 				}
 			}
 		}
 		metric = &MetricState{Lset: lset, key: key, name: name, hash: hash, aggrs: aggrMetrics}
-		metric.store = NewChunkStore(mc.logger)
+		metric.store = NewChunkStore(mc.logger, false)
 		mc.addMetric(hash, name, metric)
 	} else {
 		aggrMetrics = metric.aggrs
