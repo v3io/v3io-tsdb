@@ -84,6 +84,7 @@ func (it *DataFrameColumnSeriesIterator) getNextValidCell(from int) (nextIndex i
 }
 
 func (it *DataFrameColumnSeriesIterator) doesCellHasData(cell int) bool {
+	// In case we don't have a count column (for example while down sampling) check if there is a real value at `cell`
 	if it.countColumn == nil {
 		f, err := it.dataColumn.FloatAt(cell)
 		if err != nil {

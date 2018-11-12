@@ -217,7 +217,6 @@ func (suite *testQuerySuite) TestRawAggregatesSinglePartition() {
 	}
 	metricName := "cpu"
 	labels1 := utils.LabelsFromStrings("__name__", metricName, "os", "linux")
-	//labels2 := utils.LabelsFromStrings("__name__", "diskio", "os", "linux")
 	numberOfEvents := 10
 	eventsInterval := 60 * 1000
 	baseTime := time.Now().UnixNano()/1000000 - int64(numberOfEvents*eventsInterval)
@@ -262,6 +261,57 @@ func (suite *testQuerySuite) TestRawAggregatesSinglePartition() {
 	assert.Equal(suite.T(), 3, seriesCount, "series count didn't match expected")
 }
 
+func (suite *testQuerySuite) TestRawAggregatesSinglePartitionNegativeValues() {
+	adapter, err := tsdb.NewV3ioAdapter(suite.v3ioConfig, nil, nil)
+	if err != nil {
+		suite.T().Fatalf("failed to create v3io adapter. reason: %s", err)
+	}
+	metricName := "cpu"
+	labels1 := utils.LabelsFromStrings("__name__", metricName, "os", "linux")
+	numberOfEvents := 10
+	eventsInterval := 60 * 1000
+	baseTime := time.Now().UnixNano()/1000000 - int64(numberOfEvents*eventsInterval)
+
+	ingestedData := []tsdbtest.DataPoint{{baseTime, -10},
+		{int64(baseTime + tsdbtest.MinuteInMillis), -20},
+		{baseTime + 2*tsdbtest.MinuteInMillis, -30},
+		{baseTime + 3*tsdbtest.MinuteInMillis, -40}}
+	tsdbtest.InsertData(suite.T(), suite.v3ioConfig, metricName,
+		ingestedData,
+		labels1)
+
+	expected := map[string][]tsdbtest.DataPoint{"sum": {{Time: baseTime, Value: -100}},
+		"min": {{Time: baseTime, Value: -40}},
+		"max": {{Time: baseTime, Value: -10}}}
+
+	querierV2, err := adapter.QuerierV2(nil)
+	if err != nil {
+		suite.T().Fatalf("Failed to create querier v2, err: %v", err)
+	}
+
+	params := &pquerier.SelectParams{Name: "cpu", Functions: "sum,max,min", Step: 1 * 60 * 60 * 1000, From: baseTime, To: baseTime + int64(numberOfEvents*eventsInterval)}
+	set, err := querierV2.SelectQry(params)
+	if err != nil {
+		suite.T().Fatalf("Failed to exeute query, err: %v", err)
+	}
+
+	var seriesCount int
+	for set.Next() {
+		seriesCount++
+		iter := set.At().Iterator()
+
+		data, err := tsdbtest.IteratorToSlice(iter)
+		agg := set.At().Labels().Get(aggregate.AggregateLabel)
+		if err != nil {
+			suite.T().Fatal(err)
+		}
+
+		assert.Equal(suite.T(), expected[agg], data, "queried data does not match expected")
+	}
+
+	assert.Equal(suite.T(), 3, seriesCount, "series count didn't match expected")
+}
+
 func (suite *testQuerySuite) TestRawAggregatesMultiPartition() {
 	adapter, err := tsdb.NewV3ioAdapter(suite.v3ioConfig, nil, nil)
 	if err != nil {
@@ -269,7 +319,7 @@ func (suite *testQuerySuite) TestRawAggregatesMultiPartition() {
 	}
 	metricName := "cpu"
 	labels1 := utils.LabelsFromStrings("__name__", metricName, "os", "linux")
-	//labels2 := utils.LabelsFromStrings("__name__", "diskio", "os", "linux")
+
 	numberOfEvents := 10
 	eventsInterval := 60 * 1000
 	baseTime := time.Now().UnixNano()/1000000 - int64(numberOfEvents*eventsInterval)
@@ -322,7 +372,6 @@ func (suite *testQuerySuite) TestRawAggregatesMultiPartitionNonConcreteAggregate
 	}
 	metricName := "cpu"
 	labels1 := utils.LabelsFromStrings("__name__", metricName, "os", "linux")
-	//labels2 := utils.LabelsFromStrings("__name__", "diskio", "os", "linux")
 	numberOfEvents := 10
 	eventsInterval := 60 * 1000
 	baseTime := time.Now().UnixNano()/1000000 - int64(numberOfEvents*eventsInterval)

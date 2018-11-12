@@ -179,7 +179,7 @@ func (s nullSeriesIterator) Err() error               { return s.err }
 func NewRawSeries(results *qryResults) Series {
 	newSeries := V3ioRawSeries{fields: results.fields}
 	newSeries.initLabels()
-	newSeries.iter = newBucketedRawChunkIterator(*results, nil)
+	newSeries.iter = newRawChunkIterator(*results, nil)
 	return &newSeries
 }
 
@@ -203,7 +203,7 @@ func (s *V3ioRawSeries) GetKey() uint64 {
 func (s *V3ioRawSeries) Iterator() SeriesIterator { return s.iter }
 
 func (s *V3ioRawSeries) AddChunks(results *qryResults) {
-	s.iter.(*bucketedRawChunkIterator).AddChunks(results)
+	s.iter.(*rawChunkIterator).AddChunks(*results)
 }
 
 // Initialize the label set from _lset and _name attributes
@@ -231,60 +231,4 @@ func (s *V3ioRawSeries) initLabels() {
 	}
 
 	s.lset = lset
-}
-
-// Chunk-list series iterator
-type bucketedRawChunkIterator struct {
-	iter          SeriesIterator
-	log           logger.Logger
-	mint, step    int64
-	currentBucket int
-}
-
-func newBucketedRawChunkIterator(item qryResults, log logger.Logger) SeriesIterator {
-	newIterator := bucketedRawChunkIterator{log: log, step: item.query.step, mint: item.query.mint, currentBucket: -1}
-	newIterator.iter = newRawChunkIterator(item, log)
-
-	return &newIterator
-}
-
-// Advance the iterator to the specified chunk and time
-func (it *bucketedRawChunkIterator) Seek(t int64) bool {
-	return it.iter.Seek(t)
-}
-
-// Move to the next iterator item
-func (it *bucketedRawChunkIterator) Next() bool {
-	if it.step != 0 {
-		it.currentBucket++
-		return it.iter.Seek(it.mint + it.step*int64(it.currentBucket))
-	} else {
-		return it.iter.Next()
-	}
-}
-
-// Read the time and value at the current location
-func (it *bucketedRawChunkIterator) At() (int64, float64) {
-	if it.step != 0 {
-		prevT, prevV := it.iter.(*rawChunkIterator).PeakBack()
-		nextT, nextV := it.iter.At()
-		if nextT-it.currentBucketTime() > it.step {
-			it.currentBucket = int((nextT - it.mint) / it.step)
-		}
-		// TODO: Get interpolation from column spec + tolerance
-		interpolatedT, interpolatedV := GetInterpolateFunc(interpolateNext)(prevT, nextT, it.currentBucketTime(), prevV, nextV)
-		return interpolatedT, interpolatedV
-	} else {
-		return it.iter.At()
-	}
-}
-
-func (it *bucketedRawChunkIterator) currentBucketTime() int64 {
-	return it.mint + it.step*int64(it.currentBucket)
-}
-
-func (it *bucketedRawChunkIterator) Err() error { return it.iter.Err() }
-
-func (it *bucketedRawChunkIterator) AddChunks(results *qryResults) {
-	it.iter.(*rawChunkIterator).AddChunks(*results)
 }

@@ -104,7 +104,6 @@ func NewDataFrame(columnsSpec []columnMeta, indexColumn Column, lset utils.Label
 		df.index = indexColumn
 		df.columnByName = make(map[string]int, numOfColumns)
 		df.columns = make([]Column, 0, numOfColumns)
-		df.aggregates = make(map[string]*aggregate.RawAggregatedSeries, numOfColumns)
 		df.metricToCountColumn = map[string]Column{}
 		if !isAllColumnWildcard {
 			for i, col := range columnsSpec {
@@ -196,17 +195,7 @@ type dataFrame struct {
 	index        Column
 	columnByName map[string]int // name -> index in columns
 
-	aggregates          map[string]*aggregate.RawAggregatedSeries // metric to aggregates
 	metricToCountColumn map[string]Column
-}
-
-func (d *dataFrame) CalculateColumns() {
-	for _, col := range d.columns {
-		col.(*aggregatedColumn).SetData(d.aggregates[col.GetColumnSpec().metric], col.GetColumnSpec().function)
-		if aggregate.IsCountAggregate(col.GetColumnSpec().function) {
-			d.metricToCountColumn[col.GetColumnSpec().metric] = col
-		}
-	}
 }
 
 func (d *dataFrame) Len() int {
@@ -407,39 +396,6 @@ func (dc *dataColumn) SetDataAt(i int, value interface{}) error {
 		dc.data.([]bool)[i] = value.(bool)
 	}
 	return nil
-}
-
-func NewAggregatedColumn(name string, colSpec columnMeta) *aggregatedColumn {
-	return &aggregatedColumn{basicColumn: basicColumn{name: name, spec: colSpec}}
-}
-
-type aggregatedColumn struct {
-	basicColumn
-	aggregations *aggregate.RawAggregatedSeries
-	wantedAggr   aggregate.AggrType
-}
-
-func (c *aggregatedColumn) DType() DType {
-	var a float64
-	return reflect.TypeOf(a)
-}
-func (c *aggregatedColumn) FloatAt(i int) (float64, error) {
-	if !c.isValidIndex(i) {
-		return 0, fmt.Errorf("index %d out of bounds [0:%d]", i, c.size)
-	}
-	return c.aggregations.GetAggregate(c.wantedAggr)[i], nil
-}
-func (c *aggregatedColumn) StringAt(i int) (string, error) {
-	return "", errors.New("aggregated column does not support string type")
-}
-func (c *aggregatedColumn) TimeAt(i int) (int64, error) {
-	return 0, errors.New("aggregated column does not support time type")
-}
-
-func (c *aggregatedColumn) SetData(aggregations *aggregate.RawAggregatedSeries, wantedAggr aggregate.AggrType) {
-	c.aggregations = aggregations
-	c.wantedAggr = wantedAggr
-	c.size = len(c.aggregations.GetAggregate(c.wantedAggr))
 }
 
 func NewConcreteColumn(name string, colSpec columnMeta, size int, setFunc func(old, new interface{}) interface{}) *ConcreteColumn {
