@@ -255,7 +255,7 @@ func (s *selectQueryContext) createColumnSpecs(params *SelectParams) ([]columnMe
 		if err != nil {
 			return nil, nil, err
 		}
-		colMeta := columnMeta{metric: col.metric, alias: col.alias, interpolationFunction: GetInterpolateFunc(inter)}
+		colMeta := columnMeta{metric: col.metric, alias: col.alias, interpolationType: inter}
 
 		if col.function != "" {
 			aggr, err := aggregate.AggregateFromString(col.function)

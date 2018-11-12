@@ -52,17 +52,10 @@ func (suite *testQuerySuite) SetupSuite() {
 
 func (suite *testQuerySuite) SetupTest() {
 	suite.v3ioConfig.TablePath = suite.T().Name()
-
-	// Delete Previous db if exists
-	adapter, err := tsdb.NewV3ioAdapter(suite.v3ioConfig, nil, nil)
-	if err == nil {
-		now := time.Now().Unix() * 1000 // Current time (now) in milliseconds
-		adapter.DeleteDB(true, true, 0, now)
-	}
 	tsdbtest.CreateTestTSDB(suite.T(), suite.v3ioConfig)
 }
 
-func (suite *testQuerySuite) TeardownTest() {
+func (suite *testQuerySuite) TearDownTest() {
 	suite.v3ioConfig.TablePath = suite.T().Name()
 	tsdbtest.DeleteTSDB(suite.T(), suite.v3ioConfig)
 }

@@ -117,7 +117,7 @@ func aggregateServerAggregates(ctx *selectQueryContext, res *qryResults) {
 			if !ok {
 				ctx.logger.Error("requested function %v was not found in response", col.GetColumnSpec().function)
 			} else {
-				// go over the byte array and convert each uint as we go to save memory
+				// go over the byte array and convert each uint as we go to save memory allocation
 				bytes := array.([]byte)
 				for i := 16; i+8 <= len(bytes); i += 8 {
 					val := binary.LittleEndian.Uint64(bytes[i : i+8])
@@ -155,7 +155,7 @@ func downsampleRawData(ctx *selectQueryContext, res *qryResults) {
 				if prevT != 0 && t-prevT > tollerance {
 					col.SetDataAt(currBucket, math.NaN())
 				} else {
-					_, interpolatedV := col.GetColumnSpec().interpolationFunction(prevT, t, currBucketTime, prevV, v)
+					_, interpolatedV := col.GetInterpolationFunction()(prevT, t, currBucketTime, prevV, v)
 					col.SetDataAt(currBucket, interpolatedV)
 				}
 			}

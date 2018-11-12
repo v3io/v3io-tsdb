@@ -26,19 +26,19 @@ import (
 	"strings"
 )
 
-type InterpolateType uint8
+type InterpolationType uint8
 
 const (
-	interpolateNone InterpolateType = 0
-	interpolateNaN  InterpolateType = 1
-	interpolatePrev InterpolateType = 2
-	interpolateNext InterpolateType = 3
-	interpolateLin  InterpolateType = 4
+	interpolateNone InterpolationType = 0
+	interpolateNaN  InterpolationType = 1
+	interpolatePrev InterpolationType = 2
+	interpolateNext InterpolationType = 3
+	interpolateLin  InterpolationType = 4
 )
 
 type InterpolationFunction func(tprev, tnext, tseek int64, vprev, vnext float64) (int64, float64)
 
-func StrToInterpolateType(str string) (InterpolateType, error) {
+func StrToInterpolateType(str string) (InterpolationType, error) {
 	switch strings.ToLower(str) {
 	case "none", "":
 		return interpolateNone, nil
@@ -55,7 +55,7 @@ func StrToInterpolateType(str string) (InterpolateType, error) {
 }
 
 // return line interpolation function, estimate seek value based on previous and next points
-func GetInterpolateFunc(alg InterpolateType) InterpolationFunction {
+func GetInterpolateFunc(alg InterpolationType) InterpolationFunction {
 	switch alg {
 	case interpolateNaN:
 		return projectNaN

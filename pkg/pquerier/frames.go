@@ -118,7 +118,6 @@ func NewDataFrame(columnsSpec []columnMeta, indexColumn Column, lset utils.Label
 						if aggregate.IsCountAggregate(col.function) {
 							df.metricToCountColumn[col.metric] = column
 						}
-						//column = NewAggregatedColumn(col.getColumnName(), col)
 					} else {
 						function, err := getVirtualColumnFunction(col.function)
 						if err != nil {
@@ -272,6 +271,7 @@ type Column interface {
 	TimeAt(i int) (int64, error)    // time value at index i
 	GetColumnSpec() columnMeta      // Get the column's metadata
 	SetDataAt(i int, value interface{}) error
+	GetInterpolationFunction() InterpolationFunction
 }
 
 type basicColumn struct {
@@ -302,13 +302,19 @@ type DType reflect.Type
 func NewDataColumn(name string, colSpec columnMeta, size int, datatype DType) *dataColumn {
 	dc := &dataColumn{basicColumn: basicColumn{name: name, spec: colSpec, size: size}}
 	dc.initializeData(datatype)
+	dc.interpolationFunction = GetInterpolateFunc(colSpec.interpolationType)
 	return dc
 
 }
 
 type dataColumn struct {
 	basicColumn
-	data interface{}
+	data                  interface{}
+	interpolationFunction InterpolationFunction
+}
+
+func (dc *dataColumn) GetInterpolationFunction() InterpolationFunction {
+	return dc.interpolationFunction
 }
 
 func (dc *dataColumn) initializeData(dataType DType) {
@@ -437,6 +443,7 @@ func (c *ConcreteColumn) SetDataAt(i int, val interface{}) error {
 	c.data[i] = c.setFunc(c.data[i], val)
 	return nil
 }
+func (c *ConcreteColumn) GetInterpolationFunction() InterpolationFunction { return nil }
 
 func NewVirtualColumn(name string, colSpec columnMeta, size int, function func([]Column, int) (interface{}, error)) Column {
 	col := &virtualColumn{basicColumn: basicColumn{name: name, spec: colSpec, size: size}, function: function}
@@ -486,3 +493,4 @@ func (c *virtualColumn) TimeAt(i int) (int64, error) {
 	}
 	return value.(int64), nil
 }
+func (c *virtualColumn) GetInterpolationFunction() InterpolationFunction { return nil }
