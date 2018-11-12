@@ -24,6 +24,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math"
+	pathUtil "path"
+	"time"
+
 	"github.com/nuclio/logger"
 	"github.com/pkg/errors"
 	"github.com/v3io/v3io-go-http"
@@ -33,9 +37,6 @@ import (
 	"github.com/v3io/v3io-tsdb/pkg/querier"
 	"github.com/v3io/v3io-tsdb/pkg/tsdb/schema"
 	"github.com/v3io/v3io-tsdb/pkg/utils"
-	"math"
-	pathUtil "path"
-	"time"
 )
 
 type V3ioAdapter struct {

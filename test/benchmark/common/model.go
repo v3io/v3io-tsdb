@@ -4,11 +4,12 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"github.com/pkg/errors"
-	"github.com/v3io/v3io-tsdb/pkg/tsdb/tsdbtest"
 	"math/rand"
 	"sync/atomic"
 	"time"
+
+	"github.com/pkg/errors"
+	"github.com/v3io/v3io-tsdb/pkg/tsdb/tsdbtest"
 )
 
 var lastValue int64 = 0

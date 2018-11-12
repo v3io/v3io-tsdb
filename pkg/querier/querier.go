@@ -21,6 +21,10 @@ such restriction.
 package querier
 
 import (
+	"sort"
+	"strings"
+	"time"
+
 	"github.com/nuclio/logger"
 	"github.com/pkg/errors"
 	"github.com/v3io/v3io-go-http"
@@ -29,9 +33,6 @@ import (
 	"github.com/v3io/v3io-tsdb/pkg/config"
 	"github.com/v3io/v3io-tsdb/pkg/partmgr"
 	"github.com/v3io/v3io-tsdb/pkg/utils"
-	"sort"
-	"strings"
-	"time"
 )
 
 // Create a new Querier interface

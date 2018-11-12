@@ -3,8 +3,9 @@ package formatter
 import (
 	"encoding/csv"
 	"fmt"
-	"github.com/v3io/v3io-tsdb/pkg/querier"
 	"io"
+
+	"github.com/v3io/v3io-tsdb/pkg/querier"
 )
 
 type textFormatter struct {
