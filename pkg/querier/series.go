@@ -21,10 +21,11 @@ such restriction.
 package querier
 
 import (
+	"strings"
+
 	"github.com/v3io/v3io-tsdb/pkg/aggregate"
 	"github.com/v3io/v3io-tsdb/pkg/chunkenc"
 	"github.com/v3io/v3io-tsdb/pkg/utils"
-	"strings"
 )
 
 // Create a new series from chunks

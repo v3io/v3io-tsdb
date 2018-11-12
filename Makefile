@@ -1,6 +1,7 @@
 # All top-level dirs except for vendor/.
 TOPLEVEL_DIRS=`ls -d ./*/. | grep -v '^./vendor/.$$' | sed 's/\.$$/.../'`
 TOPLEVEL_DIRS_GOFMT_SYNTAX=`ls -d ./*/. | grep -v '^./vendor/.$$'`
+TOPLEVEL_DIRS_IMPI_SYNTAX=`ls -d ./*/. | grep -v '^./vendor/.$$' | sed 's/$$/../'`
 
 GIT_SHA := $(shell git rev-parse HEAD)
 GIT_BRANCH=$(shell git rev-parse --abbrev-ref HEAD)
@@ -59,7 +60,18 @@ build: get
 .PHONY: lint
 lint:
 ifeq ($(shell gofmt -l $(TOPLEVEL_DIRS_GOFMT_SYNTAX)),)
-	# lint OK
+	# gofmt OK
 else
 	$(error Please run `go fmt ./...` to format the code)
 endif
+	@echo Installing linters...
+	go get -u github.com/pavius/impi/cmd/impi
+
+	@echo Verifying imports...
+	$(GOPATH)/bin/impi \
+		--local github.com/iguazio/provazio \
+		--skip pkg/controller/apis \
+		--skip pkg/controller/client \
+		--scheme stdLocalThirdParty \
+		$(TOPLEVEL_DIRS_IMPI_SYNTAX)
+	# Imports OK

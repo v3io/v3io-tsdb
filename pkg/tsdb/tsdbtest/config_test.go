@@ -3,13 +3,14 @@
 package tsdbtest
 
 import (
-	"github.com/stretchr/testify/assert"
-	"github.com/v3io/v3io-tsdb/pkg/config"
 	"go/build"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/v3io/v3io-tsdb/pkg/config"
 )
 
 func createTestConfig(t *testing.T, path string) {

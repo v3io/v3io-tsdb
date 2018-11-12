@@ -22,9 +22,10 @@ package tsdbctl
 
 import (
 	"fmt"
-	"github.com/spf13/cobra"
 	"strconv"
 	"time"
+
+	"github.com/spf13/cobra"
 )
 
 type timeCommandeer struct {

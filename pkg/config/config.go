@@ -22,13 +22,14 @@ package config
 
 import (
 	"fmt"
-	"github.com/ghodss/yaml"
-	"github.com/imdario/mergo"
-	"github.com/pkg/errors"
 	"io/ioutil"
 	"os"
 	"strings"
 	"sync"
+
+	"github.com/ghodss/yaml"
+	"github.com/imdario/mergo"
+	"github.com/pkg/errors"
 )
 
 const (

@@ -2,12 +2,13 @@ package tsdbtest
 
 import (
 	"fmt"
-	"github.com/pkg/errors"
-	"github.com/v3io/v3io-tsdb/pkg/config"
 	"go/build"
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/pkg/errors"
+	"github.com/v3io/v3io-tsdb/pkg/config"
 )
 
 const TsdbDefaultTestConfigPath = "testdata"

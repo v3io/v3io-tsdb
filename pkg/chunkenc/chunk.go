@@ -31,6 +31,7 @@ package chunkenc
 import (
 	"encoding/binary"
 	"fmt"
+
 	"github.com/nuclio/logger"
 )
 

@@ -1,8 +1,9 @@
 package main
 
 import (
-	"github.com/v3io/v3io-tsdb/pkg/tsdbctl"
 	"os"
+
+	"github.com/v3io/v3io-tsdb/pkg/tsdbctl"
 )
 
 func main() {

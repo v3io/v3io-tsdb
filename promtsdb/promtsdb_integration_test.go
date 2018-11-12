@@ -4,14 +4,15 @@ package promtsdb
 
 import (
 	"fmt"
+	"math/rand"
+	"testing"
+	"time"
+
 	"github.com/prometheus/prometheus/pkg/labels"
 	"github.com/prometheus/prometheus/storage"
 	"github.com/v3io/v3io-tsdb/pkg/aggregate"
 	"github.com/v3io/v3io-tsdb/pkg/config"
 	"github.com/v3io/v3io-tsdb/pkg/partmgr"
-	"math/rand"
-	"testing"
-	"time"
 )
 
 const basetime = 15222481971234

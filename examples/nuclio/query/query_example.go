@@ -3,6 +3,8 @@ package query
 import (
 	"bytes"
 	"encoding/json"
+	"strings"
+
 	"github.com/nuclio/nuclio-sdk-go"
 	"github.com/pkg/errors"
 	"github.com/v3io/v3io-go-http"
@@ -10,7 +12,6 @@ import (
 	"github.com/v3io/v3io-tsdb/pkg/formatter"
 	"github.com/v3io/v3io-tsdb/pkg/tsdb"
 	"github.com/v3io/v3io-tsdb/pkg/utils"
-	"strings"
 )
 
 // Configuration
