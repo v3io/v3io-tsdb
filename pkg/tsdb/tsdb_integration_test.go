@@ -38,13 +38,11 @@ type testTsdbSuite struct {
 }
 
 func (suite *testTsdbSuite) TestAppend() {
+	testCtx := suite.T()
+	testParams := tsdbtest.NewTestParams(testCtx)
+	defer tsdbtest.SetUp(testCtx, testParams)()
 
-	v3ioConfig, err := tsdbtest.LoadV3ioConfig()
-	suite.Require().NoError(err)
-
-	defer tsdbtest.SetUp(suite.T(), v3ioConfig)()
-
-	adapter, err := tsdb.NewV3ioAdapter(v3ioConfig, nil, nil)
+	adapter, err := tsdb.NewV3ioAdapter(testParams.V3ioConfig(), nil, nil)
 	suite.Require().NoError(err)
 
 	appender, err := adapter.Appender()

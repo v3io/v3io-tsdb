@@ -12,11 +12,10 @@ import (
 )
 
 func TestQueryIntegration(t *testing.T) {
-	v3ioConfig, err := tsdbtest.LoadV3ioConfig()
-	if err != nil {
-		t.Fatalf("unable to load configuration. Error: %v", err)
-	}
-	defer tsdbtest.SetUp(t, v3ioConfig)()
+	testParams := tsdbtest.NewTestParams(t)
+	defer tsdbtest.SetUp(t, testParams)()
+
+	v3ioConfig := testParams.V3ioConfig()
 	tsdbConfig = fmt.Sprintf(`path: "%v"`, v3ioConfig.TablePath)
 
 	url := os.Getenv("V3IO_SERVICE_URL")
