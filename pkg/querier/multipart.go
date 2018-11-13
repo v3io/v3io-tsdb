@@ -1,8 +1,9 @@
 package querier
 
 import (
-	"github.com/v3io/v3io-tsdb/pkg/utils"
 	"sort"
+
+	"github.com/v3io/v3io-tsdb/pkg/utils"
 )
 
 func NewSetSorter(set SeriesSet) (SeriesSet, error) {

@@ -24,6 +24,12 @@ package tsdb_test
 
 import (
 	"encoding/json"
+	"math"
+	"path"
+	"sort"
+	"testing"
+	"time"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/v3io/v3io-go-http"
 	"github.com/v3io/v3io-tsdb/pkg/aggregate"
@@ -34,11 +40,6 @@ import (
 	"github.com/v3io/v3io-tsdb/pkg/tsdb/tsdbtest"
 	"github.com/v3io/v3io-tsdb/pkg/tsdb/tsdbtest/testutils"
 	"github.com/v3io/v3io-tsdb/pkg/utils"
-	"math"
-	"path"
-	"sort"
-	"testing"
-	"time"
 )
 
 const minuteInMillis = 60 * 1000
