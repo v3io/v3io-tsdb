@@ -3,7 +3,7 @@ TOPLEVEL_DIRS=`ls -d ./*/. | grep -v '^./vendor/.$$' | sed 's/\.$$/.../'`
 TOPLEVEL_DIRS_GOFMT_SYNTAX=`ls -d ./*/. | grep -v '^./vendor/.$$'`
 TOPLEVEL_DIRS_IMPI_SYNTAX=`ls -d ./*/. | grep -v '^./vendor/.$$' | sed 's/$$/../'`
 
-GIT_SHA := $(shell git rev-parse HEAD)
+GIT_COMMIT_HASH := $(shell git rev-parse HEAD)
 GIT_BRANCH=$(shell git rev-parse --abbrev-ref HEAD)
 ifeq ($(GIT_BRANCH),)
 	GIT_BRANCH="N/A"
@@ -33,7 +33,7 @@ BUILD_OPTS := -ldflags " \
   -X $(CONFIG_PKG).osys=$(GOOS) \
   -X $(CONFIG_PKG).architecture=$(GOARCH) \
   -X $(CONFIG_PKG).version=$(GIT_REVISION) \
-  -X $(CONFIG_PKG).revision=$(GIT_SHA) \
+  -X $(CONFIG_PKG).commitHash=$(GIT_COMMIT_HASH) \
   -X $(CONFIG_PKG).branch=$(GIT_BRANCH)" \
  -v -o "$(GOPATH)/bin/$(TSDBCTL_BIN_NAME)"
 

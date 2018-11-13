@@ -63,23 +63,23 @@ type BuildInfo struct {
 	Os           string `json:"os,omitempty"`
 	Architecture string `json:"architecture,omitempty"`
 	Version      string `json:"version,omitempty"`
-	Revision     string `json:"revision,omitempty"`
+	CommitHash   string `json:"commitHash,omitempty"`
 	Branch       string `json:"branch,omitempty"`
 }
 
 func (bi *BuildInfo) String() string {
-	return fmt.Sprintf("Build time: %s\nOS: %s\nArchitecture: %s\nVersion: %s\nSHA: %s\nBranch: %s\n",
+	return fmt.Sprintf("Build time: %s\nOS: %s\nArchitecture: %s\nVersion: %s\nCommit Hash: %s\nBranch: %s\n",
 		bi.BuildTime,
 		bi.Os,
 		bi.Architecture,
 		bi.Version,
-		bi.Revision,
+		bi.CommitHash,
 		bi.Branch)
 }
 
 var (
 	// Note, following variables set by make
-	buildTime, osys, architecture, version, revision, branch string
+	buildTime, osys, architecture, version, commitHash, branch string
 
 	instance *V3ioConfig
 	once     sync.Once
@@ -90,7 +90,7 @@ var (
 		Os:           osys,
 		Architecture: architecture,
 		Version:      version,
-		Revision:     revision,
+		CommitHash:   commitHash,
 		Branch:       branch,
 	}
 )
