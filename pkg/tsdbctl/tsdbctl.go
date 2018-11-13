@@ -47,10 +47,13 @@ type RootCommandeer struct {
 	username    string
 	password    string
 	Reporter    *performance.MetricReporter
+	BuildInfo   *config.BuildInfo
 }
 
 func NewRootCommandeer() *RootCommandeer {
-	commandeer := &RootCommandeer{}
+	commandeer := &RootCommandeer{
+		BuildInfo: config.BuildMetadta,
+	}
 
 	cmd := &cobra.Command{
 		Use:          "tsdbctl [command] [arguments] [flags]",
@@ -89,6 +92,7 @@ func NewRootCommandeer() *RootCommandeer {
 		newInfoCommandeer(commandeer).cmd,
 		newDeleteCommandeer(commandeer).cmd,
 		newCheckCommandeer(commandeer).cmd,
+		newVersionCommandeer(commandeer).cmd,
 	)
 
 	commandeer.cmd = cmd
