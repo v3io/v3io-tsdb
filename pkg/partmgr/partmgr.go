@@ -23,16 +23,17 @@ package partmgr
 import (
 	"encoding/json"
 	"fmt"
+	"math"
+	"path"
+	"strconv"
+	"sync"
+
 	"github.com/pkg/errors"
 	"github.com/v3io/v3io-go-http"
 	"github.com/v3io/v3io-tsdb/internal/pkg/performance"
 	"github.com/v3io/v3io-tsdb/pkg/aggregate"
 	"github.com/v3io/v3io-tsdb/pkg/config"
 	"github.com/v3io/v3io-tsdb/pkg/utils"
-	"math"
-	"path"
-	"strconv"
-	"sync"
 )
 
 // Create a new partition manager

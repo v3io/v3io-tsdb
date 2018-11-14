@@ -22,11 +22,12 @@ package appender
 
 import (
 	"fmt"
-	"github.com/pkg/errors"
-	"github.com/v3io/v3io-go-http"
 	"net/http"
 	"reflect"
 	"time"
+
+	"github.com/pkg/errors"
+	"github.com/v3io/v3io-go-http"
 )
 
 // Start event loops for handling metric updates (appends and Get/Update DB responses)

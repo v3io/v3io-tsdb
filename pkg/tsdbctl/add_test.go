@@ -23,9 +23,10 @@ such restriction.
 package tsdbctl
 
 import (
-	"github.com/stretchr/testify/suite"
 	"math"
 	"testing"
+
+	"github.com/stretchr/testify/suite"
 )
 
 type testAddSuite struct {

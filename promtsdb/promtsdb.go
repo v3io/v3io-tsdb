@@ -3,6 +3,8 @@ package promtsdb
 import (
 	"context"
 	"fmt"
+	"strings"
+
 	"github.com/nuclio/logger"
 	"github.com/pkg/errors"
 	"github.com/prometheus/prometheus/pkg/labels"
@@ -14,7 +16,6 @@ import (
 	"github.com/v3io/v3io-tsdb/pkg/querier"
 	"github.com/v3io/v3io-tsdb/pkg/tsdb"
 	"github.com/v3io/v3io-tsdb/pkg/utils"
-	"strings"
 )
 
 type V3ioPromAdapter struct {

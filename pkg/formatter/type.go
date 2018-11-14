@@ -2,12 +2,13 @@ package formatter
 
 import (
 	"fmt"
-	"github.com/v3io/v3io-tsdb/pkg/querier"
-	"github.com/v3io/v3io-tsdb/pkg/utils"
 	"io"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/v3io/v3io-tsdb/pkg/querier"
+	"github.com/v3io/v3io-tsdb/pkg/utils"
 )
 
 const DefaultOutputFormat = "text"

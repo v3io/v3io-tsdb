@@ -24,11 +24,11 @@ package chunkenc
 
 import (
 	"fmt"
-	"github.com/nuclio/zap"
-	"github.com/stretchr/testify/assert"
+	"math/rand"
 	"testing"
 
-	"math/rand"
+	"github.com/nuclio/zap"
+	"github.com/stretchr/testify/assert"
 )
 
 const basetime = 1524690488000
