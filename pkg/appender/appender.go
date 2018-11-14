@@ -22,6 +22,9 @@ package appender
 
 import (
 	"fmt"
+	"sync"
+	"time"
+
 	"github.com/nuclio/logger"
 	"github.com/pkg/errors"
 	"github.com/v3io/v3io-go-http"
@@ -29,8 +32,6 @@ import (
 	"github.com/v3io/v3io-tsdb/pkg/config"
 	"github.com/v3io/v3io-tsdb/pkg/partmgr"
 	"github.com/v3io/v3io-tsdb/pkg/utils"
-	"sync"
-	"time"
 )
 
 // TODO: make configurable
@@ -267,6 +268,10 @@ func (mc *MetricsCache) AddFast(ref uint64, t int64, v interface{}) error {
 	metric.setError(nil)
 
 	mc.appendTV(metric, t, v)
+
+	for _, aggrMetric := range metric.aggrs {
+		mc.appendTV(aggrMetric, t, v)
+	}
 
 	return err
 }
