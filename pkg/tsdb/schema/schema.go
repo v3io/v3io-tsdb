@@ -78,7 +78,7 @@ func newSchema(samplesIngestionRate, aggregationGranularity, aggregatesList stri
 	partitionSchema := config.PartitionSchema{
 		Version:                tableSchema.Version,
 		Aggregates:             aggregates,
-		AggregationGranularity: config.DefaultAggregationGranularity,
+		AggregationGranularity: aggregationGranularity,
 		StorageClass:           config.DefaultStorageClass,
 		SampleRetention:        config.DefaultSampleRetentionTime,
 		ChunckerInterval:       tableSchema.ChunckerInterval,
