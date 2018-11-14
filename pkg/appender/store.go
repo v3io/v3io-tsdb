@@ -66,6 +66,10 @@ type chunkStore struct {
 	delRawSamples bool  // TODO: for metrics w aggregates only
 }
 
+func (cs *chunkStore) isAggr() bool {
+	return cs.chunks[0] == nil
+}
+
 func (cs *chunkStore) samplesQueueLength() int {
 	return len(cs.pending)
 }
@@ -134,7 +138,7 @@ func (cs *chunkStore) getChunksState(mc *MetricsCache, metric *MetricState) (boo
 	if err != nil {
 		return false, err
 	}
-	if cs.chunks[0] != nil {
+	if !cs.isAggr() {
 		cs.chunks[0].initialize(part, t)
 	}
 	cs.aggrList = aggregate.NewAggregatesList(part.AggrType())
@@ -142,7 +146,7 @@ func (cs *chunkStore) getChunksState(mc *MetricsCache, metric *MetricState) (boo
 	// TODO: if policy to merge w old chunks needs to get prev chunk, vs restart appender
 
 	// Issue a GetItem command to the DB to load last state of metric
-	path := part.GetMetricPath(metric.name, metric.hash, cs.chunks[0] == nil)
+	path := part.GetMetricPath(metric.name, metric.hash, cs.isAggr())
 	getInput := v3io.GetItemInput{
 		Path: path, AttributeNames: []string{"_maxtime"}}
 
@@ -159,7 +163,7 @@ func (cs *chunkStore) getChunksState(mc *MetricsCache, metric *MetricState) (boo
 // Process the GetItem response from the DB and initialize or restore the current chunk
 func (cs *chunkStore) processGetResp(mc *MetricsCache, metric *MetricState, resp *v3io.Response) {
 
-	if cs.chunks[0] != nil {
+	if !cs.isAggr() {
 		// TODO: init based on schema, use init function, recover old state vs append based on policy
 		chunk := chunkenc.NewXORChunk(cs.logger)
 		app, _ := chunk.Appender()
@@ -206,7 +210,7 @@ func (cs *chunkStore) processGetResp(mc *MetricsCache, metric *MetricState, resp
 		cs.initMaxTime = maxTime
 	}
 
-	if cs.chunks[0] != nil {
+	if !cs.isAggr() {
 		if cs.chunks[0].inRange(maxTime) && !mc.cfg.OverrideOld {
 			cs.chunks[0].state |= chunkStateMerge
 		}
@@ -316,7 +320,7 @@ func (cs *chunkStore) writeChunks(mc *MetricsCache, metric *MetricState) (hasPen
 
 			// Init activeChunk if nil (when samples are too old); if still too
 			// old, skip to next sample
-			if cs.chunks[0] != nil && activeChunk == nil {
+			if !cs.isAggr() && activeChunk == nil {
 				activeChunk = cs.chunkByTime(sampleTime)
 				if activeChunk == nil {
 					pendingSampleIndex++
@@ -399,7 +403,7 @@ func (cs *chunkStore) writeChunks(mc *MetricsCache, metric *MetricState) (hasPen
 
 		// Call the V3IO async UpdateItem method
 		expr += fmt.Sprintf("_maxtime=%d;", cs.maxTime) // TODO: use max() expr
-		path := partition.GetMetricPath(metric.name, metric.hash, cs.chunks[0] == nil)
+		path := partition.GetMetricPath(metric.name, metric.hash, cs.isAggr())
 		request, err := mc.container.UpdateItem(
 			&v3io.UpdateItemInput{Path: path, Expression: &expr}, metric, mc.responseChan)
 		if err != nil {

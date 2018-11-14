@@ -280,7 +280,7 @@ func (mc *MetricsCache) handleResponse(metric *MetricState, resp *v3io.Response,
 	} else {
 		// Handle Update Expression responses
 		if resp.Error == nil {
-			if metric.store.chunks[0] != nil {
+			if !metric.store.isAggr() {
 				// Set fields so next write won't include redundant info (bytes, labels, init_array)
 				metric.store.ProcessWriteResp()
 			}
@@ -288,7 +288,7 @@ func (mc *MetricsCache) handleResponse(metric *MetricState, resp *v3io.Response,
 		} else {
 			clear := func() {
 				resp.Release()
-				metric.store = NewChunkStore(mc.logger, metric.store.chunks[0] == nil)
+				metric.store = NewChunkStore(mc.logger, metric.store.isAggr())
 				metric.retryCount = 0
 				metric.setState(storeStateInit)
 			}
