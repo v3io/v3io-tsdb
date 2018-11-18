@@ -32,19 +32,21 @@ func (q *qryResults) IsClientAggregates() bool {
 }
 
 type RequestedColumn struct {
-	Metric       string
-	Alias        string
-	Function     string
-	Interpolator string
+	Metric                 string
+	Alias                  string
+	Function               string
+	Interpolator           string
+	InterpolationTolerance int64 // tolerance in Millis
 }
 
 type columnMeta struct {
-	metric            string
-	alias             string
-	function          aggregate.AggrType
-	functionParams    []interface{}
-	interpolationType InterpolationType
-	isHidden          bool // real columns = columns the user has specifically requested. Hidden columns = columns needed to calculate the real columns but don't show to the user
+	metric                 string
+	alias                  string
+	function               aggregate.AggrType
+	functionParams         []interface{}
+	interpolationType      InterpolationType
+	interpolationTolerance int64
+	isHidden               bool // real columns = columns the user has specifically requested. Hidden columns = columns needed to calculate the real columns but don't show to the user
 }
 
 // if a user specifies he wants all metrics

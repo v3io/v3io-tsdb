@@ -271,7 +271,7 @@ type Column interface {
 	TimeAt(i int) (int64, error)    // time value at index i
 	GetColumnSpec() columnMeta      // Get the column's metadata
 	SetDataAt(i int, value interface{}) error
-	GetInterpolationFunction() InterpolationFunction
+	GetInterpolationFunction() (InterpolationFunction, int64)
 }
 
 type basicColumn struct {
@@ -303,18 +303,20 @@ func NewDataColumn(name string, colSpec columnMeta, size int, datatype DType) *d
 	dc := &dataColumn{basicColumn: basicColumn{name: name, spec: colSpec, size: size}}
 	dc.initializeData(datatype)
 	dc.interpolationFunction = GetInterpolateFunc(colSpec.interpolationType)
+	dc.interpolationTolerance = colSpec.interpolationTolerance
 	return dc
 
 }
 
 type dataColumn struct {
 	basicColumn
-	data                  interface{}
-	interpolationFunction InterpolationFunction
+	data                   interface{}
+	interpolationFunction  InterpolationFunction
+	interpolationTolerance int64
 }
 
-func (dc *dataColumn) GetInterpolationFunction() InterpolationFunction {
-	return dc.interpolationFunction
+func (dc *dataColumn) GetInterpolationFunction() (InterpolationFunction, int64) {
+	return dc.interpolationFunction, dc.interpolationTolerance
 }
 
 func (dc *dataColumn) initializeData(dataType DType) {
@@ -443,7 +445,7 @@ func (c *ConcreteColumn) SetDataAt(i int, val interface{}) error {
 	c.data[i] = c.setFunc(c.data[i], val)
 	return nil
 }
-func (c *ConcreteColumn) GetInterpolationFunction() InterpolationFunction { return nil }
+func (c *ConcreteColumn) GetInterpolationFunction() (InterpolationFunction, int64) { return nil, 0 }
 
 func NewVirtualColumn(name string, colSpec columnMeta, size int, function func([]Column, int) (interface{}, error)) Column {
 	col := &virtualColumn{basicColumn: basicColumn{name: name, spec: colSpec, size: size}, function: function}
@@ -493,7 +495,7 @@ func (c *virtualColumn) TimeAt(i int) (int64, error) {
 	}
 	return value.(int64), nil
 }
-func (c *virtualColumn) GetInterpolationFunction() InterpolationFunction { return nil }
+func (c *virtualColumn) GetInterpolationFunction() (InterpolationFunction, int64) { return nil, 0 }
 
 //func NewVirtualRawColumn(name string, colSpec columnMeta, size int, function func([]Column, int) (interface{}, error)) Column {
 //	col := &virtualColumn{basicColumn: basicColumn{name: name, spec: colSpec, size: size}, function: function}

@@ -13,6 +13,7 @@ import (
 )
 
 const columnWildcard = "*"
+const defaultToleranceFactor = 2
 
 type selectQueryContext struct {
 	logger    logger.Logger
@@ -274,7 +275,12 @@ func (s *selectQueryContext) createColumnSpecs(params *SelectParams) ([]columnMe
 		if err != nil {
 			return nil, nil, err
 		}
-		colMeta := columnMeta{metric: col.Metric, alias: col.Alias, interpolationType: inter}
+
+		tolerance := col.InterpolationTolerance
+		if tolerance == 0 {
+			tolerance = s.step * defaultToleranceFactor
+		}
+		colMeta := columnMeta{metric: col.Metric, alias: col.Alias, interpolationType: inter, interpolationTolerance: tolerance}
 
 		if col.Function != "" {
 			aggr, err := aggregate.AggregateFromString(col.Function)

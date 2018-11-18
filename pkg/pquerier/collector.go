@@ -159,11 +159,11 @@ func downsampleRawData(ctx *selectQueryContext, res *qryResults) {
 			} else {
 				prevT, prevV := it.PeakBack()
 
-				tollerance := 2 * res.query.step
-				if prevT != 0 && t-prevT > tollerance {
+				interpolateFunc, tolerance := col.GetInterpolationFunction()
+				if prevT != 0 && t-prevT > tolerance {
 					col.SetDataAt(currBucket, math.NaN())
 				} else {
-					_, interpolatedV := col.GetInterpolationFunction()(prevT, t, currBucketTime, prevV, v)
+					_, interpolatedV := interpolateFunc(prevT, t, currBucketTime, prevV, v)
 					col.SetDataAt(currBucket, interpolatedV)
 				}
 			}
