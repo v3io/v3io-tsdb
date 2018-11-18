@@ -635,6 +635,66 @@ func (suite *testQuerySuite) TestClientAggregatesMultiPartitionNonConcreteAggreg
 	assert.Equal(suite.T(), len(expected), seriesCount, "series count didn't match expected")
 }
 
+func (suite *testQuerySuite) TestClientAggregatesMultiPartitionOneStep() {
+	adapter, err := tsdb.NewV3ioAdapter(suite.v3ioConfig, nil, nil)
+	if err != nil {
+		suite.T().Fatalf("failed to create v3io adapter. reason: %s", err)
+	}
+	metricName := "cpu"
+	labels1 := utils.LabelsFromStrings("__name__", metricName, "os", "linux")
+	numberOfEvents := 10
+	eventsInterval := 60 * 1000
+	baseTime := time.Now().UnixNano()/1000000 - int64(numberOfEvents*eventsInterval)
+
+	ingestedData := []tsdbtest.DataPoint{{baseTime - 25*tsdbtest.DaysInMillis, 10},
+		{baseTime - 20*tsdbtest.DaysInMillis, 20},
+		{baseTime - 12*tsdbtest.DaysInMillis, 30},
+		{baseTime - 1*tsdbtest.DaysInMillis, 40},
+		{baseTime + 20*tsdbtest.DaysInMillis, 50}}
+	testParams := tsdbtest.NewTestParams(suite.T(),
+		tsdbtest.TestOption{
+			Key: tsdbtest.OptTimeSeries,
+			Value: tsdbtest.TimeSeries{tsdbtest.Metric{
+				Name:   "cpu",
+				Labels: labels1,
+				Data:   ingestedData},
+			}})
+	tsdbtest.InsertData(suite.T(), testParams)
+
+	expected := map[string][]tsdbtest.DataPoint{"count": {{Time: baseTime - 25*tsdbtest.DaysInMillis, Value: 5}}}
+
+	querierV2, err := adapter.QuerierV2(nil)
+	if err != nil {
+		suite.T().Fatalf("Failed to create querier v2, err: %v", err)
+	}
+
+	params := &pquerier.SelectParams{Name: "cpu",
+		Functions: "count",
+		Step:      0,
+		From:      baseTime - 25*tsdbtest.DaysInMillis,
+		To:        baseTime + 21*tsdbtest.DaysInMillis}
+	set, err := querierV2.SelectQry(params)
+	if err != nil {
+		suite.T().Fatalf("Failed to exeute query, err: %v", err)
+	}
+
+	var seriesCount int
+	for set.Next() {
+		seriesCount++
+		iter := set.At().Iterator()
+
+		data, err := tsdbtest.IteratorToSlice(iter)
+		agg := set.At().Labels().Get(aggregate.AggregateLabel)
+		if err != nil {
+			suite.T().Fatal(err)
+		}
+
+		assert.Equal(suite.T(), expected[agg], data, "queried data does not match expected")
+	}
+
+	assert.Equal(suite.T(), 1, seriesCount, "series count didn't match expected")
+}
+
 func (suite *testQuerySuite) TestGetEmptyResponse() {
 	adapter, err := tsdb.NewV3ioAdapter(suite.v3ioConfig, nil, nil)
 	if err != nil {

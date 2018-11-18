@@ -48,6 +48,12 @@ type selectQueryContext struct {
 func (s *selectQueryContext) start(parts []*partmgr.DBPartition, params *SelectParams) (*frameIterator, error) {
 	s.dataFrames = make(map[uint64]*dataFrame)
 
+	// If step isn't passed (e.g., when using the console), the step is the
+	// difference between the end (maxt) and start (mint) times (e.g., 5 minutes)
+	if params.Functions != "" && s.step == 0 {
+		s.step = s.maxt - s.mint
+	}
+
 	s.functions = params.Functions
 	var err error
 	s.columnsSpec, s.columnsSpecByMetric, err = s.createColumnSpecs(params)
@@ -145,12 +151,6 @@ func (s *selectQueryContext) queryPartition(partition *partmgr.DBPartition) ([]*
 
 		// Check whether there are aggregations to add and aggregates aren't disabled
 		if functions != "" && !s.disableAllAggr {
-
-			// If step isn't passed (e.g., when using the console), the step is the
-			// difference between the end (maxt) and start (mint) times (e.g., 5 minutes)
-			if step == 0 {
-				step = maxt - mint
-			}
 
 			if step > partition.RollupTime() && s.disableClientAggr {
 				step = partition.RollupTime()
