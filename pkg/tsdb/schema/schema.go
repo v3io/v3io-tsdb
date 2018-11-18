@@ -2,13 +2,14 @@ package schema
 
 import (
 	"fmt"
+	"strconv"
+	"strings"
+	"time"
+
 	"github.com/pkg/errors"
 	"github.com/v3io/v3io-tsdb/pkg/aggregate"
 	"github.com/v3io/v3io-tsdb/pkg/config"
 	"github.com/v3io/v3io-tsdb/pkg/utils"
-	"strconv"
-	"strings"
-	"time"
 )
 
 const (
@@ -77,7 +78,7 @@ func newSchema(samplesIngestionRate, aggregationGranularity, aggregatesList stri
 	partitionSchema := config.PartitionSchema{
 		Version:                tableSchema.Version,
 		Aggregates:             aggregates,
-		AggregationGranularity: config.DefaultAggregationGranularity,
+		AggregationGranularity: aggregationGranularity,
 		StorageClass:           config.DefaultStorageClass,
 		SampleRetention:        config.DefaultSampleRetentionTime,
 		ChunckerInterval:       tableSchema.ChunckerInterval,

@@ -22,6 +22,10 @@ package tsdbctl
 
 import (
 	"fmt"
+	"strconv"
+	"strings"
+	"time"
+
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/v3io/v3io-tsdb/pkg/config"
@@ -29,9 +33,6 @@ import (
 	"github.com/v3io/v3io-tsdb/pkg/pquerier"
 	"github.com/v3io/v3io-tsdb/pkg/querier"
 	"github.com/v3io/v3io-tsdb/pkg/utils"
-	"strconv"
-	"strings"
-	"time"
 )
 
 type queryCommandeer struct {

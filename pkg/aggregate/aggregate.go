@@ -22,9 +22,10 @@ package aggregate
 
 import (
 	"fmt"
-	"github.com/v3io/v3io-tsdb/pkg/config"
 	"math"
 	"strings"
+
+	"github.com/v3io/v3io-tsdb/pkg/config"
 )
 
 type AggrType uint16

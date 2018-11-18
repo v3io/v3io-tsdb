@@ -23,13 +23,14 @@ package tsdbctl
 import (
 	"bufio"
 	"fmt"
+	"os"
+	"strings"
+	"time"
+
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/v3io/v3io-tsdb/pkg/config"
 	"github.com/v3io/v3io-tsdb/pkg/utils"
-	"os"
-	"strings"
-	"time"
 )
 
 type delCommandeer struct {

@@ -4,10 +4,11 @@ package aggregate
 
 import (
 	"fmt"
-	"github.com/stretchr/testify/assert"
-	"github.com/v3io/v3io-tsdb/pkg/utils"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/v3io/v3io-tsdb/pkg/utils"
 )
 
 func TestAggregates(t *testing.T) {

@@ -75,12 +75,19 @@ func (suite *testQuerySuite) TestRawDataSinglePartition() {
 		{int64(baseTime + tsdbtest.MinuteInMillis), 20},
 		{baseTime + 2*tsdbtest.MinuteInMillis, 30},
 		{baseTime + 3*tsdbtest.MinuteInMillis, 40}}
-	tsdbtest.InsertData(suite.T(), suite.v3ioConfig, metricName,
-		expectedData,
-		labels1)
-	tsdbtest.InsertData(suite.T(), suite.v3ioConfig, metricName,
-		expectedData,
-		labels2)
+	testParams := tsdbtest.NewTestParams(suite.T(),
+		tsdbtest.TestOption{
+			Key: tsdbtest.OptTimeSeries,
+			Value: tsdbtest.TimeSeries{tsdbtest.Metric{
+				Name:   "cpu",
+				Labels: labels1,
+				Data:   expectedData},
+				tsdbtest.Metric{
+					Name:   "cpu",
+					Labels: labels2,
+					Data:   expectedData},
+			}})
+	tsdbtest.InsertData(suite.T(), testParams)
 
 	querierV2, err := adapter.QuerierV2(nil)
 	if err != nil {
@@ -123,12 +130,21 @@ func (suite *testQuerySuite) TestRawDataMultiplePartitions() {
 		{int64(baseTime + tsdbtest.MinuteInMillis), 20},
 		{baseTime + 2*eventsInterval, 30},
 		{baseTime + 3*eventsInterval, 40}}
-	tsdbtest.InsertData(suite.T(), suite.v3ioConfig, metricName,
-		expectedData,
-		labels1)
-	tsdbtest.InsertData(suite.T(), suite.v3ioConfig, metricName,
-		expectedData,
-		labels2)
+
+	testParams := tsdbtest.NewTestParams(suite.T(),
+		tsdbtest.TestOption{
+			Key: tsdbtest.OptTimeSeries,
+			Value: tsdbtest.TimeSeries{tsdbtest.Metric{
+				Name:   "cpu",
+				Labels: labels1,
+				Data:   expectedData},
+				tsdbtest.Metric{
+					Name:   "cpu",
+					Labels: labels2,
+					Data:   expectedData},
+			}})
+
+	tsdbtest.InsertData(suite.T(), testParams)
 
 	querierV2, err := adapter.QuerierV2(nil)
 	if err != nil {
@@ -170,9 +186,16 @@ func (suite *testQuerySuite) TestRawDataSinglePartitionWithDownSample() {
 		{int64(baseTime + tsdbtest.MinuteInMillis), 20},
 		{baseTime + 6*tsdbtest.MinuteInMillis, 30},
 		{baseTime + 9*tsdbtest.MinuteInMillis, 40}}
-	tsdbtest.InsertData(suite.T(), suite.v3ioConfig, metricName,
-		ingestData,
-		labels1)
+	testParams := tsdbtest.NewTestParams(suite.T(),
+		tsdbtest.TestOption{
+			Key: tsdbtest.OptTimeSeries,
+			Value: tsdbtest.TimeSeries{tsdbtest.Metric{
+				Name:   "cpu",
+				Labels: labels1,
+				Data:   ingestData},
+			}})
+	tsdbtest.InsertData(suite.T(), testParams)
+
 	expectedData := []tsdbtest.DataPoint{{baseTime, 10},
 		{baseTime + 6*tsdbtest.MinuteInMillis, 30},
 		{baseTime + 8*tsdbtest.MinuteInMillis, 40}}
@@ -218,9 +241,15 @@ func (suite *testQuerySuite) TestRawAggregatesSinglePartition() {
 		{int64(baseTime + tsdbtest.MinuteInMillis), 20},
 		{baseTime + 2*tsdbtest.MinuteInMillis, 30},
 		{baseTime + 3*tsdbtest.MinuteInMillis, 40}}
-	tsdbtest.InsertData(suite.T(), suite.v3ioConfig, metricName,
-		ingestedData,
-		labels1)
+	testParams := tsdbtest.NewTestParams(suite.T(),
+		tsdbtest.TestOption{
+			Key: tsdbtest.OptTimeSeries,
+			Value: tsdbtest.TimeSeries{tsdbtest.Metric{
+				Name:   "cpu",
+				Labels: labels1,
+				Data:   ingestedData},
+			}})
+	tsdbtest.InsertData(suite.T(), testParams)
 
 	expected := map[string][]tsdbtest.DataPoint{"sum": {{Time: baseTime, Value: 100}},
 		"min": {{Time: baseTime, Value: 10}},
@@ -269,9 +298,15 @@ func (suite *testQuerySuite) TestRawAggregatesSinglePartitionNegativeValues() {
 		{int64(baseTime + tsdbtest.MinuteInMillis), -20},
 		{baseTime + 2*tsdbtest.MinuteInMillis, -30},
 		{baseTime + 3*tsdbtest.MinuteInMillis, -40}}
-	tsdbtest.InsertData(suite.T(), suite.v3ioConfig, metricName,
-		ingestedData,
-		labels1)
+	testParams := tsdbtest.NewTestParams(suite.T(),
+		tsdbtest.TestOption{
+			Key: tsdbtest.OptTimeSeries,
+			Value: tsdbtest.TimeSeries{tsdbtest.Metric{
+				Name:   "cpu",
+				Labels: labels1,
+				Data:   ingestedData},
+			}})
+	tsdbtest.InsertData(suite.T(), testParams)
 
 	expected := map[string][]tsdbtest.DataPoint{"sum": {{Time: baseTime, Value: -100}},
 		"min": {{Time: baseTime, Value: -40}},
@@ -321,9 +356,15 @@ func (suite *testQuerySuite) TestRawAggregatesMultiPartition() {
 		{int64(baseTime + tsdbtest.MinuteInMillis), 20},
 		{baseTime + 2*tsdbtest.MinuteInMillis, 30},
 		{baseTime + 3*tsdbtest.MinuteInMillis, 40}}
-	tsdbtest.InsertData(suite.T(), suite.v3ioConfig, metricName,
-		ingestedData,
-		labels1)
+	testParams := tsdbtest.NewTestParams(suite.T(),
+		tsdbtest.TestOption{
+			Key: tsdbtest.OptTimeSeries,
+			Value: tsdbtest.TimeSeries{tsdbtest.Metric{
+				Name:   "cpu",
+				Labels: labels1,
+				Data:   ingestedData},
+			}})
+	tsdbtest.InsertData(suite.T(), testParams)
 
 	expected := map[string][]tsdbtest.DataPoint{"sum": {{Time: baseTime - 7*tsdbtest.DaysInMillis, Value: 10}, {Time: baseTime, Value: 90}},
 		"min": {{Time: baseTime - 7*tsdbtest.DaysInMillis, Value: 10}, {Time: baseTime, Value: 20}},
@@ -374,9 +415,15 @@ func (suite *testQuerySuite) TestRawAggregatesMultiPartitionNonConcreteAggregate
 		{int64(baseTime + tsdbtest.MinuteInMillis), 20},
 		{baseTime + 2*tsdbtest.MinuteInMillis, 30},
 		{baseTime + 3*tsdbtest.MinuteInMillis, 40}}
-	tsdbtest.InsertData(suite.T(), suite.v3ioConfig, metricName,
-		ingestedData,
-		labels1)
+	testParams := tsdbtest.NewTestParams(suite.T(),
+		tsdbtest.TestOption{
+			Key: tsdbtest.OptTimeSeries,
+			Value: tsdbtest.TimeSeries{tsdbtest.Metric{
+				Name:   "cpu",
+				Labels: labels1,
+				Data:   ingestedData},
+			}})
+	tsdbtest.InsertData(suite.T(), testParams)
 
 	expected := map[string][]tsdbtest.DataPoint{"avg": {{Time: baseTime - 7*tsdbtest.DaysInMillis, Value: 11}, {Time: baseTime, Value: 30}},
 		"stdvar": {{Time: baseTime - 7*tsdbtest.DaysInMillis, Value: 2}, {Time: baseTime, Value: 100}}}
@@ -424,9 +471,15 @@ func (suite *testQuerySuite) TestClientAggregatesSinglePartition() {
 		{int64(baseTime + tsdbtest.MinuteInMillis), 20},
 		{baseTime + 2*tsdbtest.MinuteInMillis, 30},
 		{baseTime + 3*tsdbtest.MinuteInMillis, 40}}
-	tsdbtest.InsertData(suite.T(), suite.v3ioConfig, metricName,
-		ingestedData,
-		labels1)
+	testParams := tsdbtest.NewTestParams(suite.T(),
+		tsdbtest.TestOption{
+			Key: tsdbtest.OptTimeSeries,
+			Value: tsdbtest.TimeSeries{tsdbtest.Metric{
+				Name:   "cpu",
+				Labels: labels1,
+				Data:   ingestedData},
+			}})
+	tsdbtest.InsertData(suite.T(), testParams)
 
 	expected := map[string][]tsdbtest.DataPoint{"sum": {{Time: baseTime, Value: 30}, {Time: baseTime + 2*tsdbtest.MinuteInMillis, Value: 70}},
 		"min": {{Time: baseTime, Value: 10}, {Time: baseTime + 2*tsdbtest.MinuteInMillis, Value: 30}},
@@ -475,9 +528,15 @@ func (suite *testQuerySuite) TestClientAggregatesMultiPartition() {
 		{int64(baseTime), 20},
 		{baseTime + 2*tsdbtest.MinuteInMillis, 30},
 		{baseTime + 3*tsdbtest.MinuteInMillis, 40}}
-	tsdbtest.InsertData(suite.T(), suite.v3ioConfig, metricName,
-		ingestedData,
-		labels1)
+	testParams := tsdbtest.NewTestParams(suite.T(),
+		tsdbtest.TestOption{
+			Key: tsdbtest.OptTimeSeries,
+			Value: tsdbtest.TimeSeries{tsdbtest.Metric{
+				Name:   "cpu",
+				Labels: labels1,
+				Data:   ingestedData},
+			}})
+	tsdbtest.InsertData(suite.T(), testParams)
 
 	expected := map[string][]tsdbtest.DataPoint{"sum": {{Time: baseTime - 7*tsdbtest.DaysInMillis, Value: 10}, {Time: baseTime, Value: 90}},
 		"min": {{Time: baseTime - 7*tsdbtest.DaysInMillis, Value: 10}, {Time: baseTime, Value: 20}},
@@ -531,9 +590,15 @@ func (suite *testQuerySuite) TestClientAggregatesMultiPartitionNonConcreteAggreg
 		{int64(baseTime + tsdbtest.MinuteInMillis), 20},
 		{baseTime + 2*tsdbtest.MinuteInMillis, 30},
 		{baseTime + 3*tsdbtest.MinuteInMillis, 40}}
-	tsdbtest.InsertData(suite.T(), suite.v3ioConfig, metricName,
-		ingestedData,
-		labels1)
+	testParams := tsdbtest.NewTestParams(suite.T(),
+		tsdbtest.TestOption{
+			Key: tsdbtest.OptTimeSeries,
+			Value: tsdbtest.TimeSeries{tsdbtest.Metric{
+				Name:   "cpu",
+				Labels: labels1,
+				Data:   ingestedData},
+			}})
+	tsdbtest.InsertData(suite.T(), testParams)
 
 	expected := map[string][]tsdbtest.DataPoint{"avg": {{Time: baseTime - 7*tsdbtest.DaysInMillis, Value: 11}, {Time: baseTime, Value: 30}},
 		"stdvar": {{Time: baseTime - 7*tsdbtest.DaysInMillis, Value: 2}, {Time: baseTime, Value: 100}}}
@@ -585,9 +650,15 @@ func (suite *testQuerySuite) TestGetEmptyResponse() {
 		{int64(baseTime + tsdbtest.MinuteInMillis), 20},
 		{baseTime + 2*tsdbtest.MinuteInMillis, 30},
 		{baseTime + 3*tsdbtest.MinuteInMillis, 40}}
-	tsdbtest.InsertData(suite.T(), suite.v3ioConfig, metricName,
-		ingestedData,
-		labels1)
+	testParams := tsdbtest.NewTestParams(suite.T(),
+		tsdbtest.TestOption{
+			Key: tsdbtest.OptTimeSeries,
+			Value: tsdbtest.TimeSeries{tsdbtest.Metric{
+				Name:   "cpu",
+				Labels: labels1,
+				Data:   ingestedData},
+			}})
+	tsdbtest.InsertData(suite.T(), testParams)
 
 	expected := map[string][]tsdbtest.DataPoint{}
 
@@ -634,9 +705,15 @@ func (suite *testQuerySuite) TestSelectAggregatesByRequestedColumns() {
 		{int64(baseTime + tsdbtest.MinuteInMillis), 20},
 		{baseTime + 2*tsdbtest.MinuteInMillis, 30},
 		{baseTime + 3*tsdbtest.MinuteInMillis, 40}}
-	tsdbtest.InsertData(suite.T(), suite.v3ioConfig, metricName,
-		ingestedData,
-		labels1)
+	testParams := tsdbtest.NewTestParams(suite.T(),
+		tsdbtest.TestOption{
+			Key: tsdbtest.OptTimeSeries,
+			Value: tsdbtest.TimeSeries{tsdbtest.Metric{
+				Name:   "cpu",
+				Labels: labels1,
+				Data:   ingestedData},
+			}})
+	tsdbtest.InsertData(suite.T(), testParams)
 
 	expected := map[string][]tsdbtest.DataPoint{"sum": {{Time: baseTime, Value: 30}, {Time: baseTime + 2*tsdbtest.MinuteInMillis, Value: 70}},
 		"min": {{Time: baseTime, Value: 10}, {Time: baseTime + 2*tsdbtest.MinuteInMillis, Value: 30}},
@@ -687,9 +764,15 @@ func (suite *testQuerySuite) TestSelectRawDataByRequestedColumns() {
 		{int64(baseTime + tsdbtest.MinuteInMillis), 20},
 		{baseTime + 2*tsdbtest.MinuteInMillis, 30},
 		{baseTime + 3*tsdbtest.MinuteInMillis, 40}}
-	tsdbtest.InsertData(suite.T(), suite.v3ioConfig, metricName,
-		ingestedData,
-		labels1)
+	testParams := tsdbtest.NewTestParams(suite.T(),
+		tsdbtest.TestOption{
+			Key: tsdbtest.OptTimeSeries,
+			Value: tsdbtest.TimeSeries{tsdbtest.Metric{
+				Name:   "cpu",
+				Labels: labels1,
+				Data:   ingestedData},
+			}})
+	tsdbtest.InsertData(suite.T(), testParams)
 
 	expected := ingestedData
 
@@ -736,9 +819,15 @@ func (suite *testQuerySuite) TestSelectAggregatesAndRawByRequestedColumns() {
 		{int64(baseTime + tsdbtest.MinuteInMillis), 20},
 		{baseTime + 2*tsdbtest.MinuteInMillis, 30},
 		{baseTime + 3*tsdbtest.MinuteInMillis, 40}}
-	tsdbtest.InsertData(suite.T(), suite.v3ioConfig, metricName,
-		ingestedData,
-		labels1)
+	testParams := tsdbtest.NewTestParams(suite.T(),
+		tsdbtest.TestOption{
+			Key: tsdbtest.OptTimeSeries,
+			Value: tsdbtest.TimeSeries{tsdbtest.Metric{
+				Name:   "cpu",
+				Labels: labels1,
+				Data:   ingestedData},
+			}})
+	tsdbtest.InsertData(suite.T(), testParams)
 
 	expected := map[string][]tsdbtest.DataPoint{"sum": {{Time: baseTime, Value: 30}, {Time: baseTime + 2*tsdbtest.MinuteInMillis, Value: 70}},
 		"": {{baseTime, 10}, {baseTime + 2*tsdbtest.MinuteInMillis, 30}}}
@@ -788,9 +877,15 @@ func (suite *testQuerySuite) TestSelectServerAggregatesAndRawByRequestedColumns(
 		{int64(baseTime + tsdbtest.MinuteInMillis), 20},
 		{baseTime + 2*tsdbtest.MinuteInMillis, 30},
 		{baseTime + 3*tsdbtest.MinuteInMillis, 40}}
-	tsdbtest.InsertData(suite.T(), suite.v3ioConfig, metricName,
-		ingestedData,
-		labels1)
+	testParams := tsdbtest.NewTestParams(suite.T(),
+		tsdbtest.TestOption{
+			Key: tsdbtest.OptTimeSeries,
+			Value: tsdbtest.TimeSeries{tsdbtest.Metric{
+				Name:   "cpu",
+				Labels: labels1,
+				Data:   ingestedData},
+			}})
+	tsdbtest.InsertData(suite.T(), testParams)
 
 	expected := map[string][]tsdbtest.DataPoint{"sum": {{Time: baseTime, Value: 100}},
 		"": {{baseTime, 10}}}
@@ -830,17 +925,10 @@ func TestQueryV2Suite(t *testing.T) {
 }
 
 const defaultStepMs = 5 * tsdbtest.MinuteInMillis // 5 minutes
-func TestQuery(t *testing.T) {
-	v3ioConfig, err := tsdbtest.LoadV3ioConfig()
-	if err != nil {
-		t.Fatalf("unable to load configuration. Error: %v", err)
-	}
-
+func TestQueryData(t *testing.T) {
 	testCases := []struct {
 		desc         string
-		metricName   string
-		labels       []utils.Label
-		data         []tsdbtest.DataPoint
+		testParams   tsdbtest.TestParams
 		filter       string
 		aggregates   string
 		from         int64
@@ -850,101 +938,170 @@ func TestQuery(t *testing.T) {
 		ignoreReason string
 		expectFail   bool
 	}{
-		{desc: "Should ingest and query one data point", metricName: "cpu",
-			labels:   utils.LabelsFromStrings("testLabel", "balbala"),
-			data:     []tsdbtest.DataPoint{{Time: 1532940510, Value: 314.3}},
+		{desc: "Should ingest and query one data point",
+			testParams: tsdbtest.NewTestParams(t,
+				tsdbtest.TestOption{
+					Key: tsdbtest.OptTimeSeries,
+					Value: tsdbtest.TimeSeries{tsdbtest.Metric{
+						Name:   "cpu",
+						Labels: utils.LabelsFromStrings("testLabel", "balbala"),
+						Data:   []tsdbtest.DataPoint{{Time: 1532940510, Value: 314.3}},
+					}}},
+			),
 			from:     0,
 			to:       1532940510 + 1,
-			step:     0,
 			expected: map[string][]tsdbtest.DataPoint{"": {{Time: 1532940510, Value: 314.3}}}},
 
-		{desc: "Should ingest and query multiple data points", metricName: "cpu",
-			labels: utils.LabelsFromStrings("os", "linux", "iguaz", "yesplease"),
-			data: []tsdbtest.DataPoint{{Time: 1532940510 - 10, Value: 314.3},
-				{Time: 1532940510 - 5, Value: 300.3},
-				{Time: 1532940510, Value: 3234.6}},
+		{desc: "Should ingest and query multiple data points",
+			testParams: tsdbtest.NewTestParams(t,
+				tsdbtest.TestOption{
+					Key: tsdbtest.OptTimeSeries,
+					Value: tsdbtest.TimeSeries{tsdbtest.Metric{
+						Name:   "cpu",
+						Labels: utils.LabelsFromStrings("os", "linux", "iguaz", "yesplease"),
+						Data: []tsdbtest.DataPoint{
+							{Time: 1532940510 - 10, Value: 314.3},
+							{Time: 1532940510 - 5, Value: 300.3},
+							{Time: 1532940510, Value: 3234.6}},
+					}}},
+			),
 			from: 0,
 			to:   1532940510 + 1,
-			step: 0,
 			expected: map[string][]tsdbtest.DataPoint{"": {{Time: 1532940510 - 10, Value: 314.3},
 				{Time: 1532940510 - 5, Value: 300.3},
 				{Time: 1532940510, Value: 3234.6}}}},
 
-		{desc: "Should query with filter on metric name", metricName: "cpu",
-			labels:   utils.LabelsFromStrings("os", "linux", "iguaz", "yesplease"),
-			data:     []tsdbtest.DataPoint{{Time: 1532940510, Value: 33.3}},
+		{desc: "Should query with filter on metric name",
+			testParams: tsdbtest.NewTestParams(t,
+				tsdbtest.TestOption{
+					Key: tsdbtest.OptTimeSeries,
+					Value: tsdbtest.TimeSeries{tsdbtest.Metric{
+						Name:   "cpu",
+						Labels: utils.LabelsFromStrings("os", "linux", "iguaz", "yesplease"),
+						Data:   []tsdbtest.DataPoint{{Time: 1532940510, Value: 33.3}},
+					}}},
+			),
 			filter:   "_name=='cpu'",
 			from:     0,
 			to:       1532940510 + 1,
-			step:     0,
 			expected: map[string][]tsdbtest.DataPoint{"": {{Time: 1532940510, Value: 33.3}}}},
 
-		{desc: "Should query with filter on label name", metricName: "cpu",
-			labels:   utils.LabelsFromStrings("os", "linux", "iguaz", "yesplease"),
-			data:     []tsdbtest.DataPoint{{Time: 1532940510, Value: 31.3}},
+		{desc: "Should query with filter on label name",
+			testParams: tsdbtest.NewTestParams(t,
+				tsdbtest.TestOption{
+					Key: tsdbtest.OptTimeSeries,
+					Value: tsdbtest.TimeSeries{tsdbtest.Metric{
+						Name:   "cpu",
+						Labels: utils.LabelsFromStrings("os", "linux", "iguaz", "yesplease"),
+						Data:   []tsdbtest.DataPoint{{Time: 1532940510, Value: 31.3}},
+					}}},
+			),
 			filter:   "os=='linux'",
 			from:     0,
 			to:       1532940510 + 1,
-			step:     0,
 			expected: map[string][]tsdbtest.DataPoint{"": {{Time: 1532940510, Value: 31.3}}}},
 
-		{desc: "Should ingest and query data with '-' in the metric name (IG-8585)", metricName: "cool-cpu",
-			labels:   utils.LabelsFromStrings("testLabel", "balbala"),
-			data:     []tsdbtest.DataPoint{{Time: 1532940510, Value: 314.3}},
+		{desc: "Should ingest and query data with '-' in the metric name (IG-8585)",
+			testParams: tsdbtest.NewTestParams(t,
+				tsdbtest.TestOption{
+					Key: tsdbtest.OptTimeSeries,
+					Value: tsdbtest.TimeSeries{tsdbtest.Metric{
+						Name:   "cool-cpu",
+						Labels: utils.LabelsFromStrings("os", "linux", "iguaz", "yesplease"),
+						Data:   []tsdbtest.DataPoint{{Time: 1532940510, Value: 314.3}},
+					}}},
+			),
 			from:     0,
 			to:       1532940510 + 1,
-			step:     0,
 			expected: map[string][]tsdbtest.DataPoint{"": {{Time: 1532940510, Value: 314.3}}}},
 
-		{desc: "Should ingest and query by time", metricName: "cpu",
-			labels: utils.LabelsFromStrings("os", "linux", "iguaz", "yesplease"),
-			data: []tsdbtest.DataPoint{{Time: 1532940510, Value: 314.3},
-				{Time: 1532940510 + 5, Value: 300.3},
-				{Time: 1532940510 + 10, Value: 3234.6}},
+		{desc: "Should ingest and query by time",
+			testParams: tsdbtest.NewTestParams(t,
+				tsdbtest.TestOption{
+					Key: tsdbtest.OptTimeSeries,
+					Value: tsdbtest.TimeSeries{tsdbtest.Metric{
+						Name:   "cpu",
+						Labels: utils.LabelsFromStrings("os", "linux", "iguaz", "yesplease"),
+						Data: []tsdbtest.DataPoint{
+							{Time: 1532940510, Value: 314.3},
+							{Time: 1532940510 + 5, Value: 300.3},
+							{Time: 1532940510 + 10, Value: 3234.6}},
+					}}},
+			),
 			from: 1532940510 + 2,
 			to:   1532940510 + 12,
-			step: 0,
 			expected: map[string][]tsdbtest.DataPoint{"": {{Time: 1532940510 + 5, Value: 300.3},
 				{Time: 1532940510 + 10, Value: 3234.6}}}},
 
-		{desc: "Should ingest and query by time with no results", metricName: "cpu",
-			labels: utils.LabelsFromStrings("os", "linux", "iguaz", "yesplease"),
-			data: []tsdbtest.DataPoint{{Time: 1532940510, Value: 314.3},
-				{Time: 1532940510 + 5, Value: 300.3},
-				{Time: 1532940510 + 10, Value: 3234.6}},
+		{desc: "Should ingest and query by time with no results",
+			testParams: tsdbtest.NewTestParams(t,
+				tsdbtest.TestOption{
+					Key: tsdbtest.OptTimeSeries,
+					Value: tsdbtest.TimeSeries{tsdbtest.Metric{
+						Name:   "cpu",
+						Labels: utils.LabelsFromStrings("os", "linux", "iguaz", "yesplease"),
+						Data: []tsdbtest.DataPoint{
+							{Time: 1532940510, Value: 314.3},
+							{Time: 1532940510 + 5, Value: 300.3},
+							{Time: 1532940510 + 10, Value: 3234.6}},
+					}}},
+			),
 			from:     1532940510 + 1,
 			to:       1532940510 + 4,
-			step:     0,
 			expected: map[string][]tsdbtest.DataPoint{}},
 
-		{desc: "Should ingest and query an aggregate", metricName: "cpu",
-			labels: utils.LabelsFromStrings("os", "linux", "iguaz", "yesplease"),
-			data: []tsdbtest.DataPoint{{Time: 1532940510, Value: 300.3},
-				{Time: 1532940510 + 5, Value: 300.3},
-				{Time: 1532940510 + 10, Value: 100.4}},
+		{desc: "Should ingest and query an aggregate",
+			testParams: tsdbtest.NewTestParams(t,
+				tsdbtest.TestOption{
+					Key: tsdbtest.OptTimeSeries,
+					Value: tsdbtest.TimeSeries{tsdbtest.Metric{
+						Name:   "cpu",
+						Labels: utils.LabelsFromStrings("os", "linux", "iguaz", "yesplease"),
+						Data: []tsdbtest.DataPoint{
+							{Time: 1532940510, Value: 300.3},
+							{Time: 1532940510 + 5, Value: 300.3},
+							{Time: 1532940510 + 10, Value: 100.4}},
+					}}},
+			),
 			from:       1532940510,
 			to:         1532940510 + 11,
 			step:       defaultStepMs,
 			aggregates: "sum",
 			expected:   map[string][]tsdbtest.DataPoint{"sum": {{Time: 1532940510, Value: 701.0}}}},
 
-		{desc: "Should ingest and query an aggregate with interval greater than step size", metricName: "cpu",
-			labels: utils.LabelsFromStrings("os", "linux", "iguaz", "yesplease"),
-			data: []tsdbtest.DataPoint{{Time: 1532940510, Value: 300.3},
-				{Time: 1532940510 + 60, Value: 300.3},
-				{Time: 1532940510 + 2*60, Value: 100.4},
-				{Time: 1532940510 + 5*60, Value: 200.0}},
+		{desc: "Should ingest and query an aggregate with interval greater than step size",
+			testParams: tsdbtest.NewTestParams(t,
+				tsdbtest.TestOption{
+					Key: tsdbtest.OptTimeSeries,
+					Value: tsdbtest.TimeSeries{tsdbtest.Metric{
+						Name:   "cpu",
+						Labels: utils.LabelsFromStrings("os", "linux", "iguaz", "yesplease"),
+						Data: []tsdbtest.DataPoint{
+							{Time: 1532940510, Value: 300.3},
+							{Time: 1532940510 + 60, Value: 300.3},
+							{Time: 1532940510 + 2*60, Value: 100.4},
+							{Time: 1532940510 + 5*60, Value: 200.0}},
+					}}},
+			),
 			from:       1532940510,
 			to:         1532940510 + 6*60,
 			step:       defaultStepMs,
 			aggregates: "sum",
 			expected:   map[string][]tsdbtest.DataPoint{"sum": {{Time: 1532940510, Value: 901.0}}}},
 
-		{desc: "Should ingest and query multiple aggregates", metricName: "cpu",
-			labels: utils.LabelsFromStrings("os", "linux", "iguaz", "yesplease"),
-			data: []tsdbtest.DataPoint{{Time: 1532940510, Value: 300.3},
-				{Time: 1532940510 + 5, Value: 300.3},
-				{Time: 1532940510 + 10, Value: 100.4}},
+		{desc: "Should ingest and query multiple aggregates",
+			testParams: tsdbtest.NewTestParams(t,
+				tsdbtest.TestOption{
+					Key: tsdbtest.OptTimeSeries,
+					Value: tsdbtest.TimeSeries{tsdbtest.Metric{
+						Name:   "cpu",
+						Labels: utils.LabelsFromStrings("os", "linux", "iguaz", "yesplease"),
+						Data: []tsdbtest.DataPoint{
+							{Time: 1532940510, Value: 300.3},
+							{Time: 1532940510 + 5, Value: 300.3},
+							{Time: 1532940510 + 10, Value: 100.4}},
+					}}},
+			),
 			from:       1532940510,
 			to:         1532940510 + 11,
 			step:       defaultStepMs,
@@ -952,31 +1109,54 @@ func TestQuery(t *testing.T) {
 			expected: map[string][]tsdbtest.DataPoint{"sum": {{Time: 1532940510, Value: 701.0}},
 				"count": {{Time: 1532940510, Value: 3}}}},
 
-		{desc: "Should fail on query with illegal time (switch from and to)", metricName: "cpu",
-			labels: utils.LabelsFromStrings("os", "linux", "iguaz", "yesplease"),
-			data: []tsdbtest.DataPoint{{Time: 1532940510, Value: 314.3},
-				{Time: 1532940510 + 5, Value: 300.3},
-				{Time: 1532940510 + 10, Value: 3234.6}},
+		{desc: "Should fail on query with illegal time (switch from and to)",
+			testParams: tsdbtest.NewTestParams(t,
+				tsdbtest.TestOption{
+					Key: tsdbtest.OptTimeSeries,
+					Value: tsdbtest.TimeSeries{tsdbtest.Metric{
+						Name:   "cpu",
+						Labels: utils.LabelsFromStrings("os", "linux", "iguaz", "yesplease"),
+						Data: []tsdbtest.DataPoint{
+							{Time: 1532940510, Value: 314.3},
+							{Time: 1532940510 + 5, Value: 300.3},
+							{Time: 1532940510 + 10, Value: 3234.6}},
+					}}},
+			),
 			from:       1532940510 + 1,
 			to:         0,
 			step:       defaultStepMs,
 			expectFail: true,
 		},
 
-		{desc: "Should query with filter on not existing metric name", metricName: "cpu",
-			labels:   utils.LabelsFromStrings("os", "linux", "iguaz", "yesplease"),
-			data:     []tsdbtest.DataPoint{{Time: 1532940510, Value: 33.3}},
+		{desc: "Should query with filter on not existing metric name",
+			testParams: tsdbtest.NewTestParams(t,
+				tsdbtest.TestOption{
+					Key: tsdbtest.OptTimeSeries,
+					Value: tsdbtest.TimeSeries{tsdbtest.Metric{
+						Name:   "cpu",
+						Labels: utils.LabelsFromStrings("os", "linux", "iguaz", "yesplease"),
+						Data:   []tsdbtest.DataPoint{{Time: 1532940510, Value: 33.3}},
+					}}},
+			),
 			filter:   "_name=='hahaha'",
 			from:     0,
 			to:       1532940510 + 1,
 			step:     defaultStepMs,
 			expected: map[string][]tsdbtest.DataPoint{}},
 
-		{desc: "Should ingest and query aggregates with empty bucket", metricName: "cpu",
-			labels: utils.LabelsFromStrings("os", "linux", "iguaz", "yesplease"),
-			data: []tsdbtest.DataPoint{{Time: 1537972278402, Value: 300.3},
-				{Time: 1537972278402 + 8*tsdbtest.MinuteInMillis, Value: 300.3},
-				{Time: 1537972278402 + 9*tsdbtest.MinuteInMillis, Value: 100.4}},
+		{desc: "Should ingest and query aggregates with empty bucket",
+			testParams: tsdbtest.NewTestParams(t,
+				tsdbtest.TestOption{
+					Key: tsdbtest.OptTimeSeries,
+					Value: tsdbtest.TimeSeries{tsdbtest.Metric{
+						Name:   "cpu",
+						Labels: utils.LabelsFromStrings("os", "linux", "iguaz", "yesplease"),
+						Data: []tsdbtest.DataPoint{
+							{Time: 1537972278402, Value: 300.3},
+							{Time: 1537972278402 + 8*tsdbtest.MinuteInMillis, Value: 300.3},
+							{Time: 1537972278402 + 9*tsdbtest.MinuteInMillis, Value: 100.4}},
+					}}},
+			),
 			from:       1537972278402 - 5*tsdbtest.MinuteInMillis,
 			to:         1537972278402 + 10*tsdbtest.MinuteInMillis,
 			step:       defaultStepMs,
@@ -985,11 +1165,19 @@ func TestQuery(t *testing.T) {
 				"count": {{Time: 1537972278402, Value: 1},
 					{Time: 1537972578402, Value: 2}}}},
 
-		{desc: "Should ingest and query aggregates with few empty buckets in a row", metricName: "cpu",
-			labels: utils.LabelsFromStrings("os", "linux", "iguaz", "yesplease"),
-			data: []tsdbtest.DataPoint{{Time: 1537972278402, Value: 300.3},
-				{Time: 1537972278402 + 16*tsdbtest.MinuteInMillis, Value: 300.3},
-				{Time: 1537972278402 + 17*tsdbtest.MinuteInMillis, Value: 100.4}},
+		{desc: "Should ingest and query aggregates with few empty buckets in a row",
+			testParams: tsdbtest.NewTestParams(t,
+				tsdbtest.TestOption{
+					Key: tsdbtest.OptTimeSeries,
+					Value: tsdbtest.TimeSeries{tsdbtest.Metric{
+						Name:   "cpu",
+						Labels: utils.LabelsFromStrings("os", "linux", "iguaz", "yesplease"),
+						Data: []tsdbtest.DataPoint{
+							{Time: 1537972278402, Value: 300.3},
+							{Time: 1537972278402 + 16*tsdbtest.MinuteInMillis, Value: 300.3},
+							{Time: 1537972278402 + 17*tsdbtest.MinuteInMillis, Value: 100.4}},
+					}}},
+			),
 			from:       1537972278402 - 5*tsdbtest.MinuteInMillis,
 			to:         1537972278402 + 18*tsdbtest.MinuteInMillis,
 			step:       defaultStepMs,
@@ -998,11 +1186,19 @@ func TestQuery(t *testing.T) {
 				"count": {{Time: 1537972278402, Value: 1},
 					{Time: 1537972278402 + 15*tsdbtest.MinuteInMillis, Value: 2}}}},
 
-		{desc: "Should ingest and query server-side aggregates", metricName: "cpu",
-			labels: utils.LabelsFromStrings("os", "linux", "iguaz", "yesplease"),
-			data: []tsdbtest.DataPoint{{Time: 1532940510, Value: 300.3},
-				{Time: 1532940510 + 5, Value: 300.3},
-				{Time: 1532940510 + 10, Value: 100.4}},
+		{desc: "Should ingest and query server-side aggregates",
+			testParams: tsdbtest.NewTestParams(t,
+				tsdbtest.TestOption{
+					Key: tsdbtest.OptTimeSeries,
+					Value: tsdbtest.TimeSeries{tsdbtest.Metric{
+						Name:   "cpu",
+						Labels: utils.LabelsFromStrings("os", "linux", "iguaz", "yesplease"),
+						Data: []tsdbtest.DataPoint{
+							{Time: 1532940510, Value: 300.3},
+							{Time: 1532940510 + 5, Value: 300.3},
+							{Time: 1532940510 + 10, Value: 100.4}},
+					}}},
+			),
 			from:       1532940510,
 			to:         1532940510 + 11,
 			step:       60 * tsdbtest.MinuteInMillis,
@@ -1020,16 +1216,13 @@ func TestQuery(t *testing.T) {
 			if test.ignoreReason != "" {
 				t.Skip(test.ignoreReason)
 			}
-			testQueryDataCase(t, v3ioConfig, test.metricName, test.labels,
-				test.data, test.filter, test.aggregates, test.from, test.to, test.step, test.expected, test.expectFail)
+			testQueryDataCase(t, test.testParams, test.filter, test.aggregates, test.from, test.to, test.step, test.expected, test.expectFail)
 		})
 	}
 }
-
-func testQueryDataCase(test *testing.T, v3ioConfig *config.V3ioConfig,
-	metricsName string, userLabels []utils.Label, data []tsdbtest.DataPoint, filter string, agg string,
+func testQueryDataCase(test *testing.T, params tsdbtest.TestParams, filter string, agg string,
 	from int64, to int64, step int64, expected map[string][]tsdbtest.DataPoint, expectFail bool) {
-	adapter, teardown := tsdbtest.SetUpWithData(test, v3ioConfig, metricsName, data, userLabels)
+	adapter, teardown := tsdbtest.SetUpWithData(test, params)
 	defer teardown()
 
 	qry, err := adapter.QuerierV2(nil)
@@ -1037,42 +1230,44 @@ func testQueryDataCase(test *testing.T, v3ioConfig *config.V3ioConfig,
 		test.Fatalf("Failed to create Querier. reason: %v", err)
 	}
 
-	selectParams := &pquerier.SelectParams{Name: metricsName, Functions: agg, Step: step, Filter: filter, From: from, To: to}
-	set, err := qry.SelectQry(selectParams)
-	if err != nil {
-		if expectFail {
-			return
-		} else {
-			test.Fatalf("Failed to run Select. reason: %v", err)
+	for _, metric := range params.TimeSeries() {
+		selectParams := &pquerier.SelectParams{Name: metric.Name, Functions: agg, Step: step, Filter: filter, From: from, To: to}
+		set, err := qry.SelectQry(selectParams)
+		if err != nil {
+			if expectFail {
+				return
+			} else {
+				test.Fatalf("Failed to run Select. reason: %v", err)
+			}
 		}
-	}
 
-	var counter int
-	for counter = 0; set.Next(); counter++ {
+		var counter int
+		for counter = 0; set.Next(); counter++ {
+			if set.Err() != nil {
+				test.Fatalf("Failed to query metric. reason: %v", set.Err())
+			}
+
+			series := set.At()
+			agg := series.Labels().Get(aggregate.AggregateLabel)
+			iter := series.Iterator()
+			if iter.Err() != nil {
+				test.Fatalf("Failed to query data series. reason: %v", iter.Err())
+			}
+
+			actual, err := tsdbtest.IteratorToSlice(iter)
+			if err != nil {
+				test.Fatal(err)
+			}
+
+			fmt.Println(test.Name(), "actual:", actual, "expected: ", expected[agg])
+			assert.ElementsMatch(test, expected[agg], actual)
+		}
+
 		if set.Err() != nil {
 			test.Fatalf("Failed to query metric. reason: %v", set.Err())
 		}
-
-		series := set.At()
-		agg := series.Labels().Get(aggregate.AggregateLabel)
-		iter := series.Iterator()
-		if iter.Err() != nil {
-			test.Fatalf("Failed to query data series. reason: %v", iter.Err())
+		if counter == 0 && len(expected) > 0 {
+			test.Fatalf("No data was received")
 		}
-
-		actual, err := tsdbtest.IteratorToSlice(iter)
-		if err != nil {
-			test.Fatal(err)
-		}
-
-		fmt.Println(test.Name(), "actual:", actual, "expected: ", expected[agg])
-		assert.ElementsMatch(test, expected[agg], actual)
-	}
-
-	if set.Err() != nil {
-		test.Fatalf("Failed to query metric. reason: %v", set.Err())
-	}
-	if counter == 0 && len(expected) > 0 {
-		test.Fatalf("No data was received")
 	}
 }
