@@ -76,12 +76,18 @@ func mainCollector(ctx *selectQueryContext, index int) {
 	for res := range ctx.requestChannels[index] {
 		if res.IsRawQuery() {
 			rawCollector(res)
-		} else if res.IsServerAggregates() {
-			aggregateServerAggregates(ctx, res)
-		} else if res.IsClientAggregates() {
-			aggregateClientAggregates(ctx, res)
-		} else if res.IsDownsample() {
-			downsampleRawData(ctx, res)
+		} else {
+			if res.IsServerAggregates() {
+				aggregateServerAggregates(ctx, res)
+			} else if res.IsClientAggregates() {
+				aggregateClientAggregates(ctx, res)
+			}
+
+			// It is possible to query an aggregate and down sample raw chunks in the same df.
+			if res.IsDownsample() {
+				ctx.logger.Info("Doing downsample")
+				downsampleRawData(ctx, res)
+			}
 		}
 	}
 }
@@ -112,10 +118,13 @@ func aggregateClientAggregates(ctx *selectQueryContext, res *qryResults) {
 
 func aggregateServerAggregates(ctx *selectQueryContext, res *qryResults) {
 	for _, col := range res.frame.columns {
-		if col.GetColumnSpec().metric == res.name && col.GetColumnSpec().isConcrete() {
+		if col.GetColumnSpec().metric == res.name &&
+			col.GetColumnSpec().function != 0 &&
+			col.GetColumnSpec().isConcrete() {
+
 			array, ok := res.fields[aggregate.ToAttrName(col.GetColumnSpec().function)]
 			if !ok {
-				ctx.logger.Error("requested function %v was not found in response", col.GetColumnSpec().function)
+				ctx.logger.Warn("requested function %v was not found in response", col.GetColumnSpec().function)
 			} else {
 				// go over the byte array and convert each uint as we go to save memory allocation
 				bytes := array.([]byte)
@@ -134,7 +143,6 @@ func aggregateServerAggregates(ctx *selectQueryContext, res *qryResults) {
 					col.SetDataAt(int(currentCell), floatVal)
 				}
 			}
-
 		}
 	}
 }

@@ -33,23 +33,23 @@ type V3ioQuerier struct {
 }
 
 type SelectParams struct {
-	Name           string
-	Functions      string
-	From, To, Step int64
-	Windows        []int
-	Filter         string
-	columnSpecs    []RequestedColumn
+	Name             string
+	Functions        string
+	From, To, Step   int64
+	Windows          []int
+	Filter           string
+	RequestedColumns []RequestedColumn
 }
 
 func (s *SelectParams) getRequestedColumns() []RequestedColumn {
-	if s.columnSpecs != nil {
-		return s.columnSpecs
+	if s.RequestedColumns != nil {
+		return s.RequestedColumns
 	}
 	functions := strings.Split(s.Functions, ",")
 	columns := make([]RequestedColumn, len(functions))
 	for i, function := range functions {
 		trimmed := strings.TrimSpace(function)
-		newCol := RequestedColumn{function: trimmed, metric: s.Name, interpolator: "next"}
+		newCol := RequestedColumn{Function: trimmed, Metric: s.Name, Interpolator: "next"}
 		columns[i] = newCol
 	}
 	return columns

@@ -7,6 +7,9 @@ import (
 	"strings"
 )
 
+const chunkAttributePrefix = "_v"
+const aggregateAttributePrefix = "_v_"
+
 // Chunk-list series iterator
 type rawChunkIterator struct {
 	mint, maxt int64
@@ -144,20 +147,23 @@ func (it *rawChunkIterator) AddChunks(item qryResults) {
 	// Create and initialize a chunk encoder per chunk blob
 	i := 0
 	for _, attr := range item.query.attrs {
-		values := item.fields[attr]
 
-		if values != nil {
-			bytes := values.([]byte)
-			chunk, err := chunkenc.FromData(it.log, chunkenc.EncXOR, bytes, 0)
-			if err != nil {
-				it.log.ErrorWith("Error reading chunk buffer", "columns", item.query.attrs, "err", err)
-			} else {
-				chunks = append(chunks, chunk)
-				chunksMax = append(chunksMax,
-					firstChunkTime+int64(i+1)*item.query.partition.TimePerChunk()-1)
+		// In case we get both raw chunks and server aggregates, only go over the chunks.
+		if !strings.Contains(attr, aggregateAttributePrefix) {
+			values := item.fields[attr]
+			if values != nil {
+				bytes := values.([]byte)
+				chunk, err := chunkenc.FromData(it.log, chunkenc.EncXOR, bytes, 0)
+				if err != nil {
+					it.log.ErrorWith("Error reading chunk buffer", "columns", item.query.attrs, "err", err)
+				} else {
+					chunks = append(chunks, chunk)
+					chunksMax = append(chunksMax,
+						firstChunkTime+int64(i+1)*item.query.partition.TimePerChunk()-1)
+				}
 			}
+			i++
 		}
-		i++
 	}
 
 	it.chunks = append(it.chunks, chunks...)

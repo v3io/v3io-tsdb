@@ -23,6 +23,8 @@ func NewFormatter(format string, cfg *FormatterConfig) (Formatter, error) {
 		return csvFormatter{baseFormatter{cfg: cfg}}, nil
 	case "json":
 		return simpleJsonFormatter{baseFormatter{cfg: cfg}}, nil
+	case "none":
+		return nilFormatter{baseFormatter{cfg: cfg}}, nil
 
 	default:
 		return nil, fmt.Errorf("unknown formatter type %s", format)

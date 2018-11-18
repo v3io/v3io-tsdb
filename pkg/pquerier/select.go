@@ -44,7 +44,7 @@ type selectQueryContext struct {
 	timeColumn Column
 }
 
-func (s *selectQueryContext) start(parts []*partmgr.DBPartition, params *SelectParams) (SeriesSet, error) {
+func (s *selectQueryContext) start(parts []*partmgr.DBPartition, params *SelectParams) (*frameIterator, error) {
 	s.dataFrames = make(map[uint64]*dataFrame)
 
 	s.functions = params.Functions
@@ -90,15 +90,38 @@ func (s *selectQueryContext) start(parts []*partmgr.DBPartition, params *SelectP
 
 	if len(s.frameList) > 0 {
 		s.totalColumns = s.frameList[0].Len()
-		frameIter := NewFrameIterator(s)
-		return frameIter, nil
-	} else {
-		return nullSeriesSet{}, nil
 	}
+
+	frameIter := NewFrameIterator(s)
+	return frameIter, nil
+}
+
+func (s *selectQueryContext) metricsAggregatesToString(metric string) (string, bool) {
+	var result strings.Builder
+	specs := s.columnsSpecByMetric[metric]
+	specsNum := len(specs)
+	if specsNum == 0 {
+		return "", false
+	}
+
+	var requestedRawColumn bool
+	result.WriteString(specs[0].function.String())
+	for i := 1; i < specsNum; i++ {
+		if specs[i].function.String() == "" {
+			requestedRawColumn = true
+		} else {
+			result.WriteString(",")
+			result.WriteString(specs[i].function.String())
+		}
+	}
+
+	return result.String(), requestedRawColumn && result.Len() > 0
 }
 
 // Query a single partition
 func (s *selectQueryContext) queryPartition(partition *partmgr.DBPartition) ([]*partQuery, error) {
+	var queries []*partQuery
+	var err error
 
 	mint, maxt := partition.GetPartitionRange()
 	step := s.step
@@ -111,44 +134,41 @@ func (s *selectQueryContext) queryPartition(partition *partmgr.DBPartition) ([]*
 		mint = s.mint
 	}
 
-	var aggregationParams *aggregate.AggregationParams
-	functions := s.functions
-	if functions == "" && step > 0 && step >= partition.RollupTime() && partition.AggrType().HasAverage() {
-		functions = "avg"
-	}
-
-	// Check whether there are aggregations to add and aggregates aren't disabled
-	if functions != "" && !s.disableAllAggr {
-
-		// If step isn't passed (e.g., when using the console), the step is the
-		// difference between the end (maxt) and start (mint) times (e.g., 5 minutes)
-		if step == 0 {
-			step = maxt - mint
-		}
-
-		if step > partition.RollupTime() && s.disableClientAggr {
-			step = partition.RollupTime()
-		}
-
-		params, err := aggregate.NewAggregationParams(functions,
-			"v",
-			partition.AggrBuckets(),
-			step,
-			partition.RollupTime(),
-			s.windows)
-
-		if err != nil {
-			return nil, err
-		}
-		aggregationParams = params
-
-	}
-
-	// TODO: name may become a list and separated to multiple GetItems range queries
-
-	var queries []*partQuery
-	var err error
 	for metric := range s.columnsSpecByMetric {
+		var aggregationParams *aggregate.AggregationParams
+		functions, requestAggregatesAndRaw := s.metricsAggregatesToString(metric)
+
+		if functions == "" && step > 0 && step >= partition.RollupTime() && partition.AggrType().HasAverage() {
+			functions = "avg"
+		}
+
+		// Check whether there are aggregations to add and aggregates aren't disabled
+		if functions != "" && !s.disableAllAggr {
+
+			// If step isn't passed (e.g., when using the console), the step is the
+			// difference between the end (maxt) and start (mint) times (e.g., 5 minutes)
+			if step == 0 {
+				step = maxt - mint
+			}
+
+			if step > partition.RollupTime() && s.disableClientAggr {
+				step = partition.RollupTime()
+			}
+
+			params, err := aggregate.NewAggregationParams(functions,
+				"v",
+				partition.AggrBuckets(),
+				step,
+				partition.RollupTime(),
+				s.windows)
+
+			if err != nil {
+				return nil, err
+			}
+			aggregationParams = params
+
+		}
+
 		newQuery := &partQuery{mint: mint, maxt: maxt, partition: partition, step: step}
 		if aggregationParams != nil {
 			newQuery.preAggregated = aggregationParams.CanAggregate(partition.AggrType())
@@ -157,7 +177,7 @@ func (s *selectQueryContext) queryPartition(partition *partmgr.DBPartition) ([]*
 			}
 		}
 
-		err = newQuery.getItems(s, metric)
+		err = newQuery.getItems(s, metric, requestAggregatesAndRaw)
 		queries = append(queries, newQuery)
 	}
 
@@ -183,7 +203,6 @@ func (s *selectQueryContext) startCollectors() error {
 }
 
 func (s *selectQueryContext) processQueryResults(query *partQuery) error {
-
 	for query.Next() {
 
 		// read metric name
@@ -246,27 +265,27 @@ func (s *selectQueryContext) createColumnSpecs(params *SelectParams) ([]columnMe
 	columnsSpecByMetric := make(map[string][]columnMeta)
 
 	for _, col := range params.getRequestedColumns() {
-		_, ok := columnsSpecByMetric[col.metric]
+		_, ok := columnsSpecByMetric[col.Metric]
 		if !ok {
-			columnsSpecByMetric[col.metric] = []columnMeta{}
+			columnsSpecByMetric[col.Metric] = []columnMeta{}
 		}
 
-		inter, err := StrToInterpolateType(col.interpolator)
+		inter, err := StrToInterpolateType(col.Interpolator)
 		if err != nil {
 			return nil, nil, err
 		}
-		colMeta := columnMeta{metric: col.metric, alias: col.alias, interpolationType: inter}
+		colMeta := columnMeta{metric: col.Metric, alias: col.Alias, interpolationType: inter}
 
-		if col.function != "" {
-			aggr, err := aggregate.AggregateFromString(col.function)
+		if col.Function != "" {
+			aggr, err := aggregate.AggregateFromString(col.Function)
 			if err != nil {
 				return nil, nil, err
 			}
 			colMeta.function = aggr
 		}
-		columnsSpecByMetric[col.metric] = append(columnsSpecByMetric[col.metric], colMeta)
+		columnsSpecByMetric[col.Metric] = append(columnsSpecByMetric[col.Metric], colMeta)
 		columnsSpec = append(columnsSpec, colMeta)
-		s.isAllColumns = s.isAllColumns || col.metric == columnWildcard
+		s.isAllColumns = s.isAllColumns || col.Metric == columnWildcard
 	}
 
 	// Adding hidden columns if needed
@@ -360,7 +379,7 @@ type partQuery struct {
 	aggregationParams *aggregate.AggregationParams
 }
 
-func (s *partQuery) getItems(ctx *selectQueryContext, name string) error {
+func (s *partQuery) getItems(ctx *selectQueryContext, name string, aggregatesAndChunk bool) error {
 
 	path := s.partition.GetTablePath()
 	var shardingKeys []string
@@ -371,8 +390,13 @@ func (s *partQuery) getItems(ctx *selectQueryContext, name string) error {
 
 	if s.preAggregated {
 		s.attrs = s.aggregationParams.GetAttrNames()
-	} else {
-		s.attrs, s.chunk0Time = s.partition.Range2Attrs("v", s.mint, s.maxt)
+	}
+	// It is possible to request both server aggregates and raw chunk data (to downsample) for the same metric
+	// example: `select max(cpu), avg(cpu), cpu` with step = 1h
+	if !s.preAggregated || aggregatesAndChunk {
+		chunkAttr, chunk0Time := s.partition.Range2Attrs("v", s.mint, s.maxt)
+		s.chunk0Time = chunk0Time
+		s.attrs = append(s.attrs, chunkAttr...)
 	}
 	attrs = append(attrs, s.attrs...)
 
@@ -388,7 +412,10 @@ func (s *partQuery) getItems(ctx *selectQueryContext, name string) error {
 }
 
 func (s *partQuery) Next() bool {
-	return s.iter.Next()
+	var res bool
+
+	res = s.iter.Next()
+	return res
 }
 
 func (s *partQuery) GetField(name string) interface{} {

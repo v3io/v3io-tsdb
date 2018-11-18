@@ -120,3 +120,29 @@ func (f simpleJsonFormatter) Write(out io.Writer, set querier.SeriesSet) error {
 
 	return err
 }
+
+type nilFormatter struct {
+	baseFormatter
+}
+
+func (f nilFormatter) Write(out io.Writer, set querier.SeriesSet) error {
+	var count int
+	for set.Next() {
+		count++
+		series := set.At()
+		iter := series.Iterator()
+		for iter.Next() {
+		}
+
+		if iter.Err() != nil {
+			return iter.Err()
+		}
+	}
+
+	if set.Err() != nil {
+		return set.Err()
+	}
+
+	fmt.Fprintf(out, "got %v unique label sets\n", count)
+	return nil
+}

@@ -78,7 +78,7 @@ func (it *DataFrameColumnSeriesIterator) Next() bool {
 func (it *DataFrameColumnSeriesIterator) Err() error { return it.err }
 
 func (it *DataFrameColumnSeriesIterator) getNextValidCell(from int) (nextIndex int) {
-	for nextIndex = from + 1; nextIndex <= it.dataColumn.Len() && !it.doesCellHasData(nextIndex); nextIndex++ {
+	for nextIndex = from + 1; nextIndex < it.dataColumn.Len() && !it.doesCellHasData(nextIndex); nextIndex++ {
 	}
 	return
 }

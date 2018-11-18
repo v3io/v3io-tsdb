@@ -29,11 +29,12 @@ import (
 type InterpolationType uint8
 
 const (
-	interpolateNone InterpolationType = 0
-	interpolateNaN  InterpolationType = 1
-	interpolatePrev InterpolationType = 2
-	interpolateNext InterpolationType = 3
-	interpolateLin  InterpolationType = 4
+	interpolateNone      InterpolationType = 0
+	interpolateNaN       InterpolationType = 1
+	interpolatePrev      InterpolationType = 2
+	interpolateNext      InterpolationType = 3
+	interpolateLin       InterpolationType = 4
+	defaultInterpolation InterpolationType = interpolateNext
 )
 
 type InterpolationFunction func(tprev, tnext, tseek int64, vprev, vnext float64) (int64, float64)
