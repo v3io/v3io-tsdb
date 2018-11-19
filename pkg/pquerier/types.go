@@ -78,7 +78,6 @@ func (s nullSeriesSet) Next() bool { return false }
 func (s nullSeriesSet) At() Series { return nil }
 func (s nullSeriesSet) Err() error { return s.err }
 
-
 // SeriesSet contains a set of series.
 type FrameSet interface {
 	NextFrame() bool
@@ -91,9 +90,9 @@ type nullFrameSet struct {
 	err error
 }
 
-func (s nullFrameSet) NextFrame() bool { return false }
+func (s nullFrameSet) NextFrame() bool      { return false }
 func (s nullFrameSet) GetFrame() *dataFrame { return nil }
-func (s nullFrameSet) Err() error { return s.err }
+func (s nullFrameSet) Err() error           { return s.err }
 
 // Series represents a single time series.
 type Series interface {

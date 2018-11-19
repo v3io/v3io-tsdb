@@ -69,7 +69,7 @@ func (it *rawChunkIterator) Seek(t int64) bool {
 	}
 
 	for {
-		it.prevT, it.prevV = it.At()
+		it.updatePrevPoint()
 		if it.iter.Next() {
 			t0, _ := it.iter.At()
 			if t0 > it.maxt {
@@ -98,9 +98,16 @@ func (it *rawChunkIterator) Seek(t int64) bool {
 	}
 }
 
+func (it *rawChunkIterator) updatePrevPoint() {
+	t, v := it.At()
+	if t != 0 && v != 0 {
+		it.prevT, it.prevV = t, v
+	}
+}
+
 // Move to the next iterator item
 func (it *rawChunkIterator) Next() bool {
-	it.prevT, it.prevV = it.At()
+	it.updatePrevPoint()
 	if it.iter.Next() {
 		t, _ := it.iter.At()
 		if t < it.mint {
