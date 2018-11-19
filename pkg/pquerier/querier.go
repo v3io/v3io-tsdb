@@ -57,24 +57,41 @@ func (s *SelectParams) getRequestedColumns() []RequestedColumn {
 
 // Base query function
 func (q *V3ioQuerier) SelectQry(params *SelectParams) (set SeriesSet, err error) {
+	set, err = q.baseSelectQry(params)
+	if err != nil {
+		set = nullSeriesSet{}
+	}
+
+	return
+}
+
+func (q *V3ioQuerier) SelectDataFrame(params *SelectParams) (iter FrameSet, err error) {
+	iter, err = q.baseSelectQry(params)
+	if err != nil {
+		iter = nullFrameSet{}
+	}
+
+	return
+}
+
+func (q *V3ioQuerier) baseSelectQry(params *SelectParams) (iter *frameIterator, err error) {
 	if params.To < params.From {
 		return nil, errors.Errorf("End time '%d' is lower than start time '%d'.", params.To, params.From)
 	}
 
 	err = q.partitionMngr.ReadAndUpdateSchema()
 	if err != nil {
-		return nullSeriesSet{}, errors.Wrap(err, "Failed to read/update the TSDB schema.")
+		return nil, errors.Wrap(err, "Failed to read/update the TSDB schema.")
 	}
 
 	// TODO: should be checked in config
 	if !IsPowerOfTwo(q.cfg.QryWorkers) {
-		return nullSeriesSet{}, errors.New("Query workers num must be a power of 2 and > 0 !")
+		return nil, errors.New("Query workers num must be a power of 2 and > 0 !")
 	}
 
-	set = nullSeriesSet{}
 	selectContext := selectQueryContext{
-		mint: params.From, maxt: params.To, step: params.Step, filter: params.Filter,
-		container: q.container, logger: q.logger, workers: q.cfg.QryWorkers,
+		mint:              params.From, maxt: params.To, step: params.Step, filter: params.Filter,
+		container:         q.container, logger: q.logger, workers: q.cfg.QryWorkers,
 		disableClientAggr: q.cfg.DisableClientAggr,
 	}
 
@@ -92,14 +109,7 @@ func (q *V3ioQuerier) SelectQry(params *SelectParams) (set SeriesSet, err error)
 			return
 		}
 
-		set, err = selectContext.start(parts, params)
-
-		if err != nil {
-			set = nullSeriesSet{}
-			return
-		}
-
-		// TODO: return a proper set
+		iter, err = selectContext.start(parts, params)
 		return
 	})
 

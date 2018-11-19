@@ -33,14 +33,14 @@ func NewFrameIterator(ctx *selectQueryContext) *frameIterator {
 }
 
 // advance to the next data frame
-func (fi *frameIterator) NextSet() bool {
+func (fi *frameIterator) NextFrame() bool {
 	fi.setIndex++
 	return fi.setIndex-1 < len(fi.ctx.frameList)
 }
 
 // get current data frame
 func (fi *frameIterator) GetFrame() *dataFrame {
-	return fi.ctx.frameList[fi.setIndex]
+	return fi.ctx.frameList[fi.setIndex-1]
 }
 
 // advance to the next time series (for Prometheus mode)
@@ -187,8 +187,9 @@ type dataFrame struct {
 	lset utils.Labels
 	hash uint64
 
-	isRawSeries bool
-	rawColumns  []Series
+	isRawSeries           bool
+	isRawColumnsGenerated bool
+	rawColumns            []Series
 
 	columns      []Column
 	index        Column
@@ -222,14 +223,23 @@ func (d *dataFrame) ColumnAt(i int) (Column, error) {
 	if i >= d.Len() {
 		return nil, fmt.Errorf("index %d out of bounds [0:%d]", i, d.Len())
 	}
+	if d.shouldGenerateRawColumns() {
+		d.rawSeriesToColumns()
+	}
 	return d.columns[i], nil
 }
 
 func (d *dataFrame) Columns() []Column {
+	if d.shouldGenerateRawColumns() {
+		d.rawSeriesToColumns()
+	}
 	return d.columns
 }
 
 func (d *dataFrame) Column(name string) (Column, error) {
+	if d.shouldGenerateRawColumns() {
+		d.rawSeriesToColumns()
+	}
 	i, ok := d.columnByName[name]
 	if !ok {
 		return nil, fmt.Errorf("column %q not found", name)
@@ -239,6 +249,9 @@ func (d *dataFrame) Column(name string) (Column, error) {
 }
 
 func (d *dataFrame) Index() Column {
+	if d.shouldGenerateRawColumns() {
+		d.rawSeriesToColumns()
+	}
 	return d.index
 }
 
@@ -258,6 +271,88 @@ func (d *dataFrame) TimeSeries(i int) (Series, error) {
 	}
 }
 
+// Normalizing the raw data of different metrics to one timeline with both metric's times.
+//
+// for example the following time series:
+// metric1 - (t0,v0), (t2, v1)
+// metric2 - (t1,v2), (t2, v3)
+//
+// will be converted to:
+// time		metric1		metric2
+//	t0		  v0		  NaN
+//	t1		  NaN		  v2
+//	t2		  v1		  v3
+//
+func (d *dataFrame) rawSeriesToColumns() {
+	var timeData []int64
+	columns := make([][]float64, len(d.rawColumns))
+	areExhausted := make([]bool, len(d.rawColumns))
+
+	currentTime := int64(math.MaxInt64)
+	nextTime := int64(math.MaxInt64)
+
+	for _, rawSeries := range d.rawColumns {
+		rawSeries.Iterator().Next()
+		t, _ := rawSeries.Iterator().At()
+		if t < nextTime {
+			nextTime = t
+		}
+	}
+
+	for !allValuesTrue(areExhausted) {
+		currentTime = nextTime
+		nextTime = int64(math.MaxInt64)
+		timeData = append(timeData, currentTime)
+
+		for seriesIndex, rawSeries := range d.rawColumns {
+			iter := rawSeries.Iterator()
+			t, v := iter.At()
+			if t == currentTime {
+				columns[seriesIndex] = append(columns[seriesIndex], v)
+				if iter.Next() {
+					t, _ = iter.At()
+				} else {
+					areExhausted[seriesIndex] = true
+				}
+			} else if t > currentTime {
+				columns[seriesIndex] = append(columns[seriesIndex], math.NaN())
+			} else if t < currentTime {
+				fmt.Println("got here, it's weird")
+			}
+
+			if t < nextTime {
+				nextTime = t
+			}
+		}
+	}
+
+	numberOfRows := len(timeData)
+	colSpec := columnMeta{metric: "time"}
+	d.index = NewDataColumn("time", colSpec, numberOfRows, IntType)
+	d.index.SetData(timeData, numberOfRows)
+
+	d.columns = make([]Column, len(d.rawColumns))
+	for i, series := range d.rawColumns {
+		name := series.Labels().Get("__name__")
+		spec := columnMeta{metric: name}
+		col := NewDataColumn(name, spec, numberOfRows, FloatType)
+		col.SetData(columns[i], numberOfRows)
+		d.columns[i] = col
+	}
+
+	d.isRawColumnsGenerated = true
+}
+
+func (d *dataFrame) shouldGenerateRawColumns() bool { return d.isRawSeries && !d.isRawColumnsGenerated }
+
+func allValuesTrue(indicators []bool) bool {
+	res := true
+	for _, currentBool := range indicators {
+		res = res && currentBool
+	}
+	return res
+}
+
 // Column object, store a single value or index column/array
 // There can be data columns or calculated columns (e.g. Avg built from count & sum columns)
 
@@ -271,6 +366,7 @@ type Column interface {
 	TimeAt(i int) (int64, error)    // time value at index i
 	GetColumnSpec() columnMeta      // Get the column's metadata
 	SetDataAt(i int, value interface{}) error
+	SetData(d interface{}, size int) error
 	GetInterpolationFunction() (InterpolationFunction, int64)
 }
 
@@ -295,6 +391,9 @@ func (c *basicColumn) isValidIndex(i int) bool { return i >= 0 && i < c.size }
 func (c *basicColumn) GetColumnSpec() columnMeta { return c.spec }
 
 func (c *basicColumn) SetDataAt(i int, value interface{}) error { return nil }
+func (c *basicColumn) SetData(d interface{}, size int) error {
+	return errors.New("method not supported")
+}
 
 // DType is data type
 type DType reflect.Type
@@ -381,9 +480,10 @@ func (dc *dataColumn) TimeAt(i int) (int64, error) {
 	return typedCol[i], nil
 }
 
-func (dc *dataColumn) SetData(d interface{}, size int) {
+func (dc *dataColumn) SetData(d interface{}, size int) error {
 	dc.data = d
 	dc.size = size
+	return nil
 }
 
 func (dc *dataColumn) SetDataAt(i int, value interface{}) error {

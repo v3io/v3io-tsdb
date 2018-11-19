@@ -12,6 +12,7 @@ func NewDataFrameColumnSeries(indexColumn, dataColumn, countColumn Column, label
 	return s
 }
 
+// This series converts two columns into a series of time-value pairs
 type DataFrameColumnSeries struct {
 	dataColumn  Column
 	indexColumn Column
