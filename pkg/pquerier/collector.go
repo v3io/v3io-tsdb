@@ -73,6 +73,9 @@ func dummyCollector(ctx *selectQueryContext, index int) {
 func mainCollector(ctx *selectQueryContext, index int) {
 	defer ctx.wg.Done()
 
+	lastTimePerMetric := make(map[string]int64, len(ctx.columnsSpecByMetric))
+	lastValuePerMetric := make(map[string]float64, len(ctx.columnsSpecByMetric))
+
 	for res := range ctx.requestChannels[index] {
 		if res.IsRawQuery() {
 			rawCollector(res)
@@ -85,8 +88,7 @@ func mainCollector(ctx *selectQueryContext, index int) {
 
 			// It is possible to query an aggregate and down sample raw chunks in the same df.
 			if res.IsDownsample() {
-				ctx.logger.Info("Doing downsample")
-				downsampleRawData(ctx, res)
+				lastTimePerMetric[res.name], lastValuePerMetric[res.name] = downsampleRawData(ctx, res, lastTimePerMetric[res.name], lastValuePerMetric[res.name])
 			}
 		}
 	}
@@ -147,18 +149,28 @@ func aggregateServerAggregates(ctx *selectQueryContext, res *qryResults) {
 	}
 }
 
-func downsampleRawData(ctx *selectQueryContext, res *qryResults) {
+func downsampleRawData(ctx *selectQueryContext, res *qryResults,
+	previousPartitionLastTime int64, previousPartitionLastValue float64) (int64, float64) {
+	var lastT int64
+	var lastV float64
 	it := newRawChunkIterator(*res, nil).(*rawChunkIterator)
 	col := res.frame.columns[res.frame.columnByName[res.name]]
 	for currBucket := 0; currBucket < col.Len(); currBucket++ {
 		currBucketTime := int64(currBucket)*ctx.step + ctx.mint
 		if it.Seek(currBucketTime) {
 			t, v := it.At()
+			tBucketIndex := (t - ctx.mint) / ctx.step
 			if t == currBucketTime {
 				col.SetDataAt(currBucket, v)
-			} else {
+			} else if tBucketIndex == int64(currBucket) {
 				prevT, prevV := it.PeakBack()
 
+				// In case it's the first point in the partition use the last point of the previous partition for the interpolation
+				if prevT == 0 {
+					prevT = previousPartitionLastTime
+					prevV = previousPartitionLastValue
+				}
+				// If previous point is too old for interpolation
 				interpolateFunc, tolerance := col.GetInterpolationFunction()
 				if prevT != 0 && t-prevT > tolerance {
 					col.SetDataAt(currBucket, math.NaN())
@@ -166,9 +178,14 @@ func downsampleRawData(ctx *selectQueryContext, res *qryResults) {
 					_, interpolatedV := interpolateFunc(prevT, t, currBucketTime, prevV, v)
 					col.SetDataAt(currBucket, interpolatedV)
 				}
+			} else {
+				col.SetDataAt(currBucket, math.NaN())
 			}
 		} else {
+			lastT, lastV = it.At()
 			col.SetDataAt(currBucket, math.NaN())
 		}
 	}
+
+	return lastT, lastV
 }

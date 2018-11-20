@@ -227,6 +227,65 @@ func (suite *testQuerySuite) TestRawDataSinglePartitionWithDownSample() {
 	assert.Equal(suite.T(), 1, seriesCount, "series count didn't match expected")
 }
 
+func (suite *testQuerySuite) TestRawDataDownSampleMultiPartitions() {
+	adapter, err := tsdb.NewV3ioAdapter(suite.v3ioConfig, nil, nil)
+	if err != nil {
+		suite.T().Fatalf("failed to create v3io adapter. reason: %s", err)
+	}
+	metricName := "cpu"
+	labels1 := utils.LabelsFromStrings("__name__", metricName, "os", "linux")
+
+	ingestData := []tsdbtest.DataPoint{{suite.toMillis("2018-11-18T23:40:00Z"), 10},
+		{suite.toMillis("2018-11-18T23:59:00Z"), 20},
+		{suite.toMillis("2018-11-19T00:20:00Z"), 30},
+		{suite.toMillis("2018-11-19T02:40:00Z"), 40}}
+	testParams := tsdbtest.NewTestParams(suite.T(),
+		tsdbtest.TestOption{
+			Key: tsdbtest.OptTimeSeries,
+			Value: tsdbtest.TimeSeries{tsdbtest.Metric{
+				Name:   "cpu",
+				Labels: labels1,
+				Data:   ingestData},
+			}})
+	tsdbtest.InsertData(suite.T(), testParams)
+
+	expectedData := []tsdbtest.DataPoint{{suite.toMillis("2018-11-18T22:00:00Z"), 10},
+		{suite.toMillis("2018-11-19T00:00:00Z"), 30},
+		{suite.toMillis("2018-11-19T02:00:00Z"), 40}}
+
+	querierV2, err := adapter.QuerierV2(nil)
+	if err != nil {
+		suite.T().Fatalf("Failed to create querier v2, err: %v", err)
+	}
+
+	params := &pquerier.SelectParams{RequestedColumns: []pquerier.RequestedColumn{{Metric: "cpu"}},
+		Step: 2 * int64(tsdbtest.HoursInMillis),
+		From: suite.toMillis("2018-11-18T22:00:00Z"),
+		To:   suite.toMillis("2018-11-19T4:00:00Z")}
+	set, err := querierV2.SelectQry(params)
+	if err != nil {
+		suite.T().Fatalf("Failed to exeute query, err: %v", err)
+	}
+
+	var seriesCount int
+	for set.Next() {
+		seriesCount++
+		iter := set.At().Iterator()
+		data, err := tsdbtest.IteratorToSlice(iter)
+
+		for _, point := range data {
+			fmt.Printf("t: %v (%v), v: %v\n", time.Unix(point.Time/1000, 0), point.Time, point.Value)
+		}
+		if err != nil {
+			suite.T().Fatal(err)
+		}
+
+		assert.Equal(suite.T(), expectedData, data, "queried data does not match expected")
+	}
+
+	assert.Equal(suite.T(), 1, seriesCount, "series count didn't match expected")
+}
+
 func (suite *testQuerySuite) TestRawAggregatesSinglePartition() {
 	adapter, err := tsdb.NewV3ioAdapter(suite.v3ioConfig, nil, nil)
 	if err != nil {
@@ -1121,6 +1180,14 @@ func (suite *testQuerySuite) TestDataFrameRawDataMultipleMetrics() {
 	}
 
 	assert.Equal(suite.T(), 1, seriesCount, "series count didn't match expected")
+}
+
+func (suite *testQuerySuite) toMillis(date string) int64 {
+	t, err := time.Parse(time.RFC3339, date)
+	if err != nil {
+		suite.T().Fatal(err)
+	}
+	return t.Unix() * 1000
 }
 
 func TestQueryV2Suite(t *testing.T) {

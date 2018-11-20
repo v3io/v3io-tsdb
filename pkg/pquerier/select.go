@@ -145,9 +145,9 @@ func (s *selectQueryContext) queryPartition(partition *partmgr.DBPartition) ([]*
 		var aggregationParams *aggregate.AggregationParams
 		functions, requestAggregatesAndRaw := s.metricsAggregatesToString(metric)
 
-		if functions == "" && step > 0 && step >= partition.RollupTime() && partition.AggrType().HasAverage() {
-			functions = "avg"
-		}
+		//if functions == "" && step > 0 && step >= partition.RollupTime() && partition.AggrType().HasAverage() {
+		//	functions = "avg"
+		//}
 
 		// Check whether there are aggregations to add and aggregates aren't disabled
 		if functions != "" && !s.disableAllAggr {

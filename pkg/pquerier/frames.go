@@ -495,7 +495,10 @@ func (dc *dataColumn) SetDataAt(i int, value interface{}) error {
 	case IntType:
 		dc.data.([]int64)[i] = value.(int64)
 	case FloatType:
-		dc.data.([]float64)[i] = value.(float64)
+		// Update requested cell, only if not trying to override an existing value with NaN
+		if !(math.IsNaN(value.(float64)) && dc.data.([]float64)[i] != 0) {
+			dc.data.([]float64)[i] = value.(float64)
+		}
 	case StringType:
 		dc.data.([]string)[i] = value.(string)
 	case TimeType:
