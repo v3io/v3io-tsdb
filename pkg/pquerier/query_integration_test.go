@@ -68,8 +68,8 @@ func (suite *testQuerySuite) TestRawDataSinglePartition() {
 		suite.T().Fatalf("failed to create v3io adapter. reason: %s", err)
 	}
 
-	labels1 := utils.LabelsFromStrings("os", "linux")
-	labels2 := utils.LabelsFromStrings("os", "mac")
+	labels1 := utils.LabelsFromStringList("os", "linux")
+	labels2 := utils.LabelsFromStringList("os", "mac")
 	numberOfEvents := 10
 	eventsInterval := 60 * 1000
 	baseTime := time.Now().UnixNano()/1000000 - int64(numberOfEvents*eventsInterval)
@@ -123,8 +123,8 @@ func (suite *testQuerySuite) TestRawDataMultiplePartitions() {
 		suite.T().Fatalf("failed to create v3io adapter. reason: %s", err)
 	}
 
-	labels1 := utils.LabelsFromStrings("os", "linux")
-	labels2 := utils.LabelsFromStrings("os", "mac")
+	labels1 := utils.LabelsFromStringList("os", "linux")
+	labels2 := utils.LabelsFromStringList("os", "mac")
 	numberOfEvents := 5
 	eventsInterval := int64(tsdbtest.MinuteInMillis)
 	baseTime := time.Now().UnixNano()/1000000 - int64(numberOfEvents)*eventsInterval
@@ -180,7 +180,7 @@ func (suite *testQuerySuite) TestRawDataSinglePartitionWithDownSample() {
 		suite.T().Fatalf("failed to create v3io adapter. reason: %s", err)
 	}
 
-	labels1 := utils.LabelsFromStrings("os", "linux")
+	labels1 := utils.LabelsFromStringList("os", "linux")
 	numberOfEvents := 10
 	eventsInterval := 60 * 1000
 	baseTime := time.Now().UnixNano()/1000000 - int64(numberOfEvents*eventsInterval)
@@ -234,7 +234,7 @@ func (suite *testQuerySuite) TestRawDataDownSampleMultiPartitions() {
 		suite.T().Fatalf("failed to create v3io adapter. reason: %s", err)
 	}
 
-	labels1 := utils.LabelsFromStrings("os", "linux")
+	labels1 := utils.LabelsFromStringList("os", "linux")
 
 	ingestData := []tsdbtest.DataPoint{{suite.toMillis("2018-11-18T23:40:00Z"), 10},
 		{suite.toMillis("2018-11-18T23:59:00Z"), 20},
@@ -293,7 +293,7 @@ func (suite *testQuerySuite) TestRawAggregatesSinglePartition() {
 		suite.T().Fatalf("failed to create v3io adapter. reason: %s", err)
 	}
 
-	labels1 := utils.LabelsFromStrings("os", "linux")
+	labels1 := utils.LabelsFromStringList("os", "linux")
 	numberOfEvents := 10
 	eventsInterval := 60 * 1000
 	baseTime := time.Now().UnixNano()/1000000 - int64(numberOfEvents*eventsInterval)
@@ -350,7 +350,7 @@ func (suite *testQuerySuite) TestRawAggregatesSinglePartitionNegativeValues() {
 		suite.T().Fatalf("failed to create v3io adapter. reason: %s", err)
 	}
 
-	labels1 := utils.LabelsFromStrings("os", "linux")
+	labels1 := utils.LabelsFromStringList("os", "linux")
 	numberOfEvents := 10
 	eventsInterval := 60 * 1000
 	baseTime := time.Now().UnixNano()/1000000 - int64(numberOfEvents*eventsInterval)
@@ -407,7 +407,7 @@ func (suite *testQuerySuite) TestRawAggregatesMultiPartition() {
 		suite.T().Fatalf("failed to create v3io adapter. reason: %s", err)
 	}
 
-	labels1 := utils.LabelsFromStrings("os", "linux")
+	labels1 := utils.LabelsFromStringList("os", "linux")
 
 	numberOfEvents := 10
 	eventsInterval := 60 * 1000
@@ -466,7 +466,7 @@ func (suite *testQuerySuite) TestRawAggregatesMultiPartitionNonConcreteAggregate
 		suite.T().Fatalf("failed to create v3io adapter. reason: %s", err)
 	}
 
-	labels1 := utils.LabelsFromStrings("os", "linux")
+	labels1 := utils.LabelsFromStringList("os", "linux")
 	numberOfEvents := 10
 	eventsInterval := 60 * 1000
 	baseTime := time.Now().UnixNano()/1000000 - int64(numberOfEvents*eventsInterval)
@@ -523,7 +523,7 @@ func (suite *testQuerySuite) TestClientAggregatesSinglePartition() {
 		suite.T().Fatalf("failed to create v3io adapter. reason: %s", err)
 	}
 
-	labels1 := utils.LabelsFromStrings("os", "linux")
+	labels1 := utils.LabelsFromStringList("os", "linux")
 	numberOfEvents := 10
 	eventsInterval := 60 * 1000
 	baseTime := time.Now().UnixNano()/1000000 - int64(numberOfEvents*eventsInterval)
@@ -580,7 +580,7 @@ func (suite *testQuerySuite) TestClientAggregatesMultiPartition() {
 		suite.T().Fatalf("failed to create v3io adapter. reason: %s", err)
 	}
 
-	labels1 := utils.LabelsFromStrings("os", "linux")
+	labels1 := utils.LabelsFromStringList("os", "linux")
 	numberOfEvents := 10
 	eventsInterval := 60 * 1000
 	baseTime := time.Now().UnixNano()/1000000 - int64(numberOfEvents*eventsInterval)
@@ -641,7 +641,7 @@ func (suite *testQuerySuite) TestClientAggregatesMultiPartitionNonConcreteAggreg
 		suite.T().Fatalf("failed to create v3io adapter. reason: %s", err)
 	}
 
-	labels1 := utils.LabelsFromStrings("os", "linux")
+	labels1 := utils.LabelsFromStringList("os", "linux")
 	numberOfEvents := 10
 	eventsInterval := 60 * 1000
 	baseTime := time.Now().UnixNano()/1000000 - int64(numberOfEvents*eventsInterval)
@@ -702,7 +702,7 @@ func (suite *testQuerySuite) TestClientAggregatesMultiPartitionOneStep() {
 		suite.T().Fatalf("failed to create v3io adapter. reason: %s", err)
 	}
 
-	labels1 := utils.LabelsFromStrings("os", "linux")
+	labels1 := utils.LabelsFromStringList("os", "linux")
 	numberOfEvents := 10
 	eventsInterval := 60 * 1000
 	baseTime := time.Now().UnixNano()/1000000 - int64(numberOfEvents*eventsInterval)
@@ -762,7 +762,7 @@ func (suite *testQuerySuite) TestGetEmptyResponse() {
 		suite.T().Fatalf("failed to create v3io adapter. reason: %s", err)
 	}
 
-	labels1 := utils.LabelsFromStrings("os", "linux")
+	labels1 := utils.LabelsFromStringList("os", "linux")
 	numberOfEvents := 10
 	eventsInterval := 60 * 1000
 	baseTime := time.Now().UnixNano()/1000000 - int64(numberOfEvents*eventsInterval)
@@ -817,7 +817,7 @@ func (suite *testQuerySuite) TestSelectAggregatesByRequestedColumns() {
 		suite.T().Fatalf("failed to create v3io adapter. reason: %s", err)
 	}
 
-	labels1 := utils.LabelsFromStrings("os", "linux")
+	labels1 := utils.LabelsFromStringList("os", "linux")
 	numberOfEvents := 10
 	eventsInterval := 60 * 1000
 	baseTime := time.Now().UnixNano()/1000000 - int64(numberOfEvents*eventsInterval)
@@ -876,7 +876,7 @@ func (suite *testQuerySuite) TestSelectRawDataByRequestedColumns() {
 		suite.T().Fatalf("failed to create v3io adapter. reason: %s", err)
 	}
 
-	labels1 := utils.LabelsFromStrings("os", "linux")
+	labels1 := utils.LabelsFromStringList("os", "linux")
 	numberOfEvents := 10
 	eventsInterval := 60 * 1000
 	baseTime := time.Now().UnixNano()/1000000 - int64(numberOfEvents*eventsInterval)
@@ -931,7 +931,7 @@ func (suite *testQuerySuite) TestSelectAggregatesAndRawByRequestedColumns() {
 		suite.T().Fatalf("failed to create v3io adapter. reason: %s", err)
 	}
 
-	labels1 := utils.LabelsFromStrings("os", "linux")
+	labels1 := utils.LabelsFromStringList("os", "linux")
 	numberOfEvents := 10
 	eventsInterval := 60 * 1000
 	baseTime := time.Now().UnixNano()/1000000 - int64(numberOfEvents*eventsInterval)
@@ -989,7 +989,7 @@ func (suite *testQuerySuite) TestSelectServerAggregatesAndRawByRequestedColumns(
 		suite.T().Fatalf("failed to create v3io adapter. reason: %s", err)
 	}
 
-	labels1 := utils.LabelsFromStrings("os", "linux")
+	labels1 := utils.LabelsFromStringList("os", "linux")
 	numberOfEvents := 10
 	eventsInterval := 60 * 1000
 	baseTime := time.Now().UnixNano()/1000000 - int64(numberOfEvents*eventsInterval)
@@ -1048,8 +1048,8 @@ func (suite *testQuerySuite) TestRawDataMultipleMetrics() {
 	}
 	metricName1 := "cpu"
 	metricName2 := "diskio"
-	labels1 := utils.LabelsFromStrings("os", "linux")
-	labels2 := utils.LabelsFromStrings("os", "linux")
+	labels1 := utils.LabelsFromStringList("os", "linux")
+	labels2 := utils.LabelsFromStringList("os", "linux")
 	numberOfEvents := 5
 	eventsInterval := int64(tsdbtest.MinuteInMillis)
 	baseTime := time.Now().UnixNano()/1000000 - int64(numberOfEvents)*eventsInterval
@@ -1114,8 +1114,8 @@ func (suite *testQuerySuite) TestDataFrameRawDataMultipleMetrics() {
 	}
 	metricName1 := "cpu"
 	metricName2 := "diskio"
-	labels1 := utils.LabelsFromStrings("os", "linux")
-	labels2 := utils.LabelsFromStrings("os", "linux")
+	labels1 := utils.LabelsFromStringList("os", "linux")
+	labels2 := utils.LabelsFromStringList("os", "linux")
 	numberOfEvents := 5
 	eventsInterval := int64(tsdbtest.MinuteInMillis)
 	baseTime := time.Now().UnixNano()/1000000 - int64(numberOfEvents)*eventsInterval
@@ -1215,7 +1215,7 @@ func TestQueryData(t *testing.T) {
 					Key: tsdbtest.OptTimeSeries,
 					Value: tsdbtest.TimeSeries{tsdbtest.Metric{
 						Name:   "cpu",
-						Labels: utils.LabelsFromStrings("testLabel", "balbala"),
+						Labels: utils.LabelsFromStringList("testLabel", "balbala"),
 						Data:   []tsdbtest.DataPoint{{Time: 1532940510, Value: 314.3}},
 					}}},
 			),
@@ -1229,7 +1229,7 @@ func TestQueryData(t *testing.T) {
 					Key: tsdbtest.OptTimeSeries,
 					Value: tsdbtest.TimeSeries{tsdbtest.Metric{
 						Name:   "cpu",
-						Labels: utils.LabelsFromStrings("os", "linux", "iguaz", "yesplease"),
+						Labels: utils.LabelsFromStringList("os", "linux", "iguaz", "yesplease"),
 						Data: []tsdbtest.DataPoint{
 							{Time: 1532940510 - 10, Value: 314.3},
 							{Time: 1532940510 - 5, Value: 300.3},
@@ -1248,7 +1248,7 @@ func TestQueryData(t *testing.T) {
 					Key: tsdbtest.OptTimeSeries,
 					Value: tsdbtest.TimeSeries{tsdbtest.Metric{
 						Name:   "cpu",
-						Labels: utils.LabelsFromStrings("os", "linux", "iguaz", "yesplease"),
+						Labels: utils.LabelsFromStringList("os", "linux", "iguaz", "yesplease"),
 						Data:   []tsdbtest.DataPoint{{Time: 1532940510, Value: 33.3}},
 					}}},
 			),
@@ -1263,7 +1263,7 @@ func TestQueryData(t *testing.T) {
 					Key: tsdbtest.OptTimeSeries,
 					Value: tsdbtest.TimeSeries{tsdbtest.Metric{
 						Name:   "cpu",
-						Labels: utils.LabelsFromStrings("os", "linux", "iguaz", "yesplease"),
+						Labels: utils.LabelsFromStringList("os", "linux", "iguaz", "yesplease"),
 						Data:   []tsdbtest.DataPoint{{Time: 1532940510, Value: 31.3}},
 					}}},
 			),
@@ -1278,7 +1278,7 @@ func TestQueryData(t *testing.T) {
 					Key: tsdbtest.OptTimeSeries,
 					Value: tsdbtest.TimeSeries{tsdbtest.Metric{
 						Name:   "cool-cpu",
-						Labels: utils.LabelsFromStrings("os", "linux", "iguaz", "yesplease"),
+						Labels: utils.LabelsFromStringList("os", "linux", "iguaz", "yesplease"),
 						Data:   []tsdbtest.DataPoint{{Time: 1532940510, Value: 314.3}},
 					}}},
 			),
@@ -1292,7 +1292,7 @@ func TestQueryData(t *testing.T) {
 					Key: tsdbtest.OptTimeSeries,
 					Value: tsdbtest.TimeSeries{tsdbtest.Metric{
 						Name:   "cpu",
-						Labels: utils.LabelsFromStrings("os", "linux", "iguaz", "yesplease"),
+						Labels: utils.LabelsFromStringList("os", "linux", "iguaz", "yesplease"),
 						Data: []tsdbtest.DataPoint{
 							{Time: 1532940510, Value: 314.3},
 							{Time: 1532940510 + 5, Value: 300.3},
@@ -1310,7 +1310,7 @@ func TestQueryData(t *testing.T) {
 					Key: tsdbtest.OptTimeSeries,
 					Value: tsdbtest.TimeSeries{tsdbtest.Metric{
 						Name:   "cpu",
-						Labels: utils.LabelsFromStrings("os", "linux", "iguaz", "yesplease"),
+						Labels: utils.LabelsFromStringList("os", "linux", "iguaz", "yesplease"),
 						Data: []tsdbtest.DataPoint{
 							{Time: 1532940510, Value: 314.3},
 							{Time: 1532940510 + 5, Value: 300.3},
@@ -1327,7 +1327,7 @@ func TestQueryData(t *testing.T) {
 					Key: tsdbtest.OptTimeSeries,
 					Value: tsdbtest.TimeSeries{tsdbtest.Metric{
 						Name:   "cpu",
-						Labels: utils.LabelsFromStrings("os", "linux", "iguaz", "yesplease"),
+						Labels: utils.LabelsFromStringList("os", "linux", "iguaz", "yesplease"),
 						Data: []tsdbtest.DataPoint{
 							{Time: 1532940510, Value: 300.3},
 							{Time: 1532940510 + 5, Value: 300.3},
@@ -1346,7 +1346,7 @@ func TestQueryData(t *testing.T) {
 					Key: tsdbtest.OptTimeSeries,
 					Value: tsdbtest.TimeSeries{tsdbtest.Metric{
 						Name:   "cpu",
-						Labels: utils.LabelsFromStrings("os", "linux", "iguaz", "yesplease"),
+						Labels: utils.LabelsFromStringList("os", "linux", "iguaz", "yesplease"),
 						Data: []tsdbtest.DataPoint{
 							{Time: 1532940510, Value: 300.3},
 							{Time: 1532940510 + 60, Value: 300.3},
@@ -1366,7 +1366,7 @@ func TestQueryData(t *testing.T) {
 					Key: tsdbtest.OptTimeSeries,
 					Value: tsdbtest.TimeSeries{tsdbtest.Metric{
 						Name:   "cpu",
-						Labels: utils.LabelsFromStrings("os", "linux", "iguaz", "yesplease"),
+						Labels: utils.LabelsFromStringList("os", "linux", "iguaz", "yesplease"),
 						Data: []tsdbtest.DataPoint{
 							{Time: 1532940510, Value: 300.3},
 							{Time: 1532940510 + 5, Value: 300.3},
@@ -1386,7 +1386,7 @@ func TestQueryData(t *testing.T) {
 					Key: tsdbtest.OptTimeSeries,
 					Value: tsdbtest.TimeSeries{tsdbtest.Metric{
 						Name:   "cpu",
-						Labels: utils.LabelsFromStrings("os", "linux", "iguaz", "yesplease"),
+						Labels: utils.LabelsFromStringList("os", "linux", "iguaz", "yesplease"),
 						Data: []tsdbtest.DataPoint{
 							{Time: 1532940510, Value: 314.3},
 							{Time: 1532940510 + 5, Value: 300.3},
@@ -1405,7 +1405,7 @@ func TestQueryData(t *testing.T) {
 					Key: tsdbtest.OptTimeSeries,
 					Value: tsdbtest.TimeSeries{tsdbtest.Metric{
 						Name:   "cpu",
-						Labels: utils.LabelsFromStrings("os", "linux", "iguaz", "yesplease"),
+						Labels: utils.LabelsFromStringList("os", "linux", "iguaz", "yesplease"),
 						Data:   []tsdbtest.DataPoint{{Time: 1532940510, Value: 33.3}},
 					}}},
 			),
@@ -1421,7 +1421,7 @@ func TestQueryData(t *testing.T) {
 					Key: tsdbtest.OptTimeSeries,
 					Value: tsdbtest.TimeSeries{tsdbtest.Metric{
 						Name:   "cpu",
-						Labels: utils.LabelsFromStrings("os", "linux", "iguaz", "yesplease"),
+						Labels: utils.LabelsFromStringList("os", "linux", "iguaz", "yesplease"),
 						Data: []tsdbtest.DataPoint{
 							{Time: 1537972278402, Value: 300.3},
 							{Time: 1537972278402 + 8*tsdbtest.MinuteInMillis, Value: 300.3},
@@ -1442,7 +1442,7 @@ func TestQueryData(t *testing.T) {
 					Key: tsdbtest.OptTimeSeries,
 					Value: tsdbtest.TimeSeries{tsdbtest.Metric{
 						Name:   "cpu",
-						Labels: utils.LabelsFromStrings("os", "linux", "iguaz", "yesplease"),
+						Labels: utils.LabelsFromStringList("os", "linux", "iguaz", "yesplease"),
 						Data: []tsdbtest.DataPoint{
 							{Time: 1537972278402, Value: 300.3},
 							{Time: 1537972278402 + 16*tsdbtest.MinuteInMillis, Value: 300.3},
@@ -1463,7 +1463,7 @@ func TestQueryData(t *testing.T) {
 					Key: tsdbtest.OptTimeSeries,
 					Value: tsdbtest.TimeSeries{tsdbtest.Metric{
 						Name:   "cpu",
-						Labels: utils.LabelsFromStrings("os", "linux", "iguaz", "yesplease"),
+						Labels: utils.LabelsFromStringList("os", "linux", "iguaz", "yesplease"),
 						Data: []tsdbtest.DataPoint{
 							{Time: 1532940510, Value: 300.3},
 							{Time: 1532940510 + 5, Value: 300.3},

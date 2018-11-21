@@ -27,6 +27,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/suite"
+	"github.com/v3io/v3io-tsdb/pkg/utils"
 )
 
 type testAddSuite struct {
@@ -72,7 +73,7 @@ func (suite *testAddSuite) TestStrToTVInvalidTime() {
 
 func (suite *testAddSuite) TestStrToLabelsWithEmptyName() {
 
-	labels, err := strToLabels("", "a=A,b=B")
+	labels, err := utils.LabelsFromString("", "a=A,b=B")
 
 	suite.Require().Nil(labels)
 	suite.Require().Error(err)
@@ -80,7 +81,7 @@ func (suite *testAddSuite) TestStrToLabelsWithEmptyName() {
 
 func (suite *testAddSuite) TestStrToLabelsWithIllegalName() {
 
-	labels, err := strToLabels("illegal-name", "a=A,b=B")
+	labels, err := utils.LabelsFromString("illegal-name", "a=A,b=B")
 
 	suite.Require().Nil(labels)
 	suite.Require().Error(err)
@@ -88,7 +89,7 @@ func (suite *testAddSuite) TestStrToLabelsWithIllegalName() {
 
 func (suite *testAddSuite) TestStrToLabelsWithIllegalLabel() {
 
-	labels, err := strToLabels("valid_name", "a=A,b-b=B")
+	labels, err := utils.LabelsFromString("valid_name", "a=A,b-b=B")
 
 	suite.Require().Nil(labels)
 	suite.Require().Error(err)

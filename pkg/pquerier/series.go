@@ -24,7 +24,7 @@ type DataFrameColumnSeries struct {
 }
 
 func (s *DataFrameColumnSeries) Labels() utils.Labels {
-	s.labels = append(s.labels, utils.LabelsFromStrings(aggregate.AggregateLabel, s.dataColumn.GetColumnSpec().function.String())...)
+	s.labels = append(s.labels, utils.LabelsFromStringList(aggregate.AggregateLabel, s.dataColumn.GetColumnSpec().function.String())...)
 	return s.labels
 }
 func (s *DataFrameColumnSeries) Iterator() SeriesIterator { return s.iter }

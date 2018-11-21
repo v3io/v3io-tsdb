@@ -189,8 +189,8 @@ func (s nullSeriesIterator) Next() bool               { return false }
 func (s nullSeriesIterator) At() (t int64, v float64) { return 0, 0 }
 func (s nullSeriesIterator) Err() error               { return s.err }
 
-func NewRawSeries(results *qryResults) Series {
-	newSeries := V3ioRawSeries{fields: results.fields}
+func NewRawSeries(results *qryResults, logger logger.Logger) Series {
+	newSeries := V3ioRawSeries{fields: results.fields, logger: logger}
 	newSeries.initLabels()
 	newSeries.iter = newRawChunkIterator(results, nil)
 	return &newSeries
@@ -200,6 +200,7 @@ type V3ioRawSeries struct {
 	fields map[string]interface{}
 	lset   utils.Labels
 	iter   SeriesIterator
+	logger logger.Logger
 	hash   uint64
 }
 
@@ -221,26 +222,19 @@ func (s *V3ioRawSeries) AddChunks(results *qryResults) {
 
 // Initialize the label set from _lset and _name attributes
 func (s *V3ioRawSeries) initLabels() {
-	name, nok := s.fields[config.MetricNameAttrName].(string)
-	if !nok {
-		name = "UNKNOWN"
+	name, ok := s.fields[config.MetricNameAttrName].(string)
+	if !ok {
+		s.logger.Error("error in initLabels; bad metric name.")
 	}
-	lsetAttr, lok := s.fields[config.LabelSetAttrName].(string)
-	if !lok {
-		lsetAttr = "UNKNOWN"
-	}
-	if !lok || !nok {
-		//.Error("Error in initLabels; bad field values.")
+	lsetAttr, ok := s.fields[config.LabelSetAttrName].(string)
+	if !ok {
+		s.logger.Error("error in initLabels; bad labels set.")
 	}
 
-	lset := utils.Labels{utils.Label{Name: config.PrometheusMetricNameAttribute, Value: name}}
+	lset, err := utils.LabelsFromString(name, lsetAttr)
 
-	splitLset := strings.Split(lsetAttr, ",")
-	for _, label := range splitLset {
-		kv := strings.Split(label, "=")
-		if len(kv) > 1 {
-			lset = append(lset, utils.Label{Name: kv[0], Value: kv[1]})
-		}
+	if err != nil {
+		s.logger.Error("error in initLabels; bad labels set.")
 	}
 
 	s.lset = lset

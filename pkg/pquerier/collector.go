@@ -79,7 +79,7 @@ func mainCollector(ctx *selectQueryContext, index int) {
 
 	for res := range ctx.requestChannels[index] {
 		if res.IsRawQuery() {
-			rawCollector(res)
+			rawCollector(ctx, res)
 		} else {
 			if res.IsServerAggregates() {
 				aggregateServerAggregates(ctx, res)
@@ -95,12 +95,12 @@ func mainCollector(ctx *selectQueryContext, index int) {
 	}
 }
 
-func rawCollector(res *qryResults) {
+func rawCollector(ctx *selectQueryContext, res *qryResults) {
 	frameIndex, ok := res.frame.columnByName[res.name]
 	if ok {
 		res.frame.rawColumns[frameIndex].(*V3ioRawSeries).AddChunks(res)
 	} else {
-		res.frame.rawColumns = append(res.frame.rawColumns, NewRawSeries(res))
+		res.frame.rawColumns = append(res.frame.rawColumns, NewRawSeries(res, ctx.logger.GetChild("v3ioRawSeries")))
 		res.frame.columnByName[res.name] = len(res.frame.rawColumns) - 1
 	}
 }

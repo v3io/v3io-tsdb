@@ -6,26 +6,24 @@ import (
 )
 
 type AggregationParams struct {
-	colName        string     // column name ("v" in timeseries)
-	functions      []AggrType // list of aggregation functions to return (count, avg, sum, ..)
-	aggrMask       AggrType   // the sum of aggregates (or between all aggregates)
-	rollupTime     int64      // time per bucket (cell in the array)
-	Interval       int64      // requested (query) aggregation step
-	buckets        int        // number of buckets in the array
-	overlapWindows []int      // a list of overlapping windows (* interval), e.g. last 1hr, 6hr, 12hr, 24hr
+	colName        string   // column name ("v" in timeseries)
+	aggrMask       AggrType // the sum of aggregates (or between all aggregates)
+	rollupTime     int64    // time per bucket (cell in the array)
+	Interval       int64    // requested (query) aggregation step
+	buckets        int      // number of buckets in the array
+	overlapWindows []int    // a list of overlapping windows (* interval), e.g. last 1hr, 6hr, 12hr, 24hr
 }
 
 func NewAggregationParams(functions, col string, buckets int, interval, rollupTime int64, windows []int) (*AggregationParams, error) {
 
 	aggregatesList := strings.Split(functions, ",")
-	aggrMask, aggrList, err := AggregatesFromStringList(aggregatesList)
+	aggrMask, _, err := AggregatesFromStringList(aggregatesList)
 	if err != nil {
 		return nil, err
 	}
 
 	newAggregateSeries := AggregationParams{
 		aggrMask:       aggrMask,
-		functions:      aggrList,
 		colName:        col,
 		buckets:        buckets,
 		rollupTime:     rollupTime,
@@ -51,16 +49,8 @@ func (as *AggregationParams) GetAggrMask() AggrType {
 	return as.aggrMask
 }
 
-func (as *AggregationParams) GetFunctions() []AggrType {
-	return as.functions
-}
-
 func (as *AggregationParams) GetRollupTime() int64 {
 	return as.rollupTime
-}
-
-func (as *AggregationParams) NumFunctions() int {
-	return len(as.functions)
 }
 
 func (as *AggregationParams) toAttrName(aggr AggrType) string {

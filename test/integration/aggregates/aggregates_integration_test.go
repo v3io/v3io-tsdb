@@ -335,7 +335,7 @@ func generateData(t *testing.T, testConfig *TestConfig, adapter *tsdb.V3ioAdapte
 	for m := 0; m < testConfig.numMetrics; m++ {
 		for l := 0; l < testConfig.numLabels; l++ {
 			metrics = append(metrics, &metricContext{
-				lset: utils.LabelsFromStrings(
+				lset: utils.LabelsFromStringList(
 					"__name__", fmt.Sprintf("metric%d", m), "label", fmt.Sprintf("lbl%d", l)),
 			})
 		}

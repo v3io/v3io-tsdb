@@ -21,6 +21,7 @@ import (
 	"strings"
 
 	"github.com/cespare/xxhash"
+	"github.com/pkg/errors"
 )
 
 const sep = '\xff'
@@ -224,8 +225,8 @@ func LabelsFromMap(m map[string]string) Labels {
 	return ToLabels(l...)
 }
 
-// LabelsFromStrings creates new labels from pairs of strings.
-func LabelsFromStrings(ss ...string) Labels {
+// LabelsFromStringList creates new labels from pairs of strings.
+func LabelsFromStringList(ss ...string) Labels {
 	if len(ss)%2 != 0 {
 		panic("invalid number of strings")
 	}
@@ -236,6 +237,33 @@ func LabelsFromStrings(ss ...string) Labels {
 
 	sort.Sort(res)
 	return res
+}
+
+// LabelsFromStringList creates new labels from a string in the following format key1=label1[,key2=label2,...]
+func LabelsFromString(name, lbls string) (Labels, error) {
+
+	if err := IsValidMetricName(name); err != nil {
+		return nil, errors.Wrap(err, fmt.Sprintf("Illegal metric name: '%s'", name))
+	}
+
+	lset := Labels{Label{Name: "__name__", Value: name}}
+
+	if lbls != "" {
+		splitLset := strings.Split(lbls, ",")
+		for _, l := range splitLset {
+			splitLbl := strings.Split(l, "=")
+			if len(splitLbl) != 2 {
+				return nil, errors.New("Labels must be in the form 'key1=label1[,key2=label2,...]'.")
+			}
+
+			if err := IsValidLabelName(splitLbl[0]); err != nil {
+				return nil, errors.Wrap(err, fmt.Sprintf("Illegal label name: '%s'", splitLbl[0]))
+			}
+			lset = append(lset, Label{Name: splitLbl[0], Value: splitLbl[1]})
+		}
+	}
+	sort.Sort(lset)
+	return lset, nil
 }
 
 // Compare compares the two label sets.

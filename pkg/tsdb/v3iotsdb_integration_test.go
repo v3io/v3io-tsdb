@@ -55,7 +55,7 @@ func TestIngestData(t *testing.T) {
 					Key: tsdbtest.OptTimeSeries,
 					Value: tsdbtest.TimeSeries{tsdbtest.Metric{
 						Name:   "cpu",
-						Labels: utils.LabelsFromStrings("os", "linux", "iguaz", "yesplease"),
+						Labels: utils.LabelsFromStringList("os", "linux", "iguaz", "yesplease"),
 						Data: []tsdbtest.DataPoint{
 							{Time: 1532940510, Value: 314.3}},
 					}}},
@@ -67,7 +67,7 @@ func TestIngestData(t *testing.T) {
 					Key: tsdbtest.OptTimeSeries,
 					Value: tsdbtest.TimeSeries{tsdbtest.Metric{
 						Name:   "cpu",
-						Labels: utils.LabelsFromStrings("os", "linux", "iguaz", "yesplease"),
+						Labels: utils.LabelsFromStringList("os", "linux", "iguaz", "yesplease"),
 						Data: []tsdbtest.DataPoint{
 							{Time: 1532940510, Value: 314.3},
 							{Time: 1532940510 + 5, Value: 300.3},
@@ -81,7 +81,7 @@ func TestIngestData(t *testing.T) {
 					Key: tsdbtest.OptTimeSeries,
 					Value: tsdbtest.TimeSeries{tsdbtest.Metric{
 						Name:   "cpu",
-						Labels: utils.LabelsFromStrings("os", "linux", "iguaz", "yesplease"),
+						Labels: utils.LabelsFromStringList("os", "linux", "iguaz", "yesplease"),
 						Data: []tsdbtest.DataPoint{
 							{Time: 1532940510, Value: 314.3},
 							{Time: 1532940510 + 5, Value: 300.3},
@@ -95,7 +95,7 @@ func TestIngestData(t *testing.T) {
 					Key: tsdbtest.OptTimeSeries,
 					Value: tsdbtest.TimeSeries{tsdbtest.Metric{
 						Name:   "cool-cpu",
-						Labels: utils.LabelsFromStrings("os", "linux", "iguaz", "yesplease"),
+						Labels: utils.LabelsFromStringList("os", "linux", "iguaz", "yesplease"),
 						Data: []tsdbtest.DataPoint{
 							{Time: 1532940510, Value: 314.3},
 							{Time: 1532940510 + 5, Value: 300.3},
@@ -171,7 +171,7 @@ func TestQueryData(t *testing.T) {
 					Key: tsdbtest.OptTimeSeries,
 					Value: tsdbtest.TimeSeries{tsdbtest.Metric{
 						Name:   "cpu",
-						Labels: utils.LabelsFromStrings("testLabel", "balbala"),
+						Labels: utils.LabelsFromStringList("testLabel", "balbala"),
 						Data:   []tsdbtest.DataPoint{{Time: 1532940510, Value: 314.3}},
 					}}},
 			),
@@ -186,7 +186,7 @@ func TestQueryData(t *testing.T) {
 					Key: tsdbtest.OptTimeSeries,
 					Value: tsdbtest.TimeSeries{tsdbtest.Metric{
 						Name:   "cpu",
-						Labels: utils.LabelsFromStrings("os", "linux", "iguaz", "yesplease"),
+						Labels: utils.LabelsFromStringList("os", "linux", "iguaz", "yesplease"),
 						Data: []tsdbtest.DataPoint{
 							{Time: 1532940510 - 10, Value: 314.3},
 							{Time: 1532940510 - 5, Value: 300.3},
@@ -206,7 +206,7 @@ func TestQueryData(t *testing.T) {
 					Key: tsdbtest.OptTimeSeries,
 					Value: tsdbtest.TimeSeries{tsdbtest.Metric{
 						Name:   "cpu",
-						Labels: utils.LabelsFromStrings("os", "linux", "iguaz", "yesplease"),
+						Labels: utils.LabelsFromStringList("os", "linux", "iguaz", "yesplease"),
 						Data:   []tsdbtest.DataPoint{{Time: 1532940510, Value: 33.3}},
 					}}},
 			),
@@ -222,7 +222,7 @@ func TestQueryData(t *testing.T) {
 					Key: tsdbtest.OptTimeSeries,
 					Value: tsdbtest.TimeSeries{tsdbtest.Metric{
 						Name:   "cpu",
-						Labels: utils.LabelsFromStrings("os", "linux", "iguaz", "yesplease"),
+						Labels: utils.LabelsFromStringList("os", "linux", "iguaz", "yesplease"),
 						Data:   []tsdbtest.DataPoint{{Time: 1532940510, Value: 31.3}},
 					}}},
 			),
@@ -238,7 +238,7 @@ func TestQueryData(t *testing.T) {
 					Key: tsdbtest.OptTimeSeries,
 					Value: tsdbtest.TimeSeries{tsdbtest.Metric{
 						Name:   "cool-cpu",
-						Labels: utils.LabelsFromStrings("os", "linux", "iguaz", "yesplease"),
+						Labels: utils.LabelsFromStringList("os", "linux", "iguaz", "yesplease"),
 						Data:   []tsdbtest.DataPoint{{Time: 1532940510, Value: 314.3}},
 					}}},
 			),
@@ -253,7 +253,7 @@ func TestQueryData(t *testing.T) {
 					Key: tsdbtest.OptTimeSeries,
 					Value: tsdbtest.TimeSeries{tsdbtest.Metric{
 						Name:   "cpu",
-						Labels: utils.LabelsFromStrings("os", "linux", "iguaz", "yesplease"),
+						Labels: utils.LabelsFromStringList("os", "linux", "iguaz", "yesplease"),
 						Data: []tsdbtest.DataPoint{
 							{Time: 1532940510, Value: 314.3},
 							{Time: 1532940510 + 5, Value: 300.3},
@@ -272,7 +272,7 @@ func TestQueryData(t *testing.T) {
 					Key: tsdbtest.OptTimeSeries,
 					Value: tsdbtest.TimeSeries{tsdbtest.Metric{
 						Name:   "cpu",
-						Labels: utils.LabelsFromStrings("os", "linux", "iguaz", "yesplease"),
+						Labels: utils.LabelsFromStringList("os", "linux", "iguaz", "yesplease"),
 						Data: []tsdbtest.DataPoint{
 							{Time: 1532940510, Value: 314.3},
 							{Time: 1532940510 + 5, Value: 300.3},
@@ -290,7 +290,7 @@ func TestQueryData(t *testing.T) {
 					Key: tsdbtest.OptTimeSeries,
 					Value: tsdbtest.TimeSeries{tsdbtest.Metric{
 						Name:   "cpu",
-						Labels: utils.LabelsFromStrings("os", "linux", "iguaz", "yesplease"),
+						Labels: utils.LabelsFromStringList("os", "linux", "iguaz", "yesplease"),
 						Data: []tsdbtest.DataPoint{
 							{Time: 1532940510, Value: 300.3},
 							{Time: 1532940510 + 5, Value: 300.3},
@@ -309,7 +309,7 @@ func TestQueryData(t *testing.T) {
 					Key: tsdbtest.OptTimeSeries,
 					Value: tsdbtest.TimeSeries{tsdbtest.Metric{
 						Name:   "cpu",
-						Labels: utils.LabelsFromStrings("os", "linux", "iguaz", "yesplease"),
+						Labels: utils.LabelsFromStringList("os", "linux", "iguaz", "yesplease"),
 						Data: []tsdbtest.DataPoint{
 							{Time: 1532940510, Value: 300.3},
 							{Time: 1532940510 + 60, Value: 300.3},
@@ -329,7 +329,7 @@ func TestQueryData(t *testing.T) {
 					Key: tsdbtest.OptTimeSeries,
 					Value: tsdbtest.TimeSeries{tsdbtest.Metric{
 						Name:   "cpu",
-						Labels: utils.LabelsFromStrings("os", "linux", "iguaz", "yesplease"),
+						Labels: utils.LabelsFromStringList("os", "linux", "iguaz", "yesplease"),
 						Data: []tsdbtest.DataPoint{
 							{Time: 1532940510, Value: 300.3},
 							{Time: 1532940510 + 5, Value: 300.3},
@@ -349,7 +349,7 @@ func TestQueryData(t *testing.T) {
 					Key: tsdbtest.OptTimeSeries,
 					Value: tsdbtest.TimeSeries{tsdbtest.Metric{
 						Name:   "cpu",
-						Labels: utils.LabelsFromStrings("os", "linux", "iguaz", "yesplease"),
+						Labels: utils.LabelsFromStringList("os", "linux", "iguaz", "yesplease"),
 						Data: []tsdbtest.DataPoint{
 							{Time: 1532940510, Value: 314.3},
 							{Time: 1532940510 + 5, Value: 300.3},
@@ -368,7 +368,7 @@ func TestQueryData(t *testing.T) {
 					Key: tsdbtest.OptTimeSeries,
 					Value: tsdbtest.TimeSeries{tsdbtest.Metric{
 						Name:   "cpu",
-						Labels: utils.LabelsFromStrings("os", "linux", "iguaz", "yesplease"),
+						Labels: utils.LabelsFromStringList("os", "linux", "iguaz", "yesplease"),
 						Data:   []tsdbtest.DataPoint{{Time: 1532940510, Value: 33.3}},
 					}}},
 			),
@@ -384,7 +384,7 @@ func TestQueryData(t *testing.T) {
 					Key: tsdbtest.OptTimeSeries,
 					Value: tsdbtest.TimeSeries{tsdbtest.Metric{
 						Name:   "cpu",
-						Labels: utils.LabelsFromStrings("os", "linux", "iguaz", "yesplease"),
+						Labels: utils.LabelsFromStringList("os", "linux", "iguaz", "yesplease"),
 						Data: []tsdbtest.DataPoint{
 							{Time: 1537972278402, Value: 300.3},
 							{Time: 1537972278402 + 8*tsdbtest.MinuteInMillis, Value: 300.3},
@@ -405,7 +405,7 @@ func TestQueryData(t *testing.T) {
 					Key: tsdbtest.OptTimeSeries,
 					Value: tsdbtest.TimeSeries{tsdbtest.Metric{
 						Name:   "cpu",
-						Labels: utils.LabelsFromStrings("os", "linux", "iguaz", "yesplease"),
+						Labels: utils.LabelsFromStringList("os", "linux", "iguaz", "yesplease"),
 						Data: []tsdbtest.DataPoint{
 							{Time: 1537972278402, Value: 300.3},
 							{Time: 1537972278402 + 16*tsdbtest.MinuteInMillis, Value: 300.3},
@@ -426,7 +426,7 @@ func TestQueryData(t *testing.T) {
 					Key: tsdbtest.OptTimeSeries,
 					Value: tsdbtest.TimeSeries{tsdbtest.Metric{
 						Name:   "cpu",
-						Labels: utils.LabelsFromStrings("os", "linux", "iguaz", "yesplease"),
+						Labels: utils.LabelsFromStringList("os", "linux", "iguaz", "yesplease"),
 						Data: []tsdbtest.DataPoint{
 							{Time: 1532940510, Value: 300.3},
 							{Time: 1532940510 + 5, Value: 300.3},
@@ -527,7 +527,7 @@ func TestQueryDataOverlappingWindow(t *testing.T) {
 	}{
 		{desc: "Should ingest and query with windowing",
 			metricName: "cpu",
-			labels:     utils.LabelsFromStrings("os", "linux", "iguaz", "yesplease"),
+			labels:     utils.LabelsFromStringList("os", "linux", "iguaz", "yesplease"),
 			data: []tsdbtest.DataPoint{{Time: 1532940510, Value: 314.3},
 				{Time: 1532944110, Value: 314.3},
 				{Time: 1532947710, Value: 300.3},
@@ -543,7 +543,7 @@ func TestQueryDataOverlappingWindow(t *testing.T) {
 
 		{desc: "Should ingest and query with windowing on multiple agg",
 			metricName: "cpu",
-			labels:     utils.LabelsFromStrings("os", "linux", "iguaz", "yesplease"),
+			labels:     utils.LabelsFromStringList("os", "linux", "iguaz", "yesplease"),
 			data: []tsdbtest.DataPoint{{Time: 1532940510, Value: 314.3},
 				{Time: 1532944110, Value: 314.3},
 				{Time: 1532947710, Value: 300.3},
@@ -640,7 +640,7 @@ func TestIgnoreNaNWhenSeekingAggSeries(t *testing.T) {
 	}
 	metricsName := "cpu"
 	baseTime := int64(1532940510000)
-	userLabels := utils.LabelsFromStrings("os", "linux", "iguaz", "yesplease")
+	userLabels := utils.LabelsFromStringList("os", "linux", "iguaz", "yesplease")
 	data := []tsdbtest.DataPoint{{Time: baseTime, Value: 300.3},
 		{Time: baseTime + tsdbtest.MinuteInMillis, Value: 300.3},
 		{Time: baseTime + 2*tsdbtest.MinuteInMillis, Value: 100.4},
@@ -881,7 +881,7 @@ func TestDeleteTable(t *testing.T) {
 						Key: tsdbtest.OptTimeSeries,
 						Value: tsdbtest.TimeSeries{tsdbtest.Metric{
 							Name:   "metricToDelete",
-							Labels: utils.LabelsFromStrings("os", "linux"),
+							Labels: utils.LabelsFromStringList("os", "linux"),
 							Data:   test.data,
 						}}},
 				),
