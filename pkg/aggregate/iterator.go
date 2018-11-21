@@ -41,28 +41,6 @@ type AggregateSeries struct {
 	overlapWindows []int      // a list of overlapping windows (* interval), e.g. last 1hr, 6hr, 12hr, 24hr
 }
 
-func StrToAggr(functions string) (AggrType, []AggrType, error) {
-	split := strings.Split(functions, ",")
-	var aggrMask AggrType
-	var aggrList []AggrType
-
-	for _, s := range split {
-		aggr, ok := aggrTypeString[s]
-		if !ok {
-			return 0, nil, fmt.Errorf("invalid aggragator type %s", s)
-		}
-		aggrMask = aggrMask | aggr
-		aggrList = append(aggrList, aggr)
-	}
-
-	// Always have count Aggregate by default
-	if aggrMask != 0 {
-		aggrMask |= aggrTypeCount
-	}
-
-	return aggrMask, aggrList, nil
-}
-
 func NewAggregateSeries(functions, col string, buckets int, interval, rollupTime int64, windows []int) (*AggregateSeries, error) {
 
 	split := strings.Split(functions, ",")

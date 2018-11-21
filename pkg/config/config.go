@@ -56,6 +56,13 @@ const (
 	DefaultSampleRetentionTime    = 0
 	DefaultLogLevel               = "info"
 	DefaultVerboseLevel           = "debug"
+
+	MaxTimeAttrName     = "_maxtime"
+	LabelSetAttrName    = "_lset"
+	EncodingAttrName    = "_enc"
+	OutOfOrderAttrName  = "_ooo"
+	ChunkAttrPrefix     = "_v"
+	AggregateAttrPrefix = "_v_"
 )
 
 type BuildInfo struct {

@@ -50,6 +50,7 @@ const (
 )
 
 var rawAggregates = []AggrType{aggrTypeCount, aggrTypeSum, aggrTypeSqr, aggrTypeMax, aggrTypeMin, aggrTypeLast}
+var rawAggregatesMask = aggrTypeCount | aggrTypeSum | aggrTypeSqr | aggrTypeMax | aggrTypeMin | aggrTypeLast
 
 var aggrTypeString = map[string]AggrType{
 	"count": aggrTypeCount, "sum": aggrTypeSum, "sqr": aggrTypeSqr, "max": aggrTypeMax, "min": aggrTypeMin,
@@ -110,9 +111,9 @@ func getAggrFullName(field config.SchemaField, col string) config.SchemaField {
 
 func (a AggrType) String() string { return aggrToString[a] }
 
-func AggregatesToStringList(aggregates string) ([]string, error) {
+func RawAggregatesToStringList(aggregates string) ([]string, error) {
 	aggrs := strings.Split(aggregates, ",")
-	aggType, err := AggrsFromString(aggrs)
+	aggType, _, err := AggregatesFromStringList(aggrs)
 	if err != nil {
 		return nil, err
 	}
@@ -127,32 +128,38 @@ func AggregatesToStringList(aggregates string) ([]string, error) {
 }
 
 // Convert a comma-separated aggregation-functions string to an aggregates mask
-func AggrsFromString(split []string) (AggrType, error) {
-	var aggrList AggrType
+func AggregatesFromStringList(split []string) (AggrType, []AggrType, error) {
+	var aggrMask AggrType
+	var aggrList []AggrType
+
 	var hasAggregates bool
 	for _, s := range split {
-		trimmed := strings.TrimSpace(s)
-		if trimmed != "" {
-			aggr, ok := aggrTypeString[trimmed]
-			if !ok {
-				return aggrList, fmt.Errorf("Invalid aggragate type: '%s'", s)
-			}
+		aggr, err := AggregateFromString(s)
+		if err != nil {
+			return 0, nil, err
+		}
+		if aggr != 0 {
 			hasAggregates = true
-			aggrList = aggrList | aggr
+			aggrMask = aggrMask | aggr
+			aggrList = append(aggrList, aggr)
 		}
 	}
 	// Always have count aggregate by default
 	if hasAggregates {
-		aggrList = aggrList | aggrTypeCount
+		aggrMask = aggrMask | aggrTypeCount
+		aggrList = append(aggrList, aggrTypeCount)
 	}
-	return aggrList, nil
+	return aggrMask, aggrList, nil
 }
 
 func AggregateFromString(aggrString string) (AggrType, error) {
 	trimmed := strings.TrimSpace(aggrString)
+	if trimmed == "" {
+		return 0, nil
+	}
 	aggr, ok := aggrTypeString[trimmed]
 	if !ok {
-		return 0, fmt.Errorf("no aggregate named %v", trimmed)
+		return 0, fmt.Errorf("invalid aggragate type: %v", trimmed)
 	}
 	return aggr, nil
 }
@@ -263,7 +270,7 @@ func IsRawAggregate(item AggrType) bool { return ContainsAggregate(rawAggregates
 func IsCountAggregate(aggr AggrType) bool { return aggr == aggrTypeCount }
 
 func ToAttrName(aggr AggrType) string {
-	return "_v_" + aggr.String()
+	return config.AggregateAttrPrefix + aggr.String()
 }
 
 func GetServerAggregationsFunction(aggr AggrType) (func(interface{}, interface{}) interface{}, error) {
@@ -308,7 +315,7 @@ func GetServerAggregationsFunction(aggr AggrType) (func(interface{}, interface{}
 			return next
 		}, nil
 	default:
-		return nil, fmt.Errorf("cannot aggregate %v", aggrToString[aggr])
+		return nil, fmt.Errorf("unsupported server side aggregate %v", aggrToString[aggr])
 	}
 }
 

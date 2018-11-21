@@ -9,7 +9,7 @@ type AggregationParams struct {
 	colName        string     // column name ("v" in timeseries)
 	functions      []AggrType // list of aggregation functions to return (count, avg, sum, ..)
 	aggrMask       AggrType   // the sum of aggregates (or between all aggregates)
-	RollupTime     int64      // time per bucket (cell in the array)
+	rollupTime     int64      // time per bucket (cell in the array)
 	Interval       int64      // requested (query) aggregation step
 	buckets        int        // number of buckets in the array
 	overlapWindows []int      // a list of overlapping windows (* interval), e.g. last 1hr, 6hr, 12hr, 24hr
@@ -17,22 +17,10 @@ type AggregationParams struct {
 
 func NewAggregationParams(functions, col string, buckets int, interval, rollupTime int64, windows []int) (*AggregationParams, error) {
 
-	split := strings.Split(functions, ",")
-	var aggrMask AggrType
-	var aggrList []AggrType
-
-	for _, s := range split {
-		aggr, ok := aggrTypeString[s]
-		if !ok {
-			return nil, fmt.Errorf("invalid aggragator type %s", s)
-		}
-		aggrMask = aggrMask | aggr
-		aggrList = append(aggrList, aggr)
-	}
-
-	// Always have count Aggregate by default
-	if aggrMask != 0 {
-		aggrMask |= aggrTypeCount
+	aggregatesList := strings.Split(functions, ",")
+	aggrMask, aggrList, err := AggregatesFromStringList(aggregatesList)
+	if err != nil {
+		return nil, err
 	}
 
 	newAggregateSeries := AggregationParams{
@@ -40,7 +28,7 @@ func NewAggregationParams(functions, col string, buckets int, interval, rollupTi
 		functions:      aggrList,
 		colName:        col,
 		buckets:        buckets,
-		RollupTime:     rollupTime,
+		rollupTime:     rollupTime,
 		Interval:       interval,
 		overlapWindows: windows,
 	}
@@ -56,7 +44,7 @@ func (as *AggregationParams) CanAggregate(partitionAggr AggrType) bool {
 	// if interval and rollup are not even divisors we need higher resolution (3x) to smooth the graph
 	// when we add linear/spline graph projection we can reduce back to 1x
 	return ((aggrMask & partitionAggr) == aggrMask) &&
-		as.Interval >= as.RollupTime && (as.Interval%as.RollupTime == 0 || as.Interval/as.RollupTime > 3)
+		as.Interval >= as.rollupTime && (as.Interval%as.rollupTime == 0 || as.Interval/as.rollupTime > 3)
 }
 
 func (as *AggregationParams) GetAggrMask() AggrType {
@@ -67,12 +55,16 @@ func (as *AggregationParams) GetFunctions() []AggrType {
 	return as.functions
 }
 
+func (as *AggregationParams) GetRollupTime() int64 {
+	return as.rollupTime
+}
+
 func (as *AggregationParams) NumFunctions() int {
 	return len(as.functions)
 }
 
 func (as *AggregationParams) toAttrName(aggr AggrType) string {
-	return "_" + as.colName + "_" + aggr.String()
+	return fmt.Sprintf("_%v_%v", as.colName, aggr.String())
 }
 
 func (as *AggregationParams) GetAttrNames() []string {

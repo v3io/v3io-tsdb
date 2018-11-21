@@ -31,6 +31,7 @@ import (
 	"github.com/v3io/v3io-tsdb/internal/pkg/performance"
 	"github.com/v3io/v3io-tsdb/pkg/aggregate"
 	"github.com/v3io/v3io-tsdb/pkg/chunkenc"
+	"github.com/v3io/v3io-tsdb/pkg/config"
 	"github.com/v3io/v3io-tsdb/pkg/partmgr"
 	"github.com/v3io/v3io-tsdb/pkg/utils"
 )
@@ -140,7 +141,7 @@ func (cs *chunkStore) getChunksState(mc *MetricsCache, metric *MetricState) (boo
 	// Issue a GetItem command to the DB to load last state of metric
 	path := part.GetMetricPath(metric.name, metric.hash)
 	getInput := v3io.GetItemInput{
-		Path: path, AttributeNames: []string{"_maxtime"}}
+		Path: path, AttributeNames: []string{config.MaxTimeAttrName}}
 
 	request, err := mc.container.GetItem(&getInput, metric, mc.responseChan)
 	if err != nil {
@@ -189,7 +190,7 @@ func (cs *chunkStore) processGetResp(mc *MetricsCache, metric *MetricState, resp
 	// Check and update the metric item's end time (maxt) timestamp, allow continuing from the last point in case of failure
 	item := resp.Output.(*v3io.GetItemOutput).Item
 	var maxTime int64
-	val := item["_maxtime"]
+	val := item[config.MaxTimeAttrName]
 	if val != nil {
 		maxTime = int64(val.(int))
 	}
@@ -384,11 +385,11 @@ func (cs *chunkStore) writeChunks(mc *MetricsCache, metric *MetricState) (hasPen
 			// Initialize aggregate arrays
 			lblexpr = lblexpr + cs.aggrList.InitExpr("v", numBuckets)
 
-			expr = lblexpr + fmt.Sprintf("_lset='%s'; ", metric.key) + expr
+			expr = lblexpr + fmt.Sprintf("%v='%s'; ", config.LabelSetAttrName, metric.key) + expr
 		}
 
 		// Call the V3IO async UpdateItem method
-		expr += fmt.Sprintf("_maxtime=%d;", cs.maxTime) // TODO: use max() expr
+		expr += fmt.Sprintf("%v=%d;", config.MaxTimeAttrName, cs.maxTime) // TODO: use max() expr
 		path := partition.GetMetricPath(metric.name, metric.hash)
 		request, err := mc.container.UpdateItem(
 			&v3io.UpdateItemInput{Path: path, Expression: &expr}, metric, mc.responseChan)

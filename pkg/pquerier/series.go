@@ -8,7 +8,7 @@ import (
 
 func NewDataFrameColumnSeries(indexColumn, dataColumn, countColumn Column, labels utils.Labels, hash uint64) *DataFrameColumnSeries {
 	s := &DataFrameColumnSeries{dataColumn: dataColumn, indexColumn: indexColumn, CountColumn: countColumn, labels: labels, key: hash}
-	s.iter = &DataFrameColumnSeriesIterator{indexColumn: indexColumn, dataColumn: dataColumn, countColumn: countColumn, currentIndex: -1}
+	s.iter = &dataFrameColumnSeriesIterator{indexColumn: indexColumn, dataColumn: dataColumn, countColumn: countColumn, currentIndex: -1}
 	return s
 }
 
@@ -29,7 +29,7 @@ func (s *DataFrameColumnSeries) Labels() utils.Labels {
 func (s *DataFrameColumnSeries) Iterator() SeriesIterator { return s.iter }
 func (s *DataFrameColumnSeries) GetKey() uint64           { return s.key }
 
-type DataFrameColumnSeriesIterator struct {
+type dataFrameColumnSeriesIterator struct {
 	dataColumn  Column
 	indexColumn Column
 	countColumn Column
@@ -38,7 +38,7 @@ type DataFrameColumnSeriesIterator struct {
 	err          error
 }
 
-func (it *DataFrameColumnSeriesIterator) Seek(seekT int64) bool {
+func (it *dataFrameColumnSeriesIterator) Seek(seekT int64) bool {
 	t, _ := it.At()
 	if t >= seekT {
 		return true
@@ -54,7 +54,7 @@ func (it *DataFrameColumnSeriesIterator) Seek(seekT int64) bool {
 	return false
 }
 
-func (it *DataFrameColumnSeriesIterator) At() (int64, float64) {
+func (it *dataFrameColumnSeriesIterator) At() (int64, float64) {
 	t, err := it.indexColumn.TimeAt(it.currentIndex)
 	if err != nil {
 		it.err = err
@@ -66,7 +66,7 @@ func (it *DataFrameColumnSeriesIterator) At() (int64, float64) {
 	return t, v
 }
 
-func (it *DataFrameColumnSeriesIterator) Next() bool {
+func (it *dataFrameColumnSeriesIterator) Next() bool {
 	if it.err != nil {
 		return false
 	}
@@ -76,15 +76,15 @@ func (it *DataFrameColumnSeriesIterator) Next() bool {
 	return it.currentIndex < it.indexColumn.Len()
 }
 
-func (it *DataFrameColumnSeriesIterator) Err() error { return it.err }
+func (it *dataFrameColumnSeriesIterator) Err() error { return it.err }
 
-func (it *DataFrameColumnSeriesIterator) getNextValidCell(from int) (nextIndex int) {
+func (it *dataFrameColumnSeriesIterator) getNextValidCell(from int) (nextIndex int) {
 	for nextIndex = from + 1; nextIndex < it.dataColumn.Len() && !it.doesCellHasData(nextIndex); nextIndex++ {
 	}
 	return
 }
 
-func (it *DataFrameColumnSeriesIterator) doesCellHasData(cell int) bool {
+func (it *dataFrameColumnSeriesIterator) doesCellHasData(cell int) bool {
 	// In case we don't have a count column (for example while down sampling) check if there is a real value at `cell`
 	if it.countColumn == nil {
 		f, err := it.dataColumn.FloatAt(cell)

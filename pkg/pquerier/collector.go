@@ -133,7 +133,7 @@ func aggregateServerAggregates(ctx *selectQueryContext, res *qryResults) {
 				for i := 16; i+8 <= len(bytes); i += 8 {
 					val := binary.LittleEndian.Uint64(bytes[i : i+8])
 					currentValueIndex := (i - 16) / 8
-					currentValueTime := res.query.partition.GetStartTime() + int64(currentValueIndex+1)*res.query.aggregationParams.RollupTime
+					currentValueTime := res.query.partition.GetStartTime() + int64(currentValueIndex+1)*res.query.aggregationParams.GetRollupTime()
 					currentCell := (currentValueTime - ctx.mint) / res.query.aggregationParams.Interval
 
 					var floatVal float64

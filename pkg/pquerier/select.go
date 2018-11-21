@@ -5,6 +5,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/v3io/v3io-go-http"
 	"github.com/v3io/v3io-tsdb/pkg/aggregate"
+	"github.com/v3io/v3io-tsdb/pkg/config"
 	"github.com/v3io/v3io-tsdb/pkg/partmgr"
 	"github.com/v3io/v3io-tsdb/pkg/utils"
 	"sort"
@@ -213,7 +214,7 @@ func (s *selectQueryContext) processQueryResults(query *partQuery) error {
 		}
 
 		// read label set
-		lsetAttr, lok := query.GetField("_lset").(string)
+		lsetAttr, lok := query.GetField(config.LabelSetAttrName).(string)
 		if !lok {
 			lsetAttr = "UNKNOWN"
 		}
@@ -231,7 +232,7 @@ func (s *selectQueryContext) processQueryResults(query *partQuery) error {
 		}
 
 		// read chunk encoding type (TODO: in ingestion etc.)
-		encoding, nok := query.GetField("_enc").(int)
+		encoding, nok := query.GetField(config.EncodingAttrName).(int)
 		if !nok {
 			encoding = 0
 		}
@@ -392,7 +393,7 @@ func (s *partQuery) getItems(ctx *selectQueryContext, name string, aggregatesAnd
 	if name != "" {
 		shardingKeys = s.partition.GetShardingKeys(name)
 	}
-	attrs := []string{"_lset", "_enc", "_name", "_maxtime"}
+	attrs := []string{config.LabelSetAttrName, config.EncodingAttrName, "_name", config.MaxTimeAttrName}
 
 	if s.preAggregated {
 		s.attrs = s.aggregationParams.GetAttrNames()

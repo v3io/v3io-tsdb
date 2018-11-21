@@ -72,7 +72,7 @@ func NewDBPartition(pmgr *PartitionManager, startTime int64, path string) (*DBPa
 		rollupTime:        rollupTime,
 	}
 
-	aggrType, err := aggregate.AggrsFromString(pmgr.schemaConfig.PartitionSchemaInfo.Aggregates)
+	aggrType, _, err := aggregate.AggregatesFromStringList(pmgr.schemaConfig.PartitionSchemaInfo.Aggregates)
 	if err != nil {
 		return nil, err
 	}

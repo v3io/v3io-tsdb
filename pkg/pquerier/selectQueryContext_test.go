@@ -77,6 +77,6 @@ func TestCreateColumnSpecs(t *testing.T) {
 }
 
 func toAggr(str string) aggregate.AggrType {
-	_, aggr, _ := aggregate.StrToAggr(str)
-	return aggr[0]
+	aggr, _ := aggregate.AggregateFromString(str)
+	return aggr
 }

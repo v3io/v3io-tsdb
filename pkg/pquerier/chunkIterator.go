@@ -3,12 +3,10 @@ package pquerier
 import (
 	"github.com/nuclio/logger"
 	"github.com/v3io/v3io-tsdb/pkg/chunkenc"
+	"github.com/v3io/v3io-tsdb/pkg/config"
 	"github.com/v3io/v3io-tsdb/pkg/utils"
 	"strings"
 )
-
-const chunkAttributePrefix = "_v"
-const aggregateAttributePrefix = "_v_"
 
 // Chunk-list series iterator
 type rawChunkIterator struct {
@@ -27,7 +25,7 @@ type rawChunkIterator struct {
 
 func newRawChunkIterator(item qryResults, log logger.Logger) SeriesIterator {
 	maxt := item.query.maxt
-	maxTime := item.fields["_maxtime"]
+	maxTime := item.fields[config.MaxTimeAttrName]
 	if maxTime != nil && int64(maxTime.(int)) < maxt {
 		maxt = int64(maxTime.(int))
 	}
@@ -156,7 +154,7 @@ func (it *rawChunkIterator) AddChunks(item qryResults) {
 	for _, attr := range item.query.attrs {
 
 		// In case we get both raw chunks and server aggregates, only go over the chunks.
-		if !strings.Contains(attr, aggregateAttributePrefix) {
+		if !strings.Contains(attr, config.AggregateAttrPrefix) {
 			values := item.fields[attr]
 			if values != nil {
 				bytes := values.([]byte)
@@ -165,6 +163,7 @@ func (it *rawChunkIterator) AddChunks(item qryResults) {
 					it.log.ErrorWith("Error reading chunk buffer", "columns", item.query.attrs, "err", err)
 				} else {
 					chunks = append(chunks, chunk)
+					// Calculate the end time for the current chunk
 					chunksMax = append(chunksMax,
 						firstChunkTime+int64(i+1)*item.query.partition.TimePerChunk()-1)
 				}
@@ -225,7 +224,7 @@ func (s *V3ioRawSeries) initLabels() {
 	if !nok {
 		name = "UNKNOWN"
 	}
-	lsetAttr, lok := s.fields["_lset"].(string)
+	lsetAttr, lok := s.fields[config.LabelSetAttrName].(string)
 	if !lok {
 		lsetAttr = "UNKNOWN"
 	}
