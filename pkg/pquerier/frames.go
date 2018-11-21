@@ -2,12 +2,13 @@ package pquerier
 
 import (
 	"fmt"
-	"github.com/pkg/errors"
-	"github.com/v3io/v3io-tsdb/pkg/aggregate"
-	"github.com/v3io/v3io-tsdb/pkg/utils"
 	"math"
 	"reflect"
 	"time"
+
+	"github.com/pkg/errors"
+	"github.com/v3io/v3io-tsdb/pkg/aggregate"
+	"github.com/v3io/v3io-tsdb/pkg/utils"
 )
 
 // Possible data types

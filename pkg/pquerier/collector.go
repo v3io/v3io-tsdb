@@ -3,9 +3,10 @@ package pquerier
 import (
 	"encoding/binary"
 	"fmt"
-	"github.com/v3io/v3io-tsdb/pkg/aggregate"
 	"math"
 	"time"
+
+	"github.com/v3io/v3io-tsdb/pkg/aggregate"
 )
 
 /* main query flow logic

@@ -1,14 +1,15 @@
 package pquerier
 
 import (
+	"strings"
+	"time"
+
 	"github.com/nuclio/logger"
 	"github.com/pkg/errors"
 	"github.com/v3io/v3io-go-http"
 	"github.com/v3io/v3io-tsdb/internal/pkg/performance"
 	"github.com/v3io/v3io-tsdb/pkg/config"
 	"github.com/v3io/v3io-tsdb/pkg/partmgr"
-	"strings"
-	"time"
 )
 
 // Create a new Querier interface

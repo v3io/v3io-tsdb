@@ -24,6 +24,10 @@ package pquerier_test
 
 import (
 	"fmt"
+	"math"
+	"testing"
+	"time"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 	"github.com/v3io/v3io-tsdb/pkg/aggregate"
@@ -32,9 +36,6 @@ import (
 	"github.com/v3io/v3io-tsdb/pkg/tsdb"
 	"github.com/v3io/v3io-tsdb/pkg/tsdb/tsdbtest"
 	"github.com/v3io/v3io-tsdb/pkg/utils"
-	"math"
-	"testing"
-	"time"
 )
 
 type testQuerySuite struct {

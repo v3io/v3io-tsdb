@@ -21,9 +21,10 @@ such restriction.
 package pquerier
 
 import (
-	"github.com/stretchr/testify/suite"
 	"math"
 	"testing"
+
+	"github.com/stretchr/testify/suite"
 )
 
 type testInterpolationSuite struct {

@@ -2,6 +2,7 @@ package pquerier
 
 import (
 	"fmt"
+
 	"github.com/v3io/v3io-tsdb/pkg/aggregate"
 	"github.com/v3io/v3io-tsdb/pkg/utils"
 )

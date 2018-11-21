@@ -1,9 +1,10 @@
 package pquerier
 
 import (
+	"math"
+
 	"github.com/v3io/v3io-tsdb/pkg/aggregate"
 	"github.com/v3io/v3io-tsdb/pkg/utils"
-	"math"
 )
 
 func NewDataFrameColumnSeries(indexColumn, dataColumn, countColumn Column, labels utils.Labels, hash uint64) *DataFrameColumnSeries {
