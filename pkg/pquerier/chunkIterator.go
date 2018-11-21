@@ -23,17 +23,17 @@ type rawChunkIterator struct {
 	prevV float64
 }
 
-func newRawChunkIterator(item qryResults, log logger.Logger) SeriesIterator {
-	maxt := item.query.maxt
-	maxTime := item.fields[config.MaxTimeAttrName]
+func newRawChunkIterator(queryResult *qryResults, log logger.Logger) SeriesIterator {
+	maxt := queryResult.query.maxt
+	maxTime := queryResult.fields[config.MaxTimeAttrName]
 	if maxTime != nil && int64(maxTime.(int)) < maxt {
 		maxt = int64(maxTime.(int))
 	}
 
 	newIterator := rawChunkIterator{
-		mint: item.query.mint, maxt: maxt, log: log}
+		mint: queryResult.query.mint, maxt: maxt, log: log}
 
-	newIterator.AddChunks(item)
+	newIterator.AddChunks(queryResult)
 
 	if len(newIterator.chunks) == 0 {
 		// If there's no data, create a null iterator
@@ -139,7 +139,7 @@ func (it *rawChunkIterator) At() (t int64, v float64) { return it.iter.At() }
 
 func (it *rawChunkIterator) Err() error { return it.iter.Err() }
 
-func (it *rawChunkIterator) AddChunks(item qryResults) {
+func (it *rawChunkIterator) AddChunks(item *qryResults) {
 	var chunks []chunkenc.Chunk
 	var chunksMax []int64
 	if item.query.maxt > it.maxt {
@@ -191,7 +191,7 @@ func (s nullSeriesIterator) Err() error               { return s.err }
 func NewRawSeries(results *qryResults) Series {
 	newSeries := V3ioRawSeries{fields: results.fields}
 	newSeries.initLabels()
-	newSeries.iter = newRawChunkIterator(*results, nil)
+	newSeries.iter = newRawChunkIterator(results, nil)
 	return &newSeries
 }
 
@@ -215,7 +215,7 @@ func (s *V3ioRawSeries) GetKey() uint64 {
 func (s *V3ioRawSeries) Iterator() SeriesIterator { return s.iter }
 
 func (s *V3ioRawSeries) AddChunks(results *qryResults) {
-	s.iter.(*rawChunkIterator).AddChunks(*results)
+	s.iter.(*rawChunkIterator).AddChunks(results)
 }
 
 // Initialize the label set from _lset and _name attributes

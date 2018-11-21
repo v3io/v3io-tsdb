@@ -105,7 +105,7 @@ func rawCollector(res *qryResults) {
 }
 
 func aggregateClientAggregates(ctx *selectQueryContext, res *qryResults) {
-	it := newRawChunkIterator(*res, nil)
+	it := newRawChunkIterator(res, nil)
 	for it.Next() {
 		t, v := it.At()
 		currentCell := (t - ctx.mint) / res.query.aggregationParams.Interval
@@ -153,7 +153,7 @@ func downsampleRawData(ctx *selectQueryContext, res *qryResults,
 	previousPartitionLastTime int64, previousPartitionLastValue float64) (int64, float64) {
 	var lastT int64
 	var lastV float64
-	it := newRawChunkIterator(*res, nil).(*rawChunkIterator)
+	it := newRawChunkIterator(res, nil).(*rawChunkIterator)
 	col := res.frame.columns[res.frame.columnByName[res.name]]
 	for currBucket := 0; currBucket < col.Len(); currBucket++ {
 		currBucketTime := int64(currBucket)*ctx.step + ctx.mint
