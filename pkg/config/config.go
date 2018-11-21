@@ -57,12 +57,17 @@ const (
 	DefaultLogLevel               = "info"
 	DefaultVerboseLevel           = "debug"
 
+	// KV attribute names
 	MaxTimeAttrName     = "_maxtime"
 	LabelSetAttrName    = "_lset"
 	EncodingAttrName    = "_enc"
 	OutOfOrderAttrName  = "_ooo"
+	MetricNameAttrName  = "_name"
+	ObjectNameAttrName  = "__name"
 	ChunkAttrPrefix     = "_v"
 	AggregateAttrPrefix = "_v_"
+
+	PrometheusMetricNameAttribute = "__name__"
 )
 
 type BuildInfo struct {

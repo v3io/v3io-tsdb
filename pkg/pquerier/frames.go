@@ -8,6 +8,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/v3io/v3io-tsdb/pkg/aggregate"
+	"github.com/v3io/v3io-tsdb/pkg/config"
 	"github.com/v3io/v3io-tsdb/pkg/utils"
 )
 
@@ -317,8 +318,6 @@ func (d *dataFrame) rawSeriesToColumns() {
 				}
 			} else if t > currentTime {
 				columns[seriesIndex] = append(columns[seriesIndex], math.NaN())
-			} else if t < currentTime {
-				fmt.Println("got here, it's weird")
 			}
 
 			if t < nextTime {
@@ -334,7 +333,7 @@ func (d *dataFrame) rawSeriesToColumns() {
 
 	d.columns = make([]Column, len(d.rawColumns))
 	for i, series := range d.rawColumns {
-		name := series.Labels().Get("__name__")
+		name := series.Labels().Get(config.PrometheusMetricNameAttribute)
 		spec := columnMeta{metric: name}
 		col := NewDataColumn(name, spec, numberOfRows, FloatType)
 		col.SetData(columns[i], numberOfRows)

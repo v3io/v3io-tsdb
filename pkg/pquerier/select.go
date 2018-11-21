@@ -209,7 +209,7 @@ func (s *selectQueryContext) processQueryResults(query *partQuery) error {
 	for query.Next() {
 
 		// read metric name
-		name, nok := query.GetField("_name").(string)
+		name, nok := query.GetField(config.MetricNameAttrName).(string)
 		if !nok {
 			name = "UNKNOWN"
 		}
@@ -394,7 +394,7 @@ func (s *partQuery) getItems(ctx *selectQueryContext, name string, aggregatesAnd
 	if name != "" {
 		shardingKeys = s.partition.GetShardingKeys(name)
 	}
-	attrs := []string{config.LabelSetAttrName, config.EncodingAttrName, "_name", config.MaxTimeAttrName}
+	attrs := []string{config.LabelSetAttrName, config.EncodingAttrName, config.MetricNameAttrName, config.MaxTimeAttrName}
 
 	if s.preAggregated {
 		s.attrs = s.aggregationParams.GetAttrNames()

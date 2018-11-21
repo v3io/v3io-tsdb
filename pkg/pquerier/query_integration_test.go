@@ -67,9 +67,9 @@ func (suite *testQuerySuite) TestRawDataSinglePartition() {
 	if err != nil {
 		suite.T().Fatalf("failed to create v3io adapter. reason: %s", err)
 	}
-	metricName := "cpu"
-	labels1 := utils.LabelsFromStrings("__name__", metricName, "os", "linux")
-	labels2 := utils.LabelsFromStrings("__name__", metricName, "os", "mac")
+
+	labels1 := utils.LabelsFromStrings("os", "linux")
+	labels2 := utils.LabelsFromStrings("os", "mac")
 	numberOfEvents := 10
 	eventsInterval := 60 * 1000
 	baseTime := time.Now().UnixNano()/1000000 - int64(numberOfEvents*eventsInterval)
@@ -122,9 +122,9 @@ func (suite *testQuerySuite) TestRawDataMultiplePartitions() {
 	if err != nil {
 		suite.T().Fatalf("failed to create v3io adapter. reason: %s", err)
 	}
-	metricName := "cpu"
-	labels1 := utils.LabelsFromStrings("__name__", metricName, "os", "linux")
-	labels2 := utils.LabelsFromStrings("__name__", metricName, "os", "mac")
+
+	labels1 := utils.LabelsFromStrings("os", "linux")
+	labels2 := utils.LabelsFromStrings("os", "mac")
 	numberOfEvents := 5
 	eventsInterval := int64(tsdbtest.MinuteInMillis)
 	baseTime := time.Now().UnixNano()/1000000 - int64(numberOfEvents)*eventsInterval
@@ -179,8 +179,8 @@ func (suite *testQuerySuite) TestRawDataSinglePartitionWithDownSample() {
 	if err != nil {
 		suite.T().Fatalf("failed to create v3io adapter. reason: %s", err)
 	}
-	metricName := "cpu"
-	labels1 := utils.LabelsFromStrings("__name__", metricName, "os", "linux")
+
+	labels1 := utils.LabelsFromStrings("os", "linux")
 	numberOfEvents := 10
 	eventsInterval := 60 * 1000
 	baseTime := time.Now().UnixNano()/1000000 - int64(numberOfEvents*eventsInterval)
@@ -233,8 +233,8 @@ func (suite *testQuerySuite) TestRawDataDownSampleMultiPartitions() {
 	if err != nil {
 		suite.T().Fatalf("failed to create v3io adapter. reason: %s", err)
 	}
-	metricName := "cpu"
-	labels1 := utils.LabelsFromStrings("__name__", metricName, "os", "linux")
+
+	labels1 := utils.LabelsFromStrings("os", "linux")
 
 	ingestData := []tsdbtest.DataPoint{{suite.toMillis("2018-11-18T23:40:00Z"), 10},
 		{suite.toMillis("2018-11-18T23:59:00Z"), 20},
@@ -292,8 +292,8 @@ func (suite *testQuerySuite) TestRawAggregatesSinglePartition() {
 	if err != nil {
 		suite.T().Fatalf("failed to create v3io adapter. reason: %s", err)
 	}
-	metricName := "cpu"
-	labels1 := utils.LabelsFromStrings("__name__", metricName, "os", "linux")
+
+	labels1 := utils.LabelsFromStrings("os", "linux")
 	numberOfEvents := 10
 	eventsInterval := 60 * 1000
 	baseTime := time.Now().UnixNano()/1000000 - int64(numberOfEvents*eventsInterval)
@@ -349,8 +349,8 @@ func (suite *testQuerySuite) TestRawAggregatesSinglePartitionNegativeValues() {
 	if err != nil {
 		suite.T().Fatalf("failed to create v3io adapter. reason: %s", err)
 	}
-	metricName := "cpu"
-	labels1 := utils.LabelsFromStrings("__name__", metricName, "os", "linux")
+
+	labels1 := utils.LabelsFromStrings("os", "linux")
 	numberOfEvents := 10
 	eventsInterval := 60 * 1000
 	baseTime := time.Now().UnixNano()/1000000 - int64(numberOfEvents*eventsInterval)
@@ -406,8 +406,8 @@ func (suite *testQuerySuite) TestRawAggregatesMultiPartition() {
 	if err != nil {
 		suite.T().Fatalf("failed to create v3io adapter. reason: %s", err)
 	}
-	metricName := "cpu"
-	labels1 := utils.LabelsFromStrings("__name__", metricName, "os", "linux")
+
+	labels1 := utils.LabelsFromStrings("os", "linux")
 
 	numberOfEvents := 10
 	eventsInterval := 60 * 1000
@@ -465,8 +465,8 @@ func (suite *testQuerySuite) TestRawAggregatesMultiPartitionNonConcreteAggregate
 	if err != nil {
 		suite.T().Fatalf("failed to create v3io adapter. reason: %s", err)
 	}
-	metricName := "cpu"
-	labels1 := utils.LabelsFromStrings("__name__", metricName, "os", "linux")
+
+	labels1 := utils.LabelsFromStrings("os", "linux")
 	numberOfEvents := 10
 	eventsInterval := 60 * 1000
 	baseTime := time.Now().UnixNano()/1000000 - int64(numberOfEvents*eventsInterval)
@@ -522,8 +522,8 @@ func (suite *testQuerySuite) TestClientAggregatesSinglePartition() {
 	if err != nil {
 		suite.T().Fatalf("failed to create v3io adapter. reason: %s", err)
 	}
-	metricName := "cpu"
-	labels1 := utils.LabelsFromStrings("__name__", metricName, "os", "linux")
+
+	labels1 := utils.LabelsFromStrings("os", "linux")
 	numberOfEvents := 10
 	eventsInterval := 60 * 1000
 	baseTime := time.Now().UnixNano()/1000000 - int64(numberOfEvents*eventsInterval)
@@ -579,8 +579,8 @@ func (suite *testQuerySuite) TestClientAggregatesMultiPartition() {
 	if err != nil {
 		suite.T().Fatalf("failed to create v3io adapter. reason: %s", err)
 	}
-	metricName := "cpu"
-	labels1 := utils.LabelsFromStrings("__name__", metricName, "os", "linux")
+
+	labels1 := utils.LabelsFromStrings("os", "linux")
 	numberOfEvents := 10
 	eventsInterval := 60 * 1000
 	baseTime := time.Now().UnixNano()/1000000 - int64(numberOfEvents*eventsInterval)
@@ -640,8 +640,8 @@ func (suite *testQuerySuite) TestClientAggregatesMultiPartitionNonConcreteAggreg
 	if err != nil {
 		suite.T().Fatalf("failed to create v3io adapter. reason: %s", err)
 	}
-	metricName := "cpu"
-	labels1 := utils.LabelsFromStrings("__name__", metricName, "os", "linux")
+
+	labels1 := utils.LabelsFromStrings("os", "linux")
 	numberOfEvents := 10
 	eventsInterval := 60 * 1000
 	baseTime := time.Now().UnixNano()/1000000 - int64(numberOfEvents*eventsInterval)
@@ -701,8 +701,8 @@ func (suite *testQuerySuite) TestClientAggregatesMultiPartitionOneStep() {
 	if err != nil {
 		suite.T().Fatalf("failed to create v3io adapter. reason: %s", err)
 	}
-	metricName := "cpu"
-	labels1 := utils.LabelsFromStrings("__name__", metricName, "os", "linux")
+
+	labels1 := utils.LabelsFromStrings("os", "linux")
 	numberOfEvents := 10
 	eventsInterval := 60 * 1000
 	baseTime := time.Now().UnixNano()/1000000 - int64(numberOfEvents*eventsInterval)
@@ -761,8 +761,8 @@ func (suite *testQuerySuite) TestGetEmptyResponse() {
 	if err != nil {
 		suite.T().Fatalf("failed to create v3io adapter. reason: %s", err)
 	}
-	metricName := "cpu"
-	labels1 := utils.LabelsFromStrings("__name__", metricName, "os", "linux")
+
+	labels1 := utils.LabelsFromStrings("os", "linux")
 	numberOfEvents := 10
 	eventsInterval := 60 * 1000
 	baseTime := time.Now().UnixNano()/1000000 - int64(numberOfEvents*eventsInterval)
@@ -816,8 +816,8 @@ func (suite *testQuerySuite) TestSelectAggregatesByRequestedColumns() {
 	if err != nil {
 		suite.T().Fatalf("failed to create v3io adapter. reason: %s", err)
 	}
-	metricName := "cpu"
-	labels1 := utils.LabelsFromStrings("__name__", metricName, "os", "linux")
+
+	labels1 := utils.LabelsFromStrings("os", "linux")
 	numberOfEvents := 10
 	eventsInterval := 60 * 1000
 	baseTime := time.Now().UnixNano()/1000000 - int64(numberOfEvents*eventsInterval)
@@ -875,8 +875,8 @@ func (suite *testQuerySuite) TestSelectRawDataByRequestedColumns() {
 	if err != nil {
 		suite.T().Fatalf("failed to create v3io adapter. reason: %s", err)
 	}
-	metricName := "cpu"
-	labels1 := utils.LabelsFromStrings("__name__", metricName, "os", "linux")
+
+	labels1 := utils.LabelsFromStrings("os", "linux")
 	numberOfEvents := 10
 	eventsInterval := 60 * 1000
 	baseTime := time.Now().UnixNano()/1000000 - int64(numberOfEvents*eventsInterval)
@@ -930,8 +930,8 @@ func (suite *testQuerySuite) TestSelectAggregatesAndRawByRequestedColumns() {
 	if err != nil {
 		suite.T().Fatalf("failed to create v3io adapter. reason: %s", err)
 	}
-	metricName := "cpu"
-	labels1 := utils.LabelsFromStrings("__name__", metricName, "os", "linux")
+
+	labels1 := utils.LabelsFromStrings("os", "linux")
 	numberOfEvents := 10
 	eventsInterval := 60 * 1000
 	baseTime := time.Now().UnixNano()/1000000 - int64(numberOfEvents*eventsInterval)
@@ -988,8 +988,8 @@ func (suite *testQuerySuite) TestSelectServerAggregatesAndRawByRequestedColumns(
 	if err != nil {
 		suite.T().Fatalf("failed to create v3io adapter. reason: %s", err)
 	}
-	metricName := "cpu"
-	labels1 := utils.LabelsFromStrings("__name__", metricName, "os", "linux")
+
+	labels1 := utils.LabelsFromStrings("os", "linux")
 	numberOfEvents := 10
 	eventsInterval := 60 * 1000
 	baseTime := time.Now().UnixNano()/1000000 - int64(numberOfEvents*eventsInterval)
@@ -1048,8 +1048,8 @@ func (suite *testQuerySuite) TestRawDataMultipleMetrics() {
 	}
 	metricName1 := "cpu"
 	metricName2 := "diskio"
-	labels1 := utils.LabelsFromStrings("__name__", metricName1, "os", "linux")
-	labels2 := utils.LabelsFromStrings("__name__", metricName2, "os", "linux")
+	labels1 := utils.LabelsFromStrings("os", "linux")
+	labels2 := utils.LabelsFromStrings("os", "linux")
 	numberOfEvents := 5
 	eventsInterval := int64(tsdbtest.MinuteInMillis)
 	baseTime := time.Now().UnixNano()/1000000 - int64(numberOfEvents)*eventsInterval
@@ -1095,7 +1095,7 @@ func (suite *testQuerySuite) TestRawDataMultipleMetrics() {
 	for set.Next() {
 		seriesCount++
 		iter := set.At().Iterator()
-		name := set.At().Labels().Get("__name__")
+		name := set.At().Labels().Get(config.PrometheusMetricNameAttribute)
 		data, err := tsdbtest.IteratorToSlice(iter)
 		if err != nil {
 			suite.T().Fatal(err)
@@ -1114,8 +1114,8 @@ func (suite *testQuerySuite) TestDataFrameRawDataMultipleMetrics() {
 	}
 	metricName1 := "cpu"
 	metricName2 := "diskio"
-	labels1 := utils.LabelsFromStrings("__name__", metricName1, "os", "linux")
-	labels2 := utils.LabelsFromStrings("__name__", metricName2, "os", "linux")
+	labels1 := utils.LabelsFromStrings("os", "linux")
+	labels2 := utils.LabelsFromStrings("os", "linux")
 	numberOfEvents := 5
 	eventsInterval := int64(tsdbtest.MinuteInMillis)
 	baseTime := time.Now().UnixNano()/1000000 - int64(numberOfEvents)*eventsInterval

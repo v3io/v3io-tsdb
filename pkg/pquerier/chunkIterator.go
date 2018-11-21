@@ -221,7 +221,7 @@ func (s *V3ioRawSeries) AddChunks(results *qryResults) {
 
 // Initialize the label set from _lset and _name attributes
 func (s *V3ioRawSeries) initLabels() {
-	name, nok := s.fields["_name"].(string)
+	name, nok := s.fields[config.MetricNameAttrName].(string)
 	if !nok {
 		name = "UNKNOWN"
 	}
@@ -233,7 +233,7 @@ func (s *V3ioRawSeries) initLabels() {
 		//.Error("Error in initLabels; bad field values.")
 	}
 
-	lset := utils.Labels{utils.Label{Name: "__name__", Value: name}}
+	lset := utils.Labels{utils.Label{Name: config.PrometheusMetricNameAttribute, Value: name}}
 
 	splitLset := strings.Split(lsetAttr, ",")
 	for _, label := range splitLset {

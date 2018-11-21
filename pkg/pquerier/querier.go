@@ -103,7 +103,7 @@ func (q *V3ioQuerier) baseSelectQry(params *SelectParams) (iter *frameIterator, 
 		params.Filter, params.Windows, selectContext.disableAllAggr, selectContext.disableClientAggr)
 
 	q.performanceReporter.WithTimer("QueryTimer", func() {
-		params.Filter = strings.Replace(params.Filter, "__name__", "_name", -1)
+		params.Filter = strings.Replace(params.Filter, config.PrometheusMetricNameAttribute, config.MetricNameAttrName, -1)
 
 		parts := q.partitionMngr.PartsForRange(params.From, params.To, true)
 		if len(parts) == 0 {
