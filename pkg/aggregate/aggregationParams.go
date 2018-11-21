@@ -35,8 +35,8 @@ func NewAggregationParams(functions, col string, buckets int, interval, rollupTi
 }
 
 func (as *AggregationParams) CanAggregate(partitionAggr AggrType) bool {
-	// keep only real aggregates
-	aggrMask := 0x7f & as.aggrMask
+	// Get only the raw aggregates from what the user requested
+	aggrMask := rawAggregatesMask & as.aggrMask
 	// make sure the DB has all the aggregates we need (on bits in the mask)
 	// and that the requested interval is greater/eq to aggregate resolution and is an even divisor
 	// if interval and rollup are not even divisors we need higher resolution (3x) to smooth the graph
