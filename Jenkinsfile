@@ -37,6 +37,10 @@ parallel(
                                     returnStdout: true
                             ).trim()
 
+                            stage('create tsdb-nuclio release') {
+                                sh "curl -v -H \"Content-Type: application/json\" -H \"Authorization: token ${GIT_TOKEN}\" https://api.github.com/repos/gkirok/tsdb-nuclio/releases -d '{\"tag_name\": \"v${NEXT_VERSION}\", \"target_commitish\": \"master\", \"name\": \"v${NEXT_VERSION}\", \"body\": \"Auto release, triggered by v3io-tsdb\"}'"
+                            }
+
                             echo "$NEXT_VERSION"
 
 //                            def PROMETHEUS_VERSION = sh(
