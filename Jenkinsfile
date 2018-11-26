@@ -27,12 +27,18 @@ parallel(
                                 """
                             }
 
-                            def NEXT_VERSION = sh(
-                                    script: "cat next_version",
-                                    returnStdout: true
-                            ).trim()
+//                            def NEXT_VERSION = sh(
+//                                    script: "cat next_version",
+//                                    returnStdout: true
+//                            ).trim()
+//
+//                            echo "$NEXT_VERSION"
 
-                            echo "$NEXT_VERSION"
+                            def NEXT_VERSION = "0.1.0"
+
+                            stage ('starting tsdb-nuclio job') {
+                                build job: "tsdb-nuclio/v${NEXT_VERSION}", propagate: true, wait: true, parameters: [[$class: 'StringParameterValue', name: 'TAG_NAME', value: "v${NEXT_VERSION}"]]
+                            }
 
                             stage('create tsdb-nuclio release') {
                                 sh "curl -v -H \"Content-Type: application/json\" -H \"Authorization: token ${GIT_TOKEN}\" https://api.github.com/repos/gkirok/tsdb-nuclio/releases -d '{\"tag_name\": \"v${NEXT_VERSION}\", \"target_commitish\": \"master\", \"name\": \"v${NEXT_VERSION}\", \"body\": \"Auto release, triggered by v3io-tsdb\"}'"
