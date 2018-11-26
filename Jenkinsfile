@@ -24,21 +24,21 @@ def build_nuclio(TAG_VERSION) {
         }
 //                                git checkout ${V3IO_TSDB_VERSION}
 
-        stage('build in dood') {
-            container('docker-cmd') {
-                sh """
-                    cd ${BUILD_FOLDER}/src/github.com/v3io/tsdb-nuclio/functions/ingest
-                    docker build . --tag tsdb-ingest:latest --tag ${docker_user}/tsdb-ingest:${TAG_VERSION}
-
-                    cd ${BUILD_FOLDER}/src/github.com/v3io/tsdb-nuclio/functions/query
-                    docker build . --tag tsdb-query:latest --tag ${docker_user}/tsdb-query:${TAG_VERSION}
-                """
-                withDockerRegistry([credentialsId: "472293cc-61bc-4e9f-aecb-1d8a73827fae", url: ""]) {
-                    sh "docker push ${docker_user}/tsdb-ingest:${TAG_VERSION}"
-                    sh "docker push ${docker_user}/tsdb-query:${TAG_VERSION}"
-                }
-            }
-        }
+//        stage('build in dood') {
+//            container('docker-cmd') {
+//                sh """
+//                    cd ${BUILD_FOLDER}/src/github.com/v3io/tsdb-nuclio/functions/ingest
+//                    docker build . --tag tsdb-ingest:latest --tag ${docker_user}/tsdb-ingest:${TAG_VERSION}
+//
+//                    cd ${BUILD_FOLDER}/src/github.com/v3io/tsdb-nuclio/functions/query
+//                    docker build . --tag tsdb-query:latest --tag ${docker_user}/tsdb-query:${TAG_VERSION}
+//                """
+//                withDockerRegistry([credentialsId: "472293cc-61bc-4e9f-aecb-1d8a73827fae", url: ""]) {
+//                    sh "docker push ${docker_user}/tsdb-ingest:${TAG_VERSION}"
+//                    sh "docker push ${docker_user}/tsdb-query:${TAG_VERSION}"
+//                }
+//            }
+//        }
 
         stage('git push') {
             container('jnlp') {
