@@ -7,7 +7,12 @@ import (
 	"github.com/v3io/v3io-tsdb/pkg/utils"
 )
 
-func NewDataFrameColumnSeries(indexColumn, dataColumn, countColumn Column, labels utils.Labels, hash uint64) *DataFrameColumnSeries {
+func NewDataFrameColumnSeries(indexColumn, dataColumn, countColumn Column, labels utils.Labels, hash uint64, showAggregateLabel bool) *DataFrameColumnSeries {
+	// If we need to return the Aggregate label then add it, otherwise (for example in prometheus) return labels without it
+	if showAggregateLabel {
+		labels = append(labels, utils.LabelsFromStringList(aggregate.AggregateLabel, dataColumn.GetColumnSpec().function.String())...)
+	}
+
 	s := &DataFrameColumnSeries{dataColumn: dataColumn, indexColumn: indexColumn, CountColumn: countColumn, labels: labels, key: hash}
 	s.iter = &dataFrameColumnSeriesIterator{indexColumn: indexColumn, dataColumn: dataColumn, countColumn: countColumn, currentIndex: -1}
 	return s
@@ -24,7 +29,6 @@ type DataFrameColumnSeries struct {
 }
 
 func (s *DataFrameColumnSeries) Labels() utils.Labels {
-	s.labels = append(s.labels, utils.LabelsFromStringList(aggregate.AggregateLabel, s.dataColumn.GetColumnSpec().function.String())...)
 	return s.labels
 }
 func (s *DataFrameColumnSeries) Iterator() SeriesIterator { return s.iter }
@@ -40,6 +44,9 @@ type dataFrameColumnSeriesIterator struct {
 }
 
 func (it *dataFrameColumnSeriesIterator) Seek(seekT int64) bool {
+	if it.currentIndex >= it.dataColumn.Len() {
+		return false
+	}
 	t, _ := it.At()
 	if t >= seekT {
 		return true

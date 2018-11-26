@@ -36,8 +36,9 @@ type selectQueryContext struct {
 	isAllColumns        bool
 	totalColumns        int
 
-	disableAllAggr    bool
-	disableClientAggr bool
+	disableAllAggr     bool
+	disableClientAggr  bool
+	showAggregateLabel bool
 
 	dataFrames      map[uint64]*dataFrame
 	frameList       []*dataFrame
@@ -246,7 +247,7 @@ func (s *selectQueryContext) processQueryResults(query *partQuery) error {
 		frame, ok := s.dataFrames[hash]
 		if !ok {
 			var err error
-			frame, err = NewDataFrame(s.columnsSpec, s.getOrCreateTimeColumn(), lset, hash, s.isRawQuery(), s.isAllColumns, s.getResultBucketsSize(), results.IsServerAggregates())
+			frame, err = NewDataFrame(s.columnsSpec, s.getOrCreateTimeColumn(), lset, hash, s.isRawQuery(), s.isAllColumns, s.getResultBucketsSize(), results.IsServerAggregates(), s.showAggregateLabel)
 			if err != nil {
 				return err
 			}

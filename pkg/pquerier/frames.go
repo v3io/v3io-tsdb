@@ -96,8 +96,8 @@ func (fi *frameIterator) Err() error {
 }
 
 // data frame, holds multiple value columns and an index (time) column
-func NewDataFrame(columnsSpec []columnMeta, indexColumn Column, lset utils.Labels, hash uint64, isRawQuery, isAllColumnWildcard bool, columnSize int, useServerAggregates bool) (*dataFrame, error) {
-	df := &dataFrame{lset: lset, hash: hash, isRawSeries: isRawQuery}
+func NewDataFrame(columnsSpec []columnMeta, indexColumn Column, lset utils.Labels, hash uint64, isRawQuery, isAllColumnWildcard bool, columnSize int, useServerAggregates, showAggregateLabel bool) (*dataFrame, error) {
+	df := &dataFrame{lset: lset, hash: hash, isRawSeries: isRawQuery, showAggregateLabel: showAggregateLabel}
 	// is raw query
 	if isRawQuery {
 		df.columnByName = make(map[string]int, 100)
@@ -186,8 +186,9 @@ func getVirtualColumnFunction(aggrType aggregate.AggrType) (func([]Column, int) 
 }
 
 type dataFrame struct {
-	lset utils.Labels
-	hash uint64
+	lset               utils.Labels
+	hash               uint64
+	showAggregateLabel bool
 
 	isRawSeries           bool
 	isRawColumnsGenerated bool
@@ -269,7 +270,8 @@ func (d *dataFrame) TimeSeries(i int) (Series, error) {
 			currentColumn,
 			d.metricToCountColumn[currentColumn.GetColumnSpec().metric],
 			d.Labels(),
-			d.hash), nil
+			d.hash,
+			d.showAggregateLabel), nil
 	}
 }
 
