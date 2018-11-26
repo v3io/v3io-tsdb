@@ -1,6 +1,6 @@
 container: "bigdata"
 workers: 8
-webApiEndpoint: "http://webapi.iguazio.app.fnqtlobecymq.dev.trl.iguazio.com:8081"
+webApiEndpoint: "webapi.iguazio.app.fnqtlobecymq.dev.trl.iguazio.com:8081"
 username: "iguazio"
 password: "IqXUHmIe2op3Q02S"
 batchSize: 2048
