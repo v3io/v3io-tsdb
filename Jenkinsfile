@@ -1,8 +1,8 @@
-def BUILD_FOLDER = '/go'
-def github_user = "gkirok"
-def docker_user = "gallziguazio"
+BUILD_FOLDER = '/go'
+github_user = "gkirok"
+docker_user = "gallziguazio"
 
-def build_nuclio(BUILD_FOLDER, TAG_VERSION) {
+def build_nuclio(TAG_VERSION) {
     withCredentials([
             usernamePassword(credentialsId: '4318b7db-a1af-4775-b871-5a35d3e75c21', passwordVariable: 'GIT_PASSWORD', usernameVariable: 'GIT_USERNAME'),
             string(credentialsId: 'dd7f75c5-f055-4eb3-9365-e7d04e644211', variable: 'GIT_TOKEN')
@@ -140,7 +140,7 @@ string(credentialsId: 'dd7f75c5-f055-4eb3-9365-e7d04e644211', variable: 'GIT_TOK
 //                                build job: "tsdb-nuclio/v0.0.8", propagate: true, wait: true, parameters: [[$class: 'StringParameterValue', name: 'TAG_NAME', value: "v${NEXT_VERSION}"]]
 //                            }
 
-                                build_nuclio(BUILD_FOLDER, NEXT_VERSION)
+                                build_nuclio(NEXT_VERSION)
 
                                 stage('create tsdb-nuclio release') {
                                     sh "curl -v -H \"Content-Type: application/json\" -H \"Authorization: token ${GIT_TOKEN}\" https://api.github.com/repos/gkirok/tsdb-nuclio/releases -d '{\"tag_name\": \"v${NEXT_VERSION}\", \"target_commitish\": \"master\", \"name\": \"v${NEXT_VERSION}\", \"body\": \"Autorelease, triggered by v3io-tsdb\"}'"
