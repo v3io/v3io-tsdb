@@ -89,8 +89,15 @@ parallel(
                         string(credentialsId: 'dd7f75c5-f055-4eb3-9365-e7d04e644211', variable: 'GIT_TOKEN')
                 ]) {
                     stage('trigger') {
+                        stage('prepare sources') {
+                            sh """
+                                cd ${BUILD_FOLDER}
+                                git clone https://${GIT_USERNAME}:${GIT_PASSWORD}@github.com/${github_user}/prometheus.git src/github.com/prometheus/prometheus
+                            """
+                        }
+
                         def TAG_VERSION = sh(
-                                script: "cat VERSION",
+                                script: "cat ${BUILD_FOLDER}/src/github.com/prometheus/prometheus/VERSION",
                                 returnStdout: true
                         ).trim()
 
