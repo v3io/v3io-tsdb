@@ -9,7 +9,7 @@ parallel(
         podTemplate(label: "v3io-tsdb-nuclio-${label}", inheritFrom: 'kube-slave-dood') {
             node("v3io-tsdb-nuclio-${label}") {
                 withCredentials([
-                        usernamePassword(credentialsId: '4318b7db-a1af-4775-b871-5a35d3e75c21', passwordVariable: 'GIT_PASSWORD', usernameVariable: 'GIT_USERNAME'),
+//                        usernamePassword(credentialsId: '4318b7db-a1af-4775-b871-5a35d3e75c21', passwordVariable: 'GIT_PASSWORD', usernameVariable: 'GIT_USERNAME'),
                         string(credentialsId: 'dd7f75c5-f055-4eb3-9365-e7d04e644211', variable: 'GIT_TOKEN')
                 ]) {
                     stage('trigger') {
@@ -53,7 +53,7 @@ parallel(
         podTemplate(label: "v3io-tsdb-netops-demo-${label}", inheritFrom: 'kube-slave-dood') {
             node("v3io-tsdb-netops-demo-${label}") {
                 withCredentials([
-                        usernamePassword(credentialsId: '4318b7db-a1af-4775-b871-5a35d3e75c21', passwordVariable: 'GIT_PASSWORD', usernameVariable: 'GIT_USERNAME'),
+//                        usernamePassword(credentialsId: '4318b7db-a1af-4775-b871-5a35d3e75c21', passwordVariable: 'GIT_PASSWORD', usernameVariable: 'GIT_USERNAME'),
                         string(credentialsId: 'dd7f75c5-f055-4eb3-9365-e7d04e644211', variable: 'GIT_TOKEN')
                 ]) {
                     stage('trigger') {
