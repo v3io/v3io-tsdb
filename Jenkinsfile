@@ -7,17 +7,18 @@ def build_nuclio(TAG_VERSION) {
             usernamePassword(credentialsId: '4318b7db-a1af-4775-b871-5a35d3e75c21', passwordVariable: 'GIT_PASSWORD', usernameVariable: 'GIT_USERNAME'),
             string(credentialsId: 'dd7f75c5-f055-4eb3-9365-e7d04e644211', variable: 'GIT_TOKEN')
     ]) {
+        def git_project = 'tsdb-nuclio'
         stage('prepare sources') {
             container('jnlp') {
                 sh """
                     cd ${BUILD_FOLDER}
-                    git clone https://${GIT_USERNAME}:${GIT_PASSWORD}@github.com/${github_user}/tsdb-nuclio.git src/github.com/v3io/tsdb-nuclio
-                    cd ${BUILD_FOLDER}/src/github.com/v3io/tsdb-nuclio
+                    git clone https://${GIT_USERNAME}:${GIT_PASSWORD}@github.com/${github_user}/${git_project}.git src/github.com/v3io/${git_project}
+                    cd ${BUILD_FOLDER}/src/github.com/v3io/${git_project}
                     rm -rf functions/ingest/vendor/github.com/v3io/v3io-tsdb functions/query/vendor/github.com/v3io/v3io-tsdb
                     git clone https://${GIT_USERNAME}:${GIT_PASSWORD}@github.com/${github_user}/v3io-tsdb.git functions/ingest/vendor/github.com/v3io/v3io-tsdb
                     cd functions/ingest/vendor/github.com/v3io/v3io-tsdb
                     rm -rf .git vendor/github.com/v3io vendor/github.com/nuclio
-                    cd ${BUILD_FOLDER}/src/github.com/v3io/tsdb-nuclio
+                    cd ${BUILD_FOLDER}/src/github.com/v3io/${git_project}
                     cp -R functions/ingest/vendor/github.com/v3io/v3io-tsdb functions/query/vendor/github.com/v3io/v3io-tsdb
                 """
             }
@@ -27,10 +28,10 @@ def build_nuclio(TAG_VERSION) {
 //        stage('build in dood') {
 //            container('docker-cmd') {
 //                sh """
-//                    cd ${BUILD_FOLDER}/src/github.com/v3io/tsdb-nuclio/functions/ingest
+//                    cd ${BUILD_FOLDER}/src/github.com/v3io/${git_project}/functions/ingest
 //                    docker build . --tag tsdb-ingest:latest --tag ${docker_user}/tsdb-ingest:${TAG_VERSION}
 //
-//                    cd ${BUILD_FOLDER}/src/github.com/v3io/tsdb-nuclio/functions/query
+//                    cd ${BUILD_FOLDER}/src/github.com/v3io/${git_project}/functions/query
 //                    docker build . --tag tsdb-query:latest --tag ${docker_user}/tsdb-query:${TAG_VERSION}
 //                """
 //                withDockerRegistry([credentialsId: "472293cc-61bc-4e9f-aecb-1d8a73827fae", url: ""]) {
@@ -46,7 +47,7 @@ def build_nuclio(TAG_VERSION) {
                     sh """
                         git config --global user.email '${GIT_USERNAME}@iguazio.com'
                         git config --global user.name '${GIT_USERNAME}'
-                        cd ${BUILD_FOLDER}/src/github.com/v3io/tsdb-nuclio
+                        cd ${BUILD_FOLDER}/src/github.com/v3io/${git_project}
                         git add *
                         git commit -am 'Updated TSDB to latest';
                         git push origin master
@@ -71,15 +72,17 @@ def build_demo(TAG_VERSION) {
 //                    ).trim()
 
         stage('prepare sources') {
-            sh """ 
-                cd ${BUILD_FOLDER}
-                git clone https://${GIT_USERNAME}:${GIT_PASSWORD}@github.com/${github_user}/iguazio_api_examples.git src/github.com/v3io/iguazio_api_examples
-                cd ${BUILD_FOLDER}/src/github.com/v3io/iguazio_api_examples/netops_demo/golang/src/github.com/v3io/demos
-                rm -rf vendor/github.com/v3io/v3io-tsdb/
-                git clone https://${GIT_USERNAME}:${GIT_PASSWORD}@github.com/${github_user}/v3io-tsdb.git vendor/github.com/v3io/v3io-tsdb
-                cd vendor/github.com/v3io/v3io-tsdb
-                rm -rf .git vendor/github.com/v3io vendor/github.com/nuclio
-            """
+            container('jnlp') {
+                sh """
+                    cd ${BUILD_FOLDER}
+                    git clone https://${GIT_USERNAME}:${GIT_PASSWORD}@github.com/${github_user}/iguazio_api_examples.git src/github.com/v3io/iguazio_api_examples
+                    cd ${BUILD_FOLDER}/src/github.com/v3io/iguazio_api_examples/netops_demo/golang/src/github.com/v3io/demos
+                    rm -rf vendor/github.com/v3io/v3io-tsdb/
+                    git clone https://${GIT_USERNAME}:${GIT_PASSWORD}@github.com/${github_user}/v3io-tsdb.git vendor/github.com/v3io/v3io-tsdb
+                    cd vendor/github.com/v3io/v3io-tsdb
+                    rm -rf .git vendor/github.com/v3io vendor/github.com/nuclio
+                """
+            }
         }
 //                                git checkout ${V3IO_TSDB_VERSION}
 
@@ -100,17 +103,19 @@ def build_demo(TAG_VERSION) {
         }
 
         stage('git push') {
-            try {
-                sh """
-                    git config --global user.email '${GIT_USERNAME}@iguazio.com'
-                    git config --global user.name '${GIT_USERNAME}'
-                    cd ${BUILD_FOLDER}/src/github.com/v3io/iguazio_api_examples/netops_demo
-                    git add *
-                    git commit -am 'Updated TSDB to latest';
-                    git push origin master
-                """
-            } catch (err) {
-                echo "Can not push code to git"
+            container('jnlp') {
+                try {
+                    sh """
+                        git config --global user.email '${GIT_USERNAME}@iguazio.com'
+                        git config --global user.name '${GIT_USERNAME}'
+                        cd ${BUILD_FOLDER}/src/github.com/v3io/iguazio_api_examples/netops_demo
+                        git add *
+                        git commit -am 'Updated TSDB to latest';
+                        git push origin master
+                    """
+                } catch (err) {
+                    echo "Can not push code to git"
+                }
             }
         }
     }
@@ -120,11 +125,11 @@ def build_demo(TAG_VERSION) {
 
 def label = "${UUID.randomUUID().toString()}"
 properties([pipelineTriggers([[$class: 'PeriodicFolderTrigger', interval: '2m']])])
-podTemplate(label: "v3io-tsdb", yaml: """
+podTemplate(label: "dood", yaml: """
 apiVersion: v1
 kind: Pod
 metadata:
-  name: "v3io-tsdb"
+  name: "dood"
   labels:
     jenkins/kube-default: "true"
     app: "jenkins"
@@ -164,7 +169,7 @@ spec:
 ) {
     parallel(
         'tsdb-nuclio': {
-            podTemplate(label: "v3io-tsdb-nuclio-${label}", inheritFrom: 'v3io-tsdb') {
+            podTemplate(label: "v3io-tsdb-nuclio-${label}", inheritFrom: 'dood') {
                 node("v3io-tsdb-nuclio-${label}") {
                     withCredentials([
 //                        usernamePassword(credentialsId: '4318b7db-a1af-4775-b871-5a35d3e75c21', passwordVariable: 'GIT_PASSWORD', usernameVariable: 'GIT_USERNAME'),
@@ -208,7 +213,7 @@ string(credentialsId: 'dd7f75c5-f055-4eb3-9365-e7d04e644211', variable: 'GIT_TOK
             }
         },
         'netops-demo': {
-            podTemplate(label: "v3io-tsdb-netops-demo-${label}", inheritFrom: 'kube-slave-dood') {
+            podTemplate(label: "v3io-tsdb-netops-demo-${label}", inheritFrom: 'dood') {
                 node("v3io-tsdb-netops-demo-${label}") {
                     withCredentials([
 //                        usernamePassword(credentialsId: '4318b7db-a1af-4775-b871-5a35d3e75c21', passwordVariable: 'GIT_PASSWORD', usernameVariable: 'GIT_USERNAME'),
@@ -248,7 +253,7 @@ string(credentialsId: 'dd7f75c5-f055-4eb3-9365-e7d04e644211', variable: 'GIT_TOK
             }
         },
         'prometheus': {
-            podTemplate(label: "v3io-tsdb-prometheus-${label}", inheritFrom: 'kube-slave-dood') {
+            podTemplate(label: "v3io-tsdb-prometheus-${label}", inheritFrom: 'dood') {
                 node("v3io-tsdb-prometheus-${label}") {
                     withCredentials([
                             usernamePassword(credentialsId: '4318b7db-a1af-4775-b871-5a35d3e75c21', passwordVariable: 'GIT_PASSWORD', usernameVariable: 'GIT_USERNAME'),
