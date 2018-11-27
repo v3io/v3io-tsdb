@@ -16,7 +16,7 @@ type qryResults struct {
 	encoding int16
 }
 
-func (q *qryResults) IsRawQuery() bool { return q.query.aggregationParams == nil && q.query.step == 0 }
+func (q *qryResults) IsRawQuery() bool { return q.frame.isRawSeries }
 
 func (q *qryResults) IsDownsample() bool {
 	_, ok := q.frame.columnByName[q.name]

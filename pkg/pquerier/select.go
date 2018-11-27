@@ -361,7 +361,9 @@ func (s *selectQueryContext) generateTimeColumn() Column {
 	return timeColumn
 }
 
-func (s *selectQueryContext) isRawQuery() bool { return s.functions == "" && s.step == 0 }
+func (s *selectQueryContext) isRawQuery() bool {
+	return (s.functions == "" && s.step == 0) || s.disableClientAggr
+}
 
 func (s *selectQueryContext) getResultBucketsSize() int {
 	if s.isRawQuery() {
