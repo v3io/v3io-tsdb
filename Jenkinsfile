@@ -70,13 +70,14 @@ def build_demo(TAG_VERSION) {
 //                            script: "echo ${TAG_VERSION} | awk -F '-v' '{print \"v\"\$2}'",
 //                            returnStdout: true
 //                    ).trim()
+        def git_project = 'iguazio_api_examples'
 
         stage('prepare sources') {
             container('jnlp') {
                 sh """
                     cd ${BUILD_FOLDER}
-                    git clone https://${GIT_USERNAME}:${GIT_PASSWORD}@github.com/${github_user}/iguazio_api_examples.git src/github.com/v3io/iguazio_api_examples
-                    cd ${BUILD_FOLDER}/src/github.com/v3io/iguazio_api_examples/netops_demo/golang/src/github.com/v3io/demos
+                    git clone https://${GIT_USERNAME}:${GIT_PASSWORD}@github.com/${github_user}/${git_project}.git src/github.com/v3io/${git_project}
+                    cd ${BUILD_FOLDER}/src/github.com/v3io/${git_project}/netops_demo/golang/src/github.com/v3io/demos
                     rm -rf vendor/github.com/v3io/v3io-tsdb/
                     git clone https://${GIT_USERNAME}:${GIT_PASSWORD}@github.com/${github_user}/v3io-tsdb.git vendor/github.com/v3io/v3io-tsdb
                     cd vendor/github.com/v3io/v3io-tsdb
@@ -89,10 +90,10 @@ def build_demo(TAG_VERSION) {
 //        stage('build in dood') {
 //            container('docker-cmd') {
 //                sh """
-//                    cd ${BUILD_FOLDER}/src/github.com/v3io/iguazio_api_examples/netops_demo/golang/src/github.com/v3io/demos
+//                    cd ${BUILD_FOLDER}/src/github.com/v3io/${git_project}/netops_demo/golang/src/github.com/v3io/demos
 //                    docker build . --tag netops-demo-golang:latest --tag ${docker_user}/netops-demo-golang:$NETOPS_DEMO_VERSION --build-arg NUCLIO_BUILD_OFFLINE=true --build-arg NUCLIO_BUILD_IMAGE_HANDLER_DIR=github.com/v3io/demos
 //
-//                    cd ${BUILD_FOLDER}/src/github.com/v3io/iguazio_api_examples/netops_demo/py
+//                    cd ${BUILD_FOLDER}/src/github.com/v3io/${git_project}/netops_demo/py
 //                    docker build . --tag netops-demo-py:latest --tag ${docker_user}/netops-demo-py:$NETOPS_DEMO_VERSION
 //                """
 //                withDockerRegistry([credentialsId: "472293cc-61bc-4e9f-aecb-1d8a73827fae", url: ""]) {
@@ -108,7 +109,7 @@ def build_demo(TAG_VERSION) {
                     sh """
                         git config --global user.email '${GIT_USERNAME}@iguazio.com'
                         git config --global user.name '${GIT_USERNAME}'
-                        cd ${BUILD_FOLDER}/src/github.com/v3io/iguazio_api_examples/netops_demo
+                        cd ${BUILD_FOLDER}/src/github.com/v3io/${git_project}/netops_demo
                         git add *
                         git commit -am 'Updated TSDB to latest';
                         git push origin master
