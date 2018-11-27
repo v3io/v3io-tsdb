@@ -13,19 +13,16 @@ func NewDataFrameColumnSeries(indexColumn, dataColumn, countColumn Column, label
 		labels = append(labels, utils.LabelsFromStringList(aggregate.AggregateLabel, dataColumn.GetColumnSpec().function.String())...)
 	}
 
-	s := &DataFrameColumnSeries{dataColumn: dataColumn, indexColumn: indexColumn, CountColumn: countColumn, labels: labels, key: hash}
+	s := &DataFrameColumnSeries{labels: labels, key: hash}
 	s.iter = &dataFrameColumnSeriesIterator{indexColumn: indexColumn, dataColumn: dataColumn, countColumn: countColumn, currentIndex: -1}
 	return s
 }
 
 // This series converts two columns into a series of time-value pairs
 type DataFrameColumnSeries struct {
-	dataColumn  Column
-	indexColumn Column
-	CountColumn Column // Count Column is needed to filter out empty buckets
-	labels      utils.Labels
-	key         uint64
-	iter        SeriesIterator
+	labels utils.Labels
+	key    uint64
+	iter   SeriesIterator
 }
 
 func (s *DataFrameColumnSeries) Labels() utils.Labels {
@@ -37,7 +34,7 @@ func (s *DataFrameColumnSeries) GetKey() uint64           { return s.key }
 type dataFrameColumnSeriesIterator struct {
 	dataColumn  Column
 	indexColumn Column
-	countColumn Column
+	countColumn Column // Count Column is needed to filter out empty buckets
 
 	currentIndex int
 	err          error
