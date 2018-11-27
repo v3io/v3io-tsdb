@@ -3,28 +3,24 @@ github_user = "gkirok"
 docker_user = "gallziguazio"
 
 def build_nuclio(TAG_VERSION) {
-    withCredentials([
-            usernamePassword(credentialsId: '4318b7db-a1af-4775-b871-5a35d3e75c21', passwordVariable: 'GIT_PASSWORD', usernameVariable: 'GIT_USERNAME'),
-            string(credentialsId: 'dd7f75c5-f055-4eb3-9365-e7d04e644211', variable: 'GIT_TOKEN')
-    ]) {
-        def git_project = 'tsdb-nuclio'
-        stage('prepare sources') {
-            container('jnlp') {
-                sh """
-                    cd ${BUILD_FOLDER}
-                    git clone https://${GIT_USERNAME}:${GIT_PASSWORD}@github.com/${github_user}/${git_project}.git src/github.com/v3io/${git_project}
-                    cd ${BUILD_FOLDER}/src/github.com/v3io/${git_project}
-                    rm -rf functions/ingest/vendor/github.com/v3io/v3io-tsdb functions/query/vendor/github.com/v3io/v3io-tsdb
-                    git clone https://${GIT_USERNAME}:${GIT_PASSWORD}@github.com/${github_user}/v3io-tsdb.git functions/ingest/vendor/github.com/v3io/v3io-tsdb
-                    cd functions/ingest/vendor/github.com/v3io/v3io-tsdb
-                    rm -rf .git vendor/github.com/v3io vendor/github.com/nuclio
-                    cd ${BUILD_FOLDER}/src/github.com/v3io/${git_project}
-                    cp -R functions/ingest/vendor/github.com/v3io/v3io-tsdb functions/query/vendor/github.com/v3io/v3io-tsdb
-                """
+    def git_project = 'tsdb-nuclio'
+    stage('prepare sources') {
+        container('jnlp') {
+            sh """
+                cd ${BUILD_FOLDER}
+                git clone https://${GIT_USERNAME}:${GIT_PASSWORD}@github.com/${github_user}/${git_project}.git src/github.com/v3io/${git_project}
+                cd ${BUILD_FOLDER}/src/github.com/v3io/${git_project}
+                rm -rf functions/ingest/vendor/github.com/v3io/v3io-tsdb functions/query/vendor/github.com/v3io/v3io-tsdb
+                git clone https://${GIT_USERNAME}:${GIT_PASSWORD}@github.com/${github_user}/v3io-tsdb.git functions/ingest/vendor/github.com/v3io/v3io-tsdb
+                cd functions/ingest/vendor/github.com/v3io/v3io-tsdb
+                rm -rf .git vendor/github.com/v3io vendor/github.com/nuclio
+                cd ${BUILD_FOLDER}/src/github.com/v3io/${git_project}
+                cp -R functions/ingest/vendor/github.com/v3io/v3io-tsdb functions/query/vendor/github.com/v3io/v3io-tsdb
+            """
 
-//                    git checkout ${V3IO_TSDB_VERSION}
-            }
+//                git checkout ${V3IO_TSDB_VERSION}
         }
+    }
 
 //        stage('build in dood') {
 //            container('docker-cmd') {
@@ -42,20 +38,19 @@ def build_nuclio(TAG_VERSION) {
 //            }
 //        }
 
-        stage('git push') {
-            container('jnlp') {
-                try {
-                    sh """
-                        git config --global user.email '${GIT_USERNAME}@iguazio.com'
-                        git config --global user.name '${GIT_USERNAME}'
-                        cd ${BUILD_FOLDER}/src/github.com/v3io/${git_project}
-                        git add *
-                        git commit -am 'Updated TSDB to latest';
-                        git push origin master
-                    """
-                } catch (err) {
-                    echo "Can not push code to git"
-                }
+    stage('git push') {
+        container('jnlp') {
+            try {
+                sh """
+                    git config --global user.email '${GIT_USERNAME}@iguazio.com'
+                    git config --global user.name '${GIT_USERNAME}'
+                    cd ${BUILD_FOLDER}/src/github.com/v3io/${git_project}
+                    git add *
+                    git commit -am 'Updated TSDB to latest';
+                    git push origin master
+                """
+            } catch (err) {
+                echo "Can not push code to git"
             }
         }
     }
@@ -63,31 +58,23 @@ def build_nuclio(TAG_VERSION) {
 
 
 def build_demo(TAG_VERSION) {
-    withCredentials([
-            usernamePassword(credentialsId: '4318b7db-a1af-4775-b871-5a35d3e75c21', passwordVariable: 'GIT_PASSWORD', usernameVariable: 'GIT_USERNAME'),
-            string(credentialsId: 'dd7f75c5-f055-4eb3-9365-e7d04e644211', variable: 'GIT_TOKEN')
-    ]) {
-//                    def V3IO_TSDB_VERSION = sh(
-//                            script: "echo ${TAG_VERSION} | awk -F '-v' '{print \"v\"\$2}'",
-//                            returnStdout: true
-//                    ).trim()
-        def git_project = 'iguazio_api_examples'
+    def git_project = 'iguazio_api_examples'
 
-        stage('prepare sources') {
-            container('jnlp') {
-                sh """
-                    cd ${BUILD_FOLDER}
-                    git clone https://${GIT_USERNAME}:${GIT_PASSWORD}@github.com/${github_user}/${git_project}.git src/github.com/v3io/${git_project}
-                    cd ${BUILD_FOLDER}/src/github.com/v3io/${git_project}/netops_demo/golang/src/github.com/v3io/demos
-                    rm -rf vendor/github.com/v3io/v3io-tsdb/
-                    git clone https://${GIT_USERNAME}:${GIT_PASSWORD}@github.com/${github_user}/v3io-tsdb.git vendor/github.com/v3io/v3io-tsdb
-                    cd vendor/github.com/v3io/v3io-tsdb
-                    rm -rf .git vendor/github.com/v3io vendor/github.com/nuclio
-                """
+    stage('prepare sources') {
+        container('jnlp') {
+            sh """
+                cd ${BUILD_FOLDER}
+                git clone https://${GIT_USERNAME}:${GIT_PASSWORD}@github.com/${github_user}/${git_project}.git src/github.com/v3io/${git_project}
+                cd ${BUILD_FOLDER}/src/github.com/v3io/${git_project}/netops_demo/golang/src/github.com/v3io/demos
+                rm -rf vendor/github.com/v3io/v3io-tsdb/
+                git clone https://${GIT_USERNAME}:${GIT_PASSWORD}@github.com/${github_user}/v3io-tsdb.git vendor/github.com/v3io/v3io-tsdb
+                cd vendor/github.com/v3io/v3io-tsdb
+                rm -rf .git vendor/github.com/v3io vendor/github.com/nuclio
+            """
 
-//                    git checkout ${V3IO_TSDB_VERSION}
-            }
+//                git checkout ${V3IO_TSDB_VERSION}
         }
+    }
 
 //        stage('build in dood') {
 //            container('docker-cmd') {
@@ -105,20 +92,19 @@ def build_demo(TAG_VERSION) {
 //            }
 //        }
 
-        stage('git push') {
-            container('jnlp') {
-                try {
-                    sh """
-                        git config --global user.email '${GIT_USERNAME}@iguazio.com'
-                        git config --global user.name '${GIT_USERNAME}'
-                        cd ${BUILD_FOLDER}/src/github.com/v3io/${git_project}/netops_demo
-                        git add *
-                        git commit -am 'Updated TSDB to latest';
-                        git push origin master
-                    """
-                } catch (err) {
-                    echo "Can not push code to git"
-                }
+    stage('git push') {
+        container('jnlp') {
+            try {
+                sh """
+                    git config --global user.email '${GIT_USERNAME}@iguazio.com'
+                    git config --global user.name '${GIT_USERNAME}'
+                    cd ${BUILD_FOLDER}/src/github.com/v3io/${git_project}/netops_demo
+                    git add *
+                    git commit -am 'Updated TSDB to latest';
+                    git push origin master
+                """
+            } catch (err) {
+                echo "Can not push code to git"
             }
         }
     }
@@ -148,17 +134,17 @@ def build_prometheus(TAG_VERSION) {
         }
     }
 
-    stage('build in dood') {
-        container('docker-cmd') {
-            sh """
-                cd ${BUILD_FOLDER}/src/github.com/${git_project}/${git_project}
-                docker build . -t ${docker_user}/v3io-prom:${TAG_VERSION} -f Dockerfile.multi
-            """
-            withDockerRegistry([credentialsId: "472293cc-61bc-4e9f-aecb-1d8a73827fae", url: ""]) {
-                sh "docker push ${docker_user}/v3io-prom:${TAG_VERSION}"
-            }
-        }
-    }
+//    stage('build in dood') {
+//        container('docker-cmd') {
+//            sh """
+//                cd ${BUILD_FOLDER}/src/github.com/${git_project}/${git_project}
+//                docker build . -t ${docker_user}/v3io-prom:${TAG_VERSION} -f Dockerfile.multi
+//            """
+//            withDockerRegistry([credentialsId: "472293cc-61bc-4e9f-aecb-1d8a73827fae", url: ""]) {
+//                sh "docker push ${docker_user}/v3io-prom:${TAG_VERSION}"
+//            }
+//        }
+//    }
 
     stage('git push') {
         container('jnlp') {
