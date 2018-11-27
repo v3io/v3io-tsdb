@@ -86,21 +86,21 @@ def build_demo(TAG_VERSION) {
         }
 //                                git checkout ${V3IO_TSDB_VERSION}
 
-        stage('build in dood') {
-            container('docker-cmd') {
-                sh """
-                    cd ${BUILD_FOLDER}/src/github.com/v3io/iguazio_api_examples/netops_demo/golang/src/github.com/v3io/demos
-                    docker build . --tag netops-demo-golang:latest --tag ${docker_user}/netops-demo-golang:$NETOPS_DEMO_VERSION --build-arg NUCLIO_BUILD_OFFLINE=true --build-arg NUCLIO_BUILD_IMAGE_HANDLER_DIR=github.com/v3io/demos
-
-                    cd ${BUILD_FOLDER}/src/github.com/v3io/iguazio_api_examples/netops_demo/py
-                    docker build . --tag netops-demo-py:latest --tag ${docker_user}/netops-demo-py:$NETOPS_DEMO_VERSION
-                """
-                withDockerRegistry([credentialsId: "472293cc-61bc-4e9f-aecb-1d8a73827fae", url: ""]) {
-                    sh "docker push ${docker_user}/netops-demo-golang:${NETOPS_DEMO_VERSION}"
-                    sh "docker push ${docker_user}/netops-demo-py:${NETOPS_DEMO_VERSION}"
-                }
-            }
-        }
+//        stage('build in dood') {
+//            container('docker-cmd') {
+//                sh """
+//                    cd ${BUILD_FOLDER}/src/github.com/v3io/iguazio_api_examples/netops_demo/golang/src/github.com/v3io/demos
+//                    docker build . --tag netops-demo-golang:latest --tag ${docker_user}/netops-demo-golang:$NETOPS_DEMO_VERSION --build-arg NUCLIO_BUILD_OFFLINE=true --build-arg NUCLIO_BUILD_IMAGE_HANDLER_DIR=github.com/v3io/demos
+//
+//                    cd ${BUILD_FOLDER}/src/github.com/v3io/iguazio_api_examples/netops_demo/py
+//                    docker build . --tag netops-demo-py:latest --tag ${docker_user}/netops-demo-py:$NETOPS_DEMO_VERSION
+//                """
+//                withDockerRegistry([credentialsId: "472293cc-61bc-4e9f-aecb-1d8a73827fae", url: ""]) {
+//                    sh "docker push ${docker_user}/netops-demo-golang:${NETOPS_DEMO_VERSION}"
+//                    sh "docker push ${docker_user}/netops-demo-py:${NETOPS_DEMO_VERSION}"
+//                }
+//            }
+//        }
 
         stage('git push') {
             container('jnlp') {
