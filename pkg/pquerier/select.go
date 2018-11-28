@@ -42,6 +42,7 @@ type selectQueryContext struct {
 	dataFrames      map[uint64]*dataFrame
 	frameList       []*dataFrame
 	requestChannels []chan *qryResults
+	errorChannel    chan error
 	wg              sync.WaitGroup
 
 	timeColumn Column
@@ -96,6 +97,13 @@ func (s *selectQueryContext) start(parts []*partmgr.DBPartition, params *SelectP
 
 	// wait for Go routines to complete
 	s.wg.Wait()
+	close(s.errorChannel)
+
+	// return first error
+	err = <-s.errorChannel
+	if err != nil {
+		return nil, err
+	}
 
 	if len(s.frameList) > 0 {
 		s.totalColumns = s.frameList[0].Len()
@@ -190,6 +198,7 @@ func (s *selectQueryContext) queryPartition(partition *partmgr.DBPartition) ([]*
 func (s *selectQueryContext) startCollectors() error {
 
 	s.requestChannels = make([]chan *qryResults, s.workers)
+	s.errorChannel = make(chan error, s.workers)
 
 	for i := 0; i < s.workers; i++ {
 		newChan := make(chan *qryResults, 1000)

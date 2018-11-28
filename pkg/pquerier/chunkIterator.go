@@ -224,17 +224,17 @@ func (s *V3ioRawSeries) AddChunks(results *qryResults) {
 func (s *V3ioRawSeries) initLabels() {
 	name, ok := s.fields[config.MetricNameAttrName].(string)
 	if !ok {
-		s.logger.Error("error in initLabels; bad metric name.")
+		s.logger.Error("error in initLabels; bad metric name: %v", s.fields[config.MetricNameAttrName].(string))
 	}
 	lsetAttr, ok := s.fields[config.LabelSetAttrName].(string)
 	if !ok {
-		s.logger.Error("error in initLabels; bad labels set.")
+		s.logger.Error("error in initLabels; bad labels set: %v", s.fields[config.LabelSetAttrName].(string))
 	}
 
 	lset, err := utils.LabelsFromString(name, lsetAttr)
 
 	if err != nil {
-		s.logger.Error("error in initLabels; bad labels set.")
+		s.logger.Error("error in initLabels; failed to parse labels set string: %v. err: %v", s.fields[config.LabelSetAttrName].(string), err)
 	}
 
 	s.lset = lset
