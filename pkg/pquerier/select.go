@@ -199,7 +199,7 @@ func (s *selectQueryContext) startCollectors() error {
 		// Increment the WaitGroup counter.
 		s.wg.Add(1)
 		go func(index int) {
-			mainCollector(s, index)
+			mainCollector(s, s.requestChannels[index])
 		}(i)
 	}
 

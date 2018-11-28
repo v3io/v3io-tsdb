@@ -2,9 +2,7 @@ package pquerier
 
 import (
 	"encoding/binary"
-	"fmt"
 	"math"
-	"time"
 
 	"github.com/v3io/v3io-tsdb/pkg/aggregate"
 )
@@ -45,8 +43,6 @@ once collectors are done (wg.done) return SeriesSet (prom compatible) or FrameSe
 - if vector query (results are bucketed over time or grouped by)
 	if first partition
 		create & init array per function (and per name) based on query metadata/results
-	  else
-		?
 
 	init child raw-chunk or attribute iterators
 	iterate over data and fill bucketed arrays
@@ -58,26 +54,15 @@ once collectors are done (wg.done) return SeriesSet (prom compatible) or FrameSe
 
 */
 
-// TODO: replace with a real collector implementation
-func dummyCollector(ctx *selectQueryContext, index int) {
-	defer ctx.wg.Done()
-
-	fmt.Println("starting collector:", index)
-	time.Sleep(5 * time.Second)
-
-	// collector should have a loop waiting on the s.requestChannels[index] and processing requests
-	// once the chan is closed or a fin request arrived we exit
-}
-
 // Main collector which processes query results from a channel and then dispatches them according to query type.
 // Query types: raw data, server-side aggregates, client-side aggregates
-func mainCollector(ctx *selectQueryContext, index int) {
+func mainCollector(ctx *selectQueryContext, responseChannel chan *qryResults) {
 	defer ctx.wg.Done()
 
 	lastTimePerMetric := make(map[string]int64, len(ctx.columnsSpecByMetric))
 	lastValuePerMetric := make(map[string]float64, len(ctx.columnsSpecByMetric))
 
-	for res := range ctx.requestChannels[index] {
+	for res := range responseChannel {
 		if res.IsRawQuery() {
 			rawCollector(ctx, res)
 		} else {
