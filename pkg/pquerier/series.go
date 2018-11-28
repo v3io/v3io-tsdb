@@ -4,6 +4,7 @@ import (
 	"math"
 
 	"github.com/v3io/v3io-tsdb/pkg/aggregate"
+	"github.com/v3io/v3io-tsdb/pkg/config"
 	"github.com/v3io/v3io-tsdb/pkg/utils"
 )
 
@@ -13,6 +14,8 @@ func NewDataFrameColumnSeries(indexColumn, dataColumn, countColumn Column, label
 		labels = append(labels, utils.LabelsFromStringList(aggregate.AggregateLabel, dataColumn.GetColumnSpec().function.String())...)
 	}
 
+	// The labels we get from the Dataframe are agnostic to the metric name, since there might be several metrics in one Dataframe
+	labels = append(labels, utils.LabelsFromStringList(config.PrometheusMetricNameAttribute, dataColumn.GetColumnSpec().metric)...)
 	s := &DataFrameColumnSeries{labels: labels, key: hash}
 	s.iter = &dataFrameColumnSeriesIterator{indexColumn: indexColumn, dataColumn: dataColumn, countColumn: countColumn, currentIndex: -1}
 	return s

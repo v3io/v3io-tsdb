@@ -96,7 +96,7 @@ func (fi *frameIterator) Err() error {
 }
 
 // data frame, holds multiple value columns and an index (time) column
-func NewDataFrame(columnsSpec []columnMeta, indexColumn Column, lset utils.Labels, hash uint64, isRawQuery, isAllColumnWildcard bool, columnSize int, useServerAggregates, showAggregateLabel bool) (*dataFrame, error) {
+func NewDataFrame(columnsSpec []columnMeta, indexColumn Column, lset utils.Labels, hash uint64, isRawQuery, getAllMetrics bool, columnSize int, useServerAggregates, showAggregateLabel bool) (*dataFrame, error) {
 	df := &dataFrame{lset: lset, hash: hash, isRawSeries: isRawQuery, showAggregateLabel: showAggregateLabel}
 	// is raw query
 	if isRawQuery {
@@ -107,29 +107,20 @@ func NewDataFrame(columnsSpec []columnMeta, indexColumn Column, lset utils.Label
 		df.columnByName = make(map[string]int, numOfColumns)
 		df.columns = make([]Column, 0, numOfColumns)
 		df.metricToCountColumn = map[string]Column{}
-		if !isAllColumnWildcard {
+		df.metrics = map[string]struct{}{}
+		// In case user wanted all metrics, save the template for every metric.
+		// Once we know what metrics we have we will create Columns out of the column Templates
+		if getAllMetrics {
+			df.columnsTemplates = columnsSpec
+		} else {
 			for i, col := range columnsSpec {
-				var column Column
-				if col.function != 0 {
-					if col.isConcrete() {
-						function, err := getAggreagteFunction(col.function, useServerAggregates)
-						if err != nil {
-							return nil, err
-						}
-						column = NewConcreteColumn(col.getColumnName(), col, columnSize, function)
-						if aggregate.IsCountAggregate(col.function) {
-							df.metricToCountColumn[col.metric] = column
-						}
-					} else {
-						function, err := getVirtualColumnFunction(col.function)
-						if err != nil {
-							return nil, err
-						}
-
-						column = NewVirtualColumn(col.getColumnName(), col, columnSize, function)
-					}
-				} else {
-					column = NewDataColumn(col.getColumnName(), col, columnSize, FloatType)
+				df.metrics[col.metric] = struct{}{}
+				column, err := createColumn(col, columnSize, useServerAggregates)
+				if err != nil {
+					return nil, err
+				}
+				if aggregate.IsCountAggregate(col.function) {
+					df.metricToCountColumn[col.metric] = column
 				}
 				df.columns = append(df.columns, column)
 				df.columnByName[col.getColumnName()] = i
@@ -144,6 +135,30 @@ func NewDataFrame(columnsSpec []columnMeta, indexColumn Column, lset utils.Label
 	}
 
 	return df, nil
+}
+
+func createColumn(col columnMeta, columnSize int, useServerAggregates bool) (Column, error) {
+	var column Column
+	if col.function != 0 {
+		if col.isConcrete() {
+			function, err := getAggreagteFunction(col.function, useServerAggregates)
+			if err != nil {
+				return nil, err
+			}
+			column = NewConcreteColumn(col.getColumnName(), col, columnSize, function)
+		} else {
+			function, err := getVirtualColumnFunction(col.function)
+			if err != nil {
+				return nil, err
+			}
+
+			column = NewVirtualColumn(col.getColumnName(), col, columnSize, function)
+		}
+	} else {
+		column = NewDataColumn(col.getColumnName(), col, columnSize, FloatType)
+	}
+
+	return column, nil
 }
 
 func getAggreagteFunction(aggrType aggregate.AggrType, useServerAggregates bool) (func(interface{}, interface{}) interface{}, error) {
@@ -194,11 +209,47 @@ type dataFrame struct {
 	isRawColumnsGenerated bool
 	rawColumns            []Series
 
-	columns      []Column
-	index        Column
-	columnByName map[string]int // name -> index in columns
+	columnsTemplates []columnMeta
+	columns          []Column
+	index            Column
+	columnByName     map[string]int // name -> index in columns
 
+	metrics             map[string]struct{}
 	metricToCountColumn map[string]Column
+}
+
+func (d *dataFrame) addMetricIfNotExist(metricName string, columnSize int, useServerAggregates bool) error {
+	if _, ok := d.metrics[metricName]; !ok {
+		return d.addMetricFromTemplate(metricName, columnSize, useServerAggregates)
+	}
+	return nil
+}
+
+func (d *dataFrame) addMetricFromTemplate(metricName string, columnSize int, useServerAggregates bool) error {
+	newColumns := make([]Column, len(d.columnsTemplates))
+	for i, col := range d.columnsTemplates {
+		newCol, err := createColumn(col, columnSize, useServerAggregates)
+		if err != nil {
+			return err
+		}
+
+		newCol.setMetricName(metricName)
+		newColumns[i] = newCol
+		if aggregate.IsCountAggregate(col.function) {
+			d.metricToCountColumn[metricName] = newCol
+		}
+	}
+
+	numberOfColumns := len(d.columns)
+	d.columns = append(d.columns, newColumns...)
+	for i, col := range newColumns {
+		d.columnByName[col.GetColumnSpec().getColumnName()] = numberOfColumns + i
+		if !col.GetColumnSpec().isConcrete() {
+			fillDependantColumns(col, d)
+		}
+	}
+	d.metrics[metricName] = struct{}{}
+	return nil
 }
 
 func (d *dataFrame) Len() int {
@@ -370,6 +421,7 @@ type Column interface {
 	SetDataAt(i int, value interface{}) error
 	SetData(d interface{}, size int) error
 	GetInterpolationFunction() (InterpolationFunction, int64)
+	setMetricName(name string)
 }
 
 type basicColumn struct {
@@ -391,6 +443,11 @@ func (c *basicColumn) Len() int {
 func (c *basicColumn) isValidIndex(i int) bool { return i >= 0 && i < c.size }
 
 func (c *basicColumn) GetColumnSpec() columnMeta { return c.spec }
+
+func (c *basicColumn) setMetricName(name string) {
+	c.spec.metric = name
+	c.name = c.spec.getColumnName()
+}
 
 func (c *basicColumn) SetDataAt(i int, value interface{}) error { return nil }
 func (c *basicColumn) SetData(d interface{}, size int) error {

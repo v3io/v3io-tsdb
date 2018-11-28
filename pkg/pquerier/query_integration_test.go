@@ -324,19 +324,16 @@ func (suite *testQuerySuite) TestQueryMetricWithDashInTheName() { // IG-8585
 }
 
 func (suite *testQuerySuite) TestQueryAggregateWithNameWildcard() {
-	suite.T().Skip("Reanable when feature fixed")
-
 	adapter, err := tsdb.NewV3ioAdapter(suite.v3ioConfig, nil, nil)
 	if err != nil {
 		suite.T().Fatalf("failed to create v3io adapter. reason: %s", err)
 	}
 
 	labels1 := utils.LabelsFromStringList("os", "linux")
-	labels2 := utils.LabelsFromStringList("os", "mac")
 	numberOfEvents := 10
 	eventsInterval := 60 * 1000
 	baseTime := time.Now().UnixNano()/1000000 - int64(numberOfEvents*eventsInterval)
-	expectedData := []tsdbtest.DataPoint{{baseTime, 10},
+	ingestData := []tsdbtest.DataPoint{{baseTime - 7*tsdbtest.DaysInMillis, 10},
 		{int64(baseTime + tsdbtest.MinuteInMillis), 20},
 		{baseTime + 2*tsdbtest.MinuteInMillis, 30},
 		{baseTime + 3*tsdbtest.MinuteInMillis, 40}}
@@ -346,20 +343,26 @@ func (suite *testQuerySuite) TestQueryAggregateWithNameWildcard() {
 			Value: tsdbtest.TimeSeries{tsdbtest.Metric{
 				Name:   "cpu",
 				Labels: labels1,
-				Data:   expectedData},
+				Data:   ingestData},
 				tsdbtest.Metric{
-					Name:   "cpu",
-					Labels: labels2,
-					Data:   expectedData},
+					Name:   "diskio",
+					Labels: labels1,
+					Data:   ingestData},
 			}})
 	tsdbtest.InsertData(suite.T(), testParams)
+	expectedData := map[string][]tsdbtest.DataPoint{
+		"sum": {{Time: baseTime - 7*tsdbtest.DaysInMillis, Value: 10}, {Time: baseTime, Value: 20}, {Time: baseTime + 2*tsdbtest.MinuteInMillis, Value: 70}},
+		"min": {{Time: baseTime - 7*tsdbtest.DaysInMillis, Value: 10}, {Time: baseTime, Value: 20}, {Time: baseTime + 2*tsdbtest.MinuteInMillis, Value: 30}},
+		"max": {{Time: baseTime - 7*tsdbtest.DaysInMillis, Value: 10}, {Time: baseTime, Value: 20}, {Time: baseTime + 2*tsdbtest.MinuteInMillis, Value: 40}}}
+	expected := map[string]map[string][]tsdbtest.DataPoint{"cpu": expectedData, "diskio": expectedData}
 
 	querierV2, err := adapter.QuerierV2(nil)
 	if err != nil {
 		suite.T().Fatalf("failed to create querier v2, err: %v", err)
 	}
 
-	params := &pquerier.SelectParams{Functions: "max", From: baseTime, To: baseTime + int64(numberOfEvents*eventsInterval)}
+	params := &pquerier.SelectParams{Functions: "max,min,sum", Step: 2 * tsdbtest.MinuteInMillis,
+		From: baseTime - 7*tsdbtest.DaysInMillis, To: baseTime + int64(numberOfEvents*eventsInterval)}
 	set, err := querierV2.SelectQry(params)
 	if err != nil {
 		suite.T().Fatalf("failed to exeute query, err: %v", err)
@@ -368,21 +371,21 @@ func (suite *testQuerySuite) TestQueryAggregateWithNameWildcard() {
 	var seriesCount int
 	for set.Next() {
 		seriesCount++
+		metricName := set.At().Labels().Get(config.PrometheusMetricNameAttribute)
+		aggr := set.At().Labels().Get(aggregate.AggregateLabel)
 		iter := set.At().Iterator()
 		data, err := tsdbtest.IteratorToSlice(iter)
 		if err != nil {
 			suite.T().Fatal(err)
 		}
 
-		assert.Equal(suite.T(), expectedData, data, "queried data does not match expected")
+		assert.Equal(suite.T(), expected[metricName][aggr], data, "queried data does not match expected")
 	}
 
-	assert.Equal(suite.T(), 2, seriesCount, "series count didn't match expected")
+	assert.Equal(suite.T(), len(expectedData)*len(expected), seriesCount, "series count didn't match expected")
 }
 
 func (suite *testQuerySuite) TestQueryAggregateWithFilterOnMetricName() {
-	suite.T().Skip("Reanable when feature fixed")
-
 	adapter, err := tsdb.NewV3ioAdapter(suite.v3ioConfig, nil, nil)
 	if err != nil {
 		suite.T().Fatalf("failed to create v3io adapter. reason: %s", err)
@@ -392,7 +395,7 @@ func (suite *testQuerySuite) TestQueryAggregateWithFilterOnMetricName() {
 	numberOfEvents := 10
 	eventsInterval := 60 * 1000
 	baseTime := time.Now().UnixNano()/1000000 - int64(numberOfEvents*eventsInterval)
-	expectedData := []tsdbtest.DataPoint{{baseTime, 10},
+	ingestData := []tsdbtest.DataPoint{{baseTime, 10},
 		{int64(baseTime + tsdbtest.MinuteInMillis), 20},
 		{baseTime + 2*tsdbtest.MinuteInMillis, 30},
 		{baseTime + 3*tsdbtest.MinuteInMillis, 40}}
@@ -402,20 +405,23 @@ func (suite *testQuerySuite) TestQueryAggregateWithFilterOnMetricName() {
 			Value: tsdbtest.TimeSeries{tsdbtest.Metric{
 				Name:   "cpu",
 				Labels: labels1,
-				Data:   expectedData},
+				Data:   ingestData},
 				tsdbtest.Metric{
-					Name:   "another-cpu",
+					Name:   "diskio",
 					Labels: labels1,
-					Data:   expectedData},
+					Data:   ingestData},
 			}})
 	tsdbtest.InsertData(suite.T(), testParams)
+	expectedData := map[string][]tsdbtest.DataPoint{"max": {{Time: baseTime, Value: 20}, {Time: baseTime + 2*tsdbtest.MinuteInMillis, Value: 40}}}
+	expected := map[string]map[string][]tsdbtest.DataPoint{"cpu": expectedData}
 
 	querierV2, err := adapter.QuerierV2(nil)
 	if err != nil {
 		suite.T().Fatalf("failed to create querier v2, err: %v", err)
 	}
 
-	params := &pquerier.SelectParams{Functions: "max", From: baseTime, To: baseTime + int64(numberOfEvents*eventsInterval), Filter: "_name='cpu'"}
+	params := &pquerier.SelectParams{Functions: "max", Step: 2 * tsdbtest.MinuteInMillis,
+		From: baseTime, To: baseTime + int64(numberOfEvents*eventsInterval), Filter: "_name=='cpu'"}
 	set, err := querierV2.SelectQry(params)
 	if err != nil {
 		suite.T().Fatalf("failed to exeute query, err: %v", err)
@@ -424,13 +430,15 @@ func (suite *testQuerySuite) TestQueryAggregateWithFilterOnMetricName() {
 	var seriesCount int
 	for set.Next() {
 		seriesCount++
+		metricName := set.At().Labels().Get(config.PrometheusMetricNameAttribute)
+		aggr := set.At().Labels().Get(aggregate.AggregateLabel)
 		iter := set.At().Iterator()
 		data, err := tsdbtest.IteratorToSlice(iter)
 		if err != nil {
 			suite.T().Fatal(err)
 		}
 
-		assert.Equal(suite.T(), expectedData, data, "queried data does not match expected")
+		assert.Equal(suite.T(), expected[metricName][aggr], data, "queried data does not match expected")
 	}
 
 	assert.Equal(suite.T(), 1, seriesCount, "series count didn't match expected")

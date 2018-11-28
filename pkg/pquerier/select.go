@@ -14,7 +14,6 @@ import (
 	"github.com/v3io/v3io-tsdb/pkg/utils"
 )
 
-const columnWildcard = "*"
 const defaultToleranceFactor = 2
 
 type selectQueryContext struct {
@@ -33,7 +32,7 @@ type selectQueryContext struct {
 	// TODO: create columns spec from select query params
 	columnsSpec         []columnMeta
 	columnsSpecByMetric map[string][]columnMeta
-	isAllColumns        bool
+	isAllMetrics        bool
 	totalColumns        int
 
 	disableAllAggr     bool
@@ -247,7 +246,7 @@ func (s *selectQueryContext) processQueryResults(query *partQuery) error {
 		frame, ok := s.dataFrames[hash]
 		if !ok {
 			var err error
-			frame, err = NewDataFrame(s.columnsSpec, s.getOrCreateTimeColumn(), lset, hash, s.isRawQuery(), s.isAllColumns, s.getResultBucketsSize(), results.IsServerAggregates(), s.showAggregateLabel)
+			frame, err = NewDataFrame(s.columnsSpec, s.getOrCreateTimeColumn(), lset, hash, s.isRawQuery(), s.isAllMetrics, s.getResultBucketsSize(), results.IsServerAggregates(), s.showAggregateLabel)
 			if err != nil {
 				return err
 			}
@@ -294,7 +293,7 @@ func (s *selectQueryContext) createColumnSpecs(params *SelectParams) ([]columnMe
 		}
 		columnsSpecByMetric[col.Metric] = append(columnsSpecByMetric[col.Metric], colMeta)
 		columnsSpec = append(columnsSpec, colMeta)
-		s.isAllColumns = s.isAllColumns || col.Metric == columnWildcard
+		s.isAllMetrics = s.isAllMetrics || col.Metric == ""
 	}
 
 	// Adding hidden columns if needed
@@ -321,21 +320,6 @@ func (s *selectQueryContext) createColumnSpecs(params *SelectParams) ([]columnMe
 		return nil, nil, errors.Errorf("no Columns were specified for query: %v", params)
 	}
 	return columnsSpec, columnsSpecByMetric, nil
-}
-
-func (s *selectQueryContext) AddColumnSpecByWildcard(metricName string) {
-	_, ok := s.columnsSpecByMetric[metricName]
-	if !ok {
-		wantedColumns := s.columnsSpecByMetric[columnWildcard]
-		newCols := make([]columnMeta, len(wantedColumns))
-		for _, col := range wantedColumns {
-			newCol := col
-			newCol.metric = metricName
-			newCols = append(newCols, newCol)
-		}
-		s.columnsSpec = append(s.columnsSpec, newCols...)
-		s.columnsSpecByMetric[metricName] = newCols
-	}
 }
 
 func (s *selectQueryContext) getOrCreateTimeColumn() Column {

@@ -91,6 +91,11 @@ func rawCollector(ctx *selectQueryContext, res *qryResults) {
 }
 
 func aggregateClientAggregates(ctx *selectQueryContext, res *qryResults) {
+	err := res.frame.addMetricIfNotExist(res.name, ctx.getResultBucketsSize(), res.IsServerAggregates())
+	if err != nil {
+		ctx.logger.Error("problem adding new metric '%v', err:%v", res.name, err)
+	}
+
 	it := newRawChunkIterator(res, nil)
 	for it.Next() {
 		t, v := it.At()
@@ -105,6 +110,11 @@ func aggregateClientAggregates(ctx *selectQueryContext, res *qryResults) {
 }
 
 func aggregateServerAggregates(ctx *selectQueryContext, res *qryResults) {
+	err := res.frame.addMetricIfNotExist(res.name, ctx.getResultBucketsSize(), res.IsServerAggregates())
+	if err != nil {
+		ctx.logger.Error("problem adding new metric '%v', err:%v", res.name, err)
+	}
+
 	for _, col := range res.frame.columns {
 		if col.GetColumnSpec().metric == res.name &&
 			col.GetColumnSpec().function != 0 &&
@@ -137,6 +147,11 @@ func aggregateServerAggregates(ctx *selectQueryContext, res *qryResults) {
 
 func downsampleRawData(ctx *selectQueryContext, res *qryResults,
 	previousPartitionLastTime int64, previousPartitionLastValue float64) (int64, float64) {
+	err := res.frame.addMetricIfNotExist(res.name, ctx.getResultBucketsSize(), res.IsServerAggregates())
+	if err != nil {
+		ctx.logger.Error("problem adding new metric '%v', err:%v", res.name, err)
+	}
+
 	var lastT int64
 	var lastV float64
 	it := newRawChunkIterator(res, nil).(*rawChunkIterator)
