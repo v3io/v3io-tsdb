@@ -48,28 +48,28 @@ type selectQueryContext struct {
 	timeColumn Column
 }
 
-func (s *selectQueryContext) start(parts []*partmgr.DBPartition, params *SelectParams) (*frameIterator, error) {
-	s.dataFrames = make(map[uint64]*dataFrame)
+func (queryCtx *selectQueryContext) start(parts []*partmgr.DBPartition, params *SelectParams) (*frameIterator, error) {
+	queryCtx.dataFrames = make(map[uint64]*dataFrame)
 
 	// If step isn't passed (e.g., when using the console), the step is the
 	// difference between the end (maxt) and start (mint) times (e.g., 5 minutes)
-	if params.Functions != "" && s.step == 0 {
-		s.step = s.maxt - s.mint
+	if params.Functions != "" && queryCtx.step == 0 {
+		queryCtx.step = queryCtx.maxt - queryCtx.mint
 	}
 
-	s.functions = params.Functions
+	queryCtx.functions = params.Functions
 	var err error
-	s.columnsSpec, s.columnsSpecByMetric, err = s.createColumnSpecs(params)
+	queryCtx.columnsSpec, queryCtx.columnsSpecByMetric, err = queryCtx.createColumnSpecs(params)
 	if err != nil {
 		return nil, err
 	}
 
 	// We query every partition for every requested metric
-	queries := make([]*partQuery, len(parts)*len(s.columnsSpecByMetric))
+	queries := make([]*partQuery, len(parts)*len(queryCtx.columnsSpecByMetric))
 
 	var queryIndex int
 	for _, part := range parts {
-		currQueries, err := s.queryPartition(part)
+		currQueries, err := queryCtx.queryPartition(part)
 		if err != nil {
 			return nil, err
 		}
@@ -79,43 +79,43 @@ func (s *selectQueryContext) start(parts []*partmgr.DBPartition, params *SelectP
 		}
 	}
 
-	err = s.startCollectors()
+	err = queryCtx.startCollectors()
 	if err != nil {
 		return nil, err
 	}
 
 	for _, query := range queries {
-		err = s.processQueryResults(query)
+		err = queryCtx.processQueryResults(query)
 		if err != nil {
 			return nil, err
 		}
 	}
 
-	for i := 0; i < s.workers; i++ {
-		close(s.requestChannels[i])
+	for i := 0; i < queryCtx.workers; i++ {
+		close(queryCtx.requestChannels[i])
 	}
 
 	// wait for Go routines to complete
-	s.wg.Wait()
-	close(s.errorChannel)
+	queryCtx.wg.Wait()
+	close(queryCtx.errorChannel)
 
 	// return first error
-	err = <-s.errorChannel
+	err = <-queryCtx.errorChannel
 	if err != nil {
 		return nil, err
 	}
 
-	if len(s.frameList) > 0 {
-		s.totalColumns = s.frameList[0].Len()
+	if len(queryCtx.frameList) > 0 {
+		queryCtx.totalColumns = queryCtx.frameList[0].Len()
 	}
 
-	frameIter := NewFrameIterator(s)
+	frameIter := NewFrameIterator(queryCtx)
 	return frameIter, nil
 }
 
-func (s *selectQueryContext) metricsAggregatesToString(metric string) (string, bool) {
+func (queryCtx *selectQueryContext) metricsAggregatesToString(metric string) (string, bool) {
 	var result strings.Builder
-	specs := s.columnsSpecByMetric[metric]
+	specs := queryCtx.columnsSpecByMetric[metric]
 	specsNum := len(specs)
 	if specsNum == 0 {
 		return "", false
@@ -136,33 +136,33 @@ func (s *selectQueryContext) metricsAggregatesToString(metric string) (string, b
 }
 
 // Query a single partition
-func (s *selectQueryContext) queryPartition(partition *partmgr.DBPartition) ([]*partQuery, error) {
+func (queryCtx *selectQueryContext) queryPartition(partition *partmgr.DBPartition) ([]*partQuery, error) {
 	var queries []*partQuery
 	var err error
 
 	mint, maxt := partition.GetPartitionRange()
-	step := s.step
+	step := queryCtx.step
 
-	if s.maxt < maxt {
-		maxt = s.maxt
+	if queryCtx.maxt < maxt {
+		maxt = queryCtx.maxt
 	}
 
-	if s.mint > mint {
-		mint = s.mint
+	if queryCtx.mint > mint {
+		mint = queryCtx.mint
 	}
 
-	for metric := range s.columnsSpecByMetric {
+	for metric := range queryCtx.columnsSpecByMetric {
 		var aggregationParams *aggregate.AggregationParams
-		functions, requestAggregatesAndRaw := s.metricsAggregatesToString(metric)
+		functions, requestAggregatesAndRaw := queryCtx.metricsAggregatesToString(metric)
 
 		//if functions == "" && step > 0 && step >= partition.RollupTime() && partition.AggrType().HasAverage() {
 		//	functions = "avg"
 		//}
 
 		// Check whether there are aggregations to add and aggregates aren't disabled
-		if functions != "" && !s.disableAllAggr {
+		if functions != "" && !queryCtx.disableAllAggr {
 
-			if step > partition.RollupTime() && s.disableClientAggr {
+			if step > partition.RollupTime() && queryCtx.disableClientAggr {
 				step = partition.RollupTime()
 			}
 
@@ -171,7 +171,7 @@ func (s *selectQueryContext) queryPartition(partition *partmgr.DBPartition) ([]*
 				partition.AggrBuckets(),
 				step,
 				partition.RollupTime(),
-				s.windows)
+				queryCtx.windows)
 
 			if err != nil {
 				return nil, err
@@ -183,38 +183,39 @@ func (s *selectQueryContext) queryPartition(partition *partmgr.DBPartition) ([]*
 		newQuery := &partQuery{mint: mint, maxt: maxt, partition: partition, step: step}
 		if aggregationParams != nil {
 			newQuery.preAggregated = aggregationParams.CanAggregate(partition.AggrType())
-			if newQuery.preAggregated || !s.disableClientAggr {
+			if newQuery.preAggregated || !queryCtx.disableClientAggr {
 				newQuery.aggregationParams = aggregationParams
 			}
 		}
 
-		err = newQuery.getItems(s, metric, requestAggregatesAndRaw)
+		err = newQuery.getItems(queryCtx, metric, requestAggregatesAndRaw)
 		queries = append(queries, newQuery)
 	}
 
 	return queries, err
 }
 
-func (s *selectQueryContext) startCollectors() error {
+func (queryCtx *selectQueryContext) startCollectors() error {
 
-	s.requestChannels = make([]chan *qryResults, s.workers)
-	s.errorChannel = make(chan error, s.workers)
+	queryCtx.requestChannels = make([]chan *qryResults, queryCtx.workers)
+	queryCtx.errorChannel = make(chan error, queryCtx.workers)
 
-	for i := 0; i < s.workers; i++ {
+	// Increment the WaitGroup counter.
+	queryCtx.wg.Add(queryCtx.workers)
+
+	for i := 0; i < queryCtx.workers; i++ {
 		newChan := make(chan *qryResults, 1000)
-		s.requestChannels[i] = newChan
+		queryCtx.requestChannels[i] = newChan
 
-		// Increment the WaitGroup counter.
-		s.wg.Add(1)
 		go func(index int) {
-			mainCollector(s, s.requestChannels[index])
+			mainCollector(queryCtx, queryCtx.requestChannels[index])
 		}(i)
 	}
 
 	return nil
 }
 
-func (s *selectQueryContext) processQueryResults(query *partQuery) error {
+func (queryCtx *selectQueryContext) processQueryResults(query *partQuery) error {
 	for query.Next() {
 
 		// read metric name
@@ -229,7 +230,7 @@ func (s *selectQueryContext) processQueryResults(query *partQuery) error {
 			lsetAttr = "UNKNOWN"
 		}
 		if !lok || !nok {
-			s.logger.Error("Error in initLabels; bad field values.")
+			queryCtx.logger.Error("Error in initLabels; bad field values.")
 		}
 
 		splitLset := strings.Split(lsetAttr, ",")
@@ -252,27 +253,27 @@ func (s *selectQueryContext) processQueryResults(query *partQuery) error {
 		hash := lset.Hash()
 
 		// find or create data frame
-		frame, ok := s.dataFrames[hash]
+		frame, ok := queryCtx.dataFrames[hash]
 		if !ok {
 			var err error
-			frame, err = NewDataFrame(s.columnsSpec, s.getOrCreateTimeColumn(), lset, hash, s.isRawQuery(), s.isAllMetrics, s.getResultBucketsSize(), results.IsServerAggregates(), s.showAggregateLabel)
+			frame, err = NewDataFrame(queryCtx.columnsSpec, queryCtx.getOrCreateTimeColumn(), lset, hash, queryCtx.isRawQuery(), queryCtx.isAllMetrics, queryCtx.getResultBucketsSize(), results.IsServerAggregates(), queryCtx.showAggregateLabel)
 			if err != nil {
 				return err
 			}
-			s.dataFrames[hash] = frame
-			s.frameList = append(s.frameList, frame)
+			queryCtx.dataFrames[hash] = frame
+			queryCtx.frameList = append(queryCtx.frameList, frame)
 		}
 
 		results.frame = frame
 
-		workerNum := hash & uint64(s.workers-1)
-		s.requestChannels[workerNum] <- &results
+		workerNum := hash & uint64(queryCtx.workers-1)
+		queryCtx.requestChannels[workerNum] <- &results
 	}
 
 	return query.Err()
 }
 
-func (s *selectQueryContext) createColumnSpecs(params *SelectParams) ([]columnMeta, map[string][]columnMeta, error) {
+func (queryCtx *selectQueryContext) createColumnSpecs(params *SelectParams) ([]columnMeta, map[string][]columnMeta, error) {
 	var columnsSpec []columnMeta
 	columnsSpecByMetric := make(map[string][]columnMeta)
 
@@ -289,7 +290,7 @@ func (s *selectQueryContext) createColumnSpecs(params *SelectParams) ([]columnMe
 
 		tolerance := col.InterpolationTolerance
 		if tolerance == 0 {
-			tolerance = s.step * defaultToleranceFactor
+			tolerance = queryCtx.step * defaultToleranceFactor
 		}
 		colMeta := columnMeta{metric: col.Metric, alias: col.Alias, interpolationType: inter, interpolationTolerance: tolerance}
 
@@ -302,7 +303,7 @@ func (s *selectQueryContext) createColumnSpecs(params *SelectParams) ([]columnMe
 		}
 		columnsSpecByMetric[col.Metric] = append(columnsSpecByMetric[col.Metric], colMeta)
 		columnsSpec = append(columnsSpec, colMeta)
-		s.isAllMetrics = s.isAllMetrics || col.Metric == ""
+		queryCtx.isAllMetrics = queryCtx.isAllMetrics || col.Metric == ""
 	}
 
 	// Adding hidden columns if needed
@@ -331,38 +332,38 @@ func (s *selectQueryContext) createColumnSpecs(params *SelectParams) ([]columnMe
 	return columnsSpec, columnsSpecByMetric, nil
 }
 
-func (s *selectQueryContext) getOrCreateTimeColumn() Column {
+func (queryCtx *selectQueryContext) getOrCreateTimeColumn() Column {
 	// When querying for raw data we don't need to generate a time column since we return the raw time
-	if s.isRawQuery() {
+	if queryCtx.isRawQuery() {
 		return nil
 	}
-	if s.timeColumn == nil {
-		s.timeColumn = s.generateTimeColumn()
+	if queryCtx.timeColumn == nil {
+		queryCtx.timeColumn = queryCtx.generateTimeColumn()
 	}
 
-	return s.timeColumn
+	return queryCtx.timeColumn
 }
 
-func (s *selectQueryContext) generateTimeColumn() Column {
+func (queryCtx *selectQueryContext) generateTimeColumn() Column {
 	columnMeta := columnMeta{metric: "time"}
-	timeColumn := NewDataColumn("time", columnMeta, s.getResultBucketsSize(), IntType)
+	timeColumn := NewDataColumn("time", columnMeta, queryCtx.getResultBucketsSize(), IntType)
 	i := 0
-	for t := s.mint; t <= s.maxt; t += s.step {
+	for t := queryCtx.mint; t <= queryCtx.maxt; t += queryCtx.step {
 		timeColumn.SetDataAt(i, t)
 		i++
 	}
 	return timeColumn
 }
 
-func (s *selectQueryContext) isRawQuery() bool {
-	return (s.functions == "" && s.step == 0) || s.disableClientAggr
+func (queryCtx *selectQueryContext) isRawQuery() bool {
+	return (queryCtx.functions == "" && queryCtx.step == 0) || queryCtx.disableClientAggr
 }
 
-func (s *selectQueryContext) getResultBucketsSize() int {
-	if s.isRawQuery() {
+func (queryCtx *selectQueryContext) getResultBucketsSize() int {
+	if queryCtx.isRawQuery() {
 		return 0
 	}
-	return int((s.maxt-s.mint)/s.step + 1)
+	return int((queryCtx.maxt-queryCtx.mint)/queryCtx.step + 1)
 }
 
 // query object for a single partition (or name and partition in future optimizations)
@@ -383,26 +384,26 @@ type partQuery struct {
 	aggregationParams *aggregate.AggregationParams
 }
 
-func (s *partQuery) getItems(ctx *selectQueryContext, name string, aggregatesAndChunk bool) error {
+func (query *partQuery) getItems(ctx *selectQueryContext, name string, aggregatesAndChunk bool) error {
 
-	path := s.partition.GetTablePath()
+	path := query.partition.GetTablePath()
 	var shardingKeys []string
 	if name != "" {
-		shardingKeys = s.partition.GetShardingKeys(name)
+		shardingKeys = query.partition.GetShardingKeys(name)
 	}
 	attrs := []string{config.LabelSetAttrName, config.EncodingAttrName, config.MetricNameAttrName, config.MaxTimeAttrName}
 
-	if s.preAggregated {
-		s.attrs = s.aggregationParams.GetAttrNames()
+	if query.preAggregated {
+		query.attrs = query.aggregationParams.GetAttrNames()
 	}
 	// It is possible to request both server aggregates and raw chunk data (to downsample) for the same metric
 	// example: `select max(cpu), avg(cpu), cpu` with step = 1h
-	if !s.preAggregated || aggregatesAndChunk {
-		chunkAttr, chunk0Time := s.partition.Range2Attrs("v", s.mint, s.maxt)
-		s.chunk0Time = chunk0Time
-		s.attrs = append(s.attrs, chunkAttr...)
+	if !query.preAggregated || aggregatesAndChunk {
+		chunkAttr, chunk0Time := query.partition.Range2Attrs("v", query.mint, query.maxt)
+		query.chunk0Time = chunk0Time
+		query.attrs = append(query.attrs, chunkAttr...)
 	}
-	attrs = append(attrs, s.attrs...)
+	attrs = append(attrs, query.attrs...)
 
 	ctx.logger.DebugWith("Select - GetItems", "path", path, "attr", attrs, "filter", ctx.filter, "name", name)
 	input := v3io.GetItemsInput{Path: path, AttributeNames: attrs, Filter: ctx.filter, ShardingKey: name}
@@ -411,25 +412,25 @@ func (s *partQuery) getItems(ctx *selectQueryContext, name string, aggregatesAnd
 		return err
 	}
 
-	s.iter = iter
+	query.iter = iter
 	return nil
 }
 
-func (s *partQuery) Next() bool {
+func (query *partQuery) Next() bool {
 	var res bool
 
-	res = s.iter.Next()
+	res = query.iter.Next()
 	return res
 }
 
-func (s *partQuery) GetField(name string) interface{} {
-	return s.iter.GetField(name)
+func (query *partQuery) GetField(name string) interface{} {
+	return query.iter.GetField(name)
 }
 
-func (s *partQuery) GetFields() map[string]interface{} {
-	return s.iter.GetFields()
+func (query *partQuery) GetFields() map[string]interface{} {
+	return query.iter.GetFields()
 }
 
-func (s *partQuery) Err() error {
-	return s.iter.Err()
+func (query *partQuery) Err() error {
+	return query.iter.Err()
 }
