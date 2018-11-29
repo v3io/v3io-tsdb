@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"github.com/nuclio/logger"
+	"github.com/pkg/errors"
 	"github.com/v3io/v3io-tsdb/pkg/chunkenc"
 	"github.com/v3io/v3io-tsdb/pkg/config"
 	"github.com/v3io/v3io-tsdb/pkg/utils"
@@ -189,11 +190,14 @@ func (s nullSeriesIterator) Next() bool               { return false }
 func (s nullSeriesIterator) At() (t int64, v float64) { return 0, 0 }
 func (s nullSeriesIterator) Err() error               { return s.err }
 
-func NewRawSeries(results *qryResults, logger logger.Logger) Series {
+func NewRawSeries(results *qryResults, logger logger.Logger) (Series, error) {
 	newSeries := V3ioRawSeries{fields: results.fields, logger: logger}
-	newSeries.initLabels()
+	err := newSeries.initLabels()
+	if err != nil {
+		return nil, err
+	}
 	newSeries.iter = newRawChunkIterator(results, nil)
-	return &newSeries
+	return &newSeries, nil
 }
 
 type V3ioRawSeries struct {
@@ -221,21 +225,22 @@ func (s *V3ioRawSeries) AddChunks(results *qryResults) {
 }
 
 // Initialize the label set from _lset and _name attributes
-func (s *V3ioRawSeries) initLabels() {
+func (s *V3ioRawSeries) initLabels() error {
 	name, ok := s.fields[config.MetricNameAttrName].(string)
 	if !ok {
-		s.logger.Error("error in initLabels; bad metric name: %v", s.fields[config.MetricNameAttrName].(string))
+		return errors.Errorf("error in initLabels; bad metric name: %v", s.fields[config.MetricNameAttrName].(string))
 	}
 	lsetAttr, ok := s.fields[config.LabelSetAttrName].(string)
 	if !ok {
-		s.logger.Error("error in initLabels; bad labels set: %v", s.fields[config.LabelSetAttrName].(string))
+		return errors.Errorf("error in initLabels; bad labels set: %v", s.fields[config.LabelSetAttrName].(string))
 	}
 
 	lset, err := utils.LabelsFromString(name, lsetAttr)
 
 	if err != nil {
-		s.logger.Error("error in initLabels; failed to parse labels set string: %v. err: %v", s.fields[config.LabelSetAttrName].(string), err)
+		return errors.Errorf("error in initLabels; failed to parse labels set string: %v. err: %v", s.fields[config.LabelSetAttrName].(string), err)
 	}
 
 	s.lset = lset
+	return nil
 }

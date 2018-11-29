@@ -23,7 +23,6 @@ such restriction.
 package pquerier_test
 
 import (
-	"fmt"
 	"math"
 	"testing"
 	"time"
@@ -303,24 +302,10 @@ func (suite *testQuerySuite) TestQueryMetricWithDashInTheName() { // IG-8585
 	}
 
 	params := &pquerier.SelectParams{From: baseTime, To: baseTime + int64(numberOfEvents*eventsInterval)}
-	set, err := querierV2.SelectQry(params)
-	if err != nil {
-		suite.T().Fatalf("failed to exeute query, err: %v", err)
+	_, err = querierV2.SelectQry(params)
+	if err == nil {
+		suite.T().Fatalf("expected an error but finish succesfully")
 	}
-
-	var seriesCount int
-	for set.Next() {
-		seriesCount++
-		iter := set.At().Iterator()
-		data, err := tsdbtest.IteratorToSlice(iter)
-		if err != nil {
-			suite.T().Fatal(err)
-		}
-
-		assert.Equal(suite.T(), expectedData, data, "queried data does not match expected")
-	}
-
-	assert.Equal(suite.T(), 1, seriesCount, "series count didn't match expected")
 }
 
 func (suite *testQuerySuite) TestQueryAggregateWithNameWildcard() {
@@ -544,9 +529,6 @@ func (suite *testQuerySuite) TestRawDataDownSampleMultiPartitions() {
 		iter := set.At().Iterator()
 		data, err := tsdbtest.IteratorToSlice(iter)
 
-		for _, point := range data {
-			fmt.Printf("t: %v (%v), v: %v\n", time.Unix(point.Time/1000, 0), point.Time, point.Value)
-		}
 		if err != nil {
 			suite.T().Fatal(err)
 		}

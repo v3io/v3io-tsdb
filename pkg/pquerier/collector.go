@@ -92,7 +92,12 @@ func rawCollector(ctx *selectQueryContext, res *qryResults) {
 	if ok {
 		res.frame.rawColumns[frameIndex].(*V3ioRawSeries).AddChunks(res)
 	} else {
-		res.frame.rawColumns = append(res.frame.rawColumns, NewRawSeries(res, ctx.logger.GetChild("v3ioRawSeries")))
+		series, err := NewRawSeries(res, ctx.logger.GetChild("v3ioRawSeries"))
+		if err != nil {
+			ctx.errorChannel <- err
+			return
+		}
+		res.frame.rawColumns = append(res.frame.rawColumns, series)
 		res.frame.columnByName[res.name] = len(res.frame.rawColumns) - 1
 	}
 }
