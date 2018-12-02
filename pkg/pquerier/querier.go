@@ -1,6 +1,7 @@
 package pquerier
 
 import (
+	"fmt"
 	"sort"
 	"strings"
 	"time"
@@ -108,7 +109,7 @@ func (q *V3ioQuerier) baseSelectQry(params *SelectParams, showAggregateLabel boo
 	}
 
 	// TODO: should be checked in config
-	if !IsPowerOfTwo(q.cfg.QryWorkers) {
+	if !isPowerOfTwo(q.cfg.QryWorkers) {
 		return nil, errors.New("Query workers num must be a power of 2 and > 0 !")
 	}
 
@@ -140,7 +141,7 @@ func (q *V3ioQuerier) baseSelectQry(params *SelectParams, showAggregateLabel boo
 	return
 }
 
-func IsPowerOfTwo(x int) bool {
+func isPowerOfTwo(x int) bool {
 	return (x != 0) && ((x & (x - 1)) == 0)
 }
 
@@ -158,7 +159,7 @@ func (q *V3ioQuerier) LabelValues(labelKey string) (result []string, err error) 
 
 func (q *V3ioQuerier) getMetricNames() ([]string, error) {
 	input := v3io.GetItemsInput{
-		Path:           q.cfg.TablePath + "/names/",
+		Path:           q.cfg.TablePath + config.NamesDirectory,
 		AttributeNames: []string{config.ObjectNameAttrName},
 	}
 
@@ -176,7 +177,7 @@ func (q *V3ioQuerier) getMetricNames() ([]string, error) {
 	sort.Sort(sort.StringSlice(metricNames))
 
 	if iter.Err() != nil {
-		q.logger.InfoWith("failed to read metric names; returning an empty list.", "err", iter.Err().Error())
+		return nil, fmt.Errorf("failed to read metric names; err = %v", iter.Err().Error())
 	}
 
 	return metricNames, nil
@@ -233,7 +234,7 @@ func (q *V3ioQuerier) getLabelValues(labelKey string) ([]string, error) {
 	}
 
 	if iter.Err() != nil {
-		q.logger.InfoWith("failed to read label values, returning empty list", "err", iter.Err().Error())
+		return nil, fmt.Errorf("failed to read label values, err= %v", iter.Err().Error())
 	}
 
 	var labelValues []string

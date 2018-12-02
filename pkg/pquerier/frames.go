@@ -100,7 +100,7 @@ func NewDataFrame(columnsSpec []columnMeta, indexColumn Column, lset utils.Label
 	df := &dataFrame{lset: lset, hash: hash, isRawSeries: isRawQuery, showAggregateLabel: showAggregateLabel}
 	// is raw query
 	if isRawQuery {
-		df.columnByName = make(map[string]int, 100)
+		df.columnByName = make(map[string]int, len(columnsSpec))
 	} else {
 		numOfColumns := len(columnsSpec)
 		df.index = indexColumn
@@ -341,7 +341,7 @@ func (d *dataFrame) TimeSeries(i int) (Series, error) {
 func (d *dataFrame) rawSeriesToColumns() {
 	var timeData []int64
 	columns := make([][]float64, len(d.rawColumns))
-	areExhausted := make([]bool, len(d.rawColumns))
+	nonExhaustedIterators := len(d.rawColumns)
 
 	currentTime := int64(math.MaxInt64)
 	nextTime := int64(math.MaxInt64)
@@ -354,7 +354,7 @@ func (d *dataFrame) rawSeriesToColumns() {
 		}
 	}
 
-	for !allValuesTrue(areExhausted) {
+	for nonExhaustedIterators != 0 {
 		currentTime = nextTime
 		nextTime = int64(math.MaxInt64)
 		timeData = append(timeData, currentTime)
@@ -367,7 +367,7 @@ func (d *dataFrame) rawSeriesToColumns() {
 				if iter.Next() {
 					t, _ = iter.At()
 				} else {
-					areExhausted[seriesIndex] = true
+					nonExhaustedIterators--
 				}
 			} else if t > currentTime {
 				columns[seriesIndex] = append(columns[seriesIndex], math.NaN())
@@ -398,14 +398,6 @@ func (d *dataFrame) rawSeriesToColumns() {
 
 func (d *dataFrame) shouldGenerateRawColumns() bool { return d.isRawSeries && !d.isRawColumnsGenerated }
 
-func allValuesTrue(indicators []bool) bool {
-	res := true
-	for _, currentBool := range indicators {
-		res = res && currentBool
-	}
-	return res
-}
-
 // Column object, store a single value or index column/array
 // There can be data columns or calculated columns (e.g. Avg built from count & sum columns)
 
@@ -425,9 +417,11 @@ type Column interface {
 }
 
 type basicColumn struct {
-	name string
-	size int
-	spec columnMeta
+	name                   string
+	size                   int
+	spec                   columnMeta
+	interpolationFunction  InterpolationFunction
+	interpolationTolerance int64
 }
 
 // Name returns the column name
@@ -453,28 +447,25 @@ func (c *basicColumn) SetDataAt(i int, value interface{}) error { return nil }
 func (c *basicColumn) SetData(d interface{}, size int) error {
 	return errors.New("method not supported")
 }
+func (dc *basicColumn) GetInterpolationFunction() (InterpolationFunction, int64) {
+	return dc.interpolationFunction, dc.interpolationTolerance
+}
 
 // DType is data type
 type DType reflect.Type
 
 func NewDataColumn(name string, colSpec columnMeta, size int, datatype DType) *dataColumn {
-	dc := &dataColumn{basicColumn: basicColumn{name: name, spec: colSpec, size: size}}
+	dc := &dataColumn{basicColumn: basicColumn{name: name, spec: colSpec, size: size,
+		interpolationFunction:  GetInterpolateFunc(colSpec.interpolationType),
+		interpolationTolerance: colSpec.interpolationTolerance}}
 	dc.initializeData(datatype)
-	dc.interpolationFunction = GetInterpolateFunc(colSpec.interpolationType)
-	dc.interpolationTolerance = colSpec.interpolationTolerance
 	return dc
 
 }
 
 type dataColumn struct {
 	basicColumn
-	data                   interface{}
-	interpolationFunction  InterpolationFunction
-	interpolationTolerance int64
-}
-
-func (dc *dataColumn) GetInterpolationFunction() (InterpolationFunction, int64) {
-	return dc.interpolationFunction, dc.interpolationTolerance
+	data interface{}
 }
 
 func (dc *dataColumn) initializeData(dataType DType) {
@@ -483,6 +474,10 @@ func (dc *dataColumn) initializeData(dataType DType) {
 		dc.data = make([]int64, dc.size)
 	case FloatType:
 		dc.data = make([]float64, dc.size)
+		floats := dc.data.([]float64)
+		for i := 0; i < dc.size; i++ {
+			floats[i] = math.NaN()
+		}
 	case StringType:
 		dc.data = make([]string, dc.size)
 	case TimeType:
@@ -555,7 +550,7 @@ func (dc *dataColumn) SetDataAt(i int, value interface{}) error {
 		dc.data.([]int64)[i] = value.(int64)
 	case FloatType:
 		// Update requested cell, only if not trying to override an existing value with NaN
-		if !(math.IsNaN(value.(float64)) && dc.data.([]float64)[i] != 0) {
+		if !(math.IsNaN(value.(float64)) && !math.IsNaN(dc.data.([]float64)[i])) {
 			dc.data.([]float64)[i] = value.(float64)
 		}
 	case StringType:
@@ -569,7 +564,8 @@ func (dc *dataColumn) SetDataAt(i int, value interface{}) error {
 }
 
 func NewConcreteColumn(name string, colSpec columnMeta, size int, setFunc func(old, new interface{}) interface{}) *ConcreteColumn {
-	col := &ConcreteColumn{basicColumn: basicColumn{name: name, spec: colSpec, size: size}, setFunc: setFunc}
+	col := &ConcreteColumn{basicColumn: basicColumn{name: name, spec: colSpec, size: size,
+		interpolationFunction: GetInterpolateFunc(interpolateNone)}, setFunc: setFunc}
 	col.data = make([]interface{}, size)
 	return col
 }
@@ -607,10 +603,11 @@ func (c *ConcreteColumn) SetDataAt(i int, val interface{}) error {
 	c.data[i] = c.setFunc(c.data[i], val)
 	return nil
 }
-func (c *ConcreteColumn) GetInterpolationFunction() (InterpolationFunction, int64) { return nil, 0 }
 
 func NewVirtualColumn(name string, colSpec columnMeta, size int, function func([]Column, int) (interface{}, error)) Column {
-	col := &virtualColumn{basicColumn: basicColumn{name: name, spec: colSpec, size: size}, function: function}
+	col := &virtualColumn{basicColumn: basicColumn{name: name, spec: colSpec, size: size,
+		interpolationFunction: GetInterpolateFunc(interpolateNone)},
+		function: function}
 	return col
 }
 
@@ -657,4 +654,3 @@ func (c *virtualColumn) TimeAt(i int) (int64, error) {
 	}
 	return value.(int64), nil
 }
-func (c *virtualColumn) GetInterpolationFunction() (InterpolationFunction, int64) { return nil, 0 }

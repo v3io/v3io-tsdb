@@ -68,6 +68,8 @@ const (
 	AggregateAttrPrefix = "_v_"
 
 	PrometheusMetricNameAttribute = "__name__"
+
+	NamesDirectory = "/names/"
 )
 
 type BuildInfo struct {

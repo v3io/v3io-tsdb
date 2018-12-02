@@ -22,6 +22,7 @@ import (
 
 	"github.com/cespare/xxhash"
 	"github.com/pkg/errors"
+	"github.com/v3io/v3io-tsdb/pkg/config"
 )
 
 const sep = '\xff'
@@ -240,13 +241,25 @@ func LabelsFromStringList(ss ...string) Labels {
 }
 
 // LabelsFromStringList creates new labels from a string in the following format key1=label1[,key2=label2,...]
-func LabelsFromString(name, lbls string) (Labels, error) {
+func LabelsFromStringWithName(name, lbls string) (Labels, error) {
 
 	if err := IsValidMetricName(name); err != nil {
 		return nil, errors.Wrap(err, fmt.Sprintf("Illegal metric name: '%s'", name))
 	}
 
-	lset := Labels{Label{Name: "__name__", Value: name}}
+	lset := Labels{Label{Name: config.PrometheusMetricNameAttribute, Value: name}}
+
+	moreLabels, err := LabelsFromString(lbls)
+	if err != nil {
+		return nil, err
+	}
+	lset = append(lset, moreLabels...)
+	sort.Sort(lset)
+	return lset, nil
+}
+
+func LabelsFromString(lbls string) (Labels, error) {
+	lset := Labels{}
 
 	if lbls != "" {
 		splitLset := strings.Split(lbls, ",")

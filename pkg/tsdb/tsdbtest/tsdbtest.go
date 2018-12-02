@@ -321,3 +321,8 @@ func IteratorToSlice(it chunkenc.Iterator) ([]DataPoint, error) {
 	}
 	return result, nil
 }
+
+func NanosToMillis(nanos int64) int64 {
+	millis := nanos / int64(time.Millisecond)
+	return millis
+}

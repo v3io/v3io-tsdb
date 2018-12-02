@@ -235,7 +235,7 @@ func (s *V3ioRawSeries) initLabels() error {
 		return errors.Errorf("error in initLabels; bad labels set: %v", s.fields[config.LabelSetAttrName].(string))
 	}
 
-	lset, err := utils.LabelsFromString(name, lsetAttr)
+	lset, err := utils.LabelsFromStringWithName(name, lsetAttr)
 
 	if err != nil {
 		return errors.Errorf("error in initLabels; failed to parse labels set string: %v. err: %v", s.fields[config.LabelSetAttrName].(string), err)

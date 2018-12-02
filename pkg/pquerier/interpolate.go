@@ -33,7 +33,7 @@ const (
 	interpolateNaN       InterpolationType = 1
 	interpolatePrev      InterpolationType = 2
 	interpolateNext      InterpolationType = 3
-	interpolateLin       InterpolationType = 4
+	interpolateLinear    InterpolationType = 4
 	defaultInterpolation InterpolationType = interpolateNext
 )
 
@@ -50,7 +50,7 @@ func StrToInterpolateType(str string) (InterpolationType, error) {
 	case "next":
 		return interpolateNext, nil
 	case "lin", "linear":
-		return interpolateLin, nil
+		return interpolateLinear, nil
 	}
 	return 0, fmt.Errorf("unknown/unsupported interpulation function %s", str)
 }
@@ -64,8 +64,8 @@ func GetInterpolateFunc(alg InterpolationType) InterpolationFunction {
 		return projectPrev
 	case interpolateNext:
 		return projectNext
-	case interpolateLin:
-		return projectLin
+	case interpolateLinear:
+		return projectLinear
 	default:
 		return projectNone
 	}
@@ -92,7 +92,7 @@ func projectNext(tprev, tnext, tseek int64, vprev, vnext float64) (int64, float6
 }
 
 // linear estimator (smooth graph)
-func projectLin(tprev, tnext, tseek int64, vprev, vnext float64) (int64, float64) {
+func projectLinear(tprev, tnext, tseek int64, vprev, vnext float64) (int64, float64) {
 	if math.IsNaN(vprev) || math.IsNaN(vnext) {
 		return tseek, math.NaN()
 	}

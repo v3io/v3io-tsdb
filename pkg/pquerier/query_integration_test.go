@@ -71,7 +71,7 @@ func (suite *testQuerySuite) TestRawDataSinglePartition() {
 	labels2 := utils.LabelsFromStringList("os", "mac")
 	numberOfEvents := 10
 	eventsInterval := 60 * 1000
-	baseTime := time.Now().UnixNano()/1000000 - int64(numberOfEvents*eventsInterval)
+	baseTime := tsdbtest.NanosToMillis(time.Now().UnixNano()) - int64(numberOfEvents*eventsInterval)
 	expectedData := []tsdbtest.DataPoint{{baseTime, 10},
 		{int64(baseTime + tsdbtest.MinuteInMillis), 20},
 		{baseTime + 2*tsdbtest.MinuteInMillis, 30},
@@ -126,7 +126,7 @@ func (suite *testQuerySuite) TestRawDataMultiplePartitions() {
 	labels2 := utils.LabelsFromStringList("os", "mac")
 	numberOfEvents := 5
 	eventsInterval := int64(tsdbtest.MinuteInMillis)
-	baseTime := time.Now().UnixNano()/1000000 - int64(numberOfEvents)*eventsInterval
+	baseTime := tsdbtest.NanosToMillis(time.Now().UnixNano()) - int64(numberOfEvents)*eventsInterval
 	expectedData := []tsdbtest.DataPoint{{baseTime - 7*tsdbtest.DaysInMillis, 10},
 		{int64(baseTime + tsdbtest.MinuteInMillis), 20},
 		{baseTime + 2*eventsInterval, 30},
@@ -183,7 +183,7 @@ func (suite *testQuerySuite) TestFilterOnLabel() {
 	labels2 := utils.LabelsFromStringList("os", "mac")
 	numberOfEvents := 5
 	eventsInterval := int64(tsdbtest.MinuteInMillis)
-	baseTime := time.Now().UnixNano()/1000000 - int64(numberOfEvents)*eventsInterval
+	baseTime := tsdbtest.NanosToMillis(time.Now().UnixNano()) - int64(numberOfEvents)*eventsInterval
 	expectedData := []tsdbtest.DataPoint{{baseTime - 7*tsdbtest.DaysInMillis, 10},
 		{int64(baseTime + tsdbtest.MinuteInMillis), 20},
 		{baseTime + 2*eventsInterval, 30},
@@ -241,7 +241,7 @@ func (suite *testQuerySuite) TestQueryWithBadTimeParameters() {
 	labels2 := utils.LabelsFromStringList("os", "mac")
 	numberOfEvents := 10
 	eventsInterval := 60 * 1000
-	baseTime := time.Now().UnixNano()/1000000 - int64(numberOfEvents*eventsInterval)
+	baseTime := tsdbtest.NanosToMillis(time.Now().UnixNano()) - int64(numberOfEvents*eventsInterval)
 	expectedData := []tsdbtest.DataPoint{{baseTime, 10},
 		{int64(baseTime + tsdbtest.MinuteInMillis), 20},
 		{baseTime + 2*tsdbtest.MinuteInMillis, 30},
@@ -281,7 +281,7 @@ func (suite *testQuerySuite) TestQueryMetricWithDashInTheName() { // IG-8585
 	labels1 := utils.LabelsFromStringList("os", "linux")
 	numberOfEvents := 10
 	eventsInterval := 60 * 1000
-	baseTime := time.Now().UnixNano()/1000000 - int64(numberOfEvents*eventsInterval)
+	baseTime := tsdbtest.NanosToMillis(time.Now().UnixNano()) - int64(numberOfEvents*eventsInterval)
 	expectedData := []tsdbtest.DataPoint{{baseTime, 10},
 		{int64(baseTime + tsdbtest.MinuteInMillis), 20},
 		{baseTime + 2*tsdbtest.MinuteInMillis, 30},
@@ -317,7 +317,7 @@ func (suite *testQuerySuite) TestQueryAggregateWithNameWildcard() {
 	labels1 := utils.LabelsFromStringList("os", "linux")
 	numberOfEvents := 10
 	eventsInterval := 60 * 1000
-	baseTime := time.Now().UnixNano()/1000000 - int64(numberOfEvents*eventsInterval)
+	baseTime := tsdbtest.NanosToMillis(time.Now().UnixNano()) - int64(numberOfEvents*eventsInterval)
 	ingestData := []tsdbtest.DataPoint{{baseTime - 7*tsdbtest.DaysInMillis, 10},
 		{int64(baseTime + tsdbtest.MinuteInMillis), 20},
 		{baseTime + 2*tsdbtest.MinuteInMillis, 30},
@@ -379,7 +379,7 @@ func (suite *testQuerySuite) TestQueryAggregateWithFilterOnMetricName() {
 	labels1 := utils.LabelsFromStringList("os", "linux")
 	numberOfEvents := 10
 	eventsInterval := 60 * 1000
-	baseTime := time.Now().UnixNano()/1000000 - int64(numberOfEvents*eventsInterval)
+	baseTime := tsdbtest.NanosToMillis(time.Now().UnixNano()) - int64(numberOfEvents*eventsInterval)
 	ingestData := []tsdbtest.DataPoint{{baseTime, 10},
 		{int64(baseTime + tsdbtest.MinuteInMillis), 20},
 		{baseTime + 2*tsdbtest.MinuteInMillis, 30},
@@ -438,7 +438,7 @@ func (suite *testQuerySuite) TestRawDataSinglePartitionWithDownSample() {
 	labels1 := utils.LabelsFromStringList("os", "linux")
 	numberOfEvents := 10
 	eventsInterval := 60 * 1000
-	baseTime := time.Now().UnixNano()/1000000 - int64(numberOfEvents*eventsInterval)
+	baseTime := tsdbtest.NanosToMillis(time.Now().UnixNano()) - int64(numberOfEvents*eventsInterval)
 	ingestData := []tsdbtest.DataPoint{{baseTime, 10},
 		{int64(baseTime + tsdbtest.MinuteInMillis), 20},
 		{baseTime + 6*tsdbtest.MinuteInMillis, 30},
@@ -548,7 +548,7 @@ func (suite *testQuerySuite) TestRawAggregatesSinglePartition() {
 	labels1 := utils.LabelsFromStringList("os", "linux")
 	numberOfEvents := 10
 	eventsInterval := 60 * 1000
-	baseTime := time.Now().UnixNano()/1000000 - int64(numberOfEvents*eventsInterval)
+	baseTime := tsdbtest.NanosToMillis(time.Now().UnixNano()) - int64(numberOfEvents*eventsInterval)
 
 	ingestedData := []tsdbtest.DataPoint{{baseTime, 10},
 		{int64(baseTime + tsdbtest.MinuteInMillis), 20},
@@ -605,7 +605,7 @@ func (suite *testQuerySuite) TestRawAggregatesSinglePartitionNegativeValues() {
 	labels1 := utils.LabelsFromStringList("os", "linux")
 	numberOfEvents := 10
 	eventsInterval := 60 * 1000
-	baseTime := time.Now().UnixNano()/1000000 - int64(numberOfEvents*eventsInterval)
+	baseTime := tsdbtest.NanosToMillis(time.Now().UnixNano()) - int64(numberOfEvents*eventsInterval)
 
 	ingestedData := []tsdbtest.DataPoint{{baseTime, -10},
 		{int64(baseTime + tsdbtest.MinuteInMillis), -20},
@@ -663,7 +663,7 @@ func (suite *testQuerySuite) TestRawAggregatesMultiPartition() {
 
 	numberOfEvents := 10
 	eventsInterval := 60 * 1000
-	baseTime := time.Now().UnixNano()/1000000 - int64(numberOfEvents*eventsInterval)
+	baseTime := tsdbtest.NanosToMillis(time.Now().UnixNano()) - int64(numberOfEvents*eventsInterval)
 
 	ingestedData := []tsdbtest.DataPoint{{baseTime - 7*tsdbtest.DaysInMillis, 10},
 		{int64(baseTime + tsdbtest.MinuteInMillis), 20},
@@ -721,7 +721,7 @@ func (suite *testQuerySuite) TestRawAggregatesMultiPartitionNonConcreteAggregate
 	labels1 := utils.LabelsFromStringList("os", "linux")
 	numberOfEvents := 10
 	eventsInterval := 60 * 1000
-	baseTime := time.Now().UnixNano()/1000000 - int64(numberOfEvents*eventsInterval)
+	baseTime := tsdbtest.NanosToMillis(time.Now().UnixNano()) - int64(numberOfEvents*eventsInterval)
 
 	ingestedData := []tsdbtest.DataPoint{{baseTime - 7*tsdbtest.DaysInMillis, 10},
 		{baseTime - 7*tsdbtest.DaysInMillis + tsdbtest.MinuteInMillis, 12},
@@ -778,7 +778,7 @@ func (suite *testQuerySuite) TestClientAggregatesSinglePartition() {
 	labels1 := utils.LabelsFromStringList("os", "linux")
 	numberOfEvents := 10
 	eventsInterval := 60 * 1000
-	baseTime := time.Now().UnixNano()/1000000 - int64(numberOfEvents*eventsInterval)
+	baseTime := tsdbtest.NanosToMillis(time.Now().UnixNano()) - int64(numberOfEvents*eventsInterval)
 
 	ingestedData := []tsdbtest.DataPoint{{baseTime, 10},
 		{int64(baseTime + tsdbtest.MinuteInMillis), 20},
@@ -835,7 +835,7 @@ func (suite *testQuerySuite) TestClientAggregatesMultiPartition() {
 	labels1 := utils.LabelsFromStringList("os", "linux")
 	numberOfEvents := 10
 	eventsInterval := 60 * 1000
-	baseTime := time.Now().UnixNano()/1000000 - int64(numberOfEvents*eventsInterval)
+	baseTime := tsdbtest.NanosToMillis(time.Now().UnixNano()) - int64(numberOfEvents*eventsInterval)
 
 	ingestedData := []tsdbtest.DataPoint{{baseTime - 7*tsdbtest.DaysInMillis, 10},
 		{int64(baseTime), 20},
@@ -896,7 +896,7 @@ func (suite *testQuerySuite) TestClientAggregatesMultiPartitionNonConcreteAggreg
 	labels1 := utils.LabelsFromStringList("os", "linux")
 	numberOfEvents := 10
 	eventsInterval := 60 * 1000
-	baseTime := time.Now().UnixNano()/1000000 - int64(numberOfEvents*eventsInterval)
+	baseTime := tsdbtest.NanosToMillis(time.Now().UnixNano()) - int64(numberOfEvents*eventsInterval)
 
 	ingestedData := []tsdbtest.DataPoint{{baseTime - 7*tsdbtest.DaysInMillis, 10},
 		{baseTime - 7*tsdbtest.DaysInMillis + tsdbtest.MinuteInMillis, 12},
@@ -957,7 +957,7 @@ func (suite *testQuerySuite) TestClientAggregatesMultiPartitionOneStep() {
 	labels1 := utils.LabelsFromStringList("os", "linux")
 	numberOfEvents := 10
 	eventsInterval := 60 * 1000
-	baseTime := time.Now().UnixNano()/1000000 - int64(numberOfEvents*eventsInterval)
+	baseTime := tsdbtest.NanosToMillis(time.Now().UnixNano()) - int64(numberOfEvents*eventsInterval)
 
 	ingestedData := []tsdbtest.DataPoint{{baseTime - 25*tsdbtest.DaysInMillis, 10},
 		{baseTime - 20*tsdbtest.DaysInMillis, 20},
@@ -1017,7 +1017,7 @@ func (suite *testQuerySuite) TestGetEmptyResponse() {
 	labels1 := utils.LabelsFromStringList("os", "linux")
 	numberOfEvents := 10
 	eventsInterval := 60 * 1000
-	baseTime := time.Now().UnixNano()/1000000 - int64(numberOfEvents*eventsInterval)
+	baseTime := tsdbtest.NanosToMillis(time.Now().UnixNano()) - int64(numberOfEvents*eventsInterval)
 
 	ingestedData := []tsdbtest.DataPoint{{baseTime - 7*tsdbtest.DaysInMillis, 10},
 		{int64(baseTime + tsdbtest.MinuteInMillis), 20},
@@ -1072,7 +1072,7 @@ func (suite *testQuerySuite) TestSelectAggregatesByRequestedColumns() {
 	labels1 := utils.LabelsFromStringList("os", "linux")
 	numberOfEvents := 10
 	eventsInterval := 60 * 1000
-	baseTime := time.Now().UnixNano()/1000000 - int64(numberOfEvents*eventsInterval)
+	baseTime := tsdbtest.NanosToMillis(time.Now().UnixNano()) - int64(numberOfEvents*eventsInterval)
 
 	ingestedData := []tsdbtest.DataPoint{{baseTime, 10},
 		{int64(baseTime + tsdbtest.MinuteInMillis), 20},
@@ -1131,7 +1131,7 @@ func (suite *testQuerySuite) TestSelectRawDataByRequestedColumns() {
 	labels1 := utils.LabelsFromStringList("os", "linux")
 	numberOfEvents := 10
 	eventsInterval := 60 * 1000
-	baseTime := time.Now().UnixNano()/1000000 - int64(numberOfEvents*eventsInterval)
+	baseTime := tsdbtest.NanosToMillis(time.Now().UnixNano()) - int64(numberOfEvents*eventsInterval)
 
 	ingestedData := []tsdbtest.DataPoint{{baseTime, 10},
 		{int64(baseTime + tsdbtest.MinuteInMillis), 20},
@@ -1186,7 +1186,7 @@ func (suite *testQuerySuite) TestSelectAggregatesAndRawByRequestedColumns() {
 	labels1 := utils.LabelsFromStringList("os", "linux")
 	numberOfEvents := 10
 	eventsInterval := 60 * 1000
-	baseTime := time.Now().UnixNano()/1000000 - int64(numberOfEvents*eventsInterval)
+	baseTime := tsdbtest.NanosToMillis(time.Now().UnixNano()) - int64(numberOfEvents*eventsInterval)
 
 	ingestedData := []tsdbtest.DataPoint{{baseTime, 10},
 		{int64(baseTime + tsdbtest.MinuteInMillis), 20},
@@ -1244,7 +1244,7 @@ func (suite *testQuerySuite) TestSelectServerAggregatesAndRawByRequestedColumns(
 	labels1 := utils.LabelsFromStringList("os", "linux")
 	numberOfEvents := 10
 	eventsInterval := 60 * 1000
-	baseTime := time.Now().UnixNano()/1000000 - int64(numberOfEvents*eventsInterval)
+	baseTime := tsdbtest.NanosToMillis(time.Now().UnixNano()) - int64(numberOfEvents*eventsInterval)
 
 	ingestedData := []tsdbtest.DataPoint{{baseTime, 10},
 		{int64(baseTime + tsdbtest.MinuteInMillis), 20},
@@ -1304,7 +1304,7 @@ func (suite *testQuerySuite) TestRawDataMultipleMetrics() {
 	labels2 := utils.LabelsFromStringList("os", "linux")
 	numberOfEvents := 5
 	eventsInterval := int64(tsdbtest.MinuteInMillis)
-	baseTime := time.Now().UnixNano()/1000000 - int64(numberOfEvents)*eventsInterval
+	baseTime := tsdbtest.NanosToMillis(time.Now().UnixNano()) - int64(numberOfEvents)*eventsInterval
 	ingestData1 := []tsdbtest.DataPoint{{baseTime - 7*tsdbtest.DaysInMillis, 10},
 		{int64(baseTime + tsdbtest.MinuteInMillis), 20},
 		{baseTime + 2*eventsInterval, 30},
@@ -1370,7 +1370,7 @@ func (suite *testQuerySuite) TestDataFrameRawDataMultipleMetrics() {
 	labels2 := utils.LabelsFromStringList("os", "linux")
 	numberOfEvents := 5
 	eventsInterval := int64(tsdbtest.MinuteInMillis)
-	baseTime := time.Now().UnixNano()/1000000 - int64(numberOfEvents)*eventsInterval
+	baseTime := tsdbtest.NanosToMillis(time.Now().UnixNano()) - int64(numberOfEvents)*eventsInterval
 	expectedTimeColumn := []int64{baseTime - 7*tsdbtest.DaysInMillis, baseTime - 5*tsdbtest.DaysInMillis,
 		baseTime + tsdbtest.MinuteInMillis, baseTime + 2*tsdbtest.MinuteInMillis,
 		baseTime + 3*tsdbtest.MinuteInMillis, baseTime + 4*tsdbtest.MinuteInMillis}

@@ -34,6 +34,7 @@ type AggrType uint16
 const (
 	AggregateLabel = "Aggregate"
 
+	aggrTypeNone  AggrType = 0
 	aggrTypeCount AggrType = 1
 	aggrTypeSum   AggrType = 2
 	aggrTypeSqr   AggrType = 4
@@ -113,7 +114,7 @@ func (a AggrType) String() string { return aggrToString[a] }
 
 func RawAggregatesToStringList(aggregates string) ([]string, error) {
 	aggrs := strings.Split(aggregates, ",")
-	aggType, _, err := AggregatesFromStringList(aggrs)
+	aggType, _, err := AggregatesFromStringListWithCount(aggrs)
 	if err != nil {
 		return nil, err
 	}
@@ -128,7 +129,7 @@ func RawAggregatesToStringList(aggregates string) ([]string, error) {
 }
 
 // Convert a comma-separated aggregation-functions string to an aggregates mask
-func AggregatesFromStringList(split []string) (AggrType, []AggrType, error) {
+func AggregatesFromStringListWithCount(split []string) (AggrType, []AggrType, error) {
 	var aggrMask AggrType
 	var aggrList []AggrType
 
@@ -268,6 +269,8 @@ func ContainsAggregate(list []AggrType, item AggrType) bool {
 func IsRawAggregate(item AggrType) bool { return ContainsAggregate(rawAggregates, item) }
 
 func IsCountAggregate(aggr AggrType) bool { return aggr == aggrTypeCount }
+
+func HasAggregates(mask AggrType) bool { return mask != aggrTypeNone }
 
 func ToAttrName(aggr AggrType) string {
 	return config.AggregateAttrPrefix + aggr.String()

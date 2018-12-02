@@ -1,6 +1,7 @@
 package pquerier
 
 import (
+	"fmt"
 	"sort"
 	"strings"
 	"sync"
@@ -155,10 +156,6 @@ func (queryCtx *selectQueryContext) queryPartition(partition *partmgr.DBPartitio
 		var aggregationParams *aggregate.AggregationParams
 		functions, requestAggregatesAndRaw := queryCtx.metricsAggregatesToString(metric)
 
-		//if functions == "" && step > 0 && step >= partition.RollupTime() && partition.AggrType().HasAverage() {
-		//	functions = "avg"
-		//}
-
 		// Check whether there are aggregations to add and aggregates aren't disabled
 		if functions != "" && !queryCtx.disableAllAggr {
 
@@ -219,27 +216,20 @@ func (queryCtx *selectQueryContext) processQueryResults(query *partQuery) error 
 	for query.Next() {
 
 		// read metric name
-		name, nok := query.GetField(config.MetricNameAttrName).(string)
-		if !nok {
-			name = "UNKNOWN"
+		name, ok := query.GetField(config.MetricNameAttrName).(string)
+		if !ok {
+			return fmt.Errorf("could not find metric name attribute in response, res:%v", query.GetFields())
 		}
 
 		// read label set
 		lsetAttr, lok := query.GetField(config.LabelSetAttrName).(string)
 		if !lok {
-			lsetAttr = "UNKNOWN"
-		}
-		if !lok || !nok {
-			queryCtx.logger.Error("Error in initLabels; bad field values.")
+			return fmt.Errorf("could not find label set attribute in response, res:%v", query.GetFields())
 		}
 
-		splitLset := strings.Split(lsetAttr, ",")
-		lset := make(utils.Labels, 0, len(splitLset))
-		for _, label := range splitLset {
-			kv := strings.Split(label, "=")
-			if len(kv) > 1 {
-				lset = append(lset, utils.Label{Name: kv[0], Value: kv[1]})
-			}
+		lset, err := utils.LabelsFromString(lsetAttr)
+		if err != nil {
+			return err
 		}
 
 		// read chunk encoding type (TODO: in ingestion etc.)

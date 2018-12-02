@@ -81,7 +81,12 @@ func mainCollector(ctx *selectQueryContext, responseChannel chan *qryResults) {
 
 			// It is possible to query an aggregate and down sample raw chunks in the same df.
 			if res.IsDownsample() {
-				lastTimePerMetric[res.name], lastValuePerMetric[res.name] = downsampleRawData(ctx, res, lastTimePerMetric[res.name], lastValuePerMetric[res.name])
+				lastTimePerMetric[res.name], lastValuePerMetric[res.name], err = downsampleRawData(ctx, res, lastTimePerMetric[res.name], lastValuePerMetric[res.name])
+				if err != nil {
+					ctx.logger.Error("problem downsampling '%v', lset: %v, err:%v", res.name, res.frame.lset, err)
+					ctx.errorChannel <- err
+					return
+				}
 			}
 		}
 	}
@@ -117,9 +122,11 @@ func aggregateClientAggregates(ctx *selectQueryContext, res *qryResults) {
 }
 
 func aggregateServerAggregates(ctx *selectQueryContext, res *qryResults) {
+	partitionStartTime := res.query.partition.GetStartTime()
+	rollupInterval := res.query.aggregationParams.GetRollupTime()
 	for _, col := range res.frame.columns {
 		if col.GetColumnSpec().metric == res.name &&
-			col.GetColumnSpec().function != 0 &&
+			aggregate.HasAggregates(col.GetColumnSpec().function) &&
 			col.GetColumnSpec().isConcrete() {
 
 			array, ok := res.fields[aggregate.ToAttrName(col.GetColumnSpec().function)]
@@ -128,10 +135,11 @@ func aggregateServerAggregates(ctx *selectQueryContext, res *qryResults) {
 			} else {
 				// go over the byte array and convert each uint as we go to save memory allocation
 				bytes := array.([]byte)
+
 				for i := 16; i+8 <= len(bytes); i += 8 {
 					val := binary.LittleEndian.Uint64(bytes[i : i+8])
 					currentValueIndex := (i - 16) / 8
-					currentValueTime := res.query.partition.GetStartTime() + int64(currentValueIndex+1)*res.query.aggregationParams.GetRollupTime()
+					currentValueTime := partitionStartTime + int64(currentValueIndex+1)*rollupInterval
 					currentCell := (currentValueTime - ctx.mint) / res.query.aggregationParams.Interval
 
 					var floatVal float64
@@ -148,11 +156,14 @@ func aggregateServerAggregates(ctx *selectQueryContext, res *qryResults) {
 }
 
 func downsampleRawData(ctx *selectQueryContext, res *qryResults,
-	previousPartitionLastTime int64, previousPartitionLastValue float64) (int64, float64) {
+	previousPartitionLastTime int64, previousPartitionLastValue float64) (int64, float64, error) {
 	var lastT int64
 	var lastV float64
 	it := newRawChunkIterator(res, nil).(*rawChunkIterator)
-	col := res.frame.columns[res.frame.columnByName[res.name]]
+	col, err := res.frame.Column(res.name)
+	if err != nil {
+		return previousPartitionLastTime, previousPartitionLastValue, err
+	}
 	for currBucket := 0; currBucket < col.Len(); currBucket++ {
 		currBucketTime := int64(currBucket)*ctx.step + ctx.mint
 		if it.Seek(currBucketTime) {
@@ -185,5 +196,5 @@ func downsampleRawData(ctx *selectQueryContext, res *qryResults,
 		}
 	}
 
-	return lastT, lastV
+	return lastT, lastV, nil
 }

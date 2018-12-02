@@ -17,7 +17,7 @@ type AggregationParams struct {
 func NewAggregationParams(functions, col string, buckets int, interval, rollupTime int64, windows []int) (*AggregationParams, error) {
 
 	aggregatesList := strings.Split(functions, ",")
-	aggrMask, _, err := AggregatesFromStringList(aggregatesList)
+	aggrMask, _, err := AggregatesFromStringListWithCount(aggregatesList)
 	if err != nil {
 		return nil, err
 	}

@@ -200,12 +200,9 @@ func (qc *queryCommandeer) newQuery(from, to, step int64) error {
 
 	for set.Next() {
 		series := set.At()
-		//fmt.Println("labels: ", set.At().Labels())
 		count++
 		iter := series.Iterator()
 		for iter.Next() {
-			//t, v := iter.At()
-			//fmt.Println("  %s  v=%.2f\n", f.timeString(t), v)
 		}
 
 		if iter.Err() != nil {
