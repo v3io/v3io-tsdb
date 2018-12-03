@@ -96,7 +96,7 @@ func (suite *testQuerySuite) TestRawDataSinglePartition() {
 	}
 
 	params := &pquerier.SelectParams{Name: "cpu", From: baseTime, To: baseTime + int64(numberOfEvents*eventsInterval)}
-	set, err := querierV2.SelectQry(params)
+	set, err := querierV2.Select(params)
 	if err != nil {
 		suite.T().Fatalf("Failed to exeute query, err: %v", err)
 	}
@@ -153,7 +153,7 @@ func (suite *testQuerySuite) TestRawDataMultiplePartitions() {
 	}
 
 	params := &pquerier.SelectParams{Name: "cpu", From: baseTime - 8*tsdbtest.DaysInMillis, To: baseTime + int64(numberOfEvents)*eventsInterval}
-	set, err := querierV2.SelectQry(params)
+	set, err := querierV2.Select(params)
 	if err != nil {
 		suite.T().Fatalf("Failed to exeute query, err: %v", err)
 	}
@@ -211,7 +211,7 @@ func (suite *testQuerySuite) TestFilterOnLabel() {
 
 	params := &pquerier.SelectParams{Name: "cpu", Filter: "os=='linux'",
 		From: baseTime - 8*tsdbtest.DaysInMillis, To: baseTime + int64(numberOfEvents)*eventsInterval}
-	set, err := querierV2.SelectQry(params)
+	set, err := querierV2.Select(params)
 	if err != nil {
 		suite.T().Fatalf("Failed to exeute query, err: %v", err)
 	}
@@ -266,7 +266,7 @@ func (suite *testQuerySuite) TestQueryWithBadTimeParameters() {
 	}
 
 	params := &pquerier.SelectParams{Name: "cpu", From: baseTime + int64(numberOfEvents*eventsInterval), To: baseTime}
-	_, err = querierV2.SelectQry(params)
+	_, err = querierV2.Select(params)
 	if err == nil {
 		suite.T().Fatalf("expected to get error but no error was returned")
 	}
@@ -302,7 +302,7 @@ func (suite *testQuerySuite) TestQueryMetricWithDashInTheName() { // IG-8585
 	}
 
 	params := &pquerier.SelectParams{From: baseTime, To: baseTime + int64(numberOfEvents*eventsInterval)}
-	_, err = querierV2.SelectQry(params)
+	_, err = querierV2.Select(params)
 	if err == nil {
 		suite.T().Fatalf("expected an error but finish succesfully")
 	}
@@ -348,7 +348,7 @@ func (suite *testQuerySuite) TestQueryAggregateWithNameWildcard() {
 
 	params := &pquerier.SelectParams{Functions: "max,min,sum", Step: 2 * tsdbtest.MinuteInMillis,
 		From: baseTime - 7*tsdbtest.DaysInMillis, To: baseTime + int64(numberOfEvents*eventsInterval)}
-	set, err := querierV2.SelectQry(params)
+	set, err := querierV2.Select(params)
 	if err != nil {
 		suite.T().Fatalf("failed to exeute query, err: %v", err)
 	}
@@ -407,7 +407,7 @@ func (suite *testQuerySuite) TestQueryAggregateWithFilterOnMetricName() {
 
 	params := &pquerier.SelectParams{Functions: "max", Step: 2 * tsdbtest.MinuteInMillis,
 		From: baseTime, To: baseTime + int64(numberOfEvents*eventsInterval), Filter: "_name=='cpu'"}
-	set, err := querierV2.SelectQry(params)
+	set, err := querierV2.Select(params)
 	if err != nil {
 		suite.T().Fatalf("failed to exeute query, err: %v", err)
 	}
@@ -463,7 +463,7 @@ func (suite *testQuerySuite) TestRawDataSinglePartitionWithDownSample() {
 	}
 
 	params := &pquerier.SelectParams{Name: "cpu", Step: 2 * int64(tsdbtest.MinuteInMillis), From: baseTime, To: baseTime + int64(numberOfEvents*eventsInterval)}
-	set, err := querierV2.SelectQry(params)
+	set, err := querierV2.Select(params)
 	if err != nil {
 		suite.T().Fatalf("Failed to exeute query, err: %v", err)
 	}
@@ -518,7 +518,7 @@ func (suite *testQuerySuite) TestRawDataDownSampleMultiPartitions() {
 		Step: 2 * int64(tsdbtest.HoursInMillis),
 		From: suite.toMillis("2018-11-18T22:00:00Z"),
 		To:   suite.toMillis("2018-11-19T4:00:00Z")}
-	set, err := querierV2.SelectQry(params)
+	set, err := querierV2.Select(params)
 	if err != nil {
 		suite.T().Fatalf("Failed to exeute query, err: %v", err)
 	}
@@ -574,7 +574,7 @@ func (suite *testQuerySuite) TestRawAggregatesSinglePartition() {
 	}
 
 	params := &pquerier.SelectParams{Name: "cpu", Functions: "sum,max,min", Step: 1 * 60 * 60 * 1000, From: baseTime, To: baseTime + int64(numberOfEvents*eventsInterval)}
-	set, err := querierV2.SelectQry(params)
+	set, err := querierV2.Select(params)
 	if err != nil {
 		suite.T().Fatalf("Failed to exeute query, err: %v", err)
 	}
@@ -631,7 +631,7 @@ func (suite *testQuerySuite) TestRawAggregatesSinglePartitionNegativeValues() {
 	}
 
 	params := &pquerier.SelectParams{Name: "cpu", Functions: "sum,max,min", Step: 1 * 60 * 60 * 1000, From: baseTime, To: baseTime + int64(numberOfEvents*eventsInterval)}
-	set, err := querierV2.SelectQry(params)
+	set, err := querierV2.Select(params)
 	if err != nil {
 		suite.T().Fatalf("Failed to exeute query, err: %v", err)
 	}
@@ -690,7 +690,7 @@ func (suite *testQuerySuite) TestRawAggregatesMultiPartition() {
 	}
 
 	params := &pquerier.SelectParams{Name: "cpu", Functions: "sum,max,min,sqr", Step: 1 * 60 * 60 * 1000, From: baseTime - 7*tsdbtest.DaysInMillis, To: baseTime + int64(numberOfEvents*eventsInterval)}
-	set, err := querierV2.SelectQry(params)
+	set, err := querierV2.Select(params)
 	if err != nil {
 		suite.T().Fatalf("Failed to exeute query, err: %v", err)
 	}
@@ -747,7 +747,7 @@ func (suite *testQuerySuite) TestRawAggregatesMultiPartitionNonConcreteAggregate
 	}
 
 	params := &pquerier.SelectParams{Name: "cpu", Functions: "avg,stdvar", Step: 1 * 60 * 60 * 1000, From: baseTime - 7*tsdbtest.DaysInMillis, To: baseTime + int64(numberOfEvents*eventsInterval)}
-	set, err := querierV2.SelectQry(params)
+	set, err := querierV2.Select(params)
 	if err != nil {
 		suite.T().Fatalf("Failed to exeute query, err: %v", err)
 	}
@@ -804,7 +804,7 @@ func (suite *testQuerySuite) TestClientAggregatesSinglePartition() {
 	}
 
 	params := &pquerier.SelectParams{Name: "cpu", Functions: "sum,max,min", Step: 2 * 60 * 1000, From: baseTime, To: baseTime + int64(numberOfEvents*eventsInterval)}
-	set, err := querierV2.SelectQry(params)
+	set, err := querierV2.Select(params)
 	if err != nil {
 		suite.T().Fatalf("Failed to exeute query, err: %v", err)
 	}
@@ -865,7 +865,7 @@ func (suite *testQuerySuite) TestClientAggregatesMultiPartition() {
 		Step:      5 * tsdbtest.MinuteInMillis,
 		From:      baseTime - 7*tsdbtest.DaysInMillis,
 		To:        baseTime + int64(numberOfEvents*eventsInterval)}
-	set, err := querierV2.SelectQry(params)
+	set, err := querierV2.Select(params)
 	if err != nil {
 		suite.T().Fatalf("Failed to exeute query, err: %v", err)
 	}
@@ -926,7 +926,7 @@ func (suite *testQuerySuite) TestClientAggregatesMultiPartitionNonConcreteAggreg
 		Step:      5 * tsdbtest.MinuteInMillis,
 		From:      baseTime - 7*tsdbtest.DaysInMillis,
 		To:        baseTime + int64(numberOfEvents*eventsInterval)}
-	set, err := querierV2.SelectQry(params)
+	set, err := querierV2.Select(params)
 	if err != nil {
 		suite.T().Fatalf("Failed to exeute query, err: %v", err)
 	}
@@ -986,7 +986,7 @@ func (suite *testQuerySuite) TestClientAggregatesMultiPartitionOneStep() {
 		Step:      0,
 		From:      baseTime - 25*tsdbtest.DaysInMillis,
 		To:        baseTime + 21*tsdbtest.DaysInMillis}
-	set, err := querierV2.SelectQry(params)
+	set, err := querierV2.Select(params)
 	if err != nil {
 		suite.T().Fatalf("Failed to exeute query, err: %v", err)
 	}
@@ -1041,7 +1041,7 @@ func (suite *testQuerySuite) TestGetEmptyResponse() {
 	}
 
 	params := &pquerier.SelectParams{Name: "i dont exist", Functions: "sum,max,min,sqr", Step: 1 * 60 * 60 * 1000, From: baseTime - 7*tsdbtest.DaysInMillis, To: baseTime + int64(numberOfEvents*eventsInterval)}
-	set, err := querierV2.SelectQry(params)
+	set, err := querierV2.Select(params)
 	if err != nil {
 		suite.T().Fatalf("Failed to exeute query, err: %v", err)
 	}
@@ -1100,7 +1100,7 @@ func (suite *testQuerySuite) TestSelectAggregatesByRequestedColumns() {
 	params := &pquerier.SelectParams{RequestedColumns: []pquerier.RequestedColumn{{Metric: "cpu", Function: "max"}, {Metric: "cpu", Function: "min"}, {Metric: "cpu", Function: "sum"}},
 		Step: 2 * 60 * 1000, From: baseTime, To: baseTime + int64(numberOfEvents*eventsInterval)}
 
-	set, err := querierV2.SelectQry(params)
+	set, err := querierV2.Select(params)
 	if err != nil {
 		suite.T().Fatalf("Failed to exeute query, err: %v", err)
 	}
@@ -1156,7 +1156,7 @@ func (suite *testQuerySuite) TestSelectRawDataByRequestedColumns() {
 
 	params := &pquerier.SelectParams{RequestedColumns: []pquerier.RequestedColumn{{Metric: "cpu"}},
 		From: baseTime, To: baseTime + int64(numberOfEvents*eventsInterval)}
-	set, err := querierV2.SelectQry(params)
+	set, err := querierV2.Select(params)
 	if err != nil {
 		suite.T().Fatalf("Failed to exeute query, err: %v", err)
 	}
@@ -1213,7 +1213,7 @@ func (suite *testQuerySuite) TestSelectAggregatesAndRawByRequestedColumns() {
 	params := &pquerier.SelectParams{RequestedColumns: []pquerier.RequestedColumn{{Metric: "cpu", Function: "sum"}, {Metric: "cpu"}},
 		Step: 2 * 60 * 1000, From: baseTime, To: baseTime + int64(numberOfEvents*eventsInterval)}
 
-	set, err := querierV2.SelectQry(params)
+	set, err := querierV2.Select(params)
 	if err != nil {
 		suite.T().Fatalf("Failed to exeute query, err: %v", err)
 	}
@@ -1271,7 +1271,7 @@ func (suite *testQuerySuite) TestSelectServerAggregatesAndRawByRequestedColumns(
 	params := &pquerier.SelectParams{RequestedColumns: []pquerier.RequestedColumn{{Metric: "cpu", Function: "sum"}, {Metric: "cpu", Interpolator: "next"}},
 		Step: 60 * tsdbtest.MinuteInMillis, From: baseTime, To: baseTime + int64(numberOfEvents*eventsInterval)}
 
-	set, err := querierV2.SelectQry(params)
+	set, err := querierV2.Select(params)
 	if err != nil {
 		suite.T().Fatalf("Failed to exeute query, err: %v", err)
 	}
@@ -1338,7 +1338,7 @@ func (suite *testQuerySuite) TestRawDataMultipleMetrics() {
 
 	params := &pquerier.SelectParams{RequestedColumns: []pquerier.RequestedColumn{{Metric: metricName1}, {Metric: metricName2}},
 		From: baseTime - 8*tsdbtest.DaysInMillis, To: baseTime + int64(numberOfEvents)*eventsInterval}
-	set, err := querierV2.SelectQry(params)
+	set, err := querierV2.Select(params)
 	if err != nil {
 		suite.T().Fatalf("Failed to exeute query, err: %v", err)
 	}

@@ -63,40 +63,40 @@ func (s *SelectParams) getRequestedColumns() []RequestedColumn {
 	return columns
 }
 
-func (q *V3ioQuerier) SelectProm(params *SelectParams, noAggr bool) (set SeriesSet, err error) {
+func (q *V3ioQuerier) SelectProm(params *SelectParams, noAggr bool) (SeriesSet, error) {
 
 	params.disableClientAggr = true
 	params.disableAllAggr = noAggr
 
-	set, err = q.baseSelectQry(params, false)
-	if err != nil {
-		set = nullSeriesSet{}
+	iter, err := q.baseSelectQry(params, false)
+	if err != nil || iter == nil {
+		return nullSeriesSet{}, err
 	}
 
-	return set, err
+	return iter, nil
 }
 
 // Base query function
-func (q *V3ioQuerier) SelectQry(params *SelectParams) (set SeriesSet, err error) {
+func (q *V3ioQuerier) Select(params *SelectParams) (SeriesSet, error) {
 	params.disableAllAggr = false
 	params.disableClientAggr = q.cfg.DisableClientAggr
-	set, err = q.baseSelectQry(params, true)
-	if err != nil {
-		set = nullSeriesSet{}
+	iter, err := q.baseSelectQry(params, true)
+	if err != nil || iter == nil {
+		return nullSeriesSet{}, err
 	}
 
-	return
+	return iter, nil
 }
 
-func (q *V3ioQuerier) SelectDataFrame(params *SelectParams) (iter FrameSet, err error) {
+func (q *V3ioQuerier) SelectDataFrame(params *SelectParams) (FrameSet, error) {
 	params.disableAllAggr = false
 	params.disableClientAggr = q.cfg.DisableClientAggr
-	iter, err = q.baseSelectQry(params, true)
-	if err != nil {
-		iter = nullFrameSet{}
+	iter, err := q.baseSelectQry(params, true)
+	if err != nil || iter == nil {
+		return nullFrameSet{}, err
 	}
 
-	return
+	return iter, nil
 }
 
 func (q *V3ioQuerier) baseSelectQry(params *SelectParams, showAggregateLabel bool) (iter *frameIterator, err error) {
@@ -132,6 +132,7 @@ func (q *V3ioQuerier) baseSelectQry(params *SelectParams, showAggregateLabel boo
 
 		parts := q.partitionMngr.PartsForRange(params.From, params.To, true)
 		if len(parts) == 0 {
+			//iter = nil
 			return
 		}
 

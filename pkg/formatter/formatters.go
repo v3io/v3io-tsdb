@@ -6,14 +6,14 @@ import (
 	"io"
 
 	"github.com/pkg/errors"
-	"github.com/v3io/v3io-tsdb/pkg/querier"
+	"github.com/v3io/v3io-tsdb/pkg/pquerier"
 )
 
 type textFormatter struct {
 	baseFormatter
 }
 
-func (f textFormatter) Write(out io.Writer, set querier.SeriesSet) error {
+func (f textFormatter) Write(out io.Writer, set pquerier.SeriesSet) error {
 
 	for set.Next() {
 		series := set.At()
@@ -43,7 +43,7 @@ type csvFormatter struct {
 	baseFormatter
 }
 
-func (f csvFormatter) Write(out io.Writer, set querier.SeriesSet) error {
+func (f csvFormatter) Write(out io.Writer, set pquerier.SeriesSet) error {
 
 	writer := csv.NewWriter(out)
 	for set.Next() {
@@ -81,7 +81,7 @@ const metricTemplate = `
     "datapoints": [%s]
   }`
 
-func (f simpleJsonFormatter) Write(out io.Writer, set querier.SeriesSet) error {
+func (f simpleJsonFormatter) Write(out io.Writer, set pquerier.SeriesSet) error {
 
 	firstSeries := true
 	output := "["
@@ -127,7 +127,7 @@ type testFormatter struct {
 	baseFormatter
 }
 
-func (f testFormatter) Write(out io.Writer, set querier.SeriesSet) error {
+func (f testFormatter) Write(out io.Writer, set pquerier.SeriesSet) error {
 	var count int
 	for set.Next() {
 		count++
