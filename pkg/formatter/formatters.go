@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/pkg/errors"
 	"github.com/v3io/v3io-tsdb/pkg/querier"
 )
 
@@ -120,4 +121,32 @@ func (f simpleJsonFormatter) Write(out io.Writer, set querier.SeriesSet) error {
 	_, err := out.Write([]byte(output + "\n]"))
 
 	return err
+}
+
+type testFormatter struct {
+	baseFormatter
+}
+
+func (f testFormatter) Write(out io.Writer, set querier.SeriesSet) error {
+	var count int
+	for set.Next() {
+		count++
+		series := set.At()
+		iter := series.Iterator()
+		var i int
+		for iter.Next() {
+			i++
+		}
+
+		if iter.Err() != nil {
+			return errors.Errorf("error reading point for label set: %v, at index: %v, error: %v", series.Labels(), i, iter.Err())
+		}
+	}
+
+	if set.Err() != nil {
+		return set.Err()
+	}
+
+	fmt.Fprintf(out, "got %v unique label sets\n", count)
+	return nil
 }

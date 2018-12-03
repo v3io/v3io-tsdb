@@ -44,7 +44,7 @@ func newSchema(samplesIngestionRate, aggregationGranularity, aggregatesList stri
 		return nil, errors.Wrap(err, "Failed to calculate the chunk interval.")
 	}
 
-	aggregates, err := aggregate.AggregatesToStringList(aggregatesList)
+	aggregates, err := aggregate.RawAggregatesToStringList(aggregatesList)
 	if err != nil {
 		return nil, errors.Wrapf(err, "Failed to parse aggregates list '%s'.", aggregatesList)
 	}

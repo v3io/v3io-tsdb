@@ -24,6 +24,7 @@ import (
 	"github.com/nuclio/logger"
 	"github.com/v3io/v3io-go-http"
 	"github.com/v3io/v3io-tsdb/pkg/aggregate"
+	"github.com/v3io/v3io-tsdb/pkg/config"
 	"github.com/v3io/v3io-tsdb/pkg/partmgr"
 	"github.com/v3io/v3io-tsdb/pkg/utils"
 )
@@ -59,7 +60,7 @@ func (s *V3ioSeriesSet) getItems(partition *partmgr.DBPartition, name, filter st
 	if name != "" {
 		shardingKeys = partition.GetShardingKeys(name)
 	}
-	attrs := []string{"_lset", "_ooo", "_name", "_maxtime"}
+	attrs := []string{config.LabelSetAttrName, config.OutOfOrderAttrName, "_name", config.MaxTimeAttrName}
 
 	if s.aggrSeries != nil && s.canAggregate {
 		s.attrs = s.aggrSeries.GetAttrNames()
@@ -107,7 +108,7 @@ func (s *V3ioSeriesSet) Next() bool {
 			// Create a series from aggregation arrays (in the TSDB table) if
 			// the partition stores the desired aggregates
 			maxtUpdate := s.maxt
-			maxTime := s.iter.GetField("_maxtime")
+			maxTime := s.iter.GetField(config.MaxTimeAttrName)
 			if maxTime != nil && int64(maxTime.(int)) < s.maxt {
 				maxtUpdate = int64(maxTime.(int))
 			}

@@ -72,7 +72,7 @@ func NewDBPartition(pmgr *PartitionManager, startTime int64, path string) (*DBPa
 		rollupTime:        rollupTime,
 	}
 
-	aggrType, err := aggregate.AggrsFromString(pmgr.schemaConfig.PartitionSchemaInfo.Aggregates)
+	aggrType, _, err := aggregate.AggregatesFromStringListWithCount(pmgr.schemaConfig.PartitionSchemaInfo.Aggregates)
 	if err != nil {
 		return nil, err
 	}
@@ -431,7 +431,12 @@ func (p *DBPartition) Range2Attrs(col string, mint, maxt int64) ([]string, int64
 		strList = append(strList, p.ChunkID2Attr(col, id))
 	}
 
-	firstAttrTime := p.startTime + ((mint-p.startTime)/p.chunkInterval)*p.chunkInterval
+	var firstAttrTime int64
+	if mint < p.startTime {
+		firstAttrTime = p.startTime
+	} else {
+		firstAttrTime = p.startTime + ((mint-p.startTime)/p.chunkInterval)*p.chunkInterval
+	}
 	return strList, firstAttrTime
 }
 

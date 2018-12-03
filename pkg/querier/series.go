@@ -25,6 +25,7 @@ import (
 
 	"github.com/v3io/v3io-tsdb/pkg/aggregate"
 	"github.com/v3io/v3io-tsdb/pkg/chunkenc"
+	"github.com/v3io/v3io-tsdb/pkg/config"
 	"github.com/v3io/v3io-tsdb/pkg/utils"
 )
 
@@ -86,7 +87,7 @@ func initLabels(set *V3ioSeriesSet) utils.Labels {
 func (s *V3ioSeries) initSeriesIter() {
 
 	maxt := s.set.maxt
-	maxTime := s.set.iter.GetField("_maxtime")
+	maxTime := s.set.iter.GetField(config.MaxTimeAttrName)
 	if maxTime != nil && int64(maxTime.(int)) < maxt {
 		maxt = int64(maxTime.(int))
 	}
