@@ -132,7 +132,6 @@ func (q *V3ioQuerier) baseSelectQry(params *SelectParams, showAggregateLabel boo
 
 		parts := q.partitionMngr.PartsForRange(params.From, params.To, true)
 		if len(parts) == 0 {
-			//iter = nil
 			return
 		}
 
