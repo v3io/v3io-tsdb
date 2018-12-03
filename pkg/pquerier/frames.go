@@ -354,7 +354,7 @@ func (d *dataFrame) rawSeriesToColumns() {
 		}
 	}
 
-	for nonExhaustedIterators != 0 {
+	for nonExhaustedIterators > 0 {
 		currentTime = nextTime
 		nextTime = int64(math.MaxInt64)
 		timeData = append(timeData, currentTime)

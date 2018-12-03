@@ -69,7 +69,7 @@ const (
 
 	PrometheusMetricNameAttribute = "__name__"
 
-	NamesDirectory = "/names/"
+	NamesDirectory = "names"
 )
 
 type BuildInfo struct {

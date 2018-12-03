@@ -2,6 +2,7 @@ package pquerier
 
 import (
 	"fmt"
+	"path/filepath"
 	"sort"
 	"strings"
 	"time"
@@ -159,7 +160,7 @@ func (q *V3ioQuerier) LabelValues(labelKey string) (result []string, err error) 
 
 func (q *V3ioQuerier) getMetricNames() ([]string, error) {
 	input := v3io.GetItemsInput{
-		Path:           q.cfg.TablePath + config.NamesDirectory,
+		Path:           filepath.Join(q.cfg.TablePath, config.NamesDirectory),
 		AttributeNames: []string{config.ObjectNameAttrName},
 	}
 

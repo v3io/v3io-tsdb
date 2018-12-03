@@ -23,6 +23,7 @@ package appender
 import (
 	"encoding/base64"
 	"fmt"
+	"path/filepath"
 	"sort"
 	"time"
 
@@ -168,7 +169,7 @@ func (cs *chunkStore) processGetResp(mc *MetricsCache, metric *MetricState, resp
 	if resp.Error != nil {
 		if utils.IsNotExistsError(resp.Error) {
 			if metric.newName {
-				path := mc.cfg.TablePath + config.NamesDirectory + metric.name
+				path := filepath.Join(mc.cfg.TablePath, config.NamesDirectory, metric.name)
 				putInput := v3io.PutItemInput{Path: path, Attributes: map[string]interface{}{}}
 
 				request, err := mc.container.PutItem(&putInput, metric, mc.nameUpdateChan)
