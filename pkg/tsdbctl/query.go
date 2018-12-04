@@ -21,7 +21,6 @@ such restriction.
 package tsdbctl
 
 import (
-	"fmt"
 	"strconv"
 	"strings"
 	"time"
@@ -31,7 +30,6 @@ import (
 	"github.com/v3io/v3io-tsdb/pkg/config"
 	"github.com/v3io/v3io-tsdb/pkg/formatter"
 	"github.com/v3io/v3io-tsdb/pkg/pquerier"
-	"github.com/v3io/v3io-tsdb/pkg/querier"
 	"github.com/v3io/v3io-tsdb/pkg/utils"
 )
 
@@ -47,7 +45,7 @@ type queryCommandeer struct {
 	functions      string
 	step           string
 	output         string
-	newQuerier     bool
+	oldQuerier     bool
 }
 
 func newQueryCommandeer(rootCommandeer *RootCommandeer) *queryCommandeer {
@@ -112,7 +110,8 @@ Arguments:
 		"Aggregation information to return, as a comma-separated\nlist of supported aggregation functions - count | avg |\nsum | min | max | stddev | stdvar | last | rate.\nExample: \"sum,min,max,count\".")
 	cmd.Flags().StringVarP(&commandeer.step, "aggregation-interval", "i", "",
 		"Aggregation interval for applying the aggregation functions\n(if set - see the -a|--aggregates flag), of the format\n\"[0-9]+[mhd]\" (where 'm' = minutes, 'h' = hours, and\n'd' = days). Examples: \"1h\"; \"150m\". (default =\n<end time> - <start time>)")
-	cmd.Flags().BoolVarP(&commandeer.newQuerier, "newQuerier", "q", false, "")
+	cmd.Flags().BoolVarP(&commandeer.oldQuerier, "oldQuerier", "q", false, "use old querier")
+	cmd.Flags().Lookup("oldQuerier").Hidden = true
 	commandeer.cmd = cmd
 
 	return commandeer
@@ -170,7 +169,7 @@ func (qc *queryCommandeer) query() error {
 	qc.rootCommandeer.logger.DebugWith("Query", "from", from, "to", to, "name", qc.name,
 		"filter", qc.filter, "functions", qc.functions, "step", qc.step)
 
-	if qc.newQuerier {
+	if !qc.oldQuerier {
 		return qc.newQuery(from, to, step)
 	} else {
 		return qc.oldQuery(from, to, step)
@@ -185,36 +184,19 @@ func (qc *queryCommandeer) newQuery(from, to, step int64) error {
 
 	selectParams := &pquerier.SelectParams{Name: qc.name, Functions: qc.functions,
 		Step: step, Filter: qc.filter, From: from, To: to}
-	set, err := qry.SelectQry(selectParams)
+	set, err := qry.Select(selectParams)
 
 	if err != nil {
 		return errors.Wrap(err, "The query selection failed.")
 	}
 
-	_, err = formatter.NewFormatter(qc.output, nil)
+	f, err := formatter.NewFormatter(qc.output, nil)
 	if err != nil {
 		return errors.Wrapf(err, "Failed to start formatter '%s'.", qc.output)
 	}
 
-	var count int
+	err = f.Write(qc.cmd.OutOrStdout(), set)
 
-	for set.Next() {
-		series := set.At()
-		count++
-		iter := series.Iterator()
-		for iter.Next() {
-		}
-
-		if iter.Err() != nil {
-			return iter.Err()
-		}
-	}
-
-	if set.Err() != nil {
-		return set.Err()
-	}
-
-	fmt.Printf("got %v different labelsets\n", count)
 	return err
 }
 
@@ -225,7 +207,7 @@ func (qc *queryCommandeer) oldQuery(from, to, step int64) error {
 		return errors.Wrap(err, "Failed to initialize the Querier object.")
 	}
 
-	var set querier.SeriesSet
+	var set utils.SeriesSet
 	if qc.windows == "" {
 		set, err = qry.Select(qc.name, qc.functions, step, qc.filter)
 	} else {

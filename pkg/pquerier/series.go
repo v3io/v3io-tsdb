@@ -25,14 +25,14 @@ func NewDataFrameColumnSeries(indexColumn, dataColumn, countColumn Column, label
 type DataFrameColumnSeries struct {
 	labels utils.Labels
 	key    uint64
-	iter   SeriesIterator
+	iter   utils.SeriesIterator
 }
 
 func (s *DataFrameColumnSeries) Labels() utils.Labels {
 	return s.labels
 }
-func (s *DataFrameColumnSeries) Iterator() SeriesIterator { return s.iter }
-func (s *DataFrameColumnSeries) GetKey() uint64           { return s.key }
+func (s *DataFrameColumnSeries) Iterator() utils.SeriesIterator { return s.iter }
+func (s *DataFrameColumnSeries) GetKey() uint64                 { return s.key }
 
 type dataFrameColumnSeriesIterator struct {
 	dataColumn  Column

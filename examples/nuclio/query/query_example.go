@@ -10,6 +10,7 @@ import (
 	"github.com/v3io/v3io-go-http"
 	"github.com/v3io/v3io-tsdb/pkg/config"
 	"github.com/v3io/v3io-tsdb/pkg/formatter"
+	"github.com/v3io/v3io-tsdb/pkg/pquerier"
 	"github.com/v3io/v3io-tsdb/pkg/tsdb"
 	"github.com/v3io/v3io-tsdb/pkg/utils"
 )
@@ -60,13 +61,15 @@ func Handler(context *nuclio.Context, event nuclio.Event) (interface{}, error) {
 	// Create a TSDB Querier
 	context.Logger.DebugWith("Query", "params", query)
 	adapter := context.UserData.(*tsdb.V3ioAdapter)
-	qry, err := adapter.Querier(nil, from, to)
+	qry, err := adapter.QuerierV2(nil)
 	if err != nil {
 		return nil, errors.Wrap(err, "Failed to initialize Querier")
 	}
 
+	selectParams := &pquerier.SelectParams{Name: query.Name, Functions: strings.Join(query.Aggregates, ","),
+		Step: step, Filter: query.Filter, From: from, To: to}
 	// Select a query to get back a series-set iterator
-	set, err := qry.Select(query.Name, strings.Join(query.Aggregates, ","), step, query.Filter)
+	set, err := qry.Select(selectParams)
 	if err != nil {
 		return nil, errors.Wrap(err, "Select Failed")
 	}

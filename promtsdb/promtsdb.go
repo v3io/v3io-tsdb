@@ -14,7 +14,6 @@ import (
 	"github.com/v3io/v3io-tsdb/pkg/appender"
 	"github.com/v3io/v3io-tsdb/pkg/config"
 	"github.com/v3io/v3io-tsdb/pkg/pquerier"
-	"github.com/v3io/v3io-tsdb/pkg/querier"
 	"github.com/v3io/v3io-tsdb/pkg/tsdb"
 	"github.com/v3io/v3io-tsdb/pkg/utils"
 )
@@ -149,7 +148,7 @@ func match2filter(oms []*labels.Matcher, logger logger.Logger) (string, string, 
 }
 
 type V3ioPromSeriesSet struct {
-	s pquerier.SeriesSet
+	s utils.SeriesSet
 }
 
 func (s *V3ioPromSeriesSet) Next() bool { return s.s.Next() }
@@ -161,7 +160,7 @@ func (s *V3ioPromSeriesSet) At() storage.Series {
 
 // Series represents a single time series.
 type V3ioPromSeries struct {
-	s pquerier.Series
+	s utils.Series
 }
 
 // Labels returns the complete set of labels identifying the series.
@@ -181,7 +180,7 @@ func (s *V3ioPromSeries) Iterator() storage.SeriesIterator {
 
 // SeriesIterator iterates over the data of a time series.
 type V3ioPromSeriesIterator struct {
-	s querier.SeriesIterator
+	s utils.SeriesIterator
 }
 
 // Seek advances the iterator forward to the given timestamp.
