@@ -63,26 +63,26 @@ func (s *SelectParams) getRequestedColumns() []RequestedColumn {
 	return columns
 }
 
-func (q *V3ioQuerier) SelectProm(params *SelectParams, noAggr bool) (SeriesSet, error) {
+func (q *V3ioQuerier) SelectProm(params *SelectParams, noAggr bool) (utils.SeriesSet, error) {
 
 	params.disableClientAggr = true
 	params.disableAllAggr = noAggr
 
 	iter, err := q.baseSelectQry(params, false)
 	if err != nil || iter == nil {
-		return nullSeriesSet{}, err
+		return utils.NullSeriesSet{}, err
 	}
 
 	return iter, nil
 }
 
 // Base query function
-func (q *V3ioQuerier) Select(params *SelectParams) (SeriesSet, error) {
+func (q *V3ioQuerier) Select(params *SelectParams) (utils.SeriesSet, error) {
 	params.disableAllAggr = false
 	params.disableClientAggr = q.cfg.DisableClientAggr
 	iter, err := q.baseSelectQry(params, true)
 	if err != nil || iter == nil {
-		return nullSeriesSet{}, err
+		return utils.NullSeriesSet{}, err
 	}
 
 	return iter, nil

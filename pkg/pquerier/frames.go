@@ -71,7 +71,7 @@ func (fi *frameIterator) Next() bool {
 }
 
 // get current time series (for Prometheus mode)
-func (fi *frameIterator) At() Series {
+func (fi *frameIterator) At() utils.Series {
 	s, err := fi.ctx.frameList[fi.setIndex].TimeSeries(fi.seriesIndex)
 	if err != nil {
 		fi.err = err
@@ -207,7 +207,7 @@ type dataFrame struct {
 
 	isRawSeries           bool
 	isRawColumnsGenerated bool
-	rawColumns            []Series
+	rawColumns            []utils.Series
 
 	columnsTemplates []columnMeta
 	columns          []Column
@@ -309,7 +309,7 @@ func (d *dataFrame) Index() Column {
 	return d.index
 }
 
-func (d *dataFrame) TimeSeries(i int) (Series, error) {
+func (d *dataFrame) TimeSeries(i int) (utils.Series, error) {
 	if d.isRawSeries {
 		return d.rawColumns[i], nil
 	} else {

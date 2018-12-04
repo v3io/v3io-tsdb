@@ -21,7 +21,6 @@ such restriction.
 package tsdbctl
 
 import (
-	"fmt"
 	"strconv"
 	"strings"
 	"time"
@@ -31,7 +30,6 @@ import (
 	"github.com/v3io/v3io-tsdb/pkg/config"
 	"github.com/v3io/v3io-tsdb/pkg/formatter"
 	"github.com/v3io/v3io-tsdb/pkg/pquerier"
-	"github.com/v3io/v3io-tsdb/pkg/querier"
 	"github.com/v3io/v3io-tsdb/pkg/utils"
 )
 
@@ -209,7 +207,7 @@ func (qc *queryCommandeer) oldQuery(from, to, step int64) error {
 		return errors.Wrap(err, "Failed to initialize the Querier object.")
 	}
 
-	var set querier.SeriesSet
+	var set utils.SeriesSet
 	if qc.windows == "" {
 		set, err = qry.Select(qc.name, qc.functions, step, qc.filter)
 	} else {
@@ -231,25 +229,12 @@ func (qc *queryCommandeer) oldQuery(from, to, step int64) error {
 		return errors.Wrap(err, "The query selection failed.")
 	}
 
-	for set.Next() {
-		series := set.At()
-		fmt.Printf("Labels: %s\n", series.Labels())
-		iter := series.Iterator()
-		for iter.Next() {
-			t, v := iter.At()
-			fmt.Printf("  %v  v=%.2f\n", t, v)
-		}
-
-		if iter.Err() != nil {
-			return iter.Err()
-		}
-
-		fmt.Println("")
+	f, err := formatter.NewFormatter(qc.output, nil)
+	if err != nil {
+		return errors.Wrapf(err, "Failed to start formatter '%s'.", qc.output)
 	}
 
-	if set.Err() != nil {
-		return set.Err()
-	}
+	err = f.Write(qc.cmd.OutOrStdout(), set)
 
 	return err
 }

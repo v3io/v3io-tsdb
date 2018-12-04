@@ -25,7 +25,7 @@ type rawChunkIterator struct {
 	prevV float64
 }
 
-func newRawChunkIterator(queryResult *qryResults, log logger.Logger) SeriesIterator {
+func newRawChunkIterator(queryResult *qryResults, log logger.Logger) utils.SeriesIterator {
 	maxt := queryResult.query.maxt
 	maxTime := queryResult.fields[config.MaxTimeAttrName]
 	if maxTime != nil && int64(maxTime.(int)) < maxt {
@@ -39,7 +39,7 @@ func newRawChunkIterator(queryResult *qryResults, log logger.Logger) SeriesItera
 
 	if len(newIterator.chunks) == 0 {
 		// If there's no data, create a null iterator
-		return &nullSeriesIterator{}
+		return &utils.NullSeriesIterator{}
 	} else {
 		newIterator.iter = newIterator.chunks[0].Iterator()
 		return &newIterator
@@ -180,17 +180,7 @@ func (it *rawChunkIterator) AddChunks(item *qryResults) {
 
 func (it *rawChunkIterator) PeakBack() (t int64, v float64) { return it.prevT, it.prevV }
 
-// Null-series iterator
-type nullSeriesIterator struct {
-	err error
-}
-
-func (s nullSeriesIterator) Seek(t int64) bool        { return false }
-func (s nullSeriesIterator) Next() bool               { return false }
-func (s nullSeriesIterator) At() (t int64, v float64) { return 0, 0 }
-func (s nullSeriesIterator) Err() error               { return s.err }
-
-func NewRawSeries(results *qryResults, logger logger.Logger) (Series, error) {
+func NewRawSeries(results *qryResults, logger logger.Logger) (utils.Series, error) {
 	newSeries := V3ioRawSeries{fields: results.fields, logger: logger}
 	err := newSeries.initLabels()
 	if err != nil {
@@ -203,7 +193,7 @@ func NewRawSeries(results *qryResults, logger logger.Logger) (Series, error) {
 type V3ioRawSeries struct {
 	fields map[string]interface{}
 	lset   utils.Labels
-	iter   SeriesIterator
+	iter   utils.SeriesIterator
 	logger logger.Logger
 	hash   uint64
 }
@@ -218,7 +208,7 @@ func (s *V3ioRawSeries) GetKey() uint64 {
 	return s.hash
 }
 
-func (s *V3ioRawSeries) Iterator() SeriesIterator { return s.iter }
+func (s *V3ioRawSeries) Iterator() utils.SeriesIterator { return s.iter }
 
 func (s *V3ioRawSeries) AddChunks(results *qryResults) {
 	s.iter.(*rawChunkIterator).AddChunks(results)

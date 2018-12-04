@@ -45,7 +45,7 @@ type V3ioSeriesSet struct {
 	aggrSeries   *aggregate.AggregateSeries
 	aggrIdx      int
 	canAggregate bool
-	currSeries   Series
+	currSeries   utils.Series
 	aggrSet      *aggregate.AggregateSet
 	noAggrLbl    bool
 	baseTime     int64
@@ -226,19 +226,10 @@ func (s *V3ioSeriesSet) Err() error {
 }
 
 // Return a series iterator
-func (s *V3ioSeriesSet) At() Series {
+func (s *V3ioSeriesSet) At() utils.Series {
 	if s.aggrSeries == nil {
 		return s.currSeries
 	}
 
 	return NewAggrSeries(s, s.aggrSeries.GetFunctions()[s.aggrIdx])
 }
-
-// Null-series set
-type nullSeriesSet struct {
-	err error
-}
-
-func (s nullSeriesSet) Next() bool { return false }
-func (s nullSeriesSet) At() Series { return nil }
-func (s nullSeriesSet) Err() error { return s.err }
