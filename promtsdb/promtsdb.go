@@ -74,6 +74,15 @@ func (promQuery *V3ioPromQuerier) Select(params *storage.SelectParams, oms ...*l
 	name, filter, functions := match2filter(oms, promQuery.logger)
 	noAggr := false
 
+	// if a nil params is passed (like when getting here from a /series query), opt
+	// to use a default set of params
+	if params == nil {
+		params = &storage.SelectParams{
+			Step: 0,
+			Func: "",
+		}
+	}
+
 	promQuery.logger.Debug("SelectParams: %+v", params)
 
 	if params.Func != "" {
