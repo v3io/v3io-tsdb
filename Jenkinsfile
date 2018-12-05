@@ -1,6 +1,8 @@
-BUILD_FOLDER = '/go'
-github_user = "gkirok"
-docker_user = "gallziguazio"
+def label = "${UUID.randomUUID().toString()}"
+def BUILD_FOLDER = "/go"
+def github_user = "gkirok"
+def docker_user = "gallziguazio"
+def git_project = "v3io-tsdb"
 
 def build_nuclio(TAG_VERSION) {
     withCredentials([
@@ -181,8 +183,6 @@ def build_prometheus(TAG_VERSION) {
     }
 }
 
-
-def label = "${UUID.randomUUID().toString()}"
 properties([pipelineTriggers([[$class: 'PeriodicFolderTrigger', interval: '2m']])])
 podTemplate(label: "${git_project}-${label}", yaml: """
 apiVersion: v1
@@ -241,6 +241,8 @@ spec:
                             script: "echo ${TAG_NAME} | tr -d '\\n' | egrep '^v[\\.0-9]*.*\$' | sed 's/v//'",
                             returnStdout: true
                     ).trim()
+
+                    sh "curl -v -H \"Authorization: token ${GIT_TOKEN}\" https://api.github.com/repos/gkirok/${git_project}/releases/tags/v${MAIN_TAG_VERSION} > ~/tag_version"
 
                     PUBLISHED_BEFORE = sh(
                             script: "tag_published_at=\$(cat ~/tag_version | python -c 'import json,sys;obj=json.load(sys.stdin);print obj[\"published_at\"]'); SECONDS=\$(expr \$(date +%s) - \$(date -d \"\$tag_published_at\" +%s)); expr \$SECONDS / 60 + 1",
