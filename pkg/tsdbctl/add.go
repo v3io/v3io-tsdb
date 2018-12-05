@@ -23,17 +23,17 @@ package tsdbctl
 import (
 	"encoding/csv"
 	"fmt"
+	"io"
+	"os"
+	"strconv"
+	"strings"
+	"time"
+
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/v3io/v3io-tsdb/pkg/config"
 	"github.com/v3io/v3io-tsdb/pkg/tsdb"
 	"github.com/v3io/v3io-tsdb/pkg/utils"
-	"io"
-	"os"
-	"sort"
-	"strconv"
-	"strings"
-	"time"
 )
 
 const ArraySeparator = ","
@@ -146,7 +146,7 @@ func (ac *addCommandeer) add() error {
 
 	if ac.inFile == "" && !ac.stdin {
 		// Process direct CLI input
-		if lset, err = strToLabels(ac.name, ac.lset); err != nil {
+		if lset, err = utils.LabelsFromStringWithName(ac.name, ac.lset); err != nil {
 			return err
 		}
 
@@ -222,7 +222,7 @@ func (ac *addCommandeer) appendMetrics(append tsdb.Appender, lset utils.Labels) 
 			return fmt.Errorf("Line %d of the CSV input file (%v) doesn't conform to the CSV-record requirements of 3-4 columns in each row - metric name,labels,value,[time]", num, line)
 		}
 
-		if lset, err = strToLabels(line[0], line[1]); err != nil {
+		if lset, err = utils.LabelsFromStringWithName(line[0], line[1]); err != nil {
 			return err
 		}
 
@@ -264,32 +264,6 @@ func (ac *addCommandeer) appendMetric(
 	}
 
 	return ref, nil
-}
-
-func strToLabels(name, lbls string) (utils.Labels, error) {
-
-	if err := utils.IsValidMetricName(name); err != nil {
-		return nil, errors.Wrap(err, fmt.Sprintf("Illegal metric name: '%s'", name))
-	}
-
-	lset := utils.Labels{utils.Label{Name: "__name__", Value: name}}
-
-	if lbls != "" {
-		splitLset := strings.Split(lbls, ",")
-		for _, l := range splitLset {
-			splitLbl := strings.Split(l, "=")
-			if len(splitLbl) != 2 {
-				return nil, errors.New("Labels must be in the form 'key1=label1[,key2=label2,...]'.")
-			}
-
-			if err := utils.IsValidLabelName(splitLbl[0]); err != nil {
-				return nil, errors.Wrap(err, fmt.Sprintf("Illegal label name: '%s'", splitLbl[0]))
-			}
-			lset = append(lset, utils.Label{Name: splitLbl[0], Value: splitLbl[1]})
-		}
-	}
-	sort.Sort(lset)
-	return lset, nil
 }
 
 func strToTV(tarr, varr string) ([]int64, []float64, error) {

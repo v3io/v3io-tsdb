@@ -4,10 +4,11 @@ package aggregate
 
 import (
 	"fmt"
-	"github.com/stretchr/testify/assert"
-	"github.com/v3io/v3io-tsdb/pkg/utils"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/v3io/v3io-tsdb/pkg/utils"
 )
 
 func TestAggregates(t *testing.T) {
@@ -119,7 +120,7 @@ func TestAggregates(t *testing.T) {
 func testAggregateCase(t *testing.T, aggString string, data map[int64]float64, exprCol string, bucket int,
 	expectedUpdateExpr string, expectedSetExpr string, expectFail bool) {
 
-	aggregates, err := AggrsFromString(strings.Split(aggString, ","))
+	aggregates, _, err := AggregatesFromStringListWithCount(strings.Split(aggString, ","))
 	if err != nil {
 		if !expectFail {
 			t.Fatal(err)

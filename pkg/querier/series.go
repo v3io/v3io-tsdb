@@ -21,14 +21,16 @@ such restriction.
 package querier
 
 import (
+	"strings"
+
 	"github.com/v3io/v3io-tsdb/pkg/aggregate"
 	"github.com/v3io/v3io-tsdb/pkg/chunkenc"
+	"github.com/v3io/v3io-tsdb/pkg/config"
 	"github.com/v3io/v3io-tsdb/pkg/utils"
-	"strings"
 )
 
 // Create a new series from chunks
-func NewSeries(set *V3ioSeriesSet) Series {
+func NewSeries(set *V3ioSeriesSet) utils.Series {
 	newSeries := V3ioSeries{set: set}
 	newSeries.lset = initLabels(set)
 	newSeries.initSeriesIter()
@@ -38,7 +40,7 @@ func NewSeries(set *V3ioSeriesSet) Series {
 type V3ioSeries struct {
 	set  *V3ioSeriesSet
 	lset utils.Labels
-	iter SeriesIterator
+	iter utils.SeriesIterator
 	hash uint64
 }
 
@@ -52,7 +54,7 @@ func (s *V3ioSeries) GetKey() uint64 {
 	return s.hash
 }
 
-func (s *V3ioSeries) Iterator() SeriesIterator { return s.iter }
+func (s *V3ioSeries) Iterator() utils.SeriesIterator { return s.iter }
 
 // Initialize the label set from _lset and _name attributes
 func initLabels(set *V3ioSeriesSet) utils.Labels {
@@ -85,7 +87,7 @@ func initLabels(set *V3ioSeriesSet) utils.Labels {
 func (s *V3ioSeries) initSeriesIter() {
 
 	maxt := s.set.maxt
-	maxTime := s.set.iter.GetField("_maxtime")
+	maxTime := s.set.iter.GetField(config.MaxTimeAttrName)
 	if maxTime != nil && int64(maxTime.(int)) < maxt {
 		maxt = int64(maxTime.(int))
 	}
@@ -115,7 +117,7 @@ func (s *V3ioSeries) initSeriesIter() {
 
 	if len(newIterator.chunks) == 0 {
 		// If there's no data, create a null iterator
-		s.iter = &nullSeriesIterator{}
+		s.iter = &utils.NullSeriesIterator{}
 	} else {
 		newIterator.iter = newIterator.chunks[0].Iterator()
 		s.iter = &newIterator
@@ -231,7 +233,7 @@ func NewAggrSeries(set *V3ioSeriesSet, aggr aggregate.AggrType) *V3ioSeries {
 	newSeries.lset = lset
 
 	if set.nullSeries {
-		newSeries.iter = &nullSeriesIterator{}
+		newSeries.iter = &utils.NullSeriesIterator{}
 	} else {
 
 		// `set` - the iterator "iterates" over stateful data - it holds a
@@ -292,13 +294,3 @@ func (s *aggrSeriesIterator) At() (t int64, v float64) {
 }
 
 func (s *aggrSeriesIterator) Err() error { return s.err }
-
-// Null-series iterator
-type nullSeriesIterator struct {
-	err error
-}
-
-func (s nullSeriesIterator) Seek(t int64) bool        { return false }
-func (s nullSeriesIterator) Next() bool               { return false }
-func (s nullSeriesIterator) At() (t int64, v float64) { return 0, 0 }
-func (s nullSeriesIterator) Err() error               { return s.err }

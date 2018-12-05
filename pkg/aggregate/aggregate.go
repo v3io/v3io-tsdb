@@ -22,9 +22,10 @@ package aggregate
 
 import (
 	"fmt"
-	"github.com/v3io/v3io-tsdb/pkg/config"
 	"math"
 	"strings"
+
+	"github.com/v3io/v3io-tsdb/pkg/config"
 )
 
 type AggrType uint16
@@ -33,6 +34,7 @@ type AggrType uint16
 const (
 	AggregateLabel = "Aggregate"
 
+	aggrTypeNone  AggrType = 0
 	aggrTypeCount AggrType = 1
 	aggrTypeSum   AggrType = 2
 	aggrTypeSqr   AggrType = 4
@@ -49,6 +51,7 @@ const (
 )
 
 var rawAggregates = []AggrType{aggrTypeCount, aggrTypeSum, aggrTypeSqr, aggrTypeMax, aggrTypeMin, aggrTypeLast}
+var rawAggregatesMask = aggrTypeCount | aggrTypeSum | aggrTypeSqr | aggrTypeMax | aggrTypeMin | aggrTypeLast
 
 var aggrTypeString = map[string]AggrType{
 	"count": aggrTypeCount, "sum": aggrTypeSum, "sqr": aggrTypeSqr, "max": aggrTypeMax, "min": aggrTypeMin,
@@ -109,9 +112,9 @@ func getAggrFullName(field config.SchemaField, col string) config.SchemaField {
 
 func (a AggrType) String() string { return aggrToString[a] }
 
-func AggregatesToStringList(aggregates string) ([]string, error) {
+func RawAggregatesToStringList(aggregates string) ([]string, error) {
 	aggrs := strings.Split(aggregates, ",")
-	aggType, err := AggrsFromString(aggrs)
+	aggType, _, err := AggregatesFromStringListWithCount(aggrs)
 	if err != nil {
 		return nil, err
 	}
@@ -126,25 +129,40 @@ func AggregatesToStringList(aggregates string) ([]string, error) {
 }
 
 // Convert a comma-separated aggregation-functions string to an aggregates mask
-func AggrsFromString(split []string) (AggrType, error) {
-	var aggrList AggrType
+func AggregatesFromStringListWithCount(split []string) (AggrType, []AggrType, error) {
+	var aggrMask AggrType
+	var aggrList []AggrType
+
 	var hasAggregates bool
 	for _, s := range split {
-		trimmed := strings.TrimSpace(s)
-		if trimmed != "" {
-			aggr, ok := aggrTypeString[trimmed]
-			if !ok {
-				return aggrList, fmt.Errorf("Invalid aggragate type: '%s'", s)
-			}
+		aggr, err := AggregateFromString(s)
+		if err != nil {
+			return 0, nil, err
+		}
+		if aggr != 0 {
 			hasAggregates = true
-			aggrList = aggrList | aggr
+			aggrMask = aggrMask | aggr
+			aggrList = append(aggrList, aggr)
 		}
 	}
 	// Always have count aggregate by default
 	if hasAggregates {
-		aggrList = aggrList | aggrTypeCount
+		aggrMask = aggrMask | aggrTypeCount
+		aggrList = append(aggrList, aggrTypeCount)
 	}
-	return aggrList, nil
+	return aggrMask, aggrList, nil
+}
+
+func AggregateFromString(aggrString string) (AggrType, error) {
+	trimmed := strings.TrimSpace(aggrString)
+	if trimmed == "" {
+		return 0, nil
+	}
+	aggr, ok := aggrTypeString[trimmed]
+	if !ok {
+		return 0, fmt.Errorf("invalid aggragate type: %v", trimmed)
+	}
+	return aggr, nil
 }
 
 // Create a list of aggregate objects from an aggregates mask
@@ -221,4 +239,143 @@ func (a AggregatesList) Clear() {
 	for _, aggr := range a {
 		aggr.Clear()
 	}
+}
+
+func GetHiddenAggregates(mask AggrType, requestedAggregates []AggrType) []AggrType {
+	var hiddenAggregates []AggrType
+
+	for _, aggr := range rawAggregates {
+		if aggr&mask == aggr && !ContainsAggregate(requestedAggregates, aggr) {
+			hiddenAggregates = append(hiddenAggregates, aggr)
+		}
+	}
+	return hiddenAggregates
+}
+
+func GetHiddenAggregatesWithCount(mask AggrType, requestedAggregates []AggrType) []AggrType {
+	mask |= aggrTypeCount
+	return GetHiddenAggregates(mask, requestedAggregates)
+}
+
+func ContainsAggregate(list []AggrType, item AggrType) bool {
+	for _, v := range list {
+		if v == item {
+			return true
+		}
+	}
+	return false
+}
+
+func IsRawAggregate(item AggrType) bool { return ContainsAggregate(rawAggregates, item) }
+
+func IsCountAggregate(aggr AggrType) bool { return aggr == aggrTypeCount }
+
+func HasAggregates(mask AggrType) bool { return mask != aggrTypeNone }
+
+func ToAttrName(aggr AggrType) string {
+	return config.AggregateAttrPrefix + aggr.String()
+}
+
+func GetServerAggregationsFunction(aggr AggrType) (func(interface{}, interface{}) interface{}, error) {
+	switch aggr {
+	case aggrTypeCount:
+		return func(old, next interface{}) interface{} {
+			if old == nil {
+				return next
+			}
+			return old.(float64) + next.(float64)
+		}, nil
+	case aggrTypeSum:
+		return func(old, next interface{}) interface{} {
+			if old == nil {
+				return next
+			}
+			return old.(float64) + next.(float64)
+		}, nil
+	case aggrTypeSqr:
+		return func(old, next interface{}) interface{} {
+			if old == nil {
+				return next
+			}
+			return old.(float64) + next.(float64)
+		}, nil
+	case aggrTypeMin:
+		return func(old, next interface{}) interface{} {
+			if old == nil {
+				return next
+			}
+			return math.Min(old.(float64), next.(float64))
+		}, nil
+	case aggrTypeMax:
+		return func(old, next interface{}) interface{} {
+			if old == nil {
+				return next
+			}
+			return math.Max(old.(float64), next.(float64))
+		}, nil
+	case aggrTypeLast:
+		return func(_, next interface{}) interface{} {
+			return next
+		}, nil
+	default:
+		return nil, fmt.Errorf("unsupported server side aggregate %v", aggrToString[aggr])
+	}
+}
+
+func GetServerVirtualAggregationFunction(aggr AggrType) (func([]float64) float64, error) {
+	switch aggr {
+	case aggrTypeAvg:
+		return func(data []float64) float64 {
+			count := data[0]
+			sum := data[1]
+			return sum / count
+		}, nil
+	case aggrTypeStddev:
+		return func(data []float64) float64 {
+			count := data[0]
+			sum := data[1]
+			sqr := data[2]
+			return math.Sqrt((count*sqr - sum*sum) / (count * (count - 1)))
+		}, nil
+	case aggrTypeStdvar:
+		return func(data []float64) float64 {
+			count := data[0]
+			sum := data[1]
+			sqr := data[2]
+			return (count*sqr - sum*sum) / (count * (count - 1))
+		}, nil
+	default:
+		return nil, fmt.Errorf("cannot aggregate %v", aggrToString[aggr])
+	}
+}
+
+func GetClientAggregationsFunction(aggr AggrType) (func(interface{}, interface{}) interface{}, error) {
+	switch aggr {
+	case aggrTypeCount:
+		return func(old, next interface{}) interface{} {
+			if old == nil {
+				return 1.0
+			}
+			return old.(float64) + 1.0
+		}, nil
+	case aggrTypeSqr:
+		return func(old, next interface{}) interface{} {
+			if old == nil {
+				return next.(float64) * next.(float64)
+			}
+			return old.(float64) + next.(float64)*next.(float64)
+		}, nil
+	default:
+		return GetServerAggregationsFunction(aggr)
+	}
+}
+
+func GetDependantAggregates(aggr AggrType) []AggrType {
+	var aggregates []AggrType
+	for _, rawAggr := range rawAggregates {
+		if aggr&rawAggr == rawAggr {
+			aggregates = append(aggregates, rawAggr)
+		}
+	}
+	return aggregates
 }

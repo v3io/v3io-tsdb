@@ -24,6 +24,10 @@ package aggregates
 
 import (
 	"fmt"
+	"math"
+	"testing"
+	"time"
+
 	"github.com/nuclio/logger"
 	"github.com/stretchr/testify/assert"
 	"github.com/v3io/v3io-tsdb/internal/pkg/performance"
@@ -32,9 +36,6 @@ import (
 	"github.com/v3io/v3io-tsdb/pkg/tsdb"
 	"github.com/v3io/v3io-tsdb/pkg/tsdb/tsdbtest"
 	"github.com/v3io/v3io-tsdb/pkg/utils"
-	"math"
-	"testing"
-	"time"
 )
 
 type TestConfig struct {
@@ -254,12 +255,12 @@ func testAggregatesCase(t *testing.T, testConfig *TestConfig) {
 
 	startBefore := testConfig.testStartTime - testConfig.queryStep
 
-	qry, err := adapter.Querier(nil, nanosToMillis(startBefore), nanosToMillis(testConfig.testEndTime))
+	qry, err := adapter.Querier(nil, tsdbtest.NanosToMillis(startBefore), tsdbtest.NanosToMillis(testConfig.testEndTime))
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	set, err := qry.Select("metric0", testConfig.queryFunc, nanosToMillis(testConfig.queryStep), "")
+	set, err := qry.Select("metric0", testConfig.queryFunc, tsdbtest.NanosToMillis(testConfig.queryStep), "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -324,17 +325,12 @@ func testAggregatesCase(t *testing.T, testConfig *TestConfig) {
 	assert.ElementsMatch(t, testConfig.expectedAvg, actualAvg, "Average value is not as expected")
 }
 
-func nanosToMillis(nanos int64) int64 {
-	millis := nanos / int64(time.Millisecond)
-	return millis
-}
-
 func generateData(t *testing.T, testConfig *TestConfig, adapter *tsdb.V3ioAdapter, logger logger.Logger) {
 	var metrics []*metricContext
 	for m := 0; m < testConfig.numMetrics; m++ {
 		for l := 0; l < testConfig.numLabels; l++ {
 			metrics = append(metrics, &metricContext{
-				lset: utils.LabelsFromStrings(
+				lset: utils.LabelsFromStringList(
 					"__name__", fmt.Sprintf("metric%d", m), "label", fmt.Sprintf("lbl%d", l)),
 			})
 		}
@@ -352,7 +348,7 @@ func generateData(t *testing.T, testConfig *TestConfig, adapter *tsdb.V3ioAdapte
 	var curTime int64
 	for curTime = testConfig.testStartTime; curTime < testConfig.testStartTime+testConfig.testDuration; curTime += testConfig.interval {
 		v := testConfig.values[index]
-		err := writeNext(appender, metrics, nanosToMillis(curTime), v)
+		err := writeNext(appender, metrics, tsdbtest.NanosToMillis(curTime), v)
 		if err != nil {
 			t.Fatal(err)
 		}

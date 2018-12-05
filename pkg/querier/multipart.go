@@ -1,11 +1,12 @@
 package querier
 
 import (
-	"github.com/v3io/v3io-tsdb/pkg/utils"
 	"sort"
+
+	"github.com/v3io/v3io-tsdb/pkg/utils"
 )
 
-func NewSetSorter(set SeriesSet) (SeriesSet, error) {
+func NewSetSorter(set utils.SeriesSet) (utils.SeriesSet, error) {
 	sorter := setSorter{}
 	sorter.set = set
 	sorter.index = -1
@@ -26,8 +27,8 @@ func NewSetSorter(set SeriesSet) (SeriesSet, error) {
 }
 
 type setSorter struct {
-	set   SeriesSet
-	list  []Series
+	set   utils.SeriesSet
+	list  []utils.Series
 	index int
 	err   error
 }
@@ -40,23 +41,23 @@ func (s *setSorter) Next() bool {
 	return true
 }
 
-func (s *setSorter) At() Series {
+func (s *setSorter) At() utils.Series {
 	return s.list[s.index]
 }
 
 func (s *setSorter) Err() error { return s.err }
 
 type IterSortMerger struct {
-	iters        []SeriesSet
+	iters        []utils.SeriesSet
 	done         []bool
 	currKey      uint64
 	currInvalids []bool
-	currSeries   []Series
+	currSeries   []utils.Series
 	err          error
 }
 
 // Merge-sort multiple SeriesSets
-func newIterSortMerger(sets []SeriesSet) (SeriesSet, error) {
+func newIterSortMerger(sets []utils.SeriesSet) (utils.SeriesSet, error) {
 	newMerger := IterSortMerger{}
 	newMerger.iters = sets
 	newMerger.done = make([]bool, len(sets))
@@ -92,7 +93,7 @@ func (im *IterSortMerger) Next() bool {
 		return false
 	}
 
-	im.currSeries = make([]Series, 0, len(im.iters))
+	im.currSeries = make([]utils.Series, 0, len(im.iters))
 	for i, iter := range im.iters {
 		im.currInvalids[i] = true
 		if !im.done[i] {
@@ -107,7 +108,7 @@ func (im *IterSortMerger) Next() bool {
 }
 
 // Return the current key and a list of iterators containing this key
-func (im *IterSortMerger) At() Series {
+func (im *IterSortMerger) At() utils.Series {
 	newSeries := mergedSeries{series: im.currSeries}
 	return &newSeries
 }
@@ -117,14 +118,14 @@ func (im *IterSortMerger) Err() error {
 }
 
 type mergedSeries struct {
-	series []Series
+	series []utils.Series
 }
 
 func (m *mergedSeries) Labels() utils.Labels {
 	return m.series[0].Labels()
 }
 
-func (m *mergedSeries) Iterator() SeriesIterator {
+func (m *mergedSeries) Iterator() utils.SeriesIterator {
 	return newMergedSeriesIterator(m.series...)
 }
 
@@ -133,12 +134,12 @@ func (m *mergedSeries) GetKey() uint64 {
 }
 
 type mergedSeriesIterator struct {
-	series []Series
+	series []utils.Series
 	i      int
-	cur    SeriesIterator
+	cur    utils.SeriesIterator
 }
 
-func newMergedSeriesIterator(s ...Series) *mergedSeriesIterator {
+func newMergedSeriesIterator(s ...utils.Series) *mergedSeriesIterator {
 	return &mergedSeriesIterator{
 		series: s,
 		i:      0,

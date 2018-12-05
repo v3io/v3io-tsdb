@@ -24,18 +24,21 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math"
+	pathUtil "path"
+	"path/filepath"
+	"time"
+
 	"github.com/nuclio/logger"
 	"github.com/pkg/errors"
 	"github.com/v3io/v3io-go-http"
 	"github.com/v3io/v3io-tsdb/pkg/appender"
 	"github.com/v3io/v3io-tsdb/pkg/config"
 	"github.com/v3io/v3io-tsdb/pkg/partmgr"
+	"github.com/v3io/v3io-tsdb/pkg/pquerier"
 	"github.com/v3io/v3io-tsdb/pkg/querier"
 	"github.com/v3io/v3io-tsdb/pkg/tsdb/schema"
 	"github.com/v3io/v3io-tsdb/pkg/utils"
-	"math"
-	pathUtil "path"
-	"time"
 )
 
 type V3ioAdapter struct {
@@ -192,6 +195,11 @@ func (a *V3ioAdapter) Querier(_ context.Context, mint, maxt int64) (*querier.V3i
 	return querier.NewV3ioQuerier(a.container, a.logger, mint, maxt, a.cfg, a.partitionMngr), nil
 }
 
+// Create a Querier interface, used for time-series queries
+func (a *V3ioAdapter) QuerierV2(_ context.Context) (*pquerier.V3ioQuerier, error) {
+	return pquerier.NewV3ioQuerier(a.container, a.logger, a.cfg, a.partitionMngr), nil
+}
+
 func (a *V3ioAdapter) DeleteDB(deleteAll bool, ignoreErrors bool, fromTime int64, toTime int64) error {
 	if deleteAll {
 		// Ignore time boundaries
@@ -215,7 +223,7 @@ func (a *V3ioAdapter) DeleteDB(deleteAll bool, ignoreErrors bool, fromTime int64
 	a.partitionMngr.DeletePartitionsFromSchema(partitions)
 
 	if len(a.partitionMngr.GetPartitionsPaths()) == 0 {
-		path := a.cfg.TablePath + "/names/"
+		path := filepath.Join(a.cfg.TablePath, config.NamesDirectory) + "/" // Need a trailing slash
 		a.logger.Info("Delete metric names at path '%s'.", path)
 		err := utils.DeleteTable(a.logger, a.container, path, "", a.cfg.QryWorkers)
 		if err != nil && !ignoreErrors {

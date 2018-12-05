@@ -23,17 +23,18 @@ package tsdbctl
 import (
 	"encoding/json"
 	"fmt"
+	"math"
+	"path"
+	"strconv"
+	"strings"
+	"time"
+
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/v3io/v3io-go-http"
 	"github.com/v3io/v3io-tsdb/pkg/chunkenc"
 	"github.com/v3io/v3io-tsdb/pkg/config"
 	"github.com/v3io/v3io-tsdb/pkg/utils"
-	"math"
-	"path"
-	"strconv"
-	"strings"
-	"time"
 )
 
 type checkCommandeer struct {
@@ -160,7 +161,7 @@ func (cc *checkCommandeer) checkByPath(container *v3io.Container, tablePath stri
 	var err error
 	respChan := make(chan *v3io.Response, 1)
 	objPath := path.Join("/", tablePath, cc.objPath)
-	allAttrs := append(cc.attrs, "__name", "_name", "_lset", "_maxtime")
+	allAttrs := append(cc.attrs, config.MetricNameAttrName, config.LabelSetAttrName, config.MaxTimeAttrName)
 	input := v3io.GetItemInput{Path: objPath, AttributeNames: allAttrs}
 	_, err = container.GetItem(&input, nil, respChan)
 	if err != nil {
@@ -218,19 +219,19 @@ func (cc *checkCommandeer) printResponse(resp *v3io.Response) error {
 	// Print the metric metadata
 	item := resp.Output.(*v3io.GetItemOutput).Item
 	objPath := resp.Request().Input.(*v3io.GetItemInput).Path
-	metricName, _ := item.GetFieldString("_name")
-	lsetString, _ := item.GetFieldString("_lset")
-	maxtime, _ := item.GetFieldInt("_maxtime")
+	metricName, _ := item.GetFieldString(config.MetricNameAttrName)
+	lsetString, _ := item.GetFieldString(config.LabelSetAttrName)
+	maxtime, _ := item.GetFieldInt(config.MaxTimeAttrName)
 	fmt.Printf("Metric Item: %s,  %s{%s}  maxtime: %d\n", objPath, metricName, lsetString, maxtime)
 
 	// Decompress and print metrics
 	for attr, values := range item {
-		if strings.HasPrefix(attr, "_v") {
+		if strings.HasPrefix(attr, config.ChunkAttrPrefix) {
 			fmt.Println("\tAttr:", attr)
 
 			if values != nil {
 				bytes := values.([]byte)
-				if strings.HasPrefix(attr, "_v_") {
+				if strings.HasPrefix(attr, config.AggregateAttrPrefix) {
 					cc.printArrays(attr, bytes)
 				} else {
 					err := cc.printValues(bytes)

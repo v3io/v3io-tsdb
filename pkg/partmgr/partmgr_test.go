@@ -23,10 +23,11 @@ such restriction.
 package partmgr
 
 import (
+	"testing"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/v3io/v3io-tsdb/pkg/config"
 	"github.com/v3io/v3io-tsdb/pkg/tsdb/schema"
-	"testing"
 )
 
 func TestCreateNewPartition(tst *testing.T) {

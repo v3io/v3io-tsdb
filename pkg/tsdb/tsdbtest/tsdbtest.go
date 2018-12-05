@@ -3,22 +3,82 @@ package tsdbtest
 import (
 	json2 "encoding/json"
 	"fmt"
-	"github.com/v3io/v3io-tsdb/internal/pkg/performance"
-	"github.com/v3io/v3io-tsdb/pkg/config"
-	. "github.com/v3io/v3io-tsdb/pkg/tsdb"
-	"github.com/v3io/v3io-tsdb/pkg/tsdb/tsdbtest/testutils"
-	"github.com/v3io/v3io-tsdb/pkg/utils"
 	"os"
 	"path"
 	"regexp"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/v3io/v3io-tsdb/internal/pkg/performance"
+	"github.com/v3io/v3io-tsdb/pkg/chunkenc"
+	"github.com/v3io/v3io-tsdb/pkg/config"
+	. "github.com/v3io/v3io-tsdb/pkg/tsdb"
+	"github.com/v3io/v3io-tsdb/pkg/tsdb/tsdbtest/testutils"
+	"github.com/v3io/v3io-tsdb/pkg/utils"
 )
+
+const MinuteInMillis = 60 * 1000
+const HoursInMillis = 60 * MinuteInMillis
+const DaysInMillis = 24 * HoursInMillis
 
 type DataPoint struct {
 	Time  int64
 	Value float64
+}
+type Metric struct {
+	Name   string
+	Labels utils.Labels
+	Data   []DataPoint
+}
+type TimeSeries []Metric
+
+const OptDropTableOnTearDown = "DropTableOnTearDown"
+const OptIgnoreReason = "IgnoreReason"
+const OptTimeSeries = "TimeSeries"
+const OptV3ioConfig = "V3ioConfig"
+
+type TestParams map[string]interface{}
+type TestOption struct {
+	Key   string
+	Value interface{}
+}
+
+func NewTestParams(t testing.TB, opts ...TestOption) TestParams {
+	initialSize := len(opts)
+	testOpts := make(TestParams, initialSize)
+
+	// Initialize defaults
+	testOpts[OptDropTableOnTearDown] = true
+	testOpts[OptIgnoreReason] = ""
+	testOpts[OptTimeSeries] = TimeSeries{}
+
+	defaultV3ioConfig, err := LoadV3ioConfig()
+	if err != nil {
+		t.Fatalf("Unable to get V3IO configuration.\nError: %v", err)
+	}
+
+	//defaultV3ioConfig.TablePath = PrefixTablePath(t.Name())
+	testOpts[OptV3ioConfig] = defaultV3ioConfig
+
+	for _, opt := range opts {
+		testOpts[opt.Key] = opt.Value
+	}
+
+	return testOpts
+}
+
+func (tp TestParams) TimeSeries() TimeSeries {
+	return tp[OptTimeSeries].(TimeSeries)
+}
+func (tp TestParams) DropTableOnTearDown() bool {
+	return tp[OptDropTableOnTearDown].(bool)
+}
+func (tp TestParams) IgnoreReason() string {
+	return tp[OptIgnoreReason].(string)
+}
+func (tp TestParams) V3ioConfig() *config.V3ioConfig {
+	return tp[OptV3ioConfig].(*config.V3ioConfig)
 }
 
 // DataPointTimeSorter sorts DataPoints by time
@@ -58,7 +118,15 @@ func CreateTestTSDBWithAggregates(t testing.TB, v3ioConfig *config.V3ioConfig, a
 	}
 }
 
-func SetUp(t testing.TB, v3ioConfig *config.V3ioConfig) func() {
+func tearDown(t testing.TB, v3ioConfig *config.V3ioConfig, testParams TestParams) {
+	// Don't delete the TSDB table if the test failed or test expects that
+	if !t.Failed() && testParams.DropTableOnTearDown() {
+		DeleteTSDB(t, v3ioConfig)
+	}
+}
+
+func SetUp(t testing.TB, testParams TestParams) func() {
+	v3ioConfig := testParams.V3ioConfig()
 	v3ioConfig.TablePath = PrefixTablePath(fmt.Sprintf("%s-%d", t.Name(), time.Now().Nanosecond()))
 	CreateTestTSDB(t, v3ioConfig)
 
@@ -71,20 +139,18 @@ func SetUp(t testing.TB, v3ioConfig *config.V3ioConfig) func() {
 
 	return func() {
 		defer metricReporter.Stop()
-		// Don't delete the TSDB table if the test failed
-		if !t.Failed() && !t.Skipped() {
-			DeleteTSDB(t, v3ioConfig)
-		}
+		tearDown(t, v3ioConfig, testParams)
 	}
 }
 
-func SetUpWithData(t *testing.T, v3ioConfig *config.V3ioConfig, metricName string, data []DataPoint, userLabels utils.Labels) (*V3ioAdapter, func()) {
-	teardown := SetUp(t, v3ioConfig)
-	adapter := InsertData(t, v3ioConfig, metricName, data, userLabels)
+func SetUpWithData(t *testing.T, testOpts TestParams) (*V3ioAdapter, func()) {
+	teardown := SetUp(t, testOpts)
+	adapter := InsertData(t, testOpts)
 	return adapter, teardown
 }
 
-func SetUpWithDBConfig(t *testing.T, v3ioConfig *config.V3ioConfig, schema *config.Schema) func() {
+func SetUpWithDBConfig(t *testing.T, schema *config.Schema, testParams TestParams) func() {
+	v3ioConfig := testParams.V3ioConfig()
 	v3ioConfig.TablePath = PrefixTablePath(fmt.Sprintf("%s-%d", t.Name(), time.Now().Nanosecond()))
 	if err := CreateTSDB(v3ioConfig, schema); err != nil {
 		v3ioConfigAsJson, _ := json2.MarshalIndent(v3ioConfig, "", "  ")
@@ -100,15 +166,12 @@ func SetUpWithDBConfig(t *testing.T, v3ioConfig *config.V3ioConfig, schema *conf
 
 	return func() {
 		defer metricReporter.Stop()
-		// Don't delete the TSDB table if the test failed
-		if !t.Failed() {
-			DeleteTSDB(t, v3ioConfig)
-		}
+		tearDown(t, v3ioConfig, testParams)
 	}
 }
 
-func InsertData(t *testing.T, v3ioConfig *config.V3ioConfig, metricName string, data []DataPoint, userLabels utils.Labels) *V3ioAdapter {
-	adapter, err := NewV3ioAdapter(v3ioConfig, nil, nil)
+func InsertData(t *testing.T, testParams TestParams) *V3ioAdapter {
+	adapter, err := NewV3ioAdapter(testParams.V3ioConfig(), nil, nil)
 	if err != nil {
 		t.Fatalf("Failed to create a V3IO TSDB adapter. Reason: %s", err)
 	}
@@ -118,19 +181,24 @@ func InsertData(t *testing.T, v3ioConfig *config.V3ioConfig, metricName string, 
 		t.Fatalf("Failed to get an appender. Reason: %s", err)
 	}
 
-	labels := utils.Labels{utils.Label{Name: "__name__", Value: metricName}}
-	labels = append(labels, userLabels...)
+	timeSeries := testParams.TimeSeries()
 
-	ref, err := appender.Add(labels, data[0].Time, data[0].Value)
-	if err != nil {
-		t.Fatalf("Failed to add data to the TSDB appender. Reason: %s", err)
-	}
-	for _, curr := range data[1:] {
-		appender.AddFast(labels, ref, curr.Time, curr.Value)
-	}
+	for _, metric := range timeSeries {
 
-	if _, err := appender.WaitForCompletion(0); err != nil {
-		t.Fatalf("Failed to wait for TSDB append completion. Reason: %s", err)
+		labels := utils.Labels{utils.Label{Name: "__name__", Value: metric.Name}}
+		labels = append(labels, metric.Labels...)
+
+		ref, err := appender.Add(labels, metric.Data[0].Time, metric.Data[0].Value)
+		if err != nil {
+			t.Fatalf("Failed to add data to the TSDB appender. Reason: %s", err)
+		}
+		for _, curr := range metric.Data[1:] {
+			appender.AddFast(labels, ref, curr.Time, curr.Value)
+		}
+
+		if _, err := appender.WaitForCompletion(0); err != nil {
+			t.Fatalf("Failed to wait for TSDB append completion. Reason: %s", err)
+		}
 	}
 
 	return adapter
@@ -240,4 +308,21 @@ func PrefixTablePath(tablePath string) string {
 		return tablePath
 	}
 	return path.Join(os.Getenv("TSDB_TEST_TABLE_PATH"), tablePath)
+}
+
+func IteratorToSlice(it chunkenc.Iterator) ([]DataPoint, error) {
+	var result []DataPoint
+	for it.Next() {
+		t, v := it.At()
+		if it.Err() != nil {
+			return nil, it.Err()
+		}
+		result = append(result, DataPoint{Time: t, Value: v})
+	}
+	return result, nil
+}
+
+func NanosToMillis(nanos int64) int64 {
+	millis := nanos / int64(time.Millisecond)
+	return millis
 }

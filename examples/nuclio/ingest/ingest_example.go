@@ -2,13 +2,14 @@ package ingest
 
 import (
 	"encoding/json"
+	"sync"
+
 	"github.com/nuclio/nuclio-sdk-go"
 	"github.com/v3io/v3io-go-http"
 	"github.com/v3io/v3io-tsdb/pkg/config"
 	"github.com/v3io/v3io-tsdb/pkg/tsdb"
 	"github.com/v3io/v3io-tsdb/pkg/tsdb/tsdbtest"
 	"github.com/v3io/v3io-tsdb/pkg/utils"
-	"sync"
 )
 
 // Configuration
