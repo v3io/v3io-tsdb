@@ -14,6 +14,7 @@ import (
 	"github.com/v3io/v3io-tsdb/pkg/config"
 	"github.com/v3io/v3io-tsdb/pkg/partmgr"
 	"github.com/v3io/v3io-tsdb/pkg/utils"
+	"math"
 )
 
 // Create a new Querier interface
@@ -244,4 +245,61 @@ func (q *V3ioQuerier) getLabelValues(labelKey string) ([]string, error) {
 	}
 
 	return labelValues, nil
+}
+
+// Returns all unique labels sets we have in the data
+func (q *V3ioQuerier) GetLabelSets(metric string) ([]utils.Labels, error) {
+	err := q.partitionMngr.ReadAndUpdateSchema()
+	if err != nil {
+		return nil, err
+	}
+
+	partitionPaths := q.partitionMngr.GetPartitionsPaths()
+
+	// If there are no partitions yet, there are no labels
+	if len(partitionPaths) == 0 {
+		return nil, nil
+	}
+
+	var shardingKeys []string
+	if metric != "" {
+		shardingKeys = q.partitionMngr.PartsForRange(0, math.MaxInt64, true)[0].GetShardingKeys(metric)
+	}
+
+	labelsMap := make(map[uint64]utils.Labels)
+
+	// Get all label sets
+	input := v3io.GetItemsInput{
+		Path:           partitionPaths[0],
+		AttributeNames: []string{config.LabelSetAttrName},
+	}
+
+	iter, err := utils.NewAsyncItemsCursor(q.container, &input, q.cfg.QryWorkers, shardingKeys, q.logger)
+	if err != nil {
+		return nil, err
+	}
+
+	// Iterate over the results
+	for iter.Next() {
+		labelSet := iter.GetField(config.LabelSetAttrName).(string)
+
+		currLabels, err := utils.LabelsFromString(labelSet)
+		if err != nil {
+			return nil, err
+		}
+
+		labelsMap[currLabels.Hash()] = currLabels
+	}
+
+	if iter.Err() != nil {
+		return nil, fmt.Errorf("failed to read label values, err= %v", iter.Err().Error())
+	}
+
+	labels := make([]utils.Labels, len(labelsMap))
+	var counter int
+	for _, lset := range labelsMap {
+		labels[counter] = lset
+		counter++
+	}
+	return labels, nil
 }

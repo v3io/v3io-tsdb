@@ -73,13 +73,14 @@ func (promQuery *V3ioPromQuerier) Select(params *storage.SelectParams, oms ...*l
 	name, filter, functions := match2filter(oms, promQuery.logger)
 	noAggr := false
 
-	// if a nil params is passed (like when getting here from a /series query), opt
-	// to use a default set of params
+	// if a nil params is passed we assume it's a metadata query, so we fetch only the different labelsets withtout data.
 	if params == nil {
-		params = &storage.SelectParams{
-			Step: 0,
-			Func: "",
+		labelSets, err := promQuery.v3ioQuerier.GetLabelSets(name)
+		if err != nil {
+			return nil, err
 		}
+
+		return &V3ioPromSeriesSet{newMetadataSeriesSet(labelSets)}, nil
 	}
 
 	promQuery.logger.Debug("SelectParams: %+v", params)
@@ -248,3 +249,32 @@ func (l Labels) GetExpr() string {
 
 	return lblexpr
 }
+
+func newMetadataSeriesSet(labels []utils.Labels) utils.SeriesSet {
+	return &metadataSeriesSet{labels: labels, currentIndex: -1, size: len(labels)}
+}
+
+type metadataSeriesSet struct {
+	labels       []utils.Labels
+	currentIndex int
+	size         int
+}
+
+func (ss *metadataSeriesSet) Next() bool {
+	ss.currentIndex++
+	return ss.currentIndex < ss.size
+}
+func (ss *metadataSeriesSet) At() utils.Series {
+	return &metadataSeries{labels: ss.labels[ss.currentIndex]}
+}
+func (ss *metadataSeriesSet) Err() error {
+	return nil
+}
+
+type metadataSeries struct {
+	labels utils.Labels
+}
+
+func (s *metadataSeries) Labels() utils.Labels           { return s.labels }
+func (s *metadataSeries) Iterator() utils.SeriesIterator { return utils.NullSeriesIterator{} }
+func (s *metadataSeries) GetKey() uint64                 { return s.labels.Hash() }
