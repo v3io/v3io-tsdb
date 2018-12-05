@@ -2,6 +2,7 @@ package pquerier
 
 import (
 	"fmt"
+	"math"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -14,7 +15,6 @@ import (
 	"github.com/v3io/v3io-tsdb/pkg/config"
 	"github.com/v3io/v3io-tsdb/pkg/partmgr"
 	"github.com/v3io/v3io-tsdb/pkg/utils"
-	"math"
 )
 
 // Create a new Querier interface
