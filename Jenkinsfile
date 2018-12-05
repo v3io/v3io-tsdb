@@ -1,10 +1,10 @@
-def label = "${UUID.randomUUID().toString()}"
-def BUILD_FOLDER = "/go"
-def github_user = "gkirok"
-def docker_user = "gallziguazio"
-def git_project = "v3io-tsdb"
+label = "${UUID.randomUUID().toString()}"
+BUILD_FOLDER = "/go"
+github_user = "gkirok"
+docker_user = "gallziguazio"
+git_project = "v3io-tsdb"
 
-def build_nuclio(BUILD_FOLDER) {
+def build_nuclio() {
     withCredentials([
             usernamePassword(credentialsId: '4318b7db-a1af-4775-b871-5a35d3e75c21', passwordVariable: 'GIT_PASSWORD', usernameVariable: 'GIT_USERNAME'),
             string(credentialsId: 'dd7f75c5-f055-4eb3-9365-e7d04e644211', variable: 'GIT_TOKEN')
@@ -64,7 +64,7 @@ def build_nuclio(BUILD_FOLDER) {
 }
 
 
-def build_demo(BUILD_FOLDER) {
+def build_demo() {
     withCredentials([
             usernamePassword(credentialsId: '4318b7db-a1af-4775-b871-5a35d3e75c21', passwordVariable: 'GIT_PASSWORD', usernameVariable: 'GIT_USERNAME'),
             string(credentialsId: 'dd7f75c5-f055-4eb3-9365-e7d04e644211', variable: 'GIT_TOKEN')
@@ -122,7 +122,7 @@ def build_demo(BUILD_FOLDER) {
     }
 }
 
-def build_prometheus(BUILD_FOLDER, TAG_VERSION) {
+def build_prometheus(TAG_VERSION) {
     withCredentials([
             usernamePassword(credentialsId: '4318b7db-a1af-4775-b871-5a35d3e75c21', passwordVariable: 'GIT_PASSWORD', usernameVariable: 'GIT_USERNAME'),
             string(credentialsId: 'dd7f75c5-f055-4eb3-9365-e7d04e644211', variable: 'GIT_TOKEN')
@@ -229,8 +229,8 @@ spec:
     def PUBLISHED_BEFORE
 
     node("${git_project}-${label}") {
-        currentBuild.displayName = "${git_project}"
-        currentBuild.description = "Will not run with tags created before 4 hours and more."
+//        currentBuild.displayName = "${git_project}"
+//        currentBuild.description = "Will not run with tags created before 4 hours and more."
 
         withCredentials([
                 usernamePassword(credentialsId: '4318b7db-a1af-4775-b871-5a35d3e75c21', passwordVariable: 'GIT_PASSWORD', usernameVariable: 'GIT_USERNAME'),
@@ -300,7 +300,7 @@ spec:
 //                                    build job: "tsdb-nuclio/v0.0.8", propagate: true, wait: true, parameters: [[$class: 'StringParameterValue', name: 'TAG_NAME', value: "v${NEXT_VERSION}"]]
 //                                }
 
-                                build_nuclio(BUILD_FOLDER)
+                                build_nuclio()
 
                                 stage('create tsdb-nuclio release') {
                                     container('jnlp') {
@@ -350,7 +350,7 @@ spec:
                                     }
                                 }
 
-                                build_demo(BUILD_FOLDER)
+                                build_demo()
 
                                 stage('create iguazio_api_examples release') {
                                     container('jnlp') {
@@ -395,7 +395,7 @@ spec:
                                     }
                                 }
 
-                                build_prometheus(BUILD_FOLDER, NEXT_VERSION)
+                                build_prometheus(NEXT_VERSION)
 
                                 stage('create prometheus release') {
                                     container('jnlp') {
