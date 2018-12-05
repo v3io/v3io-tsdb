@@ -4,7 +4,7 @@ def github_user = "gkirok"
 def docker_user = "gallziguazio"
 def git_project = "v3io-tsdb"
 
-def build_nuclio(TAG_VERSION) {
+def build_nuclio(BUILD_FOLDER) {
     withCredentials([
             usernamePassword(credentialsId: '4318b7db-a1af-4775-b871-5a35d3e75c21', passwordVariable: 'GIT_PASSWORD', usernameVariable: 'GIT_USERNAME'),
             string(credentialsId: 'dd7f75c5-f055-4eb3-9365-e7d04e644211', variable: 'GIT_TOKEN')
@@ -64,7 +64,7 @@ def build_nuclio(TAG_VERSION) {
 }
 
 
-def build_demo(TAG_VERSION) {
+def build_demo(BUILD_FOLDER) {
     withCredentials([
             usernamePassword(credentialsId: '4318b7db-a1af-4775-b871-5a35d3e75c21', passwordVariable: 'GIT_PASSWORD', usernameVariable: 'GIT_USERNAME'),
             string(credentialsId: 'dd7f75c5-f055-4eb3-9365-e7d04e644211', variable: 'GIT_TOKEN')
@@ -122,7 +122,7 @@ def build_demo(TAG_VERSION) {
     }
 }
 
-def build_prometheus(TAG_VERSION) {
+def build_prometheus(BUILD_FOLDER, TAG_VERSION) {
     withCredentials([
             usernamePassword(credentialsId: '4318b7db-a1af-4775-b871-5a35d3e75c21', passwordVariable: 'GIT_PASSWORD', usernameVariable: 'GIT_USERNAME'),
             string(credentialsId: 'dd7f75c5-f055-4eb3-9365-e7d04e644211', variable: 'GIT_TOKEN')
@@ -300,7 +300,7 @@ spec:
 //                                    build job: "tsdb-nuclio/v0.0.8", propagate: true, wait: true, parameters: [[$class: 'StringParameterValue', name: 'TAG_NAME', value: "v${NEXT_VERSION}"]]
 //                                }
 
-                                build_nuclio(NEXT_VERSION)
+                                build_nuclio(BUILD_FOLDER)
 
                                 stage('create tsdb-nuclio release') {
                                     container('jnlp') {
@@ -350,7 +350,7 @@ spec:
                                     }
                                 }
 
-                                build_demo(NEXT_VERSION)
+                                build_demo(BUILD_FOLDER)
 
                                 stage('create iguazio_api_examples release') {
                                     container('jnlp') {
@@ -395,7 +395,7 @@ spec:
                                     }
                                 }
 
-                                build_prometheus(NEXT_VERSION)
+                                build_prometheus(BUILD_FOLDER, NEXT_VERSION)
 
                                 stage('create prometheus release') {
                                     container('jnlp') {
