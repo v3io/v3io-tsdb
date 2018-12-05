@@ -223,7 +223,7 @@ func (a *V3ioAdapter) DeleteDB(deleteAll bool, ignoreErrors bool, fromTime int64
 	a.partitionMngr.DeletePartitionsFromSchema(partitions)
 
 	if len(a.partitionMngr.GetPartitionsPaths()) == 0 {
-		path := filepath.Join(a.cfg.TablePath, config.NamesDirectory)
+		path := filepath.Join(a.cfg.TablePath, config.NamesDirectory) + "/" // Need a trailing slash
 		a.logger.Info("Delete metric names at path '%s'.", path)
 		err := utils.DeleteTable(a.logger, a.container, path, "", a.cfg.QryWorkers)
 		if err != nil && !ignoreErrors {

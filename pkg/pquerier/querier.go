@@ -160,7 +160,7 @@ func (q *V3ioQuerier) LabelValues(labelKey string) (result []string, err error) 
 
 func (q *V3ioQuerier) getMetricNames() ([]string, error) {
 	input := v3io.GetItemsInput{
-		Path:           filepath.Join(q.cfg.TablePath, config.NamesDirectory),
+		Path:           filepath.Join(q.cfg.TablePath, config.NamesDirectory) + "/", // Need a trailing slash
 		AttributeNames: []string{config.ObjectNameAttrName},
 	}
 
