@@ -189,7 +189,6 @@ spec:
                 usernamePassword(credentialsId: git_deploy_user, passwordVariable: 'GIT_PASSWORD', usernameVariable: 'GIT_USERNAME'),
                 string(credentialsId: git_deploy_user_token, variable: 'GIT_TOKEN')
         ]) {
-
             stage('get tag data') {
                 container('jnlp') {
                     MAIN_TAG_VERSION = sh(
