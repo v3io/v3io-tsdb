@@ -1,23 +1,24 @@
 label = "${UUID.randomUUID().toString()}"
 BUILD_FOLDER = "/go"
-github_user = "gkirok"
-docker_user = "gallziguazio"
 git_project = "v3io-tsdb"
+git_project_user = "gkirok"
+git_deploy_user = "iguazio-dev-git-user"
+git_deploy_user_token = "iguazio-dev-git-user-token"
 
 def build_nuclio() {
     withCredentials([
-            usernamePassword(credentialsId: '4318b7db-a1af-4775-b871-5a35d3e75c21', passwordVariable: 'GIT_PASSWORD', usernameVariable: 'GIT_USERNAME'),
-            string(credentialsId: 'dd7f75c5-f055-4eb3-9365-e7d04e644211', variable: 'GIT_TOKEN')
+            usernamePassword(credentialsId: git_deploy_user, passwordVariable: 'GIT_PASSWORD', usernameVariable: 'GIT_USERNAME'),
+            string(credentialsId: git_deploy_user_token, variable: 'GIT_TOKEN')
     ]) {
         def git_project = 'tsdb-nuclio'
         stage('prepare sources') {
             container('jnlp') {
                 sh """
                     cd ${BUILD_FOLDER}
-                    git clone https://${GIT_USERNAME}:${GIT_PASSWORD}@github.com/${github_user}/${git_project}.git src/github.com/v3io/${git_project}
+                    git clone https://${GIT_USERNAME}:${GIT_PASSWORD}@github.com/${git_project_user}/${git_project}.git src/github.com/v3io/${git_project}
                     cd ${BUILD_FOLDER}/src/github.com/v3io/${git_project}
                     rm -rf functions/ingest/vendor/github.com/v3io/v3io-tsdb functions/query/vendor/github.com/v3io/v3io-tsdb
-                    git clone https://${GIT_USERNAME}:${GIT_PASSWORD}@github.com/${github_user}/v3io-tsdb.git functions/ingest/vendor/github.com/v3io/v3io-tsdb
+                    git clone https://${GIT_USERNAME}:${GIT_PASSWORD}@github.com/${git_project_user}/v3io-tsdb.git functions/ingest/vendor/github.com/v3io/v3io-tsdb
                     cd functions/ingest/vendor/github.com/v3io/v3io-tsdb
                     rm -rf .git vendor/github.com/v3io vendor/github.com/nuclio
                     cd ${BUILD_FOLDER}/src/github.com/v3io/${git_project}
@@ -27,22 +28,6 @@ def build_nuclio() {
 //                    git checkout ${V3IO_TSDB_VERSION}
             }
         }
-
-//        stage('build in dood') {
-//            container('docker-cmd') {
-//                sh """
-//                    cd ${BUILD_FOLDER}/src/github.com/v3io/${git_project}/functions/ingest
-//                    docker build . --tag tsdb-ingest:latest --tag ${docker_user}/tsdb-ingest:${TAG_VERSION}
-//
-//                    cd ${BUILD_FOLDER}/src/github.com/v3io/${git_project}/functions/query
-//                    docker build . --tag tsdb-query:latest --tag ${docker_user}/tsdb-query:${TAG_VERSION}
-//                """
-//                withDockerRegistry([credentialsId: "472293cc-61bc-4e9f-aecb-1d8a73827fae", url: ""]) {
-//                    sh "docker push ${docker_user}/tsdb-ingest:${TAG_VERSION}"
-//                    sh "docker push ${docker_user}/tsdb-query:${TAG_VERSION}"
-//                }
-//            }
-//        }
 
         stage('git push') {
             container('jnlp') {
@@ -63,11 +48,10 @@ def build_nuclio() {
     }
 }
 
-
 def build_demo() {
     withCredentials([
-            usernamePassword(credentialsId: '4318b7db-a1af-4775-b871-5a35d3e75c21', passwordVariable: 'GIT_PASSWORD', usernameVariable: 'GIT_USERNAME'),
-            string(credentialsId: 'dd7f75c5-f055-4eb3-9365-e7d04e644211', variable: 'GIT_TOKEN')
+            usernamePassword(credentialsId: git_deploy_user, passwordVariable: 'GIT_PASSWORD', usernameVariable: 'GIT_USERNAME'),
+            string(credentialsId: git_deploy_user_token, variable: 'GIT_TOKEN')
     ]) {
         def git_project = 'iguazio_api_examples'
 
@@ -75,10 +59,10 @@ def build_demo() {
             container('jnlp') {
                 sh """
                     cd ${BUILD_FOLDER}
-                    git clone https://${GIT_USERNAME}:${GIT_PASSWORD}@github.com/${github_user}/${git_project}.git src/github.com/v3io/${git_project}
+                    git clone https://${GIT_USERNAME}:${GIT_PASSWORD}@github.com/${git_project_user}/${git_project}.git src/github.com/v3io/${git_project}
                     cd ${BUILD_FOLDER}/src/github.com/v3io/${git_project}/netops_demo/golang/src/github.com/v3io/demos
                     rm -rf vendor/github.com/v3io/v3io-tsdb/
-                    git clone https://${GIT_USERNAME}:${GIT_PASSWORD}@github.com/${github_user}/v3io-tsdb.git vendor/github.com/v3io/v3io-tsdb
+                    git clone https://${GIT_USERNAME}:${GIT_PASSWORD}@github.com/${git_project_user}/v3io-tsdb.git vendor/github.com/v3io/v3io-tsdb
                     cd vendor/github.com/v3io/v3io-tsdb
                     rm -rf .git vendor/github.com/v3io vendor/github.com/nuclio
                 """
@@ -86,22 +70,6 @@ def build_demo() {
 //                    git checkout ${V3IO_TSDB_VERSION}
             }
         }
-
-//        stage('build in dood') {
-//            container('docker-cmd') {
-//                sh """
-//                    cd ${BUILD_FOLDER}/src/github.com/v3io/${git_project}/netops_demo/golang/src/github.com/v3io/demos
-//                    docker build . --tag netops-demo-golang:latest --tag ${docker_user}/netops-demo-golang:$NETOPS_DEMO_VERSION --build-arg NUCLIO_BUILD_OFFLINE=true --build-arg NUCLIO_BUILD_IMAGE_HANDLER_DIR=github.com/v3io/demos
-//
-//                    cd ${BUILD_FOLDER}/src/github.com/v3io/${git_project}/netops_demo/py
-//                    docker build . --tag netops-demo-py:latest --tag ${docker_user}/netops-demo-py:$NETOPS_DEMO_VERSION
-//                """
-//                withDockerRegistry([credentialsId: "472293cc-61bc-4e9f-aecb-1d8a73827fae", url: ""]) {
-//                    sh "docker push ${docker_user}/netops-demo-golang:${NETOPS_DEMO_VERSION}"
-//                    sh "docker push ${docker_user}/netops-demo-py:${NETOPS_DEMO_VERSION}"
-//                }
-//            }
-//        }
 
         stage('git push') {
             container('jnlp') {
@@ -124,8 +92,8 @@ def build_demo() {
 
 def build_prometheus(TAG_VERSION) {
     withCredentials([
-            usernamePassword(credentialsId: '4318b7db-a1af-4775-b871-5a35d3e75c21', passwordVariable: 'GIT_PASSWORD', usernameVariable: 'GIT_USERNAME'),
-            string(credentialsId: 'dd7f75c5-f055-4eb3-9365-e7d04e644211', variable: 'GIT_TOKEN')
+            usernamePassword(credentialsId: git_deploy_user, passwordVariable: 'GIT_PASSWORD', usernameVariable: 'GIT_USERNAME'),
+            string(credentialsId: git_deploy_user_token, variable: 'GIT_TOKEN')
     ]) {
         def git_project = 'prometheus'
         def V3IO_TSDB_VERSION
@@ -140,29 +108,17 @@ def build_prometheus(TAG_VERSION) {
                 sh """ 
                     cd ${BUILD_FOLDER}
                     if [[ ! -d src/github.com/${git_project}/${git_project} ]]; then 
-                        git clone https://${GIT_USERNAME}:${GIT_PASSWORD}@github.com/${github_user}/${git_project}.git src/github.com/${git_project}/${git_project}
+                        git clone https://${GIT_USERNAME}:${GIT_PASSWORD}@github.com/${git_project_user}/${git_project}.git src/github.com/${git_project}/${git_project}
                     fi
                     cd ${BUILD_FOLDER}/src/github.com/${git_project}/${git_project}
                     rm -rf vendor/github.com/v3io/v3io-tsdb/
-                    git clone https://${GIT_USERNAME}:${GIT_PASSWORD}@github.com/${github_user}/v3io-tsdb.git vendor/github.com/v3io/v3io-tsdb
+                    git clone https://${GIT_USERNAME}:${GIT_PASSWORD}@github.com/${git_project_user}/v3io-tsdb.git vendor/github.com/v3io/v3io-tsdb
                     cd vendor/github.com/v3io/v3io-tsdb
                     git checkout "v${V3IO_TSDB_VERSION}"
                     rm -rf .git vendor/github.com/${git_project}
                 """
             }
         }
-
-//        stage('build in dood') {
-//            container('docker-cmd') {
-//                sh """
-//                    cd ${BUILD_FOLDER}/src/github.com/${git_project}/${git_project}
-//                    docker build . -t ${docker_user}/v3io-prom:${TAG_VERSION} -f Dockerfile.multi
-//                """
-//                withDockerRegistry([credentialsId: "472293cc-61bc-4e9f-aecb-1d8a73827fae", url: ""]) {
-//                    sh "docker push ${docker_user}/v3io-prom:${TAG_VERSION}"
-//                }
-//            }
-//        }
 
         stage('git push') {
             container('jnlp') {
@@ -229,14 +185,10 @@ spec:
     def PUBLISHED_BEFORE
 
     node("${git_project}-${label}") {
-//        currentBuild.displayName = "${git_project}"
-//        currentBuild.description = "Will not run with tags created before 4 hours and more."
-
         withCredentials([
-                usernamePassword(credentialsId: '4318b7db-a1af-4775-b871-5a35d3e75c21', passwordVariable: 'GIT_PASSWORD', usernameVariable: 'GIT_USERNAME'),
-                string(credentialsId: 'dd7f75c5-f055-4eb3-9365-e7d04e644211', variable: 'GIT_TOKEN')
+                usernamePassword(credentialsId: git_deploy_user, passwordVariable: 'GIT_PASSWORD', usernameVariable: 'GIT_USERNAME'),
+                string(credentialsId: git_deploy_user_token, variable: 'GIT_TOKEN')
         ]) {
-
             stage('get tag data') {
                 container('jnlp') {
                     MAIN_TAG_VERSION = sh(
@@ -264,8 +216,8 @@ spec:
                 podTemplate(label: "v3io-tsdb-nuclio-${label}", inheritFrom: "${git_project}-${label}") {
                     node("v3io-tsdb-nuclio-${label}") {
                         withCredentials([
-//                            usernamePassword(credentialsId: '4318b7db-a1af-4775-b871-5a35d3e75c21', passwordVariable: 'GIT_PASSWORD', usernameVariable: 'GIT_USERNAME'),
-                            string(credentialsId: 'dd7f75c5-f055-4eb3-9365-e7d04e644211', variable: 'GIT_TOKEN')
+//                            usernamePassword(credentialsId: git_deploy_user, passwordVariable: 'GIT_PASSWORD', usernameVariable: 'GIT_USERNAME'),
+                            string(credentialsId: git_deploy_user_token, variable: 'GIT_TOKEN')
                         ]) {
                             def TAG_VERSION
                             def NEXT_VERSION
@@ -296,10 +248,6 @@ spec:
                                     }
                                 }
 
-//                                stage ('starting tsdb-nuclio job') {
-//                                    build job: "tsdb-nuclio/v0.0.8", propagate: true, wait: true, parameters: [[$class: 'StringParameterValue', name: 'TAG_NAME', value: "v${NEXT_VERSION}"]]
-//                                }
-
                                 build_nuclio()
 
                                 stage('create tsdb-nuclio release') {
@@ -317,8 +265,8 @@ spec:
                 podTemplate(label: "v3io-tsdb-netops-demo-${label}", inheritFrom: "${git_project}-${label}") {
                     node("v3io-tsdb-netops-demo-${label}") {
                         withCredentials([
-//                            usernamePassword(credentialsId: '4318b7db-a1af-4775-b871-5a35d3e75c21', passwordVariable: 'GIT_PASSWORD', usernameVariable: 'GIT_USERNAME'),
-                            string(credentialsId: 'dd7f75c5-f055-4eb3-9365-e7d04e644211', variable: 'GIT_TOKEN')
+//                            usernamePassword(credentialsId: git_deploy_user, passwordVariable: 'GIT_PASSWORD', usernameVariable: 'GIT_USERNAME'),
+                            string(credentialsId: git_deploy_user_token, variable: 'GIT_TOKEN')
                         ]) {
                             def TAG_VERSION
                             def NEXT_VERSION
@@ -366,8 +314,8 @@ spec:
                 podTemplate(label: "v3io-tsdb-prometheus-${label}", inheritFrom: "${git_project}-${label}") {
                     node("v3io-tsdb-prometheus-${label}") {
                         withCredentials([
-                                usernamePassword(credentialsId: '4318b7db-a1af-4775-b871-5a35d3e75c21', passwordVariable: 'GIT_PASSWORD', usernameVariable: 'GIT_USERNAME'),
-                                string(credentialsId: 'dd7f75c5-f055-4eb3-9365-e7d04e644211', variable: 'GIT_TOKEN')
+                                usernamePassword(credentialsId: git_deploy_user, passwordVariable: 'GIT_PASSWORD', usernameVariable: 'GIT_USERNAME'),
+                                string(credentialsId: git_deploy_user_token, variable: 'GIT_TOKEN')
                         ]) {
                             def TAG_VERSION
                             def NEXT_VERSION
@@ -376,7 +324,7 @@ spec:
                                 container('jnlp') {
                                     sh """
                                         cd ${BUILD_FOLDER}
-                                        git clone https://${GIT_USERNAME}:${GIT_PASSWORD}@github.com/${github_user}/prometheus.git src/github.com/prometheus/prometheus
+                                        git clone https://${GIT_USERNAME}:${GIT_PASSWORD}@github.com/${git_project_user}/prometheus.git src/github.com/prometheus/prometheus
                                     """
 
                                     TAG_VERSION = sh(
