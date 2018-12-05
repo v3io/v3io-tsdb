@@ -151,7 +151,7 @@ spec:
   shareProcessNamespace: true
   containers:
     - name: jnlp
-      image: jenkinsci/jnlp-slave
+      image: jenkins/jnlp-slave
       resources:
         limits:
           cpu: 1
