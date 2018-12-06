@@ -59,7 +59,7 @@ def build_demo() {
                 sh """
                     cd ${BUILD_FOLDER}
                     git clone https://${GIT_USERNAME}:${GIT_PASSWORD}@github.com/${git_project_user}/${git_project}.git src/github.com/v3io/${git_project}
-                    cd ${BUILD_FOLDER}/src/github.com/v3io/${git_project}/netops_demo/golang/src/github.com/v3io/demos
+                    cd ${BUILD_FOLDER}/src/github.com/v3io/${git_project}/netops/golang/src/github.com/v3io/demos
                     rm -rf vendor/github.com/v3io/v3io-tsdb/
                     git clone https://${GIT_USERNAME}:${GIT_PASSWORD}@github.com/${git_project_user}/v3io-tsdb.git vendor/github.com/v3io/v3io-tsdb
                     cd vendor/github.com/v3io/v3io-tsdb
@@ -75,7 +75,7 @@ def build_demo() {
                     sh """
                         git config --global user.email '${GIT_USERNAME}@iguazio.com'
                         git config --global user.name '${GIT_USERNAME}'
-                        cd ${BUILD_FOLDER}/src/github.com/v3io/${git_project}/netops_demo
+                        cd ${BUILD_FOLDER}/src/github.com/v3io/${git_project}/netops
                         git add *
                         git commit -am 'Updated TSDB to latest';
                         git push origin master
@@ -199,7 +199,7 @@ spec:
                     PUBLISHED_BEFORE = sh(
                             script: "tag_published_at=\$(cat ~/tag_version | python -c 'import json,sys;obj=json.load(sys.stdin);print obj[\"published_at\"]'); SECONDS=\$(expr \$(date +%s) - \$(date -d \"\$tag_published_at\" +%s)); expr \$SECONDS / 60 + 1",
                             returnStdout: true
-                    ).trim()
+                    ).trim().toInteger()
 
                     echo "$MAIN_TAG_VERSION"
                     echo "$PUBLISHED_BEFORE"
@@ -208,7 +208,7 @@ spec:
         }
     }
 
-    if ( MAIN_TAG_VERSION && PUBLISHED_BEFORE < 900 ) {
+    if ( MAIN_TAG_VERSION != null && MAIN_TAG_VERSION.length() > 0 && PUBLISHED_BEFORE < 900 ) {
         parallel(
             'tsdb-nuclio': {
                 podTemplate(label: "v3io-tsdb-nuclio-${label}", inheritFrom: "${git_project}-${label}") {
