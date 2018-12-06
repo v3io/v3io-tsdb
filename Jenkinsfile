@@ -208,7 +208,7 @@ spec:
         }
     }
 
-    if ( MAIN_TAG_VERSION && PUBLISHED_BEFORE < 240 ) {
+    if ( MAIN_TAG_VERSION && PUBLISHED_BEFORE < 900 ) {
         parallel(
             'tsdb-nuclio': {
                 podTemplate(label: "v3io-tsdb-nuclio-${label}", inheritFrom: "${git_project}-${label}") {
@@ -354,7 +354,7 @@ spec:
         )
     } else {
         stage('warning') {
-            if (PUBLISHED_BEFORE >= 240) {
+            if (PUBLISHED_BEFORE >= 900) {
                 echo "Tag too old, published before $PUBLISHED_BEFORE minutes."
             } else {
                 echo "${TAG_VERSION} is not release tag."
