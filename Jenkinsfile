@@ -1,9 +1,9 @@
 label = "${UUID.randomUUID().toString()}"
 BUILD_FOLDER = "/go"
 git_project = "v3io-tsdb"
-git_project_user = "v3io"
-git_deploy_user = "iguazio-prod-git-user"
-git_deploy_user_token = "iguazio-prod-git-user-token"
+git_project_user = "gkirok"
+git_deploy_user = "iguazio-dev-git-user"
+git_deploy_user_token = "iguazio-dev-git-user-token"
 
 def build_nuclio() {
     withCredentials([
@@ -199,7 +199,7 @@ spec:
                     PUBLISHED_BEFORE = sh(
                             script: "tag_published_at=\$(cat ~/tag_version | python -c 'import json,sys;obj=json.load(sys.stdin);print obj[\"published_at\"]'); SECONDS=\$(expr \$(date +%s) - \$(date -d \"\$tag_published_at\" +%s)); expr \$SECONDS / 60 + 1",
                             returnStdout: true
-                    ).trim()
+                    ).trim().toInteger()
 
                     echo "$MAIN_TAG_VERSION"
                     echo "$PUBLISHED_BEFORE"
@@ -208,7 +208,7 @@ spec:
         }
     }
 
-    if ( MAIN_TAG_VERSION && PUBLISHED_BEFORE < 900 ) {
+    if ( MAIN_TAG_VERSION != null && MAIN_TAG_VERSION.length() > 0 && PUBLISHED_BEFORE < 900 ) {
         parallel(
             'tsdb-nuclio': {
                 podTemplate(label: "v3io-tsdb-nuclio-${label}", inheritFrom: "${git_project}-${label}") {
