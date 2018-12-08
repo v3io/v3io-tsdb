@@ -71,7 +71,7 @@ type XORChunk struct {
 }
 
 // NewXORChunk returns a new chunk with XOR encoding of the given size.
-func NewXORChunk(logger logger.Logger) Chunk {
+func newXORChunk(logger logger.Logger) Chunk {
 	//b := make([]byte, 32, 32)
 	return &XORChunk{logger: logger, b: newBWriter(256)}
 }

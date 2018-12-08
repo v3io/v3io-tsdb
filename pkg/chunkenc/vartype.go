@@ -61,7 +61,7 @@ type VarChunk struct {
 }
 
 // NewVarChunk returns a new chunk with variant encoding of the given size.
-func NewVarChunk(logger logger.Logger) Chunk {
+func newVarChunk(logger logger.Logger) Chunk {
 	return &VarChunk{logger: logger, b: make([]byte, 0, 1024)}
 }
 

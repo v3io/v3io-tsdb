@@ -29,7 +29,6 @@ And was modified to suit Iguazio needs
 package chunkenc
 
 import (
-	"encoding/binary"
 	"fmt"
 
 	"github.com/nuclio/logger"
@@ -66,6 +65,13 @@ type Chunk interface {
 	Iterator() Iterator
 }
 
+func NewChunk(logger logger.Logger, variant bool) Chunk {
+	if variant {
+		return newVarChunk(logger)
+	}
+	return newXORChunk(logger)
+}
+
 // FromData returns a chunk from a byte slice of chunk data.
 func FromData(logger logger.Logger, e Encoding, d []byte, samples uint16) (Chunk, error) {
 	switch e {
@@ -75,25 +81,6 @@ func FromData(logger logger.Logger, e Encoding, d []byte, samples uint16) (Chunk
 		return &VarChunk{logger: logger, b: d, samples: samples}, nil
 	}
 	return nil, fmt.Errorf("Unknown chunk encoding: %d", e)
-}
-
-func ToUint64(bytes []byte) []uint64 {
-	array := []uint64{}
-
-	rem := len(bytes) - (len(bytes)/8)*8
-	if rem > 0 {
-		for b := rem; b < 8; b++ {
-			bytes = append(bytes, 0)
-		}
-	}
-
-	for i := 0; i+8 <= len(bytes); i += 8 {
-		val := binary.LittleEndian.Uint64(bytes[i : i+8])
-		array = append(array, val)
-	}
-
-	return array
-
 }
 
 // Appender adds metric-sample pairs to a chunk.
