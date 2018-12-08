@@ -58,6 +58,7 @@ import (
 	"math/bits"
 
 	"github.com/nuclio/logger"
+	"strconv"
 )
 
 // XORChunk holds XOR encoded sample data.
@@ -165,9 +166,10 @@ func (a *xorAppender) Chunk() Chunk {
 	return a.c
 }
 
-func (a *xorAppender) Append(t int64, v float64) {
+func (a *xorAppender) Append(t int64, vvar interface{}) {
 	var tDelta uint64
 	num := *a.samples
+	v := vvar.(float64)
 
 	// Do not append if sample is too old.
 	if t < a.t {
@@ -277,6 +279,10 @@ type xorIterator struct {
 
 func (it *xorIterator) At() (int64, float64) {
 	return it.t, it.val
+}
+
+func (it *xorIterator) AtString() (int64, string) {
+	return it.t, strconv.FormatFloat(it.val, 'f', -1, 64)
 }
 
 func (it *xorIterator) Err() error {

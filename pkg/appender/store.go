@@ -107,7 +107,7 @@ func (a *attrAppender) isAhead(t int64) bool {
 // Append a single t/v pair to a chunk
 // TODO: change appender from float to interface (allow map[str]interface cols)
 func (a *attrAppender) appendAttr(t int64, v interface{}) {
-	a.appender.Append(t, v.(float64))
+	a.appender.Append(t, v)
 }
 
 // struct/list storing uncommitted samples, with time sorting support
