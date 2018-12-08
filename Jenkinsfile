@@ -24,7 +24,6 @@ def build_nuclio() {
                     cd ${BUILD_FOLDER}/src/github.com/v3io/${git_project}
                     cp -R functions/ingest/vendor/github.com/v3io/v3io-tsdb functions/query/vendor/github.com/v3io/v3io-tsdb
                 """
-
 //                    git checkout ${V3IO_TSDB_VERSION}
             }
         }
@@ -53,7 +52,7 @@ def build_demo() {
             usernamePassword(credentialsId: git_deploy_user, passwordVariable: 'GIT_PASSWORD', usernameVariable: 'GIT_USERNAME'),
             string(credentialsId: git_deploy_user_token, variable: 'GIT_TOKEN')
     ]) {
-        def git_project = 'iguazio_api_examples'
+        def git_project = 'demos'
 
         stage('prepare sources') {
             container('jnlp') {
@@ -66,7 +65,6 @@ def build_demo() {
                     cd vendor/github.com/v3io/v3io-tsdb
                     rm -rf .git vendor/github.com/v3io vendor/github.com/nuclio
                 """
-
 //                    git checkout ${V3IO_TSDB_VERSION}
             }
         }
@@ -153,7 +151,7 @@ spec:
   shareProcessNamespace: true
   containers:
     - name: jnlp
-      image: jenkinsci/jnlp-slave
+      image: jenkins/jnlp-slave
       resources:
         limits:
           cpu: 1
@@ -196,12 +194,12 @@ spec:
                             returnStdout: true
                     ).trim()
 
-                    sh "curl -v -H \"Authorization: token ${GIT_TOKEN}\" https://api.github.com/repos/gkirok/${git_project}/releases/tags/v${MAIN_TAG_VERSION} > ~/tag_version"
+                    sh "curl -v -H \"Authorization: token ${GIT_TOKEN}\" https://api.github.com/repos/${git_project_user}/${git_project}/releases/tags/v${MAIN_TAG_VERSION} > ~/tag_version"
 
                     PUBLISHED_BEFORE = sh(
                             script: "tag_published_at=\$(cat ~/tag_version | python -c 'import json,sys;obj=json.load(sys.stdin);print obj[\"published_at\"]'); SECONDS=\$(expr \$(date +%s) - \$(date -d \"\$tag_published_at\" +%s)); expr \$SECONDS / 60 + 1",
                             returnStdout: true
-                    ).trim()
+                    ).trim().toInteger()
 
                     echo "$MAIN_TAG_VERSION"
                     echo "$PUBLISHED_BEFORE"
@@ -210,13 +208,12 @@ spec:
         }
     }
 
-    if ( MAIN_TAG_VERSION && PUBLISHED_BEFORE < 240 ) {
+    if ( MAIN_TAG_VERSION != null && MAIN_TAG_VERSION.length() > 0 && PUBLISHED_BEFORE < 240 ) {
         parallel(
             'tsdb-nuclio': {
                 podTemplate(label: "v3io-tsdb-nuclio-${label}", inheritFrom: "${git_project}-${label}") {
                     node("v3io-tsdb-nuclio-${label}") {
                         withCredentials([
-//                            usernamePassword(credentialsId: git_deploy_user, passwordVariable: 'GIT_PASSWORD', usernameVariable: 'GIT_USERNAME'),
                             string(credentialsId: git_deploy_user_token, variable: 'GIT_TOKEN')
                         ]) {
                             def TAG_VERSION
@@ -235,7 +232,7 @@ spec:
                                 stage('get previous release version') {
                                     container('jnlp') {
                                         sh """
-                                            curl -H "Authorization: bearer ${GIT_TOKEN}" -X POST -d '{"query": "query { repository(owner: \\"gkirok\\", name: \\"tsdb-nuclio\\") { refs(refPrefix: \\"refs/tags/\\", first: 1, orderBy: { field: ALPHABETICAL, direction: DESC }) { nodes { name } } } }" }' https://api.github.com/graphql > ~/last_tag;
+                                            curl -H "Authorization: bearer ${GIT_TOKEN}" -X POST -d '{"query": "query { repository(owner: \\"${git_project_user}\\", name: \\"tsdb-nuclio\\") { refs(refPrefix: \\"refs/tags/\\", first: 1, orderBy: { field: ALPHABETICAL, direction: DESC }) { nodes { name } } } }" }' https://api.github.com/graphql > ~/last_tag;
                                             cat ~/last_tag | python -c 'import json,sys;obj=json.load(sys.stdin);print obj["data"]["repository"]["refs"]["nodes"][0]["name"]' | sed "s/v//" > ~/tmp_tag
                                             cat ~/tmp_tag | awk -F. -v OFS=. 'NF==1{print ++\$NF}; NF>1{if(length(\$NF+1)>length(\$NF))\$(NF-1)++; \$NF=sprintf("%0*d", length(\$NF), (\$NF+1)%(10^length(\$NF))); print}' > ~/next_version
                                           """
@@ -252,7 +249,7 @@ spec:
 
                                 stage('create tsdb-nuclio release') {
                                     container('jnlp') {
-                                        sh "curl -v -H \"Content-Type: application/json\" -H \"Authorization: token ${GIT_TOKEN}\" https://api.github.com/repos/gkirok/tsdb-nuclio/releases -d '{\"tag_name\": \"v${NEXT_VERSION}\", \"target_commitish\": \"master\", \"name\": \"v${NEXT_VERSION}\", \"body\": \"Autorelease, triggered by v3io-tsdb\"}'"
+                                        sh "curl -v -H \"Content-Type: application/json\" -H \"Authorization: token ${GIT_TOKEN}\" https://api.github.com/repos/${git_project_user}/tsdb-nuclio/releases -d '{\"tag_name\": \"v${NEXT_VERSION}\", \"target_commitish\": \"master\", \"name\": \"v${NEXT_VERSION}\", \"body\": \"Autorelease, triggered by v3io-tsdb\", \"prerelease\": true}'"
                                     }
                                 }
                             }
@@ -262,10 +259,9 @@ spec:
                 }
             },
             'netops-demo': {
-                podTemplate(label: "v3io-tsdb-netops-demo-${label}", inheritFrom: "${git_project}-${label}") {
-                    node("v3io-tsdb-netops-demo-${label}") {
+                podTemplate(label: "netops-demo-${label}", inheritFrom: "${git_project}-${label}") {
+                    node("netops-demo-${label}") {
                         withCredentials([
-//                            usernamePassword(credentialsId: git_deploy_user, passwordVariable: 'GIT_PASSWORD', usernameVariable: 'GIT_USERNAME'),
                             string(credentialsId: git_deploy_user_token, variable: 'GIT_TOKEN')
                         ]) {
                             def TAG_VERSION
@@ -284,7 +280,7 @@ spec:
                                 stage('get previous release version') {
                                     container('jnlp') {
                                         sh """
-                                            curl -H "Authorization: bearer ${GIT_TOKEN}" -X POST -d '{"query": "query { repository(owner: \\"gkirok\\", name: \\"iguazio_api_examples\\") { refs(refPrefix: \\"refs/tags/\\", first: 1, orderBy: { field: ALPHABETICAL, direction: DESC }) { nodes { name } } } }" }' https://api.github.com/graphql > last_tag;
+                                            curl -H "Authorization: bearer ${GIT_TOKEN}" -X POST -d '{"query": "query { repository(owner: \\"${git_project_user}\\", name: \\"demos\\") { refs(refPrefix: \\"refs/tags/\\", first: 1, orderBy: { field: ALPHABETICAL, direction: DESC }) { nodes { name } } } }" }' https://api.github.com/graphql > last_tag;
                                             cat last_tag | python -c 'import json,sys;obj=json.load(sys.stdin);print obj["data"]["repository"]["refs"]["nodes"][0]["name"]' | sed "s/v//" > tmp_tag
                                             cat tmp_tag | awk -F. -v OFS=. 'NF==1{print ++\$NF}; NF>1{if(length(\$NF+1)>length(\$NF))\$(NF-1)++; \$NF=sprintf("%0*d", length(\$NF), (\$NF+1)%(10^length(\$NF))); print}' > next_version
                                         """
@@ -300,9 +296,9 @@ spec:
 
                                 build_demo()
 
-                                stage('create iguazio_api_examples release') {
+                                stage('create demos release') {
                                     container('jnlp') {
-                                        sh "curl -v -H \"Content-Type: application/json\" -H \"Authorization: token ${GIT_TOKEN}\" https://api.github.com/repos/gkirok/iguazio_api_examples/releases -d '{\"tag_name\": \"v${NEXT_VERSION}\", \"target_commitish\": \"master\", \"name\": \"v${NEXT_VERSION}\", \"body\": \"Autorelease, triggered by v3io-tsdb\"}'"
+                                        sh "curl -v -H \"Content-Type: application/json\" -H \"Authorization: token ${GIT_TOKEN}\" https://api.github.com/repos/${git_project_user}/demos/releases -d '{\"tag_name\": \"v${NEXT_VERSION}\", \"target_commitish\": \"master\", \"name\": \"v${NEXT_VERSION}\", \"body\": \"Autorelease, triggered by v3io-tsdb\", \"prerelease\": true}'"
                                     }
                                 }
                             }
@@ -347,7 +343,7 @@ spec:
 
                                 stage('create prometheus release') {
                                     container('jnlp') {
-                                        sh "curl -v -H \"Content-Type: application/json\" -H \"Authorization: token ${GIT_TOKEN}\" https://api.github.com/repos/gkirok/prometheus/releases -d '{\"tag_name\": \"v${NEXT_VERSION}\", \"target_commitish\": \"master\", \"name\": \"v${NEXT_VERSION}\", \"body\": \"Autorelease, triggered by v3io-tsdb\"}'"
+                                        sh "curl -v -H \"Content-Type: application/json\" -H \"Authorization: token ${GIT_TOKEN}\" https://api.github.com/repos/${git_project_user}/prometheus/releases -d '{\"tag_name\": \"v${NEXT_VERSION}\", \"target_commitish\": \"master\", \"name\": \"v${NEXT_VERSION}\", \"body\": \"Autorelease, triggered by v3io-tsdb\", \"prerelease\": true}'"
                                     }
                                 }
                             }
