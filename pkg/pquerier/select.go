@@ -51,7 +51,7 @@ type selectQueryContext struct {
 
 func (queryCtx *selectQueryContext) start(parts []*partmgr.DBPartition, params *SelectParams) (*frameIterator, error) {
 	queryCtx.dataFrames = make(map[uint64]*dataFrame)
-
+	queryCtx.mint, queryCtx.maxt = params.From, params.To
 	// If step isn't passed (e.g., when using the console), the step is the
 	// difference between the end (maxt) and start (mint) times (e.g., 5 minutes)
 	if params.Functions != "" && queryCtx.step == 0 {
