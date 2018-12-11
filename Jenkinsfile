@@ -380,10 +380,11 @@ spec:
                             if (!status) {
                                 RELEASE_SUCCESS = sh(
                                         script: "curl -H \"Content-Type: application/json\" -H \"Authorization: token ${GIT_TOKEN}\" -X GET https://api.github.com/repos/${git_project_user}/${project}/releases/tags/v${next_versions[project]} | python -c 'import json,sys;obj=json.load(sys.stdin);print obj[\"prerelease\"]' | grep -i false",
-                                        returnStdout: true
-                                ).trim()
+                                        returnStatus: true
+                                )
 
-                                if (RELEASE_SUCCESS != null || RELEASE_SUCCESS.length() > 0) {
+                                echo "RELEASE_SUCCESS --- ${RELEASE_SUCCESS} ---"
+                                if (RELEASE_SUCCESS != null || RELEASE_SUCCESS == 0) {
                                     success.putAt(project, true)
                                     success_count++
                                 }
