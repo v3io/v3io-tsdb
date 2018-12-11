@@ -252,6 +252,26 @@ spec:
                                         sh "curl -v -H \"Content-Type: application/json\" -H \"Authorization: token ${GIT_TOKEN}\" https://api.github.com/repos/${git_project_user}/tsdb-nuclio/releases -d '{\"tag_name\": \"v${NEXT_VERSION}\", \"target_commitish\": \"master\", \"name\": \"v${NEXT_VERSION}\", \"body\": \"Autorelease, triggered by v3io-tsdb\", \"prerelease\": true}'"
                                     }
                                 }
+
+                                stage('waiting for tsdb-nuclio prerelease moved to release') {
+                                    container('jnlp') {
+                                        i = 0
+                                        while(true) {
+                                            RELEASE_SUCCESS = sh(
+                                                    script: "curl -H \"Content-Type: application/json\" -H \"Authorization: token ${GIT_TOKEN}\" -X GET https://api.github.com/repos/${git_project_user}/tsdb-nuclio/releases/tags/v${NEXT_VERSION} | python -c 'import json,sys;obj=json.load(sys.stdin);print obj[\"prerelease\"]' | grep -i true",
+                                                    returnStdout: true
+                                            ).trim()
+
+                                            if ( i++ > 10 && ( RELEASE_SUCCESS == null || RELEASE_SUCCESS.length() <= 0)) {
+                                                error('tsdb-nuclio has been not completed :(')
+                                            }
+
+                                            sleep(60)
+                                        }
+
+                                        echo "tsdb-nuclio release has been successfully completed"
+                                    }
+                                }
                             }
                         }
                     }
@@ -298,6 +318,26 @@ spec:
                                 stage('create demos prerelease') {
                                     container('jnlp') {
                                         sh "curl -v -H \"Content-Type: application/json\" -H \"Authorization: token ${GIT_TOKEN}\" https://api.github.com/repos/${git_project_user}/demos/releases -d '{\"tag_name\": \"v${NEXT_VERSION}\", \"target_commitish\": \"master\", \"name\": \"v${NEXT_VERSION}\", \"body\": \"Autorelease, triggered by v3io-tsdb\", \"prerelease\": true}'"
+                                    }
+                                }
+
+                                stage('waiting for demos prerelease moved to release') {
+                                    container('jnlp') {
+                                        i = 0
+                                        while(true) {
+                                            RELEASE_SUCCESS = sh(
+                                                    script: "curl -H \"Content-Type: application/json\" -H \"Authorization: token ${GIT_TOKEN}\" -X GET https://api.github.com/repos/${git_project_user}/demos/releases/tags/v${NEXT_VERSION} | python -c 'import json,sys;obj=json.load(sys.stdin);print obj[\"prerelease\"]' | grep -i true",
+                                                    returnStdout: true
+                                            ).trim()
+
+                                            if ( i++ > 10 && ( RELEASE_SUCCESS == null || RELEASE_SUCCESS.length() <= 0)) {
+                                                error('demos has been not completed :(')
+                                            }
+
+                                            sleep(60)
+                                        }
+
+                                        echo "demos release has been successfully completed"
                                     }
                                 }
                             }
