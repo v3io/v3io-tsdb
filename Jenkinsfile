@@ -181,6 +181,7 @@ spec:
 ) {
     def MAIN_TAG_VERSION
     def PUBLISHED_BEFORE
+    def next_versions = ['demos':null, 'prometheus':null, 'tsdb-nuclio':null]
 
     node("${git_project}-${label}") {
         withCredentials([
@@ -242,6 +243,8 @@ spec:
                                         ).trim()
 
                                         echo "$NEXT_VERSION"
+
+                                        next_versions.putAt('tsdb-nuclio', NEXT_VERSION)
                                     }
                                 }
 
@@ -290,6 +293,7 @@ spec:
                                         ).trim()
 
                                         echo "$NEXT_VERSION"
+                                        next_versions.putAt('demos', NEXT_VERSION)
                                     }
                                 }
 
@@ -335,6 +339,7 @@ spec:
                                         NEXT_VERSION = "${TAG_VERSION}-${TAG_NAME}"
 
                                         echo "$NEXT_VERSION"
+                                        next_versions.putAt('prometheus', NEXT_VERSION)
                                     }
                                 }
 
@@ -374,7 +379,7 @@ spec:
                         success.each { project, status ->
                             if (!status) {
                                 RELEASE_SUCCESS = sh(
-                                        script: "curl -H \"Content-Type: application/json\" -H \"Authorization: token ${GIT_TOKEN}\" -X GET https://api.github.com/repos/${git_project_user}/${project}/releases/tags/v${NEXT_VERSION} | python -c 'import json,sys;obj=json.load(sys.stdin);print obj[\"prerelease\"]' | grep -i false",
+                                        script: "curl -H \"Content-Type: application/json\" -H \"Authorization: token ${GIT_TOKEN}\" -X GET https://api.github.com/repos/${git_project_user}/${project}/releases/tags/v${next_versions[project]} | python -c 'import json,sys;obj=json.load(sys.stdin);print obj[\"prerelease\"]' | grep -i false",
                                         returnStdout: true
                                 ).trim()
 
