@@ -373,38 +373,62 @@ spec:
             stage('waiting for prereleases moved to releases') {
                 container('jnlp') {
                     i = 0
-                    def success = ['demos':false, 'prometheus':false, 'tsdb-nuclio':false]
+                    def tasks_list = ['demos':null, 'prometheus':null, 'tsdb-nuclio':null]
                     def success_count = 0
                     while( true ) {
-                        success.each { project, status ->
-                            if (!status) {
+                        def done_count = 0
+                        tasks_list.each { project, status ->
+                            if (status == null) {
                                 def RELEASE_SUCCESS = sh(
-                                        script: "curl --silent -H \"Content-Type: application/json\" -H \"Authorization: token ${GIT_TOKEN}\" -X GET https://api.github.com/repos/${git_project_user}/${project}/releases/tags/v${next_versions[project]} > ${project}.result; cat ${project}.result | python -c 'import json,sys;obj=json.load(sys.stdin);print obj[\"prerelease\"]' | if grep -iq false; then echo 'release'; else echo 'prerelease'; fi",
+                                        script: "curl --silent -H \"Content-Type: application/json\" -H \"Authorization: token ${GIT_TOKEN}\" -X GET https://api.github.com/repos/${git_project_user}/${project}/releases/tags/v${next_versions[project]} | python -c 'import json,sys;obj=json.load(sys.stdin);print obj[\"prerelease\"]' | if grep -iq false; then echo 'release'; else echo 'prerelease'; fi",
                                         returnStdout: true
                                 ).trim()
 
                                 echo "RELEASE_SUCCESS --- ${RELEASE_SUCCESS} ---"
                                 if (RELEASE_SUCCESS != null && RELEASE_SUCCESS == 'release') {
-                                    success.putAt(project, true)
+                                    tasks_list.putAt(project, true)
                                     success_count++
-                                }
+                                } else {
+                                    def TAG_SHA = sh(
+                                            script: "curl --silent -H \"Content-Type: application/json\" -H \"Authorization: token ${GIT_TOKEN}\" -X GET https://api.github.com/repos/${git_project_user}/${project}/git/refs/tags/v${next_versions[project]} | python -c 'import json,sys;obj=json.load(sys.stdin);print obj[\"object\"][\"sha\"]'",
+                                            returnStdout: true
+                                    ).trim()
 
-                                sh "cat ${project}.result"
+                                    if(TAG_SHA != null) {
+                                        def COMMIT_STATUS = sh(
+                                                script: "curl --silent -H \"Content-Type: application/json\" -H \"Authorization: token ${GIT_TOKEN}\" -X GET https://api.github.com/repos/gkirok/tsdb-nuclio/commits/${TAG_SHA}/statuses | python -c 'import json,sys;obj=json.load(sys.stdin);print obj[0][\"state\"]' | if grep -iq error; then echo 'error'; else echo 'ok'; fi",
+                                                returnStdout: true
+                                        ).trim()
+                                        if (COMMIT_STATUS != null && COMMIT_STATUS == 'error') {
+                                            tasks_list.putAt(project, false)
+                                        }
+                                    }
+                                }
+                            } else {
+                                done_count++
                             }
                         }
-                        if(success_count >= 3) {
+                        if(success_count >= tasks_list.size()) {
                             echo "all releases have been successfully completed"
                             break
                         }
-                        echo "i is ${i}"
-                        if(i++ > 10) {
-                            def failed
-                            success.each { project, status ->
-                                if(!status) {
+
+                        if(done_count >= tasks_list.size() || i++ > 10) {
+                            def failed = []
+                            def notcompleted = []
+                            tasks_list.each { project, status ->
+                                if(status == null) {
+                                    notcompleted += project
+                                } else if(status == false) {
                                     failed += project
                                 }
                             }
-                            error(failed.join(',') + ' have been not completed :(')
+                            if(failed.size()) {
+                                error(failed.join(',') + ' have been failed :_(')
+                            }
+                            if(notcompleted.size()) {
+                                error(notcompleted.join(',') + ' have been not completed :(')
+                            }
                             break
                         }
 
