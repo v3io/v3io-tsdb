@@ -258,9 +258,9 @@ spec:
                     }
                 }
             },
-            'netops-demo': {
-                podTemplate(label: "netops-demo-${label}", inheritFrom: "${git_project}-${label}") {
-                    node("netops-demo-${label}") {
+            'demos': {
+                podTemplate(label: "demos-${label}", inheritFrom: "${git_project}-${label}") {
+                    node("demos-${label}") {
                         withCredentials([
                             string(credentialsId: git_deploy_user_token, variable: 'GIT_TOKEN')
                         ]) {
