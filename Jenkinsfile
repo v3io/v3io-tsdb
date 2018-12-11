@@ -59,7 +59,7 @@ def build_demo() {
                 sh """
                     cd ${BUILD_FOLDER}
                     git clone https://${GIT_USERNAME}:${GIT_PASSWORD}@github.com/${git_project_user}/${git_project}.git src/github.com/v3io/${git_project}
-                    cd ${BUILD_FOLDER}/src/github.com/v3io/${git_project}/netops_demo/golang/src/github.com/v3io/demos
+                    cd ${BUILD_FOLDER}/src/github.com/v3io/${git_project}/netops/golang/src/github.com/v3io/demos
                     rm -rf vendor/github.com/v3io/v3io-tsdb/
                     git clone https://${GIT_USERNAME}:${GIT_PASSWORD}@github.com/${git_project_user}/v3io-tsdb.git vendor/github.com/v3io/v3io-tsdb
                     cd vendor/github.com/v3io/v3io-tsdb
@@ -75,7 +75,7 @@ def build_demo() {
                     sh """
                         git config --global user.email '${GIT_USERNAME}@iguazio.com'
                         git config --global user.name '${GIT_USERNAME}'
-                        cd ${BUILD_FOLDER}/src/github.com/v3io/${git_project}/netops_demo
+                        cd ${BUILD_FOLDER}/src/github.com/v3io/${git_project}/netops
                         git add *
                         git commit -am 'Updated TSDB to latest';
                         git push origin master
@@ -247,13 +247,12 @@ spec:
 
                                 build_nuclio()
 
-                                stage('create tsdb-nuclio release') {
+                                stage('create tsdb-nuclio prerelease') {
                                     container('jnlp') {
                                         sh "curl -v -H \"Content-Type: application/json\" -H \"Authorization: token ${GIT_TOKEN}\" https://api.github.com/repos/${git_project_user}/tsdb-nuclio/releases -d '{\"tag_name\": \"v${NEXT_VERSION}\", \"target_commitish\": \"master\", \"name\": \"v${NEXT_VERSION}\", \"body\": \"Autorelease, triggered by v3io-tsdb\", \"prerelease\": true}'"
                                     }
                                 }
                             }
-
                         }
                     }
                 }
@@ -296,7 +295,7 @@ spec:
 
                                 build_demo()
 
-                                stage('create demos release') {
+                                stage('create demos prerelease') {
                                     container('jnlp') {
                                         sh "curl -v -H \"Content-Type: application/json\" -H \"Authorization: token ${GIT_TOKEN}\" https://api.github.com/repos/${git_project_user}/demos/releases -d '{\"tag_name\": \"v${NEXT_VERSION}\", \"target_commitish\": \"master\", \"name\": \"v${NEXT_VERSION}\", \"body\": \"Autorelease, triggered by v3io-tsdb\", \"prerelease\": true}'"
                                     }
@@ -341,7 +340,7 @@ spec:
 
                                 build_prometheus(NEXT_VERSION)
 
-                                stage('create prometheus release') {
+                                stage('create prometheus prerelease') {
                                     container('jnlp') {
                                         sh "curl -v -H \"Content-Type: application/json\" -H \"Authorization: token ${GIT_TOKEN}\" https://api.github.com/repos/${git_project_user}/prometheus/releases -d '{\"tag_name\": \"v${NEXT_VERSION}\", \"target_commitish\": \"master\", \"name\": \"v${NEXT_VERSION}\", \"body\": \"Autorelease, triggered by v3io-tsdb\", \"prerelease\": true}'"
                                     }
