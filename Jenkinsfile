@@ -380,7 +380,7 @@ spec:
                             if (!status) {
                                 RELEASE_SUCCESS = sh(
                                         script: "curl -H \"Content-Type: application/json\" -H \"Authorization: token ${GIT_TOKEN}\" -X GET https://api.github.com/repos/${git_project_user}/${project}/releases/tags/v${next_versions[project]} | python -c 'import json,sys;obj=json.load(sys.stdin);print obj[\"prerelease\"]' | grep -i false",
-                                        returnStatus: true
+                                        returnResult: true
                                 )
 
                                 echo "RELEASE_SUCCESS --- ${RELEASE_SUCCESS} ---"
@@ -394,6 +394,7 @@ spec:
                             echo "all releases have been successfully completed"
                             break
                         }
+                        echo "i is ${i}"
                         if(i++ > 10) {
                             def failed
                             success.each { project, status ->
