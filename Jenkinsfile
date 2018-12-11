@@ -384,7 +384,7 @@ spec:
                                 )
 
                                 echo "RELEASE_SUCCESS --- ${RELEASE_SUCCESS} ---"
-                                if (RELEASE_SUCCESS != null || RELEASE_SUCCESS == 0) {
+                                if (RELEASE_SUCCESS != null && RELEASE_SUCCESS == 0) {
                                     success.putAt(project, true)
                                     success_count++
                                 }
