@@ -74,6 +74,18 @@ func (it *dataFrameColumnSeriesIterator) At() (int64, float64) {
 	return t, v
 }
 
+func (it *dataFrameColumnSeriesIterator) AtString() (int64, string) {
+	t, err := it.indexColumn.TimeAt(it.currentIndex)
+	if err != nil {
+		it.err = err
+	}
+	v, err := it.dataColumn.StringAt(it.currentIndex)
+	if err != nil {
+		it.err = err
+	}
+	return t, v
+}
+
 func (it *dataFrameColumnSeriesIterator) Next() bool {
 	if it.err != nil {
 		return false

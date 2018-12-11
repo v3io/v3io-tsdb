@@ -33,6 +33,8 @@ type SeriesIterator interface {
 	Seek(t int64) bool
 	// At returns the current timestamp/value pair.
 	At() (t int64, v float64)
+	// At returns the current timestamp/String value pair.
+	AtString() (t int64, v string)
 	// Next advances the iterator by one.
 	Next() bool
 	// Err returns the current error.
@@ -44,7 +46,8 @@ type NullSeriesIterator struct {
 	err error
 }
 
-func (s NullSeriesIterator) Seek(t int64) bool        { return false }
-func (s NullSeriesIterator) Next() bool               { return false }
-func (s NullSeriesIterator) At() (t int64, v float64) { return 0, 0 }
-func (s NullSeriesIterator) Err() error               { return s.err }
+func (s NullSeriesIterator) Seek(t int64) bool             { return false }
+func (s NullSeriesIterator) Next() bool                    { return false }
+func (s NullSeriesIterator) At() (t int64, v float64)      { return 0, 0 }
+func (s NullSeriesIterator) AtString() (t int64, v string) { return 0, "" }
+func (s NullSeriesIterator) Err() error                    { return s.err }

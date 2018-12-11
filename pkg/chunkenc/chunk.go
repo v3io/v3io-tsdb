@@ -87,6 +87,7 @@ func FromData(logger logger.Logger, e Encoding, d []byte, samples uint16) (Chunk
 type Appender interface {
 	Append(int64, interface{})
 	Chunk() Chunk
+	Encoding() Encoding
 }
 
 // Iterator is a simple iterator that can only get the next value.

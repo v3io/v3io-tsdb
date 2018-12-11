@@ -57,17 +57,17 @@ func (suite *testTsdbSuite) TestAppend() {
 	_, err = appender.Add(
 		utils.Labels{utils.Label{Name: "__name__", Value: "AAPL"}, utils.Label{Name: "market", Value: "usa"}},
 		t1,
-		-91)
+		-91.0)
 	suite.Require().NoError(err)
 	_, err = appender.Add(
 		utils.Labels{utils.Label{Name: "__name__", Value: "AAL"}, utils.Label{Name: "market", Value: "usa"}},
 		t1,
-		-87)
+		-87.0)
 	suite.Require().NoError(err)
 	_, err = appender.Add(
 		utils.Labels{utils.Label{Name: "__name__", Value: "AAP"}, utils.Label{Name: "market", Value: "usa"}},
 		t2,
-		-50)
+		-50.0)
 	suite.Require().NoError(err)
 
 	_, err = appender.WaitForCompletion(0)

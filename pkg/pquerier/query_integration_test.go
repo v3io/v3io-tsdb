@@ -1435,6 +1435,137 @@ func (suite *testQuerySuite) TestDataFrameRawDataMultipleMetrics() {
 	assert.Equal(suite.T(), 1, seriesCount, "series count didn't match expected")
 }
 
+func (suite *testQuerySuite) TestVariantTypeQueryWithDataFrame() {
+	adapter, err := tsdb.NewV3ioAdapter(suite.v3ioConfig, nil, nil)
+	if err != nil {
+		suite.T().Fatalf("failed to create v3io adapter. reason: %s", err)
+	}
+
+	metricName := "log"
+	labels := utils.LabelsFromStringList("os", "linux", "__name__", metricName)
+
+	dataToIngest := []string{"a", "b", "c", "d", "e"}
+	numberOfEvents := len(dataToIngest)
+	eventsInterval := int64(tsdbtest.MinuteInMillis)
+	baseTime := tsdbtest.NanosToMillis(time.Now().UnixNano()) - int64(numberOfEvents)*eventsInterval
+	var expectedTimeColumn []int64
+	for i := 0; i < numberOfEvents; i++ {
+		expectedTimeColumn = append(expectedTimeColumn, baseTime+int64(i)*tsdbtest.MinuteInMillis)
+	}
+
+	appender, err := adapter.Appender()
+	if err != nil {
+		suite.T().Fatalf("failed to create v3io appender. reason: %s", err)
+	}
+
+	ref, err := appender.Add(labels, expectedTimeColumn[0], dataToIngest[0])
+	if err != nil {
+		suite.T().Fatalf("Failed to add data to the TSDB appender. Reason: %s", err)
+	}
+	for i := 1; i < numberOfEvents; i++ {
+		appender.AddFast(labels, ref, expectedTimeColumn[i], dataToIngest[i])
+	}
+
+	if _, err := appender.WaitForCompletion(0); err != nil {
+		suite.T().Fatalf("Failed to wait for TSDB append completion. Reason: %s", err)
+	}
+
+	querierV2, err := adapter.QuerierV2(nil)
+	if err != nil {
+		suite.T().Fatalf("Failed to create querier v2, err: %v", err)
+	}
+
+	params := &pquerier.SelectParams{RequestedColumns: []pquerier.RequestedColumn{{Metric: metricName}},
+		From: baseTime - tsdbtest.DaysInMillis, To: baseTime + tsdbtest.DaysInMillis}
+	iter, err := querierV2.SelectDataFrame(params)
+	if err != nil {
+		suite.T().Fatalf("Failed to exeute query, err: %v", err)
+	}
+	var seriesCount int
+	for iter.NextFrame() {
+		seriesCount++
+		frame := iter.GetFrame()
+		in := frame.Index()
+		cols := frame.Columns()
+
+		for i := 0; i < frame.Index().Len(); i++ {
+			t, _ := in.TimeAt(i)
+			assert.Equal(suite.T(), expectedTimeColumn[i], t, "time column does not match at index %v", i)
+			for _, column := range cols {
+				v, _ := column.StringAt(i)
+
+				expected := dataToIngest[i]
+
+				assert.Equal(suite.T(), expected, v, "column %v does not match at index %v", column.Name(), i)
+			}
+		}
+	}
+
+	assert.Equal(suite.T(), 1, seriesCount, "series count didn't match expected")
+}
+
+func (suite *testQuerySuite) TestVariantTypeQueryWithSeries() {
+	adapter, err := tsdb.NewV3ioAdapter(suite.v3ioConfig, nil, nil)
+	if err != nil {
+		suite.T().Fatalf("failed to create v3io adapter. reason: %s", err)
+	}
+
+	metricName := "log"
+	labels := utils.LabelsFromStringList("os", "linux", "__name__", metricName)
+
+	dataToIngest := []string{"a", "b", "c", "d", "e"}
+	numberOfEvents := len(dataToIngest)
+	eventsInterval := int64(tsdbtest.MinuteInMillis)
+	baseTime := tsdbtest.NanosToMillis(time.Now().UnixNano()) - int64(numberOfEvents)*eventsInterval
+	var expectedTimeColumn []int64
+	for i := 0; i < numberOfEvents; i++ {
+		expectedTimeColumn = append(expectedTimeColumn, baseTime+int64(i)*tsdbtest.MinuteInMillis)
+	}
+
+	appender, err := adapter.Appender()
+	if err != nil {
+		suite.T().Fatalf("failed to create v3io appender. reason: %s", err)
+	}
+
+	ref, err := appender.Add(labels, expectedTimeColumn[0], dataToIngest[0])
+	if err != nil {
+		suite.T().Fatalf("Failed to add data to the TSDB appender. Reason: %s", err)
+	}
+	for i := 1; i < numberOfEvents; i++ {
+		appender.AddFast(labels, ref, expectedTimeColumn[i], dataToIngest[i])
+	}
+
+	if _, err := appender.WaitForCompletion(0); err != nil {
+		suite.T().Fatalf("Failed to wait for TSDB append completion. Reason: %s", err)
+	}
+
+	querierV2, err := adapter.QuerierV2(nil)
+	if err != nil {
+		suite.T().Fatalf("Failed to create querier v2, err: %v", err)
+	}
+
+	params := &pquerier.SelectParams{RequestedColumns: []pquerier.RequestedColumn{{Metric: metricName}},
+		From: baseTime - tsdbtest.DaysInMillis, To: baseTime + tsdbtest.DaysInMillis}
+	iter, err := querierV2.Select(params)
+	if err != nil {
+		suite.T().Fatalf("Failed to exeute query, err: %v", err)
+	}
+	var seriesCount int
+	for iter.Next() {
+		seriesCount++
+		iter := iter.At().Iterator()
+		var i int
+		for iter.Next() {
+			t, v := iter.AtString()
+			assert.Equal(suite.T(), expectedTimeColumn[i], t, "time does not match at index %v", i)
+			assert.Equal(suite.T(), dataToIngest[i], v, "value does not match at index %v", i)
+			i++
+		}
+	}
+
+	assert.Equal(suite.T(), 1, seriesCount, "series count didn't match expected")
+}
+
 func (suite *testQuerySuite) toMillis(date string) int64 {
 	t, err := time.Parse(time.RFC3339, date)
 	if err != nil {

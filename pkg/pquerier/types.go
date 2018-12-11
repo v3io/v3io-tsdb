@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/v3io/v3io-tsdb/pkg/aggregate"
+	"github.com/v3io/v3io-tsdb/pkg/chunkenc"
 )
 
 // data and metadata passed to the query processor workers via a channel
@@ -12,7 +13,7 @@ type qryResults struct {
 	query    *partQuery
 	name     string
 	fields   map[string]interface{}
-	encoding int16
+	encoding chunkenc.Encoding
 }
 
 func (q *qryResults) IsRawQuery() bool { return q.frame.isRawSeries }

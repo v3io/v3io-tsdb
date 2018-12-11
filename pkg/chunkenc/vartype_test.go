@@ -2,10 +2,11 @@ package chunkenc
 
 import (
 	"fmt"
-	"github.com/nuclio/zap"
-	"github.com/stretchr/testify/suite"
 	"testing"
 	"time"
+
+	"github.com/nuclio/zap"
+	"github.com/stretchr/testify/suite"
 )
 
 type testVarEncoderSuite struct {
@@ -17,7 +18,7 @@ func (suite *testVarEncoderSuite) TestStringEnc() {
 	logger, err := nucliozap.NewNuclioZapTest("test")
 	suite.Require().Nil(err)
 
-	chunk := NewVarChunk(logger)
+	chunk := newVarChunk(logger)
 	appender, err := chunk.Appender()
 	suite.Require().Nil(err)
 

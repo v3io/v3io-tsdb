@@ -56,9 +56,9 @@ package chunkenc
 import (
 	"math"
 	"math/bits"
+	"strconv"
 
 	"github.com/nuclio/logger"
-	"strconv"
 )
 
 // XORChunk holds XOR encoded sample data.
@@ -160,6 +160,10 @@ type xorAppender struct {
 
 	leading  uint8
 	trailing uint8
+}
+
+func (a *xorAppender) Encoding() Encoding {
+	return a.Chunk().Encoding()
 }
 
 func (a *xorAppender) Chunk() Chunk {

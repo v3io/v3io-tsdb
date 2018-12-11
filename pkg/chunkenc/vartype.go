@@ -23,9 +23,10 @@ package chunkenc
 import (
 	"encoding/binary"
 	"fmt"
-	"github.com/nuclio/logger"
 	"math"
 	"strconv"
+
+	"github.com/nuclio/logger"
 )
 
 const (
@@ -96,6 +97,10 @@ type varAppender struct {
 	c       *VarChunk
 	samples *uint16
 	t       int64
+}
+
+func (a *varAppender) Encoding() Encoding {
+	return a.Chunk().Encoding()
 }
 
 func (a *varAppender) Chunk() Chunk {

@@ -385,7 +385,9 @@ func (cs *chunkStore) writeChunks(mc *MetricsCache, metric *MetricState) (hasPen
 			// Initialize aggregate arrays
 			lblexpr = lblexpr + cs.aggrList.InitExpr("v", numBuckets)
 
-			expr = lblexpr + fmt.Sprintf("%v='%s'; ", config.LabelSetAttrName, metric.key) + expr
+			encodingExpr := fmt.Sprintf("%v='%d'; ", config.EncodingAttrName, activeChunk.appender.Encoding())
+			lsetExpr := fmt.Sprintf("%v='%s'; ", config.LabelSetAttrName, metric.key)
+			expr = lblexpr + encodingExpr + lsetExpr + expr
 		}
 
 		// Call the V3IO async UpdateItem method
