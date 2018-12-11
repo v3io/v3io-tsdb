@@ -378,8 +378,8 @@ spec:
                     while( true ) {
                         success.each { project, status ->
                             if (!status) {
-                                RELEASE_SUCCESS = sh(
-                                        script: "curl --silent -H \"Content-Type: application/json\" -H \"Authorization: token ${GIT_TOKEN}\" -X GET https://api.github.com/repos/${git_project_user}/${project}/releases/tags/v${next_versions[project]} | python -c 'import json,sys;obj=json.load(sys.stdin);print obj[\"prerelease\"]' | if grep -iq false; then echo 'prerelease'; else echo 'release'; fi",
+                                def RELEASE_SUCCESS = sh(
+                                        script: "curl --silent -H \"Content-Type: application/json\" -H \"Authorization: token ${GIT_TOKEN}\" -X GET https://api.github.com/repos/${git_project_user}/${project}/releases/tags/v${next_versions[project]} > ${project}.result; cat ${project}.result | python -c 'import json,sys;obj=json.load(sys.stdin);print obj[\"prerelease\"]' | if grep -iq false; then echo 'release'; else echo 'prerelease'; fi",
                                         returnStdout: true
                                 ).trim()
 
@@ -388,6 +388,8 @@ spec:
                                     success.putAt(project, true)
                                     success_count++
                                 }
+
+                                sh "cat ${project}.result"
                             }
                         }
                         if(success_count >= 3) {
