@@ -325,7 +325,8 @@ func (d *dataFrame) TimeSeries(i int) (utils.Series, error) {
 			d.metricToCountColumn[currentColumn.GetColumnSpec().metric],
 			d.Labels(),
 			d.hash,
-			d.showAggregateLabel), nil
+			d.showAggregateLabel,
+			d.encoding), nil
 	}
 }
 

@@ -1,5 +1,7 @@
 package utils
 
+import "github.com/v3io/v3io-tsdb/pkg/chunkenc"
+
 // SeriesSet contains a set of series.
 type SeriesSet interface {
 	Next() bool
@@ -39,6 +41,8 @@ type SeriesIterator interface {
 	Next() bool
 	// Err returns the current error.
 	Err() error
+	// Encoding returns the encoding of the data. according to the encoding you will call the appropriate At method
+	Encoding() chunkenc.Encoding
 }
 
 // Null-series iterator
@@ -51,3 +55,4 @@ func (s NullSeriesIterator) Next() bool                    { return false }
 func (s NullSeriesIterator) At() (t int64, v float64)      { return 0, 0 }
 func (s NullSeriesIterator) AtString() (t int64, v string) { return 0, "" }
 func (s NullSeriesIterator) Err() error                    { return s.err }
+func (s NullSeriesIterator) Encoding() chunkenc.Encoding   { return chunkenc.EncNone }

@@ -224,6 +224,8 @@ func (it *v3ioSeriesIterator) AtString() (t int64, v string) { return it.iter.At
 
 func (it *v3ioSeriesIterator) Err() error { return it.iter.Err() }
 
+func (it *v3ioSeriesIterator) Encoding() chunkenc.Encoding { return chunkenc.EncXOR }
+
 // Aggregates (count, avg, sum, ..) series and iterator
 
 func NewAggrSeries(set *V3ioSeriesSet, aggr aggregate.AggrType) *V3ioSeries {
@@ -296,5 +298,7 @@ func (s *aggrSeriesIterator) At() (t int64, v float64) {
 }
 
 func (s *aggrSeriesIterator) AtString() (t int64, v string) { return 0, "" }
+
+func (s *aggrSeriesIterator) Encoding() chunkenc.Encoding { return chunkenc.EncXOR }
 
 func (s *aggrSeriesIterator) Err() error { return s.err }

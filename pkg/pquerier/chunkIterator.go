@@ -144,6 +144,8 @@ func (it *rawChunkIterator) AtString() (t int64, v string) { return it.iter.AtSt
 
 func (it *rawChunkIterator) Err() error { return it.iter.Err() }
 
+func (it *rawChunkIterator) Encoding() chunkenc.Encoding { return it.encoding }
+
 func (it *rawChunkIterator) AddChunks(item *qryResults) {
 	var chunks []chunkenc.Chunk
 	var chunksMax []int64
