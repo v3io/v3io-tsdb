@@ -1,5 +1,7 @@
 label = "${UUID.randomUUID().toString()}"
 BUILD_FOLDER = "/go"
+expired=240
+attempts=15
 git_project = "v3io-tsdb"
 git_project_user = "gkirok"
 git_deploy_user = "iguazio-dev-git-user"
@@ -209,7 +211,7 @@ spec:
         }
     }
 
-    if ( MAIN_TAG_VERSION != null && MAIN_TAG_VERSION.length() > 0 && PUBLISHED_BEFORE < 240 ) {
+    if ( MAIN_TAG_VERSION != null && MAIN_TAG_VERSION.length() > 0 && PUBLISHED_BEFORE < expired ) {
         parallel(
             'tsdb-nuclio': {
                 podTemplate(label: "v3io-tsdb-nuclio-${label}", inheritFrom: "${git_project}-${label}") {
@@ -358,7 +360,7 @@ spec:
         )
     } else {
         stage('warning') {
-            if (PUBLISHED_BEFORE >= 240) {
+            if (PUBLISHED_BEFORE >= expired) {
                 echo "Tag too old, published before $PUBLISHED_BEFORE minutes."
             } else {
                 echo "${TAG_VERSION} is not release tag."
@@ -415,7 +417,7 @@ spec:
                             break
                         }
 
-                        if(done_count >= tasks_list.size() || i++ > 10) {
+                        if(done_count >= tasks_list.size() || i++ > attempts) {
                             def failed = []
                             def notcompleted = []
                             def error_string = ''
