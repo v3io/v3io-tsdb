@@ -387,6 +387,7 @@ spec:
                                 echo "RELEASE_SUCCESS --- ${RELEASE_SUCCESS} ---"
                                 if (RELEASE_SUCCESS != null && RELEASE_SUCCESS == 'release') {
                                     tasks_list.putAt(project, true)
+                                    done_count++
                                     success_count++
                                 } else {
                                     def TAG_SHA = sh(
@@ -401,6 +402,7 @@ spec:
                                         ).trim()
                                         if (COMMIT_STATUS != null && COMMIT_STATUS == 'error') {
                                             tasks_list.putAt(project, false)
+                                            done_count++
                                         }
                                     }
                                 }
@@ -416,6 +418,7 @@ spec:
                         if(done_count >= tasks_list.size() || i++ > 10) {
                             def failed = []
                             def notcompleted = []
+                            def error_string = ''
                             tasks_list.each { project, status ->
                                 if(status == null) {
                                     notcompleted += project
@@ -424,10 +427,10 @@ spec:
                                 }
                             }
                             if(failed.size()) {
-                                error(failed.join(',') + ' have been failed :_(')
+                                error_string += failed.join(',') + ' have been failed :_(. '
                             }
                             if(notcompleted.size()) {
-                                error(notcompleted.join(',') + ' have been not completed :(')
+                                error(notcompleted.join(',') + ' have been not completed :(. ')
                             }
                             break
                         }
