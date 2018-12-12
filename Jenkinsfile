@@ -377,8 +377,11 @@ spec:
                     i = 0
                     def tasks_list = ['demos':null, 'prometheus':null, 'tsdb-nuclio':null]
                     def success_count = 0
+
                     while( true ) {
                         def done_count = 0
+
+                        echo "attempt #${i}"
                         tasks_list.each { project, status ->
                             if (status == null) {
                                 def RELEASE_SUCCESS = sh(
