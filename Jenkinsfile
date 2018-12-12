@@ -1,5 +1,7 @@
 label = "${UUID.randomUUID().toString()}"
 BUILD_FOLDER = "/go"
+expired=240
+attempts=15
 git_project = "v3io-tsdb"
 git_project_user = "v3io"
 git_deploy_user = "iguazio-prod-git-user"
@@ -209,13 +211,13 @@ spec:
         }
     }
 
-    if ( MAIN_TAG_VERSION != null && MAIN_TAG_VERSION.length() > 0 && PUBLISHED_BEFORE < 240 ) {
+    if ( MAIN_TAG_VERSION != null && MAIN_TAG_VERSION.length() > 0 && PUBLISHED_BEFORE < expired ) {
         parallel(
             'tsdb-nuclio': {
                 podTemplate(label: "v3io-tsdb-nuclio-${label}", inheritFrom: "${git_project}-${label}") {
                     node("v3io-tsdb-nuclio-${label}") {
                         withCredentials([
-                            string(credentialsId: git_deploy_user_token, variable: 'GIT_TOKEN')
+                                string(credentialsId: git_deploy_user_token, variable: 'GIT_TOKEN')
                         ]) {
                             def TAG_VERSION
                             def NEXT_VERSION
@@ -236,7 +238,7 @@ spec:
                                             curl -H "Authorization: bearer ${GIT_TOKEN}" -X POST -d '{"query": "query { repository(owner: \\"${git_project_user}\\", name: \\"tsdb-nuclio\\") { refs(refPrefix: \\"refs/tags/\\", first: 1, orderBy: { field: ALPHABETICAL, direction: DESC }) { nodes { name } } } }" }' https://api.github.com/graphql > ~/last_tag;
                                             cat ~/last_tag | python -c 'import json,sys;obj=json.load(sys.stdin);print obj["data"]["repository"]["refs"]["nodes"][0]["name"]' | sed "s/v//" > ~/tmp_tag
                                             cat ~/tmp_tag | awk -F. -v OFS=. 'NF==1{print ++\$NF}; NF>1{if(length(\$NF+1)>length(\$NF))\$(NF-1)++; \$NF=sprintf("%0*d", length(\$NF), (\$NF+1)%(10^length(\$NF))); print}' > ~/next_version
-                                          """
+                                        """
                                         NEXT_VERSION = sh(
                                                 script: "cat ~/next_version",
                                                 returnStdout: true
@@ -264,7 +266,7 @@ spec:
                 podTemplate(label: "demos-${label}", inheritFrom: "${git_project}-${label}") {
                     node("demos-${label}") {
                         withCredentials([
-                            string(credentialsId: git_deploy_user_token, variable: 'GIT_TOKEN')
+                                string(credentialsId: git_deploy_user_token, variable: 'GIT_TOKEN')
                         ]) {
                             def TAG_VERSION
                             def NEXT_VERSION
@@ -358,7 +360,7 @@ spec:
         )
     } else {
         stage('warning') {
-            if (PUBLISHED_BEFORE >= 240) {
+            if (PUBLISHED_BEFORE >= expired) {
                 echo "Tag too old, published before $PUBLISHED_BEFORE minutes."
             } else {
                 echo "${TAG_VERSION} is not release tag."
@@ -369,7 +371,7 @@ spec:
     node("${git_project}-${label}") {
         withCredentials([
                 string(credentialsId: git_deploy_user_token, variable: 'GIT_TOKEN')
-            ]) {
+        ]) {
             stage('waiting for prereleases moved to releases') {
                 container('jnlp') {
                     i = 0
@@ -415,7 +417,7 @@ spec:
                             break
                         }
 
-                        if(done_count >= tasks_list.size() || i++ > 10) {
+                        if(done_count >= tasks_list.size() || i++ > attempts) {
                             def failed = []
                             def notcompleted = []
                             def error_string = ''
