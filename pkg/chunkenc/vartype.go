@@ -61,14 +61,14 @@ type VarChunk struct {
 	offset  int
 }
 
-// NewVarChunk returns a new chunk with variant encoding of the given size.
+// NewVarChunk returns a new chunk with variant encoding.
 func newVarChunk(logger logger.Logger) Chunk {
 	return &VarChunk{logger: logger, b: make([]byte, 0, 1024)}
 }
 
 // Encoding returns the encoding type.
 func (c *VarChunk) Encoding() Encoding {
-	return EncVar
+	return EncVariant
 }
 
 // Bytes returns the underlying byte slice of the chunk.
@@ -100,7 +100,7 @@ type varAppender struct {
 }
 
 func (a *varAppender) Encoding() Encoding {
-	return a.Chunk().Encoding()
+	return a.c.Encoding()
 }
 
 func (a *varAppender) Chunk() Chunk {
@@ -135,7 +135,7 @@ func (a *varAppender) Append(t int64, v interface{}) {
 		a.appendWithValue(t, varTypeString, val)
 
 	default:
-		a.logger.Error("unsupported type %T!\n", vType)
+		a.logger.Error("unsupported type %v of value %v\n", vType, v)
 	}
 
 }

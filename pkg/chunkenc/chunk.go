@@ -43,7 +43,7 @@ func (e Encoding) String() string {
 		return "none"
 	case EncXOR:
 		return "XOR"
-	case EncVar:
+	case EncVariant:
 		return "Variant"
 	}
 	return "<unknown>"
@@ -51,9 +51,9 @@ func (e Encoding) String() string {
 
 // Available chunk encodings
 const (
-	EncNone Encoding = 0
-	EncXOR  Encoding = 1
-	EncVar  Encoding = 2
+	EncNone    Encoding = 0
+	EncXOR     Encoding = 1
+	EncVariant Encoding = 2
 )
 
 // Chunk holds a sequence of sample pairs that can be iterated over and appended to.
@@ -77,7 +77,7 @@ func FromData(logger logger.Logger, e Encoding, d []byte, samples uint16) (Chunk
 	switch e {
 	case EncXOR:
 		return &XORChunk{logger: logger, b: &bstream{count: 0, stream: d}, samples: samples}, nil
-	case EncVar:
+	case EncVariant:
 		return &VarChunk{logger: logger, b: d, samples: samples}, nil
 	}
 	return nil, fmt.Errorf("Unknown chunk encoding: %d", e)

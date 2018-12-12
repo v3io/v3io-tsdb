@@ -22,7 +22,6 @@ func (f textFormatter) Write(out io.Writer, set utils.SeriesSet) error {
 		fmt.Fprintf(out, "Name: %s  Labels: %s\n", name, lbls)
 		iter := series.Iterator()
 		for iter.Next() {
-
 			if iter.Encoding() == chunkenc.EncXOR {
 				t, v := iter.At()
 				fmt.Fprintf(out, "  %s  v=%.2f\n", f.timeString(t), v)
@@ -30,7 +29,6 @@ func (f textFormatter) Write(out io.Writer, set utils.SeriesSet) error {
 				t, v := iter.AtString()
 				fmt.Fprintf(out, "  %s  v=%v\n", f.timeString(t), v)
 			}
-
 		}
 
 		if iter.Err() != nil {

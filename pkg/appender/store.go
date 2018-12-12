@@ -223,7 +223,7 @@ func (cs *chunkStore) Append(t int64, v interface{}) {
 }
 
 // Return current, previous, or create new  chunk based on sample time
-func (cs *chunkStore) chunkByTime(t int64, isVar bool) *attrAppender {
+func (cs *chunkStore) chunkByTime(t int64, isVariantEncoding bool) *attrAppender {
 
 	// Sample is in the current chunk
 	cur := cs.chunks[cs.curChunk]
@@ -237,7 +237,7 @@ func (cs *chunkStore) chunkByTime(t int64, isVar bool) *attrAppender {
 		part := cur.partition
 		cur = cs.chunks[cs.curChunk^1]
 
-		chunk := chunkenc.NewChunk(cs.logger, isVar) // TODO: init based on schema, use init function
+		chunk := chunkenc.NewChunk(cs.logger, isVariantEncoding) // TODO: init based on schema, use init function
 		app, err := chunk.Appender()
 		if err != nil {
 			return nil

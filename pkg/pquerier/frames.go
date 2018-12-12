@@ -369,7 +369,7 @@ func (d *dataFrame) rawSeriesToColumns() {
 			var v interface{}
 			var t int64
 
-			if d.encoding == chunkenc.EncVar {
+			if d.encoding == chunkenc.EncVariant {
 				t, v = iter.AtString()
 			} else {
 				t, v = iter.At()

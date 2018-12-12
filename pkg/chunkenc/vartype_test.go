@@ -29,10 +29,9 @@ func (suite *testVarEncoderSuite) TestStringEnc() {
 		t := t0 + int64(i*1000)
 		appender.Append(t, s)
 		b := chunk.Bytes()
-		fmt.Println(t, s, len(b))
 	}
 
-	iterChunk, err := FromData(logger, EncVar, chunk.Bytes(), 0)
+	iterChunk, err := FromData(logger, EncVariant, chunk.Bytes(), 0)
 	suite.Require().Nil(err)
 
 	iter := iterChunk.Iterator()
