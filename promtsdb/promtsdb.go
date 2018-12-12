@@ -3,6 +3,8 @@ package promtsdb
 import (
 	"context"
 	"fmt"
+	"strings"
+
 	"github.com/nuclio/logger"
 	"github.com/pkg/errors"
 	"github.com/prometheus/prometheus/pkg/labels"
@@ -11,10 +13,9 @@ import (
 	"github.com/v3io/v3io-tsdb/pkg/aggregate"
 	"github.com/v3io/v3io-tsdb/pkg/appender"
 	"github.com/v3io/v3io-tsdb/pkg/config"
-	"github.com/v3io/v3io-tsdb/pkg/querier"
+	"github.com/v3io/v3io-tsdb/pkg/pquerier"
 	"github.com/v3io/v3io-tsdb/pkg/tsdb"
 	"github.com/v3io/v3io-tsdb/pkg/utils"
-	"strings"
 )
 
 type V3ioPromAdapter struct {
@@ -56,20 +57,31 @@ func (a *V3ioPromAdapter) Close() error {
 }
 
 func (a *V3ioPromAdapter) Querier(_ context.Context, mint, maxt int64) (storage.Querier, error) {
-	v3ioQuerier, err := a.db.Querier(nil, mint, maxt)
-	promQuerier := V3ioPromQuerier{v3ioQuerier: v3ioQuerier, logger: a.logger.GetChild("v3io-prom-query")}
+	v3ioQuerier, err := a.db.QuerierV2(nil)
+	promQuerier := V3ioPromQuerier{v3ioQuerier: v3ioQuerier, logger: a.logger.GetChild("v3io-prom-query"), mint: mint, maxt: maxt}
 	return &promQuerier, err
 }
 
 type V3ioPromQuerier struct {
-	v3ioQuerier *querier.V3ioQuerier
+	v3ioQuerier *pquerier.V3ioQuerier
 	logger      logger.Logger
+	mint, maxt  int64
 }
 
 // Select returns a set of series that matches the given label matchers.
 func (promQuery *V3ioPromQuerier) Select(params *storage.SelectParams, oms ...*labels.Matcher) (storage.SeriesSet, error) {
 	name, filter, functions := match2filter(oms, promQuery.logger)
 	noAggr := false
+
+	// if a nil params is passed we assume it's a metadata query, so we fetch only the different labelsets withtout data.
+	if params == nil {
+		labelSets, err := promQuery.v3ioQuerier.GetLabelSets(name)
+		if err != nil {
+			return nil, err
+		}
+
+		return &V3ioPromSeriesSet{newMetadataSeriesSet(labelSets)}, nil
+	}
 
 	promQuery.logger.Debug("SelectParams: %+v", params)
 
@@ -85,7 +97,15 @@ func (promQuery *V3ioPromQuerier) Select(params *storage.SelectParams, oms ...*l
 			}
 		}
 	}
-	set, err := promQuery.v3ioQuerier.SelectProm(name, functions, params.Step, filter, noAggr)
+
+	selectParams := &pquerier.SelectParams{Name: name,
+		Functions: functions,
+		Step:      params.Step,
+		Filter:    filter,
+		From:      promQuery.mint,
+		To:        promQuery.maxt}
+
+	set, err := promQuery.v3ioQuerier.SelectProm(selectParams, noAggr)
 	return &V3ioPromSeriesSet{s: set}, err
 }
 
@@ -129,7 +149,7 @@ func match2filter(oms []*labels.Matcher, logger logger.Logger) (string, string, 
 }
 
 type V3ioPromSeriesSet struct {
-	s querier.SeriesSet
+	s utils.SeriesSet
 }
 
 func (s *V3ioPromSeriesSet) Next() bool { return s.s.Next() }
@@ -141,7 +161,7 @@ func (s *V3ioPromSeriesSet) At() storage.Series {
 
 // Series represents a single time series.
 type V3ioPromSeries struct {
-	s querier.Series
+	s utils.Series
 }
 
 // Labels returns the complete set of labels identifying the series.
@@ -161,7 +181,7 @@ func (s *V3ioPromSeries) Iterator() storage.SeriesIterator {
 
 // SeriesIterator iterates over the data of a time series.
 type V3ioPromSeriesIterator struct {
-	s querier.SeriesIterator
+	s utils.SeriesIterator
 }
 
 // Seek advances the iterator forward to the given timestamp.
@@ -229,3 +249,32 @@ func (l Labels) GetExpr() string {
 
 	return lblexpr
 }
+
+func newMetadataSeriesSet(labels []utils.Labels) utils.SeriesSet {
+	return &metadataSeriesSet{labels: labels, currentIndex: -1, size: len(labels)}
+}
+
+type metadataSeriesSet struct {
+	labels       []utils.Labels
+	currentIndex int
+	size         int
+}
+
+func (ss *metadataSeriesSet) Next() bool {
+	ss.currentIndex++
+	return ss.currentIndex < ss.size
+}
+func (ss *metadataSeriesSet) At() utils.Series {
+	return &metadataSeries{labels: ss.labels[ss.currentIndex]}
+}
+func (ss *metadataSeriesSet) Err() error {
+	return nil
+}
+
+type metadataSeries struct {
+	labels utils.Labels
+}
+
+func (s *metadataSeries) Labels() utils.Labels           { return s.labels }
+func (s *metadataSeries) Iterator() utils.SeriesIterator { return utils.NullSeriesIterator{} }
+func (s *metadataSeries) GetKey() uint64                 { return s.labels.Hash() }

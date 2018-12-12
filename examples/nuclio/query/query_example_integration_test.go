@@ -4,18 +4,18 @@ package query
 
 import (
 	"fmt"
-	"github.com/nuclio/nuclio-test-go"
-	"github.com/v3io/v3io-tsdb/pkg/tsdb/tsdbtest"
 	"os"
 	"testing"
+
+	"github.com/nuclio/nuclio-test-go"
+	"github.com/v3io/v3io-tsdb/pkg/tsdb/tsdbtest"
 )
 
 func TestQueryIntegration(t *testing.T) {
-	v3ioConfig, err := tsdbtest.LoadV3ioConfig()
-	if err != nil {
-		t.Fatalf("unable to load configuration. Error: %v", err)
-	}
-	defer tsdbtest.SetUp(t, v3ioConfig)()
+	testParams := tsdbtest.NewTestParams(t)
+	defer tsdbtest.SetUp(t, testParams)()
+
+	v3ioConfig := testParams.V3ioConfig()
 	tsdbConfig = fmt.Sprintf(`path: "%v"`, v3ioConfig.TablePath)
 
 	url := os.Getenv("V3IO_SERVICE_URL")

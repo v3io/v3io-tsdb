@@ -243,7 +243,6 @@ spec:
                                         ).trim()
 
                                         echo "$NEXT_VERSION"
-
                                         next_versions.putAt('tsdb-nuclio', NEXT_VERSION)
                                     }
                                 }
@@ -260,6 +259,7 @@ spec:
                     }
                 }
             },
+
             'demos': {
                 podTemplate(label: "demos-${label}", inheritFrom: "${git_project}-${label}") {
                     node("demos-${label}") {
@@ -384,7 +384,7 @@ spec:
                                         returnStdout: true
                                 ).trim()
 
-                                echo "RELEASE_SUCCESS --- ${RELEASE_SUCCESS} ---"
+                                echo "${RELEASE_SUCCESS}"
                                 if (RELEASE_SUCCESS != null && RELEASE_SUCCESS == 'release') {
                                     tasks_list.putAt(project, true)
                                     done_count++
@@ -430,8 +430,9 @@ spec:
                                 error_string += failed.join(',') + ' have been failed :_(. '
                             }
                             if(notcompleted.size()) {
-                                error(notcompleted.join(',') + ' have been not completed :(. ')
+                                error_string += notcompleted.join(',') + ' have been not completed :(. '
                             }
+                            error(error_string)
                             break
                         }
 
