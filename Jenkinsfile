@@ -384,7 +384,7 @@ spec:
                                         returnStdout: true
                                 ).trim()
 
-                                echo "${RELEASE_SUCCESS}"
+                                echo "${project} is ${RELEASE_SUCCESS}"
                                 if (RELEASE_SUCCESS != null && RELEASE_SUCCESS == 'release') {
                                     tasks_list.putAt(project, true)
                                     done_count++
@@ -397,7 +397,7 @@ spec:
 
                                     if(TAG_SHA != null) {
                                         def COMMIT_STATUS = sh(
-                                                script: "curl --silent -H \"Content-Type: application/json\" -H \"Authorization: token ${GIT_TOKEN}\" -X GET https://api.github.com/repos/gkirok/tsdb-nuclio/commits/${TAG_SHA}/statuses | python -c 'import json,sys;obj=json.load(sys.stdin);print obj[0][\"state\"]' | if grep -iq error; then echo 'error'; else echo 'ok'; fi",
+                                                script: "curl --silent -H \"Content-Type: application/json\" -H \"Authorization: token ${GIT_TOKEN}\" -X GET https://api.github.com/repos/${git_project_user}/${project}/commits/${TAG_SHA}/statuses | python -c 'import json,sys;obj=json.load(sys.stdin);print obj[0][\"state\"]' | if grep -iq error; then echo 'error'; else echo 'ok'; fi",
                                                 returnStdout: true
                                         ).trim()
                                         if (COMMIT_STATUS != null && COMMIT_STATUS == 'error') {
