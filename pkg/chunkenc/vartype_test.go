@@ -1,3 +1,5 @@
+// +build unit
+
 package chunkenc
 
 import (
@@ -28,7 +30,6 @@ func (suite *testVarEncoderSuite) TestStringEnc() {
 	for i, s := range list {
 		t := t0 + int64(i*1000)
 		appender.Append(t, s)
-		b := chunk.Bytes()
 	}
 
 	iterChunk, err := FromData(logger, EncVariant, chunk.Bytes(), 0)
