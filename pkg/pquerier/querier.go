@@ -116,7 +116,7 @@ func (q *V3ioQuerier) baseSelectQry(params *SelectParams, showAggregateLabel boo
 	}
 
 	selectContext := selectQueryContext{
-		mint: params.From, maxt: params.To, step: params.Step, filter: params.Filter,
+		step: params.Step, filter: params.Filter,
 		container: q.container, logger: q.logger, workers: q.cfg.QryWorkers,
 		disableAllAggr: params.disableAllAggr, disableClientAggr: params.disableClientAggr,
 		showAggregateLabel: showAggregateLabel,
@@ -134,6 +134,14 @@ func (q *V3ioQuerier) baseSelectQry(params *SelectParams, showAggregateLabel boo
 		parts := q.partitionMngr.PartsForRange(params.From, params.To, true)
 		if len(parts) == 0 {
 			return
+		}
+
+		minExistingTime, maxExistingTime := parts[0].GetStartTime(), parts[len(parts)-1].GetEndTime()
+		if params.From < minExistingTime {
+			params.From = minExistingTime
+		}
+		if params.To > maxExistingTime {
+			params.To = maxExistingTime
 		}
 
 		iter, err = selectContext.start(parts, params)

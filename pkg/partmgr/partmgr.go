@@ -136,7 +136,7 @@ func (p *PartitionManager) TimeToPart(t int64) (*DBPartition, error) {
 		} else {
 			// Iterate backwards; ignore the last element as it's the head partition
 			for i := len(p.partitions) - 2; i >= 0; i-- {
-				if t > p.partitions[i].startTime {
+				if t >= p.partitions[i].startTime {
 					return p.partitions[i], nil
 				}
 			}
