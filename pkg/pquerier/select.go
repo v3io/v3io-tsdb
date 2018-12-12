@@ -235,12 +235,18 @@ func (queryCtx *selectQueryContext) processQueryResults(query *partQuery) error 
 		}
 
 		// read chunk encoding type
-		intEncoding, err := strconv.Atoi(query.GetField(config.EncodingAttrName).(string))
 		var encoding chunkenc.Encoding
-		if err != nil {
+		encodingStr, ok := query.GetField(config.EncodingAttrName).(string)
+		// If we don't have the encoding attribute, use XOR as default. (for backwards compatibility)
+		if !ok {
 			encoding = chunkenc.EncXOR
 		} else {
-			encoding = chunkenc.Encoding(intEncoding)
+			intEncoding, err := strconv.Atoi(encodingStr)
+			if err != nil {
+				return fmt.Errorf("error parsing encoding type of chunk, got: %v, error: %v", encodingStr, err)
+			} else {
+				encoding = chunkenc.Encoding(intEncoding)
+			}
 		}
 
 		results := qryResults{name: name, encoding: encoding, query: query, fields: query.GetFields()}
