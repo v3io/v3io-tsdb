@@ -27,6 +27,7 @@ def build_v3io_tsdb(TAG_VERSION) {
         stage('build ${git_project} binaries in dood') {
             container('docker-cmd') {
                 sh """
+                    apk add --update make
                     cd ${BUILD_FOLDER}/src/github.com/v3io/${git_project}
                     # image_tag=go-${label}
                     # docker build . --tag \${image_tag} --build-arg TRAVIS_TAG='${TAG_VERSION}'
