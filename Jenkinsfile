@@ -50,12 +50,6 @@ def build_v3io_tsdb(TAG_VERSION) {
                 sh "curl -X POST -H \"Content-Type: application/data\" -H \"Authorization: token ${GIT_TOKEN}\" https://uploads.github.com/repos/${git_project_user}/v3io-tsdb/releases/${RELEASE_ID}/assets?name=tsdbctl-${TAG_VERSION}-windows-amd64 -F 'data=@/go/bin/tsdbctl-${TAG_VERSION}-windows-amd64'"
             }
         }
-
-        stage('update release status') {
-            container('jnlp') {
-                sh "release_id=\$(curl -H \"Content-Type: application/json\" -H \"Authorization: token ${GIT_TOKEN}\" -X GET https://api.github.com/repos/${git_project_user}/${git_project}/releases/tags/v${TAG_VERSION} | python -c 'import json,sys;obj=json.load(sys.stdin);print obj[\"id\"]'); curl -H \"Content-Type: application/json\" -H \"Authorization: token ${GIT_TOKEN}\" -X PATCH https://api.github.com/repos/${git_project_user}/${git_project}/releases/\${release_id} -d '{\"prerelease\": false}'"
-            }
-        }
     }
 }
 
@@ -449,7 +443,7 @@ spec:
             if (PUBLISHED_BEFORE >= expired) {
                 echo "Tag too old, published before $PUBLISHED_BEFORE minutes."
             } else {
-                echo "${TAG_VERSION} is not release tag."
+                echo "${MAIN_TAG_VERSION} is not release tag."
             }
         }
     }
@@ -529,6 +523,12 @@ spec:
 
                         sleep(60)
                     }
+                }
+            }
+
+            stage('update release status') {
+                container('jnlp') {
+                    sh "release_id=\$(curl -H \"Content-Type: application/json\" -H \"Authorization: token ${GIT_TOKEN}\" -X GET https://api.github.com/repos/${git_project_user}/${git_project}/releases/tags/v${MAIN_TAG_VERSION} | python -c 'import json,sys;obj=json.load(sys.stdin);print obj[\"id\"]'); curl -H \"Content-Type: application/json\" -H \"Authorization: token ${GIT_TOKEN}\" -X PATCH https://api.github.com/repos/${git_project_user}/${git_project}/releases/\${release_id} -d '{\"prerelease\": false}'"
                 }
             }
         }
