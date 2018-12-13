@@ -27,7 +27,6 @@ def build_v3io_tsdb(TAG_VERSION) {
         stage('build ${git_project} binaries in dood') {
             container('golang') {
                 sh """
-                    apk add --update make git
                     cd ${BUILD_FOLDER}/src/github.com/v3io/${git_project}
                     GOOS=linux GOARCH=amd64 make bin
                     GOOS=darwin GOARCH=amd64 make bin
@@ -208,6 +207,13 @@ spec:
       volumeMounts:
         - name: docker-sock
           mountPath: /var/run
+        - name: go-shared
+          mountPath: /go
+    - name: golang
+      image: golang:1.11
+      command: [ "/bin/sh", "-c", "--" ]
+      args: [ "while true; do sleep 30; done;" ]
+      volumeMounts:
         - name: go-shared
           mountPath: /go
   volumes:
