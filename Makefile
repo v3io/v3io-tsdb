@@ -2,7 +2,6 @@
 TOPLEVEL_DIRS=`ls -d ./*/. | grep -v '^./vendor/.$$' | sed 's/\.$$/.../'`
 TOPLEVEL_DIRS_GOFMT_SYNTAX=`ls -d ./*/. | grep -v '^./vendor/.$$'`
 TOPLEVEL_DIRS_IMPI_SYNTAX=`ls -d ./*/. | grep -v '^./vendor/.$$' | sed 's/$$/../'`
-TSDB_BUILD_COMMAND ?= CGO_ENABLED=0 go build $(BUILD_OPTS) ./cmd/tsdbctl
 
 GIT_COMMIT_HASH := $(shell git rev-parse HEAD)
 GIT_BRANCH=$(shell git rev-parse --abbrev-ref HEAD)
@@ -15,10 +14,6 @@ ifneq ($(TRAVIS_TAG),)
 else
 	GIT_REVISION := $(shell git describe --always)
 endif
-
-GOOS ?= $(shell go env GOOS)
-GOARCH ?= $(shell go env GOARCH)
-GOPATH ?= $(shell go env GOPATH)
 
 TSDBCTL_BIN_NAME := tsdbctl-$(GIT_REVISION)-$(GOOS)-$(GOARCH)
 
@@ -37,6 +32,8 @@ BUILD_OPTS := -ldflags " \
   -X $(CONFIG_PKG).commitHash=$(GIT_COMMIT_HASH) \
   -X $(CONFIG_PKG).branch=$(GIT_BRANCH)" \
  -v -o "$(GOPATH)/bin/$(TSDBCTL_BIN_NAME)"
+
+TSDB_BUILD_COMMAND ?= CGO_ENABLED=0 go build $(BUILD_OPTS) ./cmd/tsdbctl
 
 .PHONY: get
 get:
