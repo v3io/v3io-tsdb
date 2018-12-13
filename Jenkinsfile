@@ -7,6 +7,46 @@ git_project_user = "gkirok"
 git_deploy_user = "iguazio-dev-git-user"
 git_deploy_user_token = "iguazio-dev-git-user-token"
 
+def build_v3io_tsdb(TAG_VERSION) {
+    withCredentials([
+            usernamePassword(credentialsId: git_deploy_user, passwordVariable: 'GIT_PASSWORD', usernameVariable: 'GIT_USERNAME'),
+            string(credentialsId: git_deploy_user_token, variable: 'GIT_TOKEN')
+    ]) {
+        def git_project = 'v3io-tsdb'
+        stage('prepare sources') {
+            container('jnlp') {
+                sh """
+                    cd ${BUILD_FOLDER}
+                    git clone https://${GIT_USERNAME}:${GIT_PASSWORD}@github.com/${git_project_user}/${git_project}.git src/github.com/v3io/${git_project}
+                    cd ${BUILD_FOLDER}/src/github.com/v3io/${git_project}
+                """
+//                    git checkout ${V3IO_TSDB_VERSION}
+            }
+        }
+
+        stage('build ${git_project} binaries in dood') {
+            container('docker-cmd') {
+                sh """
+                    cd ${BUILD_FOLDER}/src/github.com/v3io/${git_project}
+                    # image_tag=go-${label}
+                    # docker build . --tag \${image_tag} --build-arg TRAVIS_TAG='${TAG_VERSION}'
+                    # container_id=\$(docker create \$image_tag)
+                    # docker cp \$container_id:/go/bin/tsdbctl-*-darwin-amd64 tsdbctl-70618fd-darwin-amd64
+                    GOOS=linux GOARCH=amd64 make build
+                    GOOS=darwin GOARCH=amd64 make build
+                    GOOS=windows GOARCH=amd64 make build
+                """
+            }
+        }
+
+        stage('update release status') {
+            container('jnlp') {
+                sh "release_id=\$(curl -H \"Content-Type: application/json\" -H \"Authorization: token ${GIT_TOKEN}\" -X GET https://api.github.com/repos/${git_project_user}/${git_project}/releases/tags/v${TAG_VERSION} | python -c 'import json,sys;obj=json.load(sys.stdin);print obj[\"id\"]'); curl -H \"Content-Type: application/json\" -H \"Authorization: token ${GIT_TOKEN}\" -X PATCH https://api.github.com/repos/${git_project_user}/${git_project}/releases/\${release_id} -d '{\"prerelease\": false}'"
+            }
+        }
+    }
+}
+
 def build_nuclio() {
     withCredentials([
             usernamePassword(credentialsId: git_deploy_user, passwordVariable: 'GIT_PASSWORD', usernameVariable: 'GIT_USERNAME'),
@@ -213,6 +253,31 @@ spec:
 
     if ( MAIN_TAG_VERSION != null && MAIN_TAG_VERSION.length() > 0 && PUBLISHED_BEFORE < expired ) {
         parallel(
+            'v3io-tsdb': {
+                podTemplate(label: "v3io-tsdb-${label}", inheritFrom: "${git_project}-${label}") {
+                    node("v3io-tsdb-${label}") {
+                        withCredentials([
+                                string(credentialsId: git_deploy_user_token, variable: 'GIT_TOKEN')
+                        ]) {
+                            def TAG_VERSION
+
+                            stage('trigger') {
+                                container('jnlp') {
+                                    TAG_VERSION = sh(
+                                            script: "echo ${TAG_NAME} | tr -d '\\n' | egrep '^v[\\.0-9]*\$'",
+                                            returnStdout: true
+                                    ).trim()
+                                }
+                            }
+
+                            if (TAG_VERSION) {
+                                build_v3io_tsdb(TAG_VERSION)
+                            }
+                        }
+                    }
+                }
+            },
+
             'tsdb-nuclio': {
                 podTemplate(label: "v3io-tsdb-nuclio-${label}", inheritFrom: "${git_project}-${label}") {
                     node("v3io-tsdb-nuclio-${label}") {

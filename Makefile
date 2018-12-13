@@ -2,6 +2,7 @@
 TOPLEVEL_DIRS=`ls -d ./*/. | grep -v '^./vendor/.$$' | sed 's/\.$$/.../'`
 TOPLEVEL_DIRS_GOFMT_SYNTAX=`ls -d ./*/. | grep -v '^./vendor/.$$'`
 TOPLEVEL_DIRS_IMPI_SYNTAX=`ls -d ./*/. | grep -v '^./vendor/.$$' | sed 's/$$/../'`
+TSDB_BUILD_COMMAND ?= CGO_ENABLED=0 go build $(BUILD_OPTS) ./cmd/tsdbctl
 
 GIT_COMMIT_HASH := $(shell git rev-parse HEAD)
 GIT_BRANCH=$(shell git rev-parse --abbrev-ref HEAD)
@@ -55,7 +56,18 @@ bench: get
 
 .PHONY: build
 build: get
-	CGO_ENABLED=0 go build $(BUILD_OPTS) ./cmd/tsdbctl
+	docker run \
+	  --volume $(shell pwd):/go/src/github.com/v3io/v3io-tsdb \
+	  --volume $(shell pwd):/go/bin \
+	  --workdir /go/src/github.com/v3io/v3io-tsdb \
+	  --env GOOS=$(GOOS) \
+	  --env GOARCH=$(GOARCH) \
+	  golang:1.11 \
+	  make bin
+
+.PHONY: bin
+bin:
+	${TSDB_BUILD_COMMAND}
 
 .PHONY: lint
 lint:
