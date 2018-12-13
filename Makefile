@@ -66,7 +66,7 @@ build:
 	  make bin
 
 .PHONY: bin
-bin: get
+bin:
 	${TSDB_BUILD_COMMAND}
 
 .PHONY: lint
