@@ -55,7 +55,7 @@ bench: get
 	go test -run=XXX -bench='^BenchmarkIngest$$' -benchtime 10s -timeout 5m ./test/benchmark/...
 
 .PHONY: build
-build: get
+build:
 	docker run \
 	  --volume $(shell pwd):/go/src/github.com/v3io/v3io-tsdb \
 	  --volume $(shell pwd):/go/bin \
@@ -66,7 +66,7 @@ build: get
 	  make bin
 
 .PHONY: bin
-bin:
+bin: get
 	${TSDB_BUILD_COMMAND}
 
 .PHONY: lint
