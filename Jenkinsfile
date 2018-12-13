@@ -7,6 +7,52 @@ git_project_user = "v3io"
 git_deploy_user = "iguazio-prod-git-user"
 git_deploy_user_token = "iguazio-prod-git-user-token"
 
+def build_v3io_tsdb(TAG_VERSION) {
+    withCredentials([
+            usernamePassword(credentialsId: git_deploy_user, passwordVariable: 'GIT_PASSWORD', usernameVariable: 'GIT_USERNAME'),
+            string(credentialsId: git_deploy_user_token, variable: 'GIT_TOKEN')
+    ]) {
+        def git_project = 'v3io-tsdb'
+        stage('prepare sources') {
+            container('jnlp') {
+                sh """
+                    cd ${BUILD_FOLDER}
+                    git clone https://${GIT_USERNAME}:${GIT_PASSWORD}@github.com/${git_project_user}/${git_project}.git src/github.com/v3io/${git_project}
+                    cd ${BUILD_FOLDER}/src/github.com/v3io/${git_project}
+                """
+//                    git checkout ${V3IO_TSDB_VERSION}
+            }
+        }
+
+        stage('build ${git_project} binaries in dood') {
+            container('golang') {
+                sh """
+                    cd ${BUILD_FOLDER}/src/github.com/v3io/${git_project}
+                    GOOS=linux GOARCH=amd64 TRAVIS_TAG=${TAG_VERSION} make bin
+                    GOOS=darwin GOARCH=amd64 TRAVIS_TAG=${TAG_VERSION} make bin
+                    GOOS=windows GOARCH=amd64 TRAVIS_TAG=${TAG_VERSION} make bin
+                    ls -la /go/bin
+                """
+            }
+        }
+
+        stage('upload release assets') {
+            container('jnlp') {
+                RELEASE_ID = sh(
+                        script: "curl -H \"Content-Type: application/json\" -H \"Authorization: token ${GIT_TOKEN}\" -X GET https://api.github.com/repos/${git_project_user}/${git_project}/releases/tags/v${TAG_VERSION} | python -c 'import json,sys;obj=json.load(sys.stdin);print obj[\"id\"]'",
+                        returnStdout: true
+                ).trim()
+
+                sh "curl -X POST -H \"Content-Type: application/data\" -H \"Authorization: token ${GIT_TOKEN}\" https://uploads.github.com/repos/${git_project_user}/v3io-tsdb/releases/${RELEASE_ID}/assets?name=tsdbctl-${TAG_VERSION}-linux-amd64 -F 'data=@/go/bin/tsdbctl-${TAG_VERSION}-linux-amd64'"
+
+                sh "curl -X POST -H \"Content-Type: application/data\" -H \"Authorization: token ${GIT_TOKEN}\" https://uploads.github.com/repos/${git_project_user}/v3io-tsdb/releases/${RELEASE_ID}/assets?name=tsdbctl-${TAG_VERSION}-darwin-amd64 -F 'data=@/go/bin/tsdbctl-${TAG_VERSION}-darwin-amd64'"
+
+                sh "curl -X POST -H \"Content-Type: application/data\" -H \"Authorization: token ${GIT_TOKEN}\" https://uploads.github.com/repos/${git_project_user}/v3io-tsdb/releases/${RELEASE_ID}/assets?name=tsdbctl-${TAG_VERSION}-windows-amd64 -F 'data=@/go/bin/tsdbctl-${TAG_VERSION}-windows-amd64'"
+            }
+        }
+    }
+}
+
 def build_nuclio() {
     withCredentials([
             usernamePassword(credentialsId: git_deploy_user, passwordVariable: 'GIT_PASSWORD', usernameVariable: 'GIT_USERNAME'),
@@ -173,6 +219,13 @@ spec:
           mountPath: /var/run
         - name: go-shared
           mountPath: /go
+    - name: golang
+      image: golang:1.11
+      command: [ "/bin/sh", "-c", "--" ]
+      args: [ "while true; do sleep 30; done;" ]
+      volumeMounts:
+        - name: go-shared
+          mountPath: /go
   volumes:
     - name: docker-sock
       hostPath:
@@ -213,157 +266,184 @@ spec:
 
     if ( MAIN_TAG_VERSION != null && MAIN_TAG_VERSION.length() > 0 && PUBLISHED_BEFORE < expired ) {
         parallel(
-            'tsdb-nuclio': {
-                podTemplate(label: "v3io-tsdb-nuclio-${label}", inheritFrom: "${git_project}-${label}") {
-                    node("v3io-tsdb-nuclio-${label}") {
-                        withCredentials([
-                                string(credentialsId: git_deploy_user_token, variable: 'GIT_TOKEN')
-                        ]) {
-                            def TAG_VERSION
-                            def NEXT_VERSION
+                'v3io-tsdb': {
+                    podTemplate(label: "v3io-tsdb-${label}", inheritFrom: "${git_project}-${label}", containers: [
+                            containerTemplate(name: 'golang', image: 'golang:1.11')
+                    ]) {
+                        node("v3io-tsdb-${label}") {
+                            withCredentials([
+                                    string(credentialsId: git_deploy_user_token, variable: 'GIT_TOKEN')
+                            ]) {
+                                def TAG_VERSION
 
-                            stage('trigger') {
-                                container('jnlp') {
-                                    TAG_VERSION = sh(
-                                            script: "echo ${TAG_NAME} | tr -d '\\n' | egrep '^v[\\.0-9]*\$'",
-                                            returnStdout: true
-                                    ).trim()
-                                }
-                            }
-
-                            if (TAG_VERSION) {
-                                stage('get previous release version') {
+                                stage('trigger') {
                                     container('jnlp') {
-                                        sh """
-                                            curl -H "Authorization: bearer ${GIT_TOKEN}" -X POST -d '{"query": "query { repository(owner: \\"${git_project_user}\\", name: \\"tsdb-nuclio\\") { refs(refPrefix: \\"refs/tags/\\", first: 1, orderBy: { field: ALPHABETICAL, direction: DESC }) { nodes { name } } } }" }' https://api.github.com/graphql > ~/last_tag;
-                                            cat ~/last_tag | python -c 'import json,sys;obj=json.load(sys.stdin);print obj["data"]["repository"]["refs"]["nodes"][0]["name"]' | sed "s/v//" > ~/tmp_tag
-                                            cat ~/tmp_tag | awk -F. -v OFS=. 'NF==1{print ++\$NF}; NF>1{if(length(\$NF+1)>length(\$NF))\$(NF-1)++; \$NF=sprintf("%0*d", length(\$NF), (\$NF+1)%(10^length(\$NF))); print}' > ~/next_version
-                                        """
-                                        NEXT_VERSION = sh(
-                                                script: "cat ~/next_version",
+                                        TAG_VERSION = sh(
+                                                script: "echo ${TAG_NAME} | tr -d '\\n' | egrep '^v[\\.0-9]*\$' | sed 's/v//'",
                                                 returnStdout: true
                                         ).trim()
-
-                                        echo "$NEXT_VERSION"
-                                        next_versions.putAt('tsdb-nuclio', NEXT_VERSION)
                                     }
                                 }
 
-                                build_nuclio()
-
-                                stage('create tsdb-nuclio prerelease') {
-                                    container('jnlp') {
-                                        sh "curl -H \"Content-Type: application/json\" -H \"Authorization: token ${GIT_TOKEN}\" https://api.github.com/repos/${git_project_user}/tsdb-nuclio/releases -d '{\"tag_name\": \"v${NEXT_VERSION}\", \"target_commitish\": \"master\", \"name\": \"v${NEXT_VERSION}\", \"body\": \"Autorelease, triggered by v3io-tsdb\", \"prerelease\": true}'"
-                                    }
+                                if (TAG_VERSION) {
+                                    build_v3io_tsdb(TAG_VERSION)
                                 }
                             }
                         }
                     }
-                }
-            },
+                },
 
-            'demos': {
-                podTemplate(label: "demos-${label}", inheritFrom: "${git_project}-${label}") {
-                    node("demos-${label}") {
-                        withCredentials([
-                                string(credentialsId: git_deploy_user_token, variable: 'GIT_TOKEN')
-                        ]) {
-                            def TAG_VERSION
-                            def NEXT_VERSION
+                'tsdb-nuclio': {
+                    podTemplate(label: "v3io-tsdb-nuclio-${label}", inheritFrom: "${git_project}-${label}") {
+                        node("v3io-tsdb-nuclio-${label}") {
+                            withCredentials([
+                                    string(credentialsId: git_deploy_user_token, variable: 'GIT_TOKEN')
+                            ]) {
+                                def TAG_VERSION
+                                def NEXT_VERSION
 
-                            stage('trigger') {
-                                container('jnlp') {
-                                    TAG_VERSION = sh(
-                                            script: "echo ${TAG_NAME} | tr -d '\\n' | egrep '^v[\\.0-9]*\$'",
-                                            returnStdout: true
-                                    ).trim()
-                                }
-                            }
-
-                            if (TAG_VERSION) {
-                                stage('get previous release version') {
+                                stage('trigger') {
                                     container('jnlp') {
-                                        sh """
-                                            curl -H "Authorization: bearer ${GIT_TOKEN}" -X POST -d '{"query": "query { repository(owner: \\"${git_project_user}\\", name: \\"demos\\") { refs(refPrefix: \\"refs/tags/\\", first: 1, orderBy: { field: ALPHABETICAL, direction: DESC }) { nodes { name } } } }" }' https://api.github.com/graphql > last_tag;
-                                            cat last_tag | python -c 'import json,sys;obj=json.load(sys.stdin);print obj["data"]["repository"]["refs"]["nodes"][0]["name"]' | sed "s/v//" > tmp_tag
-                                            cat tmp_tag | awk -F. -v OFS=. 'NF==1{print ++\$NF}; NF>1{if(length(\$NF+1)>length(\$NF))\$(NF-1)++; \$NF=sprintf("%0*d", length(\$NF), (\$NF+1)%(10^length(\$NF))); print}' > next_version
-                                        """
-
-                                        NEXT_VERSION = sh(
-                                                script: "cat next_version",
+                                        TAG_VERSION = sh(
+                                                script: "echo ${TAG_NAME} | tr -d '\\n' | egrep '^v[\\.0-9]*\$'",
                                                 returnStdout: true
                                         ).trim()
-
-                                        echo "$NEXT_VERSION"
-                                        next_versions.putAt('demos', NEXT_VERSION)
                                     }
                                 }
 
-                                build_demo()
+                                if (TAG_VERSION) {
+                                    stage('get previous release version') {
+                                        container('jnlp') {
+                                            sh """
+                                                curl -H "Authorization: bearer ${GIT_TOKEN}" -X POST -d '{"query": "query { repository(owner: \\"${git_project_user}\\", name: \\"tsdb-nuclio\\") { refs(refPrefix: \\"refs/tags/\\", first: 1, orderBy: { field: ALPHABETICAL, direction: DESC }) { nodes { name } } } }" }' https://api.github.com/graphql > ~/last_tag;
+                                                cat ~/last_tag | python -c 'import json,sys;obj=json.load(sys.stdin);print obj["data"]["repository"]["refs"]["nodes"][0]["name"]' | sed "s/v//" > ~/tmp_tag
+                                                cat ~/tmp_tag | awk -F. -v OFS=. 'NF==1{print ++\$NF}; NF>1{if(length(\$NF+1)>length(\$NF))\$(NF-1)++; \$NF=sprintf("%0*d", length(\$NF), (\$NF+1)%(10^length(\$NF))); print}' > ~/next_version
+                                              """
+                                            NEXT_VERSION = sh(
+                                                    script: "cat ~/next_version",
+                                                    returnStdout: true
+                                            ).trim()
 
-                                stage('create demos prerelease') {
+                                            echo "$NEXT_VERSION"
+                                            next_versions.putAt('tsdb-nuclio', NEXT_VERSION)
+                                        }
+                                    }
+
+                                    build_nuclio()
+
+                                    stage('create tsdb-nuclio prerelease') {
+                                        container('jnlp') {
+                                            sh "curl -H \"Content-Type: application/json\" -H \"Authorization: token ${GIT_TOKEN}\" https://api.github.com/repos/${git_project_user}/tsdb-nuclio/releases -d '{\"tag_name\": \"v${NEXT_VERSION}\", \"target_commitish\": \"master\", \"name\": \"v${NEXT_VERSION}\", \"body\": \"Autorelease, triggered by v3io-tsdb\", \"prerelease\": true}'"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+
+                'demos': {
+                    podTemplate(label: "demos-${label}", inheritFrom: "${git_project}-${label}") {
+                        node("demos-${label}") {
+                            withCredentials([
+                                    string(credentialsId: git_deploy_user_token, variable: 'GIT_TOKEN')
+                            ]) {
+                                def TAG_VERSION
+                                def NEXT_VERSION
+
+                                stage('trigger') {
                                     container('jnlp') {
-                                        sh "curl -H \"Content-Type: application/json\" -H \"Authorization: token ${GIT_TOKEN}\" https://api.github.com/repos/${git_project_user}/demos/releases -d '{\"tag_name\": \"v${NEXT_VERSION}\", \"target_commitish\": \"master\", \"name\": \"v${NEXT_VERSION}\", \"body\": \"Autorelease, triggered by v3io-tsdb\", \"prerelease\": true}'"
+                                        TAG_VERSION = sh(
+                                                script: "echo ${TAG_NAME} | tr -d '\\n' | egrep '^v[\\.0-9]*\$'",
+                                                returnStdout: true
+                                        ).trim()
+                                    }
+                                }
+
+                                if (TAG_VERSION) {
+                                    stage('get previous release version') {
+                                        container('jnlp') {
+                                            sh """
+                                                curl -H "Authorization: bearer ${GIT_TOKEN}" -X POST -d '{"query": "query { repository(owner: \\"${git_project_user}\\", name: \\"demos\\") { refs(refPrefix: \\"refs/tags/\\", first: 1, orderBy: { field: ALPHABETICAL, direction: DESC }) { nodes { name } } } }" }' https://api.github.com/graphql > last_tag;
+                                                cat last_tag | python -c 'import json,sys;obj=json.load(sys.stdin);print obj["data"]["repository"]["refs"]["nodes"][0]["name"]' | sed "s/v//" > tmp_tag
+                                                cat tmp_tag | awk -F. -v OFS=. 'NF==1{print ++\$NF}; NF>1{if(length(\$NF+1)>length(\$NF))\$(NF-1)++; \$NF=sprintf("%0*d", length(\$NF), (\$NF+1)%(10^length(\$NF))); print}' > next_version
+                                            """
+
+                                            NEXT_VERSION = sh(
+                                                    script: "cat next_version",
+                                                    returnStdout: true
+                                            ).trim()
+
+                                            echo "$NEXT_VERSION"
+                                            next_versions.putAt('demos', NEXT_VERSION)
+                                        }
+                                    }
+
+                                    build_demo()
+
+                                    stage('create demos prerelease') {
+                                        container('jnlp') {
+                                            sh "curl -H \"Content-Type: application/json\" -H \"Authorization: token ${GIT_TOKEN}\" https://api.github.com/repos/${git_project_user}/demos/releases -d '{\"tag_name\": \"v${NEXT_VERSION}\", \"target_commitish\": \"master\", \"name\": \"v${NEXT_VERSION}\", \"body\": \"Autorelease, triggered by v3io-tsdb\", \"prerelease\": true}'"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                'prometheus': {
+                    podTemplate(label: "v3io-tsdb-prometheus-${label}", inheritFrom: "${git_project}-${label}") {
+                        node("v3io-tsdb-prometheus-${label}") {
+                            withCredentials([
+                                    usernamePassword(credentialsId: git_deploy_user, passwordVariable: 'GIT_PASSWORD', usernameVariable: 'GIT_USERNAME'),
+                                    string(credentialsId: git_deploy_user_token, variable: 'GIT_TOKEN')
+                            ]) {
+                                def TAG_VERSION
+                                def NEXT_VERSION
+
+                                stage('trigger') {
+                                    container('jnlp') {
+                                        sh """
+                                            cd ${BUILD_FOLDER}
+                                            git clone https://${GIT_USERNAME}:${GIT_PASSWORD}@github.com/${git_project_user}/prometheus.git src/github.com/prometheus/prometheus
+                                        """
+
+                                        TAG_VERSION = sh(
+                                                script: "cat ${BUILD_FOLDER}/src/github.com/prometheus/prometheus/VERSION",
+                                                returnStdout: true
+                                        ).trim()
+                                    }
+                                }
+
+                                if (TAG_VERSION) {
+                                    stage('get previous release version') {
+                                        container('jnlp') {
+                                            NEXT_VERSION = "${TAG_VERSION}-${TAG_NAME}"
+
+                                            echo "$NEXT_VERSION"
+                                            next_versions.putAt('prometheus', NEXT_VERSION)
+                                        }
+                                    }
+
+                                    build_prometheus(NEXT_VERSION)
+
+                                    stage('create prometheus prerelease') {
+                                        container('jnlp') {
+                                            sh "curl -H \"Content-Type: application/json\" -H \"Authorization: token ${GIT_TOKEN}\" https://api.github.com/repos/${git_project_user}/prometheus/releases -d '{\"tag_name\": \"v${NEXT_VERSION}\", \"target_commitish\": \"master\", \"name\": \"v${NEXT_VERSION}\", \"body\": \"Autorelease, triggered by v3io-tsdb\", \"prerelease\": true}'"
+                                        }
                                     }
                                 }
                             }
                         }
                     }
                 }
-            },
-            'prometheus': {
-                podTemplate(label: "v3io-tsdb-prometheus-${label}", inheritFrom: "${git_project}-${label}") {
-                    node("v3io-tsdb-prometheus-${label}") {
-                        withCredentials([
-                                usernamePassword(credentialsId: git_deploy_user, passwordVariable: 'GIT_PASSWORD', usernameVariable: 'GIT_USERNAME'),
-                                string(credentialsId: git_deploy_user_token, variable: 'GIT_TOKEN')
-                        ]) {
-                            def TAG_VERSION
-                            def NEXT_VERSION
-
-                            stage('trigger') {
-                                container('jnlp') {
-                                    sh """
-                                        cd ${BUILD_FOLDER}
-                                        git clone https://${GIT_USERNAME}:${GIT_PASSWORD}@github.com/${git_project_user}/prometheus.git src/github.com/prometheus/prometheus
-                                    """
-
-                                    TAG_VERSION = sh(
-                                            script: "cat ${BUILD_FOLDER}/src/github.com/prometheus/prometheus/VERSION",
-                                            returnStdout: true
-                                    ).trim()
-                                }
-                            }
-
-                            if (TAG_VERSION) {
-                                stage('get previous release version') {
-                                    container('jnlp') {
-                                        NEXT_VERSION = "${TAG_VERSION}-${TAG_NAME}"
-
-                                        echo "$NEXT_VERSION"
-                                        next_versions.putAt('prometheus', NEXT_VERSION)
-                                    }
-                                }
-
-                                build_prometheus(NEXT_VERSION)
-
-                                stage('create prometheus prerelease') {
-                                    container('jnlp') {
-                                        sh "curl -H \"Content-Type: application/json\" -H \"Authorization: token ${GIT_TOKEN}\" https://api.github.com/repos/${git_project_user}/prometheus/releases -d '{\"tag_name\": \"v${NEXT_VERSION}\", \"target_commitish\": \"master\", \"name\": \"v${NEXT_VERSION}\", \"body\": \"Autorelease, triggered by v3io-tsdb\", \"prerelease\": true}'"
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
         )
     } else {
         stage('warning') {
             if (PUBLISHED_BEFORE >= expired) {
                 echo "Tag too old, published before $PUBLISHED_BEFORE minutes."
             } else {
-                echo "${TAG_VERSION} is not release tag."
+                echo "${MAIN_TAG_VERSION} is not release tag."
             }
         }
     }
@@ -445,7 +525,12 @@ spec:
                     }
                 }
             }
+
+            stage('update release status') {
+                container('jnlp') {
+                    sh "release_id=\$(curl -H \"Content-Type: application/json\" -H \"Authorization: token ${GIT_TOKEN}\" -X GET https://api.github.com/repos/${git_project_user}/${git_project}/releases/tags/v${MAIN_TAG_VERSION} | python -c 'import json,sys;obj=json.load(sys.stdin);print obj[\"id\"]'); curl -H \"Content-Type: application/json\" -H \"Authorization: token ${GIT_TOKEN}\" -X PATCH https://api.github.com/repos/${git_project_user}/${git_project}/releases/\${release_id} -d '{\"prerelease\": false}'"
+                }
+            }
         }
     }
 }
-
