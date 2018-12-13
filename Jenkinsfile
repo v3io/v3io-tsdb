@@ -29,8 +29,11 @@ def build_v3io_tsdb(TAG_VERSION) {
                 sh """
                     cd ${BUILD_FOLDER}/src/github.com/v3io/${git_project}
                     GOOS=linux GOARCH=amd64 make bin
+                    ls -la
                     GOOS=darwin GOARCH=amd64 make bin
+                    ls -la
                     GOOS=windows GOARCH=amd64 make bin
+                    ls -la
                 """
             }
         }
