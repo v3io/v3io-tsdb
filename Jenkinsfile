@@ -25,17 +25,13 @@ def build_v3io_tsdb(TAG_VERSION) {
         }
 
         stage('build ${git_project} binaries in dood') {
-            container('docker-cmd') {
+            container('golang') {
                 sh """
                     apk add --update make git
                     cd ${BUILD_FOLDER}/src/github.com/v3io/${git_project}
-                    # image_tag=go-${label}
-                    # docker build . --tag \${image_tag} --build-arg TRAVIS_TAG='${TAG_VERSION}'
-                    # container_id=\$(docker create \$image_tag)
-                    # docker cp \$container_id:/go/bin/tsdbctl-*-darwin-amd64 tsdbctl-70618fd-darwin-amd64
-                    GOOS=linux GOARCH=amd64 make build
-                    GOOS=darwin GOARCH=amd64 make build
-                    GOOS=windows GOARCH=amd64 make build
+                    GOOS=linux GOARCH=amd64 make bin
+                    GOOS=darwin GOARCH=amd64 make bin
+                    GOOS=windows GOARCH=amd64 make bin
                 """
             }
         }
@@ -255,7 +251,9 @@ spec:
     if ( MAIN_TAG_VERSION != null && MAIN_TAG_VERSION.length() > 0 && PUBLISHED_BEFORE < expired ) {
         parallel(
             'v3io-tsdb': {
-                podTemplate(label: "v3io-tsdb-${label}", inheritFrom: "${git_project}-${label}") {
+                podTemplate(label: "v3io-tsdb-${label}", inheritFrom: "${git_project}-${label}", containers: [
+                        containerTemplate(name: 'golang', image: 'golang:1.11')
+                ]) {
                     node("v3io-tsdb-${label}") {
                         withCredentials([
                                 string(credentialsId: git_deploy_user_token, variable: 'GIT_TOKEN')
