@@ -15,6 +15,10 @@ else
 	GIT_REVISION := $(shell git describe --always)
 endif
 
+GOOS ?= $(shell go env GOOS)
+GOARCH ?= $(shell go env GOARCH)
+GOPATH ?= $(shell go env GOPATH)
+
 TSDBCTL_BIN_NAME := tsdbctl-$(GIT_REVISION)-$(GOOS)-$(GOARCH)
 
 # Use RFC3339 (ISO8601) date format

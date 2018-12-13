@@ -29,11 +29,11 @@ def build_v3io_tsdb(TAG_VERSION) {
                 sh """
                     cd ${BUILD_FOLDER}/src/github.com/v3io/${git_project}
                     GOOS=linux GOARCH=amd64 make bin
-                    ls -la
+                    ls -la /go/bin
                     GOOS=darwin GOARCH=amd64 make bin
-                    ls -la
+                    ls -la /go/bin
                     GOOS=windows GOARCH=amd64 make bin
-                    ls -la
+                    ls -la /go/bin
                 """
             }
         }
@@ -272,7 +272,7 @@ spec:
                             stage('trigger') {
                                 container('jnlp') {
                                     TAG_VERSION = sh(
-                                            script: "echo ${TAG_NAME} | tr -d '\\n' | egrep '^v[\\.0-9]*\$'",
+                                            script: "echo ${TAG_NAME} | tr -d '\\n' | egrep '^v[\\.0-9]*\$' | sed 's/v//'",
                                             returnStdout: true
                                     ).trim()
                                 }
