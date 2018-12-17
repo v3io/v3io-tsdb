@@ -20,7 +20,6 @@ def build_v3io_tsdb(TAG_VERSION) {
                     git clone https://${GIT_USERNAME}:${GIT_PASSWORD}@github.com/${git_project_user}/${git_project}.git src/github.com/v3io/${git_project}
                     cd ${BUILD_FOLDER}/src/github.com/v3io/${git_project}
                 """
-//                    git checkout ${V3IO_TSDB_VERSION}
             }
         }
 
@@ -43,11 +42,11 @@ def build_v3io_tsdb(TAG_VERSION) {
                         returnStdout: true
                 ).trim()
 
-                sh "curl -X POST -H \"Content-Type: application/data\" -H \"Authorization: token ${GIT_TOKEN}\" https://uploads.github.com/repos/${git_project_user}/v3io-tsdb/releases/${RELEASE_ID}/assets?name=tsdbctl-${TAG_VERSION}-linux-amd64 -F 'data=@/go/bin/tsdbctl-${TAG_VERSION}-linux-amd64'"
+                sh "curl -X POST -H \"Content-Type: application/data\" -H \"Authorization: token ${GIT_TOKEN}\" https://uploads.github.com/repos/${git_project_user}/${git_project}/releases/${RELEASE_ID}/assets?name=tsdbctl-${TAG_VERSION}-linux-amd64 -F 'data=@/go/bin/tsdbctl-${TAG_VERSION}-linux-amd64'"
 
-                sh "curl -X POST -H \"Content-Type: application/data\" -H \"Authorization: token ${GIT_TOKEN}\" https://uploads.github.com/repos/${git_project_user}/v3io-tsdb/releases/${RELEASE_ID}/assets?name=tsdbctl-${TAG_VERSION}-darwin-amd64 -F 'data=@/go/bin/tsdbctl-${TAG_VERSION}-darwin-amd64'"
+                sh "curl -X POST -H \"Content-Type: application/data\" -H \"Authorization: token ${GIT_TOKEN}\" https://uploads.github.com/repos/${git_project_user}/${git_project}/releases/${RELEASE_ID}/assets?name=tsdbctl-${TAG_VERSION}-darwin-amd64 -F 'data=@/go/bin/tsdbctl-${TAG_VERSION}-darwin-amd64'"
 
-                sh "curl -X POST -H \"Content-Type: application/data\" -H \"Authorization: token ${GIT_TOKEN}\" https://uploads.github.com/repos/${git_project_user}/v3io-tsdb/releases/${RELEASE_ID}/assets?name=tsdbctl-${TAG_VERSION}-windows-amd64 -F 'data=@/go/bin/tsdbctl-${TAG_VERSION}-windows-amd64'"
+                sh "curl -X POST -H \"Content-Type: application/data\" -H \"Authorization: token ${GIT_TOKEN}\" https://uploads.github.com/repos/${git_project_user}/${git_project}/releases/${RELEASE_ID}/assets?name=tsdbctl-${TAG_VERSION}-windows-amd64 -F 'data=@/go/bin/tsdbctl-${TAG_VERSION}-windows-amd64'"
             }
         }
     }
