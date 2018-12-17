@@ -196,7 +196,7 @@ func (a *V3ioAdapter) Querier(_ context.Context, mint, maxt int64) (*querier.V3i
 }
 
 // Create a Querier interface, used for time-series queries
-func (a *V3ioAdapter) QuerierV2(_ context.Context) (*pquerier.V3ioQuerier, error) {
+func (a *V3ioAdapter) QuerierV2() (*pquerier.V3ioQuerier, error) {
 	return pquerier.NewV3ioQuerier(a.container, a.logger, a.cfg, a.partitionMngr), nil
 }
 

@@ -45,7 +45,7 @@ type SelectParams struct {
 	Windows          []int
 	Filter           string
 	RequestedColumns []RequestedColumn
-	GroupBy          []string
+	GroupBy          string
 
 	disableAllAggr    bool
 	disableClientAggr bool

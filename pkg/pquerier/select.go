@@ -233,14 +233,16 @@ func (queryCtx *selectQueryContext) processQueryResults(query *partQuery) error 
 		sort.Sort(lset) // maybe skipped if its written sorted
 		var hash uint64
 
-		if len(queryCtx.queryParams.GroupBy) > 0 {
-			newLset := make(utils.Labels, len(queryCtx.queryParams.GroupBy))
-			for i, label := range queryCtx.queryParams.GroupBy {
-				labelValue := lset.Get(label)
+		if queryCtx.queryParams.GroupBy != "" {
+			groupByList := strings.Split(queryCtx.queryParams.GroupBy, ",")
+			newLset := make(utils.Labels, len(groupByList))
+			for i, label := range groupByList {
+				trimmed := strings.TrimSpace(label)
+				labelValue := lset.Get(trimmed)
 				if labelValue != "" {
-					newLset[i] = utils.Label{Name: label, Value: labelValue}
+					newLset[i] = utils.Label{Name: trimmed, Value: labelValue}
 				} else {
-					return fmt.Errorf("no label named %v found to group by", label)
+					return fmt.Errorf("no label named %v found to group by", trimmed)
 				}
 			}
 			lset = newLset

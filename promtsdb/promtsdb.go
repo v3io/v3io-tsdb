@@ -57,7 +57,7 @@ func (a *V3ioPromAdapter) Close() error {
 }
 
 func (a *V3ioPromAdapter) Querier(_ context.Context, mint, maxt int64) (storage.Querier, error) {
-	v3ioQuerier, err := a.db.QuerierV2(nil)
+	v3ioQuerier, err := a.db.QuerierV2()
 	promQuerier := V3ioPromQuerier{v3ioQuerier: v3ioQuerier, logger: a.logger.GetChild("v3io-prom-query"), mint: mint, maxt: maxt}
 	return &promQuerier, err
 }

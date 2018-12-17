@@ -91,7 +91,7 @@ func (suite *testQuerySuite) TestRawDataSinglePartition() {
 			}})
 	tsdbtest.InsertData(suite.T(), testParams)
 
-	querierV2, err := adapter.QuerierV2(nil)
+	querierV2, err := adapter.QuerierV2()
 	if err != nil {
 		suite.T().Fatalf("Failed to create querier v2, err: %v", err)
 	}
@@ -148,7 +148,7 @@ func (suite *testQuerySuite) TestRawDataMultiplePartitions() {
 
 	tsdbtest.InsertData(suite.T(), testParams)
 
-	querierV2, err := adapter.QuerierV2(nil)
+	querierV2, err := adapter.QuerierV2()
 	if err != nil {
 		suite.T().Fatalf("Failed to create querier v2, err: %v", err)
 	}
@@ -205,7 +205,7 @@ func (suite *testQuerySuite) TestFilterOnLabel() {
 
 	tsdbtest.InsertData(suite.T(), testParams)
 
-	querierV2, err := adapter.QuerierV2(nil)
+	querierV2, err := adapter.QuerierV2()
 	if err != nil {
 		suite.T().Fatalf("Failed to create querier v2, err: %v", err)
 	}
@@ -261,7 +261,7 @@ func (suite *testQuerySuite) TestQueryWithBadTimeParameters() {
 			}})
 	tsdbtest.InsertData(suite.T(), testParams)
 
-	querierV2, err := adapter.QuerierV2(nil)
+	querierV2, err := adapter.QuerierV2()
 	if err != nil {
 		suite.T().Fatalf("Failed to create querier v2, err: %v", err)
 	}
@@ -297,7 +297,7 @@ func (suite *testQuerySuite) TestQueryMetricWithDashInTheName() { // IG-8585
 			}})
 	tsdbtest.InsertData(suite.T(), testParams)
 
-	querierV2, err := adapter.QuerierV2(nil)
+	querierV2, err := adapter.QuerierV2()
 	if err != nil {
 		suite.T().Fatalf("Failed to create querier v2, err: %v", err)
 	}
@@ -342,7 +342,7 @@ func (suite *testQuerySuite) TestQueryAggregateWithNameWildcard() {
 		"max": {{Time: baseTime - 7*tsdbtest.DaysInMillis, Value: 10}, {Time: baseTime, Value: 20}, {Time: baseTime + 2*tsdbtest.MinuteInMillis, Value: 40}}}
 	expected := map[string]map[string][]tsdbtest.DataPoint{"cpu": expectedData, "diskio": expectedData}
 
-	querierV2, err := adapter.QuerierV2(nil)
+	querierV2, err := adapter.QuerierV2()
 	if err != nil {
 		suite.T().Fatalf("failed to create querier v2, err: %v", err)
 	}
@@ -401,7 +401,7 @@ func (suite *testQuerySuite) TestQueryAggregateWithFilterOnMetricName() {
 	expectedData := map[string][]tsdbtest.DataPoint{"max": {{Time: baseTime, Value: 20}, {Time: baseTime + 2*tsdbtest.MinuteInMillis, Value: 40}}}
 	expected := map[string]map[string][]tsdbtest.DataPoint{"cpu": expectedData}
 
-	querierV2, err := adapter.QuerierV2(nil)
+	querierV2, err := adapter.QuerierV2()
 	if err != nil {
 		suite.T().Fatalf("failed to create querier v2, err: %v", err)
 	}
@@ -458,7 +458,7 @@ func (suite *testQuerySuite) TestRawDataSinglePartitionWithDownSample() {
 		{baseTime + 6*tsdbtest.MinuteInMillis, 30},
 		{baseTime + 8*tsdbtest.MinuteInMillis, 40}}
 
-	querierV2, err := adapter.QuerierV2(nil)
+	querierV2, err := adapter.QuerierV2()
 	if err != nil {
 		suite.T().Fatalf("Failed to create querier v2, err: %v", err)
 	}
@@ -510,7 +510,7 @@ func (suite *testQuerySuite) TestRawDataDownSampleMultiPartitions() {
 		{suite.toMillis("2018-11-19T00:00:00Z"), 30},
 		{suite.toMillis("2018-11-19T02:00:00Z"), 40}}
 
-	querierV2, err := adapter.QuerierV2(nil)
+	querierV2, err := adapter.QuerierV2()
 	if err != nil {
 		suite.T().Fatalf("Failed to create querier v2, err: %v", err)
 	}
@@ -569,7 +569,7 @@ func (suite *testQuerySuite) TestRawAggregatesSinglePartition() {
 		"min": {{Time: baseTime, Value: 10}},
 		"max": {{Time: baseTime, Value: 40}}}
 
-	querierV2, err := adapter.QuerierV2(nil)
+	querierV2, err := adapter.QuerierV2()
 	if err != nil {
 		suite.T().Fatalf("Failed to create querier v2, err: %v", err)
 	}
@@ -626,7 +626,7 @@ func (suite *testQuerySuite) TestRawAggregatesSinglePartitionNegativeValues() {
 		"min": {{Time: baseTime, Value: -40}},
 		"max": {{Time: baseTime, Value: -10}}}
 
-	querierV2, err := adapter.QuerierV2(nil)
+	querierV2, err := adapter.QuerierV2()
 	if err != nil {
 		suite.T().Fatalf("Failed to create querier v2, err: %v", err)
 	}
@@ -685,7 +685,7 @@ func (suite *testQuerySuite) TestRawAggregatesMultiPartition() {
 		"max": {{Time: baseTime - 7*tsdbtest.DaysInMillis, Value: 10}, {Time: baseTime, Value: 40}},
 		"sqr": {{Time: baseTime - 7*tsdbtest.DaysInMillis, Value: 100}, {Time: baseTime, Value: 2900}}}
 
-	querierV2, err := adapter.QuerierV2(nil)
+	querierV2, err := adapter.QuerierV2()
 	if err != nil {
 		suite.T().Fatalf("Failed to create querier v2, err: %v", err)
 	}
@@ -742,7 +742,7 @@ func (suite *testQuerySuite) TestRawAggregatesMultiPartitionNonConcreteAggregate
 	expected := map[string][]tsdbtest.DataPoint{"avg": {{Time: baseTime - 7*tsdbtest.DaysInMillis, Value: 11}, {Time: baseTime, Value: 30}},
 		"stdvar": {{Time: baseTime - 7*tsdbtest.DaysInMillis, Value: 2}, {Time: baseTime, Value: 100}}}
 
-	querierV2, err := adapter.QuerierV2(nil)
+	querierV2, err := adapter.QuerierV2()
 	if err != nil {
 		suite.T().Fatalf("Failed to create querier v2, err: %v", err)
 	}
@@ -799,7 +799,7 @@ func (suite *testQuerySuite) TestClientAggregatesSinglePartition() {
 		"min": {{Time: baseTime, Value: 10}, {Time: baseTime + 2*tsdbtest.MinuteInMillis, Value: 30}},
 		"max": {{Time: baseTime, Value: 20}, {Time: baseTime + 2*tsdbtest.MinuteInMillis, Value: 40}}}
 
-	querierV2, err := adapter.QuerierV2(nil)
+	querierV2, err := adapter.QuerierV2()
 	if err != nil {
 		suite.T().Fatalf("Failed to create querier v2, err: %v", err)
 	}
@@ -856,7 +856,7 @@ func (suite *testQuerySuite) TestClientAggregatesMultiPartition() {
 		"min": {{Time: baseTime - 7*tsdbtest.DaysInMillis, Value: 10}, {Time: baseTime, Value: 20}},
 		"max": {{Time: baseTime - 7*tsdbtest.DaysInMillis, Value: 10}, {Time: baseTime, Value: 40}}}
 
-	querierV2, err := adapter.QuerierV2(nil)
+	querierV2, err := adapter.QuerierV2()
 	if err != nil {
 		suite.T().Fatalf("Failed to create querier v2, err: %v", err)
 	}
@@ -917,7 +917,7 @@ func (suite *testQuerySuite) TestClientAggregatesMultiPartitionNonConcreteAggreg
 	expected := map[string][]tsdbtest.DataPoint{"avg": {{Time: baseTime - 7*tsdbtest.DaysInMillis, Value: 11}, {Time: baseTime, Value: 30}},
 		"stdvar": {{Time: baseTime - 7*tsdbtest.DaysInMillis, Value: 2}, {Time: baseTime, Value: 100}}}
 
-	querierV2, err := adapter.QuerierV2(nil)
+	querierV2, err := adapter.QuerierV2()
 	if err != nil {
 		suite.T().Fatalf("Failed to create querier v2, err: %v", err)
 	}
@@ -977,7 +977,7 @@ func (suite *testQuerySuite) TestClientAggregatesMultiPartitionOneStep() {
 
 	expected := map[string][]tsdbtest.DataPoint{"count": {{Time: baseTime - 25*tsdbtest.DaysInMillis, Value: 5}}}
 
-	querierV2, err := adapter.QuerierV2(nil)
+	querierV2, err := adapter.QuerierV2()
 	if err != nil {
 		suite.T().Fatalf("Failed to create querier v2, err: %v", err)
 	}
@@ -1036,7 +1036,7 @@ func (suite *testQuerySuite) TestGetEmptyResponse() {
 
 	expected := map[string][]tsdbtest.DataPoint{}
 
-	querierV2, err := adapter.QuerierV2(nil)
+	querierV2, err := adapter.QuerierV2()
 	if err != nil {
 		suite.T().Fatalf("Failed to create querier v2, err: %v", err)
 	}
@@ -1093,7 +1093,7 @@ func (suite *testQuerySuite) TestSelectAggregatesByRequestedColumns() {
 		"min": {{Time: baseTime, Value: 10}, {Time: baseTime + 2*tsdbtest.MinuteInMillis, Value: 30}},
 		"max": {{Time: baseTime, Value: 20}, {Time: baseTime + 2*tsdbtest.MinuteInMillis, Value: 40}}}
 
-	querierV2, err := adapter.QuerierV2(nil)
+	querierV2, err := adapter.QuerierV2()
 	if err != nil {
 		suite.T().Fatalf("Failed to create querier v2, err: %v", err)
 	}
@@ -1150,7 +1150,7 @@ func (suite *testQuerySuite) TestSelectRawDataByRequestedColumns() {
 
 	expected := ingestedData
 
-	querierV2, err := adapter.QuerierV2(nil)
+	querierV2, err := adapter.QuerierV2()
 	if err != nil {
 		suite.T().Fatalf("Failed to create querier v2, err: %v", err)
 	}
@@ -1206,7 +1206,7 @@ func (suite *testQuerySuite) TestSelectAggregatesAndRawByRequestedColumns() {
 	expected := map[string][]tsdbtest.DataPoint{"sum": {{Time: baseTime, Value: 30}, {Time: baseTime + 2*tsdbtest.MinuteInMillis, Value: 70}},
 		"": {{baseTime, 10}, {baseTime + 2*tsdbtest.MinuteInMillis, 30}}}
 
-	querierV2, err := adapter.QuerierV2(nil)
+	querierV2, err := adapter.QuerierV2()
 	if err != nil {
 		suite.T().Fatalf("Failed to create querier v2, err: %v", err)
 	}
@@ -1264,7 +1264,7 @@ func (suite *testQuerySuite) TestSelectServerAggregatesAndRawByRequestedColumns(
 	expected := map[string][]tsdbtest.DataPoint{"sum": {{Time: baseTime, Value: 100}},
 		"": {{baseTime, 10}}}
 
-	querierV2, err := adapter.QuerierV2(nil)
+	querierV2, err := adapter.QuerierV2()
 	if err != nil {
 		suite.T().Fatalf("Failed to create querier v2, err: %v", err)
 	}
@@ -1332,7 +1332,7 @@ func (suite *testQuerySuite) TestRawDataMultipleMetrics() {
 
 	tsdbtest.InsertData(suite.T(), testParams)
 
-	querierV2, err := adapter.QuerierV2(nil)
+	querierV2, err := adapter.QuerierV2()
 	if err != nil {
 		suite.T().Fatalf("Failed to create querier v2, err: %v", err)
 	}
@@ -1399,7 +1399,7 @@ func (suite *testQuerySuite) TestDataFrameRawDataMultipleMetrics() {
 
 	tsdbtest.InsertData(suite.T(), testParams)
 
-	querierV2, err := adapter.QuerierV2(nil)
+	querierV2, err := adapter.QuerierV2()
 	if err != nil {
 		suite.T().Fatalf("Failed to create querier v2, err: %v", err)
 	}
@@ -1463,7 +1463,7 @@ func (suite *testQuerySuite) TestQueryAllData() {
 		"min": {{Time: baseTime, Value: 10}, {Time: baseTime + 2*tsdbtest.MinuteInMillis, Value: 30}},
 		"max": {{Time: baseTime, Value: 20}, {Time: baseTime + 2*tsdbtest.MinuteInMillis, Value: 40}}}
 
-	querierV2, err := adapter.QuerierV2(nil)
+	querierV2, err := adapter.QuerierV2()
 	if err != nil {
 		suite.T().Fatalf("Failed to create querier v2, err: %v", err)
 	}
@@ -1529,7 +1529,7 @@ func (suite *testQuerySuite) TestCrossSeriesAggregatesSinglePartition() {
 		"count": {{Time: baseTime, Value: 2}},
 		"avg":   {{Time: baseTime, Value: 15}}}
 
-	querierV2, err := adapter.QuerierV2(nil)
+	querierV2, err := adapter.QuerierV2()
 	if err != nil {
 		suite.T().Fatalf("Failed to create querier v2, err: %v", err)
 	}
@@ -1602,7 +1602,7 @@ func (suite *testQuerySuite) TestGroupByOneLabelSinglePartition() {
 			"sum":   {{Time: baseTime, Value: 10}},
 			"count": {{Time: baseTime, Value: 1}}}}
 
-	querierV2, err := adapter.QuerierV2(nil)
+	querierV2, err := adapter.QuerierV2()
 	if err != nil {
 		suite.T().Fatalf("Failed to create querier v2, err: %v", err)
 	}
@@ -1612,7 +1612,7 @@ func (suite *testQuerySuite) TestGroupByOneLabelSinglePartition() {
 		Step:      2 * 60 * 1000,
 		From:      baseTime,
 		To:        baseTime + int64(numberOfEvents*eventsInterval),
-		GroupBy:   []string{"os"}}
+		GroupBy:   "os"}
 	set, err := querierV2.Select(params)
 	if err != nil {
 		suite.T().Fatalf("Failed to exeute query, err: %v", err)
@@ -1690,7 +1690,7 @@ func (suite *testQuerySuite) TestGroupByMultipleLabelsSinglePartition() {
 			"sum":   {{Time: baseTime, Value: 20}},
 			"count": {{Time: baseTime, Value: 2}}}}
 
-	querierV2, err := adapter.QuerierV2(nil)
+	querierV2, err := adapter.QuerierV2()
 	if err != nil {
 		suite.T().Fatalf("Failed to create querier v2, err: %v", err)
 	}
@@ -1700,7 +1700,7 @@ func (suite *testQuerySuite) TestGroupByMultipleLabelsSinglePartition() {
 		Step:      2 * 60 * 1000,
 		From:      baseTime,
 		To:        baseTime + int64(numberOfEvents*eventsInterval),
-		GroupBy:   groupBy}
+		GroupBy:   strings.Join(groupBy, ",")}
 	set, err := querierV2.Select(params)
 	if err != nil {
 		suite.T().Fatalf("Failed to exeute query, err: %v", err)
@@ -1751,7 +1751,7 @@ func (suite *testQuerySuite) TestGroupByNotExistingLabel() {
 			}})
 	tsdbtest.InsertData(suite.T(), testParams)
 
-	querierV2, err := adapter.QuerierV2(nil)
+	querierV2, err := adapter.QuerierV2()
 	if err != nil {
 		suite.T().Fatalf("Failed to create querier v2, err: %v", err)
 	}
@@ -1761,7 +1761,7 @@ func (suite *testQuerySuite) TestGroupByNotExistingLabel() {
 		Step:      2 * 60 * 1000,
 		From:      baseTime,
 		To:        baseTime + int64(numberOfEvents*eventsInterval),
-		GroupBy:   []string{"something that does not exist"}}
+		GroupBy:   "something that does not exist"}
 	_, err = querierV2.Select(params)
 	if err == nil {
 		suite.T().Fatalf("expected fail but continued normally")

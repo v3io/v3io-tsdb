@@ -180,13 +180,13 @@ func (qc *queryCommandeer) query() error {
 }
 
 func (qc *queryCommandeer) newQuery(from, to, step int64) error {
-	qry, err := qc.rootCommandeer.adapter.QuerierV2(nil)
+	qry, err := qc.rootCommandeer.adapter.QuerierV2()
 	if err != nil {
 		return errors.Wrap(err, "Failed to initialize the Querier object.")
 	}
 
 	selectParams := &pquerier.SelectParams{Name: qc.name, Functions: qc.functions,
-		Step: step, Filter: qc.filter, From: from, To: to, GroupBy: strings.Split(qc.groupBy, ",")}
+		Step: step, Filter: qc.filter, From: from, To: to, GroupBy: qc.groupBy}
 	set, err := qry.Select(selectParams)
 
 	if err != nil {
