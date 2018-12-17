@@ -32,7 +32,7 @@ import (
 	"github.com/v3io/v3io-tsdb/pkg/config"
 )
 
-const defaultHttpTimeout = 10 * time.Second
+const defaultHttpTimeout = 30 * time.Second
 
 func NewLogger(level string) (logger.Logger, error) {
 	var logLevel nucliozap.Level
@@ -102,7 +102,7 @@ func AsInt64Array(val []byte) []uint64 {
 }
 
 func DeleteTable(logger logger.Logger, container *v3io.Container, path, filter string, workers int) error {
-	input := v3io.GetItemsInput{Path: path, AttributeNames: []string{"__name"}, Filter: filter}
+	input := v3io.GetItemsInput{Path: path, AttributeNames: []string{config.ObjectNameAttrName}, Filter: filter}
 	iter, err := NewAsyncItemsCursor(container, &input, workers, []string{}, logger)
 	if err != nil {
 		return err
@@ -115,7 +115,7 @@ func DeleteTable(logger logger.Logger, container *v3io.Container, path, filter s
 
 	i := 0
 	for iter.Next() {
-		name := iter.GetField("__name").(string)
+		name := iter.GetField(config.ObjectNameAttrName).(string)
 		req, err := container.DeleteObject(&v3io.DeleteObjectInput{Path: path + "/" + name}, nil, responseChan)
 		if err != nil {
 			commChan <- i

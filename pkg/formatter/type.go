@@ -7,7 +7,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/v3io/v3io-tsdb/pkg/querier"
 	"github.com/v3io/v3io-tsdb/pkg/utils"
 )
 
@@ -24,6 +23,8 @@ func NewFormatter(format string, cfg *FormatterConfig) (Formatter, error) {
 		return csvFormatter{baseFormatter{cfg: cfg}}, nil
 	case "json":
 		return simpleJsonFormatter{baseFormatter{cfg: cfg}}, nil
+	case "none":
+		return testFormatter{baseFormatter{cfg: cfg}}, nil
 
 	default:
 		return nil, fmt.Errorf("unknown formatter type %s", format)
@@ -31,7 +32,7 @@ func NewFormatter(format string, cfg *FormatterConfig) (Formatter, error) {
 }
 
 type Formatter interface {
-	Write(out io.Writer, set querier.SeriesSet) error
+	Write(out io.Writer, set utils.SeriesSet) error
 }
 
 type FormatterConfig struct {
