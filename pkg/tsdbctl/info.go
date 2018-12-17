@@ -45,7 +45,7 @@ func newInfoCommandeer(rootCommandeer *RootCommandeer) *infoCommandeer {
 		Short: "Display information about a TSDB instance",
 		Long:  `Display configuration and metrics information for a TSDB instance (table).`,
 		Example: `- tsdbctl info -s 192.168.1.100:8081 -u myuser -p mypassword -c bigdata -t mytsdb -m -n
-- tsdbctl info -s 192.168.1.100:8081 -u jerrys -p OpenSesame -c mycontainer -t my_tsdb`,
+- tsdbctl info -s 192.168.1.100:8081 -k 9c1f3e75-a521-4b0d-b640-68c86417df2f -c mycontainer -t my_tsdb`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 
 			// Initialize parameters
