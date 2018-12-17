@@ -13,23 +13,35 @@ type SyncSession struct {
 	logger             logger.Logger
 	context            *SyncContext
 	authenticatioToken string
+	sessionKey   string
 }
 
 func newSyncSession(parentLogger logger.Logger,
 	context *SyncContext,
 	username string,
 	password string,
-	label string) (*SyncSession, error) {
+	label string,
+	sessionKey string) (*SyncSession, error) {
 
-	// generate token for basic authentication
-	usernameAndPassword := fmt.Sprintf("%s:%s", username, password)
-	encodedUsernameAndPassword := base64.StdEncoding.EncodeToString([]byte(usernameAndPassword))
+	if sessionKey != "" {
+		return &SyncSession{
+			logger:             parentLogger.GetChild("session"),
+			context:            context,
+			sessionKey:			sessionKey,
+		}, nil
 
-	return &SyncSession{
-		logger:             parentLogger.GetChild("session"),
-		context:            context,
-		authenticatioToken: "Basic " + encodedUsernameAndPassword,
-	}, nil
+	} else {
+		// generate token for basic authentication
+		usernameAndPassword := fmt.Sprintf("%s:%s", username, password)
+		encodedUsernameAndPassword := base64.StdEncoding.EncodeToString([]byte(usernameAndPassword))
+
+		return &SyncSession{
+			logger:             parentLogger.GetChild("session"),
+			context:            context,
+			authenticatioToken: "Basic " + encodedUsernameAndPassword,
+		}, nil
+
+	}
 }
 
 func (ss *SyncSession) ListAll() (*Response, error) {
@@ -40,8 +52,13 @@ func (ss *SyncSession) ListAll() (*Response, error) {
 
 func (ss *SyncSession) sendRequestViaContext(request *fasthttp.Request, response *fasthttp.Response) error {
 
-	// add authorization token
-	request.Header.Set("Authorization", ss.authenticatioToken)
+	if ss.sessionKey != "" {
+		//add session-key header
+		request.Header.Set("X-v3io-session-key", ss.sessionKey)
+	} else {
+		// add authorization token
+		request.Header.Set("Authorization", ss.authenticatioToken)
+	}
 
 	// delegate to context
 	return ss.context.sendRequest(request, response)

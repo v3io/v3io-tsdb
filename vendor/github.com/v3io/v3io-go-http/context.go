@@ -31,8 +31,12 @@ func NewContext(parentLogger logger.Logger, clusterURL string, numWorkers int) (
 	return newContext, nil
 }
 
-func (c *Context) NewSession(username string, password string, label string) (*Session, error) {
-	return newSession(c.logger, c, username, password, label)
+func (c *Context) NewSession(username string, password string, label string, sessionKey ...string) (*Session, error) {
+	session := ""
+	if len(sessionKey) > 0 {
+		session = sessionKey[0]
+	}
+	return newSession(c.logger, c, username, password, label, session)
 }
 
 func (c *Context) sendRequest(request *Request) error {
