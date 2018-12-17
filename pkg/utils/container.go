@@ -32,7 +32,7 @@ import (
 	"github.com/v3io/v3io-tsdb/pkg/config"
 )
 
-const defaultHttpTimeout = 10 * time.Second
+const defaultHttpTimeout = 30 * time.Second
 
 func NewLogger(level string) (logger.Logger, error) {
 	var logLevel nucliozap.Level
