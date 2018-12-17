@@ -113,7 +113,7 @@ func aggregateClientAggregates(ctx *selectQueryContext, res *qryResults) {
 	it := newRawChunkIterator(res, nil)
 	for it.Next() {
 		t, v := it.At()
-		currentCell := (t - ctx.mint) / res.query.aggregationParams.Interval
+		currentCell := (t - ctx.queryParams.From) / res.query.aggregationParams.Interval
 
 		for _, col := range res.frame.columns {
 			if col.GetColumnSpec().metric == res.name {
@@ -144,7 +144,7 @@ func aggregateServerAggregates(ctx *selectQueryContext, res *qryResults) {
 					val := binary.LittleEndian.Uint64(bytes[i : i+8])
 					currentValueIndex := (i - 16) / 8
 					currentValueTime := partitionStartTime + int64(currentValueIndex+1)*rollupInterval
-					currentCell := (currentValueTime - ctx.mint) / res.query.aggregationParams.Interval
+					currentCell := (currentValueTime - ctx.queryParams.From) / res.query.aggregationParams.Interval
 
 					var floatVal float64
 					if aggregate.IsCountAggregate(col.GetColumnSpec().function) {
@@ -171,10 +171,10 @@ func downsampleRawData(ctx *selectQueryContext, res *qryResults,
 		return previousPartitionLastTime, previousPartitionLastValue, err
 	}
 	for currBucket := 0; currBucket < col.Len(); currBucket++ {
-		currBucketTime := int64(currBucket)*ctx.step + ctx.mint
+		currBucketTime := int64(currBucket)*ctx.queryParams.Step + ctx.queryParams.From
 		if it.Seek(currBucketTime) {
 			t, v := it.At()
-			tBucketIndex := (t - ctx.mint) / ctx.step
+			tBucketIndex := (t - ctx.queryParams.From) / ctx.queryParams.Step
 			if t == currBucketTime {
 				col.SetDataAt(currBucket, v)
 			} else if tBucketIndex == int64(currBucket) {
