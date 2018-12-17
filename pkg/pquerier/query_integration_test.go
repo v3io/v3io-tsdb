@@ -1494,6 +1494,68 @@ func (suite *testQuerySuite) TestQueryAllData() {
 	assert.Equal(suite.T(), 3, seriesCount, "series count didn't match expected")
 }
 
+func (suite *testQuerySuite) TestCrossSeriesAggregatesSinglePartition() {
+	adapter, err := tsdb.NewV3ioAdapter(suite.v3ioConfig, nil, nil)
+	if err != nil {
+		suite.T().Fatalf("failed to create v3io adapter. reason: %s", err)
+	}
+
+	labels1 := utils.LabelsFromStringList("os", "linux")
+	labels2 := utils.LabelsFromStringList("os", "mac")
+	numberOfEvents := 10
+	eventsInterval := 60 * 1000
+	baseTime := tsdbtest.NanosToMillis(time.Now().UnixNano()) - int64(numberOfEvents*eventsInterval)
+
+	ingestedData := []tsdbtest.DataPoint{{baseTime, 10}}
+	ingestedData2 := []tsdbtest.DataPoint{{baseTime, 20}}
+	testParams := tsdbtest.NewTestParams(suite.T(),
+		tsdbtest.TestOption{
+			Key: tsdbtest.OptTimeSeries,
+			Value: tsdbtest.TimeSeries{tsdbtest.Metric{
+				Name:   "cpu",
+				Labels: labels1,
+				Data:   ingestedData},
+				tsdbtest.Metric{
+					Name:   "cpu",
+					Labels: labels2,
+					Data:   ingestedData2},
+			}})
+	tsdbtest.InsertData(suite.T(), testParams)
+
+	expected := map[string][]tsdbtest.DataPoint{"sum": {{Time: baseTime, Value: 30}},
+		"min":   {{Time: baseTime, Value: 10}},
+		"max":   {{Time: baseTime, Value: 20}},
+		"count": {{Time: baseTime, Value: 2}},
+		"avg":   {{Time: baseTime, Value: 15}}}
+
+	querierV2, err := adapter.QuerierV2(nil)
+	if err != nil {
+		suite.T().Fatalf("Failed to create querier v2, err: %v", err)
+	}
+
+	params := &pquerier.SelectParams{Name: "cpu", Functions: "sum_all,min_all,max_all,count_all,avg_all", Step: 2 * 60 * 1000, From: baseTime, To: baseTime + int64(numberOfEvents*eventsInterval)}
+	set, err := querierV2.Select(params)
+	if err != nil {
+		suite.T().Fatalf("Failed to exeute query, err: %v", err)
+	}
+
+	var seriesCount int
+	for set.Next() {
+		seriesCount++
+		iter := set.At().Iterator()
+
+		data, err := tsdbtest.IteratorToSlice(iter)
+		agg := set.At().Labels().Get(aggregate.AggregateLabel)
+		if err != nil {
+			suite.T().Fatal(err)
+		}
+
+		assert.Equal(suite.T(), expected[agg], data, "queried data does not match expected")
+	}
+
+	assert.Equal(suite.T(), len(expected), seriesCount, "series count didn't match expected")
+}
+
 func (suite *testQuerySuite) toMillis(date string) int64 {
 	t, err := time.Parse(time.RFC3339, date)
 	if err != nil {

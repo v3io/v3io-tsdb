@@ -31,10 +31,11 @@ type selectQueryContext struct {
 	windows   []int
 
 	// TODO: create columns spec from select query params
-	columnsSpec         []columnMeta
-	columnsSpecByMetric map[string][]columnMeta
-	isAllMetrics        bool
-	totalColumns        int
+	columnsSpec            []columnMeta
+	columnsSpecByMetric    map[string][]columnMeta
+	isAllMetrics           bool
+	totalColumns           int
+	isCrossSeriesAggregate bool
 
 	disableAllAggr     bool
 	disableClientAggr  bool
@@ -240,7 +241,14 @@ func (queryCtx *selectQueryContext) processQueryResults(query *partQuery) error 
 
 		results := qryResults{name: name, encoding: int16(encoding), query: query, fields: query.GetFields()}
 		sort.Sort(lset) // maybe skipped if its written sorted
-		hash := lset.Hash()
+		var hash uint64
+
+		if queryCtx.isCrossSeriesAggregate {
+			hash = uint64(0)
+			lset = utils.Labels{}
+		} else {
+			hash = lset.Hash()
+		}
 
 		// find or create data frame
 		frame, ok := queryCtx.dataFrames[hash]
@@ -266,8 +274,7 @@ func (queryCtx *selectQueryContext) processQueryResults(query *partQuery) error 
 func (queryCtx *selectQueryContext) createColumnSpecs(params *SelectParams) ([]columnMeta, map[string][]columnMeta, error) {
 	var columnsSpec []columnMeta
 	columnsSpecByMetric := make(map[string][]columnMeta)
-
-	for _, col := range params.getRequestedColumns() {
+	for i, col := range params.getRequestedColumns() {
 		_, ok := columnsSpecByMetric[col.Metric]
 		if !ok {
 			columnsSpecByMetric[col.Metric] = []columnMeta{}
@@ -284,8 +291,17 @@ func (queryCtx *selectQueryContext) createColumnSpecs(params *SelectParams) ([]c
 		}
 		colMeta := columnMeta{metric: col.Metric, alias: col.Alias, interpolationType: inter, interpolationTolerance: tolerance}
 
-		if col.Function != "" {
-			aggr, err := aggregate.AggregateFromString(col.Function)
+		if col.GetFunction() != "" {
+			// validating that all given aggregates are either cross series or not
+			if col.isCrossSeries() {
+				if i > 0 && !queryCtx.isCrossSeriesAggregate {
+					return nil, nil, fmt.Errorf("can not aggregate both over time and across series aggregates")
+				}
+				queryCtx.isCrossSeriesAggregate = true
+			} else if queryCtx.isCrossSeriesAggregate {
+				return nil, nil, fmt.Errorf("can not aggregate both over time and across series aggregates")
+			}
+			aggr, err := aggregate.AggregateFromString(col.GetFunction())
 			if err != nil {
 				return nil, nil, err
 			}

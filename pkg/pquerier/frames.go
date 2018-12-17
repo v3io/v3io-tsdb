@@ -172,10 +172,14 @@ func getAggreagteFunction(aggrType aggregate.AggrType, useServerAggregates bool)
 func fillDependantColumns(wantedColumn Column, df *dataFrame) {
 	wantedAggregations := aggregate.GetDependantAggregates(wantedColumn.GetColumnSpec().function)
 	var columns []Column
-	for _, col := range df.columns {
-		if col.GetColumnSpec().metric == wantedColumn.GetColumnSpec().metric &&
-			aggregate.ContainsAggregate(wantedAggregations, col.GetColumnSpec().function) {
-			columns = append(columns, col)
+
+	// Order of the dependent columns should be the same as `wantedAggregations`.
+	for _, agg := range wantedAggregations {
+		for _, col := range df.columns {
+			if col.GetColumnSpec().metric == wantedColumn.GetColumnSpec().metric &&
+				agg == col.GetColumnSpec().function {
+				columns = append(columns, col)
+			}
 		}
 	}
 	wantedColumn.(*virtualColumn).dependantColumns = columns

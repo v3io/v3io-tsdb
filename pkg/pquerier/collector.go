@@ -93,6 +93,7 @@ func mainCollector(ctx *selectQueryContext, responseChannel chan *qryResults) {
 }
 
 func rawCollector(ctx *selectQueryContext, res *qryResults) {
+	ctx.logger.Debug("using Raw Collector for metric &v", res.name)
 	frameIndex, ok := res.frame.columnByName[res.name]
 	if ok {
 		res.frame.rawColumns[frameIndex].(*V3ioRawSeries).AddChunks(res)
@@ -108,6 +109,7 @@ func rawCollector(ctx *selectQueryContext, res *qryResults) {
 }
 
 func aggregateClientAggregates(ctx *selectQueryContext, res *qryResults) {
+	ctx.logger.Debug("using Client Aggregates Collector for metric &v", res.name)
 	it := newRawChunkIterator(res, nil)
 	for it.Next() {
 		t, v := it.At()
@@ -122,6 +124,8 @@ func aggregateClientAggregates(ctx *selectQueryContext, res *qryResults) {
 }
 
 func aggregateServerAggregates(ctx *selectQueryContext, res *qryResults) {
+	ctx.logger.Debug("using Server Aggregates Collector for metric &v", res.name)
+
 	partitionStartTime := res.query.partition.GetStartTime()
 	rollupInterval := res.query.aggregationParams.GetRollupTime()
 	for _, col := range res.frame.columns {
@@ -157,6 +161,8 @@ func aggregateServerAggregates(ctx *selectQueryContext, res *qryResults) {
 
 func downsampleRawData(ctx *selectQueryContext, res *qryResults,
 	previousPartitionLastTime int64, previousPartitionLastValue float64) (int64, float64, error) {
+	ctx.logger.Debug("using Downsample Collector for metric &v", res.name)
+
 	var lastT int64
 	var lastV float64
 	it := newRawChunkIterator(res, nil).(*rawChunkIterator)
