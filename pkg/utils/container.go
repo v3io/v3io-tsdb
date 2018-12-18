@@ -76,7 +76,13 @@ func CreateContainer(logger logger.Logger, cfg *config.V3ioConfig) (*v3io.Contai
 	}
 
 	// Create session
-	session, err := context.NewSession(cfg.Username, cfg.Password, "tsdb", cfg.SessionKey)
+	sessionConfig := &v3io.SessionConfig{
+		Username:	cfg.Username,
+		Password:	cfg.Password,
+		Label:		"tsdb",
+		SessionKey:	cfg.SessionKey,
+	}
+	session, err := context.NewSessionFromConfig(sessionConfig)
 	if err != nil {
 		return nil, errors.Wrap(err, "Failed to create a session.")
 	}
