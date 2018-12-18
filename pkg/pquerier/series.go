@@ -4,11 +4,12 @@ import (
 	"math"
 
 	"github.com/v3io/v3io-tsdb/pkg/aggregate"
+	"github.com/v3io/v3io-tsdb/pkg/chunkenc"
 	"github.com/v3io/v3io-tsdb/pkg/config"
 	"github.com/v3io/v3io-tsdb/pkg/utils"
 )
 
-func NewDataFrameColumnSeries(indexColumn, dataColumn, countColumn Column, labels utils.Labels, hash uint64, showAggregateLabel bool) *DataFrameColumnSeries {
+func NewDataFrameColumnSeries(indexColumn, dataColumn, countColumn Column, labels utils.Labels, hash uint64, showAggregateLabel bool, encoding chunkenc.Encoding) *DataFrameColumnSeries {
 	// If we need to return the Aggregate label then add it, otherwise (for example in prometheus) return labels without it
 	if showAggregateLabel {
 		labels = append(labels, utils.LabelsFromStringList(aggregate.AggregateLabel, dataColumn.GetColumnSpec().function.String())...)
@@ -17,7 +18,7 @@ func NewDataFrameColumnSeries(indexColumn, dataColumn, countColumn Column, label
 	// The labels we get from the Dataframe are agnostic to the metric name, since there might be several metrics in one Dataframe
 	labels = append(labels, utils.LabelsFromStringList(config.PrometheusMetricNameAttribute, dataColumn.GetColumnSpec().metric)...)
 	s := &DataFrameColumnSeries{labels: labels, key: hash}
-	s.iter = &dataFrameColumnSeriesIterator{indexColumn: indexColumn, dataColumn: dataColumn, countColumn: countColumn, currentIndex: -1}
+	s.iter = &dataFrameColumnSeriesIterator{indexColumn: indexColumn, dataColumn: dataColumn, countColumn: countColumn, currentIndex: -1, encoding: encoding}
 	return s
 }
 
@@ -41,6 +42,7 @@ type dataFrameColumnSeriesIterator struct {
 
 	currentIndex int
 	err          error
+	encoding     chunkenc.Encoding
 }
 
 func (it *dataFrameColumnSeriesIterator) Seek(seekT int64) bool {
@@ -74,6 +76,18 @@ func (it *dataFrameColumnSeriesIterator) At() (int64, float64) {
 	return t, v
 }
 
+func (it *dataFrameColumnSeriesIterator) AtString() (int64, string) {
+	t, err := it.indexColumn.TimeAt(it.currentIndex)
+	if err != nil {
+		it.err = err
+	}
+	v, err := it.dataColumn.StringAt(it.currentIndex)
+	if err != nil {
+		it.err = err
+	}
+	return t, v
+}
+
 func (it *dataFrameColumnSeriesIterator) Next() bool {
 	if it.err != nil {
 		return false
@@ -85,6 +99,8 @@ func (it *dataFrameColumnSeriesIterator) Next() bool {
 }
 
 func (it *dataFrameColumnSeriesIterator) Err() error { return it.err }
+
+func (it *dataFrameColumnSeriesIterator) Encoding() chunkenc.Encoding { return it.encoding }
 
 func (it *dataFrameColumnSeriesIterator) getNextValidCell(from int) (nextIndex int) {
 	for nextIndex = from + 1; nextIndex < it.dataColumn.Len() && !it.doesCellHasData(nextIndex); nextIndex++ {

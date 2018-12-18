@@ -6,6 +6,7 @@ import (
 	"io"
 
 	"github.com/pkg/errors"
+	"github.com/v3io/v3io-tsdb/pkg/chunkenc"
 	"github.com/v3io/v3io-tsdb/pkg/utils"
 )
 
@@ -21,8 +22,13 @@ func (f textFormatter) Write(out io.Writer, set utils.SeriesSet) error {
 		fmt.Fprintf(out, "Name: %s  Labels: %s\n", name, lbls)
 		iter := series.Iterator()
 		for iter.Next() {
-			t, v := iter.At()
-			fmt.Fprintf(out, "  %s  v=%.2f\n", f.timeString(t), v)
+			if iter.Encoding() == chunkenc.EncXOR {
+				t, v := iter.At()
+				fmt.Fprintf(out, "  %s  v=%.2f\n", f.timeString(t), v)
+			} else {
+				t, v := iter.AtString()
+				fmt.Fprintf(out, "  %s  v=%v\n", f.timeString(t), v)
+			}
 		}
 
 		if iter.Err() != nil {

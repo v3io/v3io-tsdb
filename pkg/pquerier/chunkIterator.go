@@ -14,7 +14,8 @@ import (
 type rawChunkIterator struct {
 	mint, maxt int64
 
-	chunks []chunkenc.Chunk
+	chunks   []chunkenc.Chunk
+	encoding chunkenc.Encoding
 
 	chunkIndex int
 	chunksMax  []int64
@@ -33,7 +34,7 @@ func newRawChunkIterator(queryResult *qryResults, log logger.Logger) utils.Serie
 	}
 
 	newIterator := rawChunkIterator{
-		mint: queryResult.query.mint, maxt: maxt, log: log}
+		mint: queryResult.query.mint, maxt: maxt, log: log, encoding: queryResult.encoding}
 
 	newIterator.AddChunks(queryResult)
 
@@ -139,7 +140,11 @@ func (it *rawChunkIterator) Next() bool {
 // Read the time and value at the current location
 func (it *rawChunkIterator) At() (t int64, v float64) { return it.iter.At() }
 
+func (it *rawChunkIterator) AtString() (t int64, v string) { return it.iter.AtString() }
+
 func (it *rawChunkIterator) Err() error { return it.iter.Err() }
+
+func (it *rawChunkIterator) Encoding() chunkenc.Encoding { return it.encoding }
 
 func (it *rawChunkIterator) AddChunks(item *qryResults) {
 	var chunks []chunkenc.Chunk
@@ -160,7 +165,8 @@ func (it *rawChunkIterator) AddChunks(item *qryResults) {
 			values := item.fields[attr]
 			if values != nil {
 				bytes := values.([]byte)
-				chunk, err := chunkenc.FromData(it.log, chunkenc.EncXOR, bytes, 0)
+
+				chunk, err := chunkenc.FromData(it.log, it.encoding, bytes, 0)
 				if err != nil {
 					it.log.ErrorWith("Error reading chunk buffer", "columns", item.query.attrs, "err", err)
 				} else {
