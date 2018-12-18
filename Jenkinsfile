@@ -273,7 +273,7 @@ spec:
                 podTemplate(label: "v3io-tsdb-nuclio-${label}", inheritFrom: "${git_project}-${label}") {
                     node("v3io-tsdb-nuclio-${label}") {
                         withCredentials([
-                            string(credentialsId: git_deploy_user_token, variable: 'GIT_TOKEN')
+                                string(credentialsId: git_deploy_user_token, variable: 'GIT_TOKEN')
                         ]) {
                             def NEXT_VERSION
 
@@ -310,7 +310,7 @@ spec:
                 podTemplate(label: "demos-${label}", inheritFrom: "${git_project}-${label}") {
                     node("demos-${label}") {
                         withCredentials([
-                            string(credentialsId: git_deploy_user_token, variable: 'GIT_TOKEN')
+                                string(credentialsId: git_deploy_user_token, variable: 'GIT_TOKEN')
                         ]) {
                             def NEXT_VERSION
 
@@ -485,4 +485,85 @@ spec:
             }
         }
     }
+
+    node("${git_project}-${label}") {
+        withCredentials([
+                string(credentialsId: git_deploy_user_token, variable: 'GIT_TOKEN')
+        ]) {
+            stage('waiting for prereleases moved to releases') {
+                container('jnlp') {
+                    i = 0
+                    def tasks_list = ['demos':null, 'prometheus':null, 'tsdb-nuclio':null]
+                    def success_count = 0
+
+                    while( true ) {
+                        def done_count = 0
+
+                        echo "attempt #${i}"
+                        tasks_list.each { project, status ->
+                            if (status == null) {
+                                def RELEASE_SUCCESS = sh(
+                                        script: "curl --silent -H \"Content-Type: application/json\" -H \"Authorization: token ${GIT_TOKEN}\" -X GET https://api.github.com/repos/${git_project_user}/${project}/releases/tags/v${next_versions[project]} | python -c 'import json,sys;obj=json.load(sys.stdin);print obj[\"prerelease\"]' | if grep -iq false; then echo 'release'; else echo 'prerelease'; fi",
+                                        returnStdout: true
+                                ).trim()
+
+                                echo "${project} is ${RELEASE_SUCCESS}"
+                                if (RELEASE_SUCCESS != null && RELEASE_SUCCESS == 'release') {
+                                    tasks_list.putAt(project, true)
+                                    done_count++
+                                    success_count++
+                                } else {
+                                    def TAG_SHA = sh(
+                                            script: "curl --silent -H \"Content-Type: application/json\" -H \"Authorization: token ${GIT_TOKEN}\" -X GET https://api.github.com/repos/${git_project_user}/${project}/git/refs/tags/v${next_versions[project]} | python -c 'import json,sys;obj=json.load(sys.stdin);print obj[\"object\"][\"sha\"]'",
+                                            returnStdout: true
+                                    ).trim()
+
+                                    if(TAG_SHA != null) {
+                                        def COMMIT_STATUS = sh(
+                                                script: "curl --silent -H \"Content-Type: application/json\" -H \"Authorization: token ${GIT_TOKEN}\" -X GET https://api.github.com/repos/${git_project_user}/${project}/commits/${TAG_SHA}/statuses | python -c 'import json,sys;obj=json.load(sys.stdin);print obj[0][\"state\"]' | if grep -iq error; then echo 'error'; else echo 'ok'; fi",
+                                                returnStdout: true
+                                        ).trim()
+                                        if (COMMIT_STATUS != null && COMMIT_STATUS == 'error') {
+                                            tasks_list.putAt(project, false)
+                                            done_count++
+                                        }
+                                    }
+                                }
+                            } else {
+                                done_count++
+                            }
+                        }
+                        if(success_count >= tasks_list.size()) {
+                            echo "all releases have been successfully completed"
+                            break
+                        }
+
+                        if(done_count >= tasks_list.size() || i++ > attempts) {
+                            def failed = []
+                            def notcompleted = []
+                            def error_string = ''
+                            tasks_list.each { project, status ->
+                                if(status == null) {
+                                    notcompleted += project
+                                } else if(status == false) {
+                                    failed += project
+                                }
+                            }
+                            if(failed.size()) {
+                                error_string += failed.join(',') + ' have been failed :_(. '
+                            }
+                            if(notcompleted.size()) {
+                                error_string += notcompleted.join(',') + ' have been not completed :(. '
+                            }
+                            error(error_string)
+                            break
+                        }
+
+                        sleep(60)
+                    }
+                }
+            }
+        }
+    }
 }
+
