@@ -3,10 +3,10 @@ BUILD_FOLDER = "/go"
 expired=240
 attempts=15
 git_project = "v3io-tsdb"
-git_project_user = "gkirok"
-git_deploy_user = "iguazio-dev-git-user"
-git_deploy_user_token = "iguazio-dev-git-user-token"
-git_deploy_user_private_key = "iguazio-dev-git-user-private-key"
+git_project_user = "v3io"
+git_deploy_user = "iguazio-prod-git-user"
+git_deploy_user_token = "iguazio-prod-git-user-token"
+git_deploy_user_private_key = "iguazio-prod-git-user-private-key"
 
 def build_v3io_tsdb(TAG_VERSION) {
     withCredentials([
@@ -239,7 +239,7 @@ spec:
                     [$class: 'GitSCMSource',
                      credentialsId: git_deploy_user_private_key,
                      remote: "git@github.com:iguazio/pipelinex.git"])).com.iguazio.pipelinex
-            multi_credentials=[pipelinex.DockerRepoDev.ARTIFACTORY_IGUAZIO, pipelinex.DockerRepoDev.DOCKER_HUB, pipelinex.DockerRepoDev.QUAY_IO]
+            multi_credentials=[pipelinex.DockerRepo.ARTIFACTORY_IGUAZIO, pipelinex.DockerRepo.DOCKER_HUB, pipelinex.DockerRepo.QUAY_IO]
 
             stage('get tag data') {
                 container('jnlp') {
