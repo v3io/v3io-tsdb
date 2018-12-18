@@ -16,21 +16,20 @@ def build_v3io_tsdb(TAG_VERSION) {
         def git_project = 'v3io-tsdb'
         stage('prepare sources') {
             container('jnlp') {
-                sh """
-                    cd ${BUILD_FOLDER}
-                    git clone https://${GIT_USERNAME}:${GIT_PASSWORD}@github.com/${git_project_user}/${git_project}.git src/github.com/v3io/${git_project}
-                    cd ${BUILD_FOLDER}/src/github.com/v3io/${git_project}
-                """
+                dir("${BUILD_FOLDER}/src/github.com/v3io/${git_project}") {
+                    git(changelog: false, credentialsId: git_deploy_user_private_key, poll: false, url: "git@github.com:${git_project_user}/${git_project}.git")
+                    sh("git checkout v${TAG_VERSION}")
+                }
             }
         }
 
-        stage('build ${git_project} binaries in dood') {
+        stage("build ${git_project} binaries in dood") {
             container('golang') {
                 sh """
                     cd ${BUILD_FOLDER}/src/github.com/v3io/${git_project}
-                    GOOS=linux GOARCH=amd64 TRAVIS_TAG=${TAG_VERSION} make bin
-                    GOOS=darwin GOARCH=amd64 TRAVIS_TAG=${TAG_VERSION} make bin
-                    GOOS=windows GOARCH=amd64 TRAVIS_TAG=${TAG_VERSION} make bin
+                    GOOS=linux GOARCH=amd64 TRAVIS_TAG=v${TAG_VERSION} make bin
+                    GOOS=darwin GOARCH=amd64 TRAVIS_TAG=v${TAG_VERSION} make bin
+                    GOOS=windows GOARCH=amd64 TRAVIS_TAG=v${TAG_VERSION} make bin
                     ls -la /go/bin
                 """
             }
@@ -38,16 +37,11 @@ def build_v3io_tsdb(TAG_VERSION) {
 
         stage('upload release assets') {
             container('jnlp') {
-                RELEASE_ID = sh(
-                        script: "curl -H \"Content-Type: application/json\" -H \"Authorization: token ${GIT_TOKEN}\" -X GET https://api.github.com/repos/${git_project_user}/${git_project}/releases/tags/v${TAG_VERSION} | python -c 'import json,sys;obj=json.load(sys.stdin);print obj[\"id\"]'",
-                        returnStdout: true
-                ).trim()
+                RELEASE_ID = github.get_release_id(git_project, git_project_user, "v${TAG_VERSION}", GIT_TOKEN)
 
-                sh "curl -X POST -H \"Content-Type: application/data\" -H \"Authorization: token ${GIT_TOKEN}\" https://uploads.github.com/repos/${git_project_user}/${git_project}/releases/${RELEASE_ID}/assets?name=tsdbctl-${TAG_VERSION}-linux-amd64 -F 'data=@/go/bin/tsdbctl-${TAG_VERSION}-linux-amd64'"
-
-                sh "curl -X POST -H \"Content-Type: application/data\" -H \"Authorization: token ${GIT_TOKEN}\" https://uploads.github.com/repos/${git_project_user}/${git_project}/releases/${RELEASE_ID}/assets?name=tsdbctl-${TAG_VERSION}-darwin-amd64 -F 'data=@/go/bin/tsdbctl-${TAG_VERSION}-darwin-amd64'"
-
-                sh "curl -X POST -H \"Content-Type: application/data\" -H \"Authorization: token ${GIT_TOKEN}\" https://uploads.github.com/repos/${git_project_user}/${git_project}/releases/${RELEASE_ID}/assets?name=tsdbctl-${TAG_VERSION}-windows-amd64 -F 'data=@/go/bin/tsdbctl-${TAG_VERSION}-windows-amd64'"
+                github.upload_asset(git_project, git_project_user, "tsdbctl-v${TAG_VERSION}-linux-amd64", RELEASE_ID, GIT_TOKEN)
+                github.upload_asset(git_project, git_project_user, "tsdbctl-v${TAG_VERSION}-darwin-amd64", RELEASE_ID, GIT_TOKEN)
+                github.upload_asset(git_project, git_project_user, "tsdbctl-v${TAG_VERSION}-windows-amd64", RELEASE_ID, GIT_TOKEN)
             }
         }
     }
@@ -244,13 +238,13 @@ spec:
             pipelinex = library(identifier: 'pipelinex@DEVOPS-204-pipelinex', retriever: modernSCM(
                     [$class: 'GitSCMSource',
                      credentialsId: git_deploy_user_private_key,
-                     remote: "git@github.com:${git_project_user}/pipelinex.git"])).com.iguazio.pipelinex
-            multi_credentials=[pipelinex.DockerRepoDev.ARTIFACTORY, pipelinex.DockerRepoDev.DOCKER_HUB, pipelinex.DockerRepoDev.QUAY_IO]
+                     remote: "git@github.com:iguazio/pipelinex.git"])).com.iguazio.pipelinex
+            multi_credentials=[pipelinex.DockerRepoDev.ARTIFACTORY_IGUAZIO, pipelinex.DockerRepoDev.DOCKER_HUB, pipelinex.DockerRepoDev.QUAY_IO]
 
             stage('get tag data') {
                 container('jnlp') {
-                    MAIN_TAG_VERSION = common.get_tag_version(TAG_NAME)
-                    PUBLISHED_BEFORE = common.get_tag_published_before(git_project, git_project_user, "v${MAIN_TAG_VERSION}", GIT_TOKEN)
+                    MAIN_TAG_VERSION = github.get_tag_version(TAG_NAME)
+                    PUBLISHED_BEFORE = github.get_tag_published_before(git_project, git_project_user, "v${MAIN_TAG_VERSION}", GIT_TOKEN)
 
                     echo "$MAIN_TAG_VERSION"
                     echo "$PUBLISHED_BEFORE"
@@ -486,7 +480,7 @@ spec:
 
             stage('update release status') {
                 container('jnlp') {
-                    common.update_release_status(git_project, git_project_user, "v${MAIN_TAG_VERSION}", GIT_TOKEN)
+                    github.update_release_status(git_project, git_project_user, "v${MAIN_TAG_VERSION}", GIT_TOKEN)
                 }
             }
         }
