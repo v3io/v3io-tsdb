@@ -205,9 +205,9 @@ The `Select()` call accepts a `SelectParams` parameter which has the following p
 * From (int64) - a timestamp in milliseconds specifying the start time of the query
 * To (int64) - a timestamp in milliseconds specifying the end time of the query
 * Name (string) - optional, metric type (e.g. cpu, memory, ..), specifying it accelerate performance (use range queries)   
-* Step (int64) - optional, the step interval in milliseconds used for the aggregation functions or for down sampling raw data
+* Step (int64) - optional, the step interval in milliseconds used for the aggregation functions or for downsampling raw data
 * Functions (string) - optional, a comma separated list of aggregation functions e.g. `"count,sum,avg,stddev"` 
-* Filter (string) - optional, V3IO GetItems filter string for selecting the desired metrics e.g. `__name__=='http_req'`
+* Filter (string) - optional, V3IO GetItems filter expression for selecting the desired metrics e.g. `_name=='http_req'`
 * GroupBy (string) - optional, a comma seperated list of labels to group the results by e.g. `"method"`
 * RequestedColumns ([]RequestedColumn) - optional, as an alternative to `Name` & `Function` a user can pass a list of `RequestedColumn` object that specify which metrics and aggregates to query.
  Using this API it is possible to query several metrics in the same query. 
@@ -255,12 +255,15 @@ Select using aggregates:
 Select using RequestedColumns:
 
 ```go
-    params := &pquerier.SelectParams{Name: "http_req",
+    wantedColumns: []pquerier.RequestedColumn{{Metric: "http_req", Function: "avg"},
+                                              {Metric: "http_req", Function: "count"},
+                                              {Metric: "http_req", Function: "max"},
+                                              {Metric: "tcp_req", Function: "avg"}}
+    params := &pquerier.SelectParams{RequestedColumns: wantedColumns
                                      Filter: "method=='post'",
                                      From: minTime,
                                      To: maxTime,
-                                     Step: 1000*3600,
-                                     Functions: "count,avg,sum,max"}
+                                     Step: 1000*3600}
     set, err := qry.Select(params)
 ```
 

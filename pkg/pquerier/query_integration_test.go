@@ -1497,9 +1497,7 @@ func (suite *testQuerySuite) TestQueryAllData() {
 
 func (suite *testQuerySuite) TestCrossSeriesAggregatesSinglePartition() {
 	adapter, err := tsdb.NewV3ioAdapter(suite.v3ioConfig, nil, nil)
-	if err != nil {
-		suite.T().Fatalf("failed to create v3io adapter. reason: %s", err)
-	}
+	suite.Require().NoError(err, "failed to create v3io adapter")
 
 	labels1 := utils.LabelsFromStringList("os", "linux")
 	labels2 := utils.LabelsFromStringList("os", "mac")
@@ -1530,15 +1528,11 @@ func (suite *testQuerySuite) TestCrossSeriesAggregatesSinglePartition() {
 		"avg":   {{Time: baseTime, Value: 15}}}
 
 	querierV2, err := adapter.QuerierV2()
-	if err != nil {
-		suite.T().Fatalf("Failed to create querier v2, err: %v", err)
-	}
+	suite.Require().NoError(err, "failed to create querier v2")
 
 	params := &pquerier.SelectParams{Name: "cpu", Functions: "sum_all,min_all,max_all,count_all,avg_all", Step: 2 * 60 * 1000, From: baseTime, To: baseTime + int64(numberOfEvents*eventsInterval)}
 	set, err := querierV2.Select(params)
-	if err != nil {
-		suite.T().Fatalf("Failed to exeute query, err: %v", err)
-	}
+	suite.Require().NoError(err, "Failed to execute query")
 
 	var seriesCount int
 	for set.Next() {
@@ -1551,17 +1545,15 @@ func (suite *testQuerySuite) TestCrossSeriesAggregatesSinglePartition() {
 			suite.T().Fatal(err)
 		}
 
-		assert.Equal(suite.T(), expected[agg], data, "queried data does not match expected")
+		suite.Require().Equal(expected[agg], data, "queried data does not match expected")
 	}
 
-	assert.Equal(suite.T(), len(expected), seriesCount, "series count didn't match expected")
+	suite.Require().Equal(len(expected), seriesCount, "series count didn't match expected")
 }
 
 func (suite *testQuerySuite) TestGroupByOneLabelSinglePartition() {
 	adapter, err := tsdb.NewV3ioAdapter(suite.v3ioConfig, nil, nil)
-	if err != nil {
-		suite.T().Fatalf("failed to create v3io adapter. reason: %s", err)
-	}
+	suite.Require().NoError(err, "failed to create v3io adapter")
 
 	labels1 := utils.LabelsFromStringList("os", "linux", "region", "europe")
 	labels2 := utils.LabelsFromStringList("os", "mac", "region", "europe")
@@ -1603,9 +1595,7 @@ func (suite *testQuerySuite) TestGroupByOneLabelSinglePartition() {
 			"count": {{Time: baseTime, Value: 1}}}}
 
 	querierV2, err := adapter.QuerierV2()
-	if err != nil {
-		suite.T().Fatalf("Failed to create querier v2, err: %v", err)
-	}
+	suite.Require().NoError(err, "failed to create querier v2")
 
 	params := &pquerier.SelectParams{Name: "cpu",
 		Functions: "sum,count",
@@ -1614,9 +1604,7 @@ func (suite *testQuerySuite) TestGroupByOneLabelSinglePartition() {
 		To:        baseTime + int64(numberOfEvents*eventsInterval),
 		GroupBy:   "os"}
 	set, err := querierV2.Select(params)
-	if err != nil {
-		suite.T().Fatalf("Failed to exeute query, err: %v", err)
-	}
+	suite.Require().NoError(err, "failed to exeute query")
 
 	var seriesCount int
 	for set.Next() {
@@ -1626,21 +1614,17 @@ func (suite *testQuerySuite) TestGroupByOneLabelSinglePartition() {
 		data, err := tsdbtest.IteratorToSlice(iter)
 		agg := set.At().Labels().Get(aggregate.AggregateLabel)
 		groupByValue := set.At().Labels().Get("os")
-		if err != nil {
-			suite.T().Fatal(err)
-		}
+		suite.Require().NoError(err)
 
-		assert.Equal(suite.T(), expected[groupByValue][agg], data, "queried data does not match expected")
+		suite.Require().Equal(expected[groupByValue][agg], data, "queried data does not match expected")
 	}
 
-	assert.Equal(suite.T(), 4, seriesCount, "series count didn't match expected")
+	suite.Require().Equal(4, seriesCount, "series count didn't match expected")
 }
 
 func (suite *testQuerySuite) TestGroupByMultipleLabelsSinglePartition() {
 	adapter, err := tsdb.NewV3ioAdapter(suite.v3ioConfig, nil, nil)
-	if err != nil {
-		suite.T().Fatalf("failed to create v3io adapter. reason: %s", err)
-	}
+	suite.Require().NoError(err, "failed to create v3io adapter")
 
 	labels1 := utils.LabelsFromStringList("os", "linux", "region", "europe", "version", "1")
 	labels2 := utils.LabelsFromStringList("os", "linux", "region", "europe", "version", "2")
@@ -1691,9 +1675,7 @@ func (suite *testQuerySuite) TestGroupByMultipleLabelsSinglePartition() {
 			"count": {{Time: baseTime, Value: 2}}}}
 
 	querierV2, err := adapter.QuerierV2()
-	if err != nil {
-		suite.T().Fatalf("Failed to create querier v2, err: %v", err)
-	}
+	suite.Require().NoError(err, "failed to create querier v2")
 
 	params := &pquerier.SelectParams{Name: "cpu",
 		Functions: "sum,count",
@@ -1702,9 +1684,7 @@ func (suite *testQuerySuite) TestGroupByMultipleLabelsSinglePartition() {
 		To:        baseTime + int64(numberOfEvents*eventsInterval),
 		GroupBy:   strings.Join(groupBy, ",")}
 	set, err := querierV2.Select(params)
-	if err != nil {
-		suite.T().Fatalf("Failed to exeute query, err: %v", err)
-	}
+	suite.Require().NoError(err, "failed to exeute query")
 
 	var seriesCount int
 	for set.Next() {
@@ -1719,21 +1699,17 @@ func (suite *testQuerySuite) TestGroupByMultipleLabelsSinglePartition() {
 		}
 		labelsStr := strings.Join(groupByValue, "-")
 
-		if err != nil {
-			suite.T().Fatal(err)
-		}
+		suite.Require().NoError(err)
 
-		assert.Equal(suite.T(), expected[labelsStr][agg], data, "queried data does not match expected")
+		suite.Require().Equal(expected[labelsStr][agg], data, "queried data does not match expected")
 	}
 
-	assert.Equal(suite.T(), 6, seriesCount, "series count didn't match expected")
+	suite.Require().Equal(6, seriesCount, "series count didn't match expected")
 }
 
 func (suite *testQuerySuite) TestGroupByNotExistingLabel() {
 	adapter, err := tsdb.NewV3ioAdapter(suite.v3ioConfig, nil, nil)
-	if err != nil {
-		suite.T().Fatalf("failed to create v3io adapter. reason: %s", err)
-	}
+	suite.Require().NoError(err, "failed to create v3io adapter")
 
 	labels1 := utils.LabelsFromStringList("os", "linux", "region", "europe")
 	numberOfEvents := 10
@@ -1752,9 +1728,7 @@ func (suite *testQuerySuite) TestGroupByNotExistingLabel() {
 	tsdbtest.InsertData(suite.T(), testParams)
 
 	querierV2, err := adapter.QuerierV2()
-	if err != nil {
-		suite.T().Fatalf("Failed to create querier v2, err: %v", err)
-	}
+	suite.Require().NoError(err, "failed to create querier v2")
 
 	params := &pquerier.SelectParams{Name: "cpu",
 		Functions: "sum,count",

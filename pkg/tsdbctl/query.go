@@ -108,7 +108,7 @@ Arguments:
 	// any other aggregate). However, it was decided that documenting this
 	// would over complicate the documentation.
 	cmd.Flags().StringVarP(&commandeer.functions, "aggregates", "a", "",
-		"Aggregation information to return, as a comma-separated\nlist of supported aggregation functions - count | avg |\nsum | min | max | stddev | stdvar | last | rate.\nFor cross series aggregations add an \"_all\" suffix for the wanted aggregate.\nNote: you can query either over time aggregates or cross series aggregate but not both at the same query.\nExample: \"sum,min,max,count\", \"sum_all,avg_all\".")
+		"Aggregation information to return, as a comma-separated\nlist of supported aggregation functions - count | avg |\nsum | min | max | stddev | stdvar | last | rate.\nFor cross series aggregations add an \"_all\" suffix for the wanted aggregate.\nNote: you can query either over time aggregates or cross series aggregate but not both in the same query.\nExample: \"sum,min,max,count\", \"sum_all,avg_all\".")
 	cmd.Flags().StringVarP(&commandeer.step, "aggregation-interval", "i", "",
 		"Aggregation interval for applying the aggregation functions\n(if set - see the -a|--aggregates flag), of the format\n\"[0-9]+[mhd]\" (where 'm' = minutes, 'h' = hours, and\n'd' = days). Examples: \"1h\"; \"150m\". (default =\n<end time> - <start time>)")
 	cmd.Flags().StringVar(&commandeer.groupBy, "groupBy", "",
