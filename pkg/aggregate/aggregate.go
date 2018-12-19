@@ -195,7 +195,10 @@ type AggregatesList []Aggregate
 
 // Append a value to all aggregates
 func (a AggregatesList) Aggregate(t int64, val interface{}) {
-	v := val.(float64)
+	v, ok := val.(float64)
+	if !ok {
+		return
+	}
 	for _, aggr := range a {
 		aggr.Aggregate(t, v)
 	}

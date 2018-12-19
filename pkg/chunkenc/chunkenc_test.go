@@ -50,7 +50,7 @@ func TestXor(tst *testing.T) {
 	logger, err := nucliozap.NewNuclioZapTest("test")
 	assert.Nil(tst, err)
 
-	ch := NewXORChunk(logger)
+	ch := newXORChunk(logger)
 	appender, err := ch.Appender()
 	if err != nil {
 		tst.Fatal(err)
@@ -65,7 +65,7 @@ func TestXor(tst *testing.T) {
 		ch.Clear()
 		if i == 4 {
 			fmt.Println("restarted appender")
-			ch = NewXORChunk(logger)
+			ch = newXORChunk(logger)
 			appender, err = ch.Appender()
 			if err != nil {
 				tst.Fatal(err)

@@ -3,6 +3,7 @@ package pquerier
 import (
 	"fmt"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -10,6 +11,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/v3io/v3io-go-http"
 	"github.com/v3io/v3io-tsdb/pkg/aggregate"
+	"github.com/v3io/v3io-tsdb/pkg/chunkenc"
 	"github.com/v3io/v3io-tsdb/pkg/config"
 	"github.com/v3io/v3io-tsdb/pkg/partmgr"
 	"github.com/v3io/v3io-tsdb/pkg/utils"
@@ -223,13 +225,22 @@ func (queryCtx *selectQueryContext) processQueryResults(query *partQuery) error 
 			return err
 		}
 
-		// read chunk encoding type (TODO: in ingestion etc.)
-		encoding, nok := query.GetField(config.EncodingAttrName).(int)
-		if !nok {
-			encoding = 0
+		// read chunk encoding type
+		var encoding chunkenc.Encoding
+		encodingStr, ok := query.GetField(config.EncodingAttrName).(string)
+		// If we don't have the encoding attribute, use XOR as default. (for backwards compatibility)
+		if !ok {
+			encoding = chunkenc.EncXOR
+		} else {
+			intEncoding, err := strconv.Atoi(encodingStr)
+			if err != nil {
+				return fmt.Errorf("error parsing encoding type of chunk, got: %v, error: %v", encodingStr, err)
+			} else {
+				encoding = chunkenc.Encoding(intEncoding)
+			}
 		}
 
-		results := qryResults{name: name, encoding: int16(encoding), query: query, fields: query.GetFields()}
+		results := qryResults{name: name, encoding: encoding, query: query, fields: query.GetFields()}
 		sort.Sort(lset) // maybe skipped if its written sorted
 		var hash uint64
 
@@ -258,7 +269,16 @@ func (queryCtx *selectQueryContext) processQueryResults(query *partQuery) error 
 		frame, ok := queryCtx.dataFrames[hash]
 		if !ok {
 			var err error
-			frame, err = NewDataFrame(queryCtx.columnsSpec, queryCtx.getOrCreateTimeColumn(), lset, hash, queryCtx.isRawQuery(), queryCtx.isAllMetrics, queryCtx.getResultBucketsSize(), results.IsServerAggregates(), queryCtx.showAggregateLabel)
+			frame, err = NewDataFrame(queryCtx.columnsSpec,
+				queryCtx.getOrCreateTimeColumn(),
+				lset,
+				hash,
+				queryCtx.isRawQuery(),
+				queryCtx.isAllMetrics,
+				queryCtx.getResultBucketsSize(),
+				results.IsServerAggregates(),
+				queryCtx.showAggregateLabel,
+				encoding)
 			if err != nil {
 				return err
 			}

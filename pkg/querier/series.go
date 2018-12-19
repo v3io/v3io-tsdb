@@ -220,7 +220,11 @@ func (it *v3ioSeriesIterator) Next() bool {
 // Read the time and value at the current location
 func (it *v3ioSeriesIterator) At() (t int64, v float64) { return it.iter.At() }
 
+func (it *v3ioSeriesIterator) AtString() (t int64, v string) { return it.iter.AtString() }
+
 func (it *v3ioSeriesIterator) Err() error { return it.iter.Err() }
+
+func (it *v3ioSeriesIterator) Encoding() chunkenc.Encoding { return chunkenc.EncXOR }
 
 // Aggregates (count, avg, sum, ..) series and iterator
 
@@ -292,5 +296,9 @@ func (s *aggrSeriesIterator) At() (t int64, v float64) {
 	val, _ := s.aggrSet.GetCellValue(s.aggrType, s.index)
 	return s.aggrSet.GetCellTime(s.set.baseTime, s.index), val
 }
+
+func (s *aggrSeriesIterator) AtString() (t int64, v string) { return 0, "" }
+
+func (s *aggrSeriesIterator) Encoding() chunkenc.Encoding { return chunkenc.EncXOR }
 
 func (s *aggrSeriesIterator) Err() error { return s.err }

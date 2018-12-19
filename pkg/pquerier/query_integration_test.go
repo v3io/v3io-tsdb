@@ -518,7 +518,7 @@ func (suite *testQuerySuite) TestRawDataDownSampleMultiPartitions() {
 	params := &pquerier.SelectParams{RequestedColumns: []pquerier.RequestedColumn{{Metric: "cpu"}},
 		Step: 2 * int64(tsdbtest.HoursInMillis),
 		From: suite.toMillis("2018-11-18T22:00:00Z"),
-		To:   suite.toMillis("2018-11-19T4:00:00Z")}
+		To: suite.toMillis("2018-11-19T4:00:00Z")}
 	set, err := querierV2.Select(params)
 	if err != nil {
 		suite.T().Fatalf("Failed to exeute query, err: %v", err)
@@ -863,9 +863,9 @@ func (suite *testQuerySuite) TestClientAggregatesMultiPartition() {
 
 	params := &pquerier.SelectParams{Name: "cpu",
 		Functions: "sum,max,min",
-		Step:      5 * tsdbtest.MinuteInMillis,
-		From:      baseTime - 7*tsdbtest.DaysInMillis,
-		To:        baseTime + int64(numberOfEvents*eventsInterval)}
+		Step: 5 * tsdbtest.MinuteInMillis,
+		From: baseTime - 7*tsdbtest.DaysInMillis,
+		To: baseTime + int64(numberOfEvents*eventsInterval)}
 	set, err := querierV2.Select(params)
 	if err != nil {
 		suite.T().Fatalf("Failed to exeute query, err: %v", err)
@@ -924,9 +924,9 @@ func (suite *testQuerySuite) TestClientAggregatesMultiPartitionNonConcreteAggreg
 
 	params := &pquerier.SelectParams{Name: "cpu",
 		Functions: "avg,stdvar",
-		Step:      5 * tsdbtest.MinuteInMillis,
-		From:      baseTime - 7*tsdbtest.DaysInMillis,
-		To:        baseTime + int64(numberOfEvents*eventsInterval)}
+		Step: 5 * tsdbtest.MinuteInMillis,
+		From: baseTime - 7*tsdbtest.DaysInMillis,
+		To: baseTime + int64(numberOfEvents*eventsInterval)}
 	set, err := querierV2.Select(params)
 	if err != nil {
 		suite.T().Fatalf("Failed to exeute query, err: %v", err)
@@ -984,9 +984,9 @@ func (suite *testQuerySuite) TestClientAggregatesMultiPartitionOneStep() {
 
 	params := &pquerier.SelectParams{Name: "cpu",
 		Functions: "count",
-		Step:      0,
-		From:      baseTime - 25*tsdbtest.DaysInMillis,
-		To:        baseTime + 21*tsdbtest.DaysInMillis}
+		Step: 0,
+		From: baseTime - 25*tsdbtest.DaysInMillis,
+		To: baseTime + 21*tsdbtest.DaysInMillis}
 	set, err := querierV2.Select(params)
 	if err != nil {
 		suite.T().Fatalf("Failed to exeute query, err: %v", err)
@@ -1470,9 +1470,9 @@ func (suite *testQuerySuite) TestQueryAllData() {
 
 	params := &pquerier.SelectParams{Name: "cpu",
 		Functions: "sum,max,min",
-		Step:      2 * 60 * 1000,
-		From:      0,
-		To:        math.MaxInt64}
+		Step: 2 * 60 * 1000,
+		From: 0,
+		To: math.MaxInt64}
 	set, err := querierV2.Select(params)
 	if err != nil {
 		suite.T().Fatalf("Failed to exeute query, err: %v", err)
@@ -1493,6 +1493,137 @@ func (suite *testQuerySuite) TestQueryAllData() {
 	}
 
 	assert.Equal(suite.T(), 3, seriesCount, "series count didn't match expected")
+}
+
+func (suite *testQuerySuite) TestVariantTypeQueryWithDataFrame() {
+	adapter, err := tsdb.NewV3ioAdapter(suite.v3ioConfig, nil, nil)
+	if err != nil {
+		suite.T().Fatalf("failed to create v3io adapter. reason: %s", err)
+	}
+
+	metricName := "log"
+	labels := utils.LabelsFromStringList("os", "linux", "__name__", metricName)
+
+	dataToIngest := []string{"a", "b", "c", "d", "e"}
+	numberOfEvents := len(dataToIngest)
+	eventsInterval := int64(tsdbtest.MinuteInMillis)
+	baseTime := tsdbtest.NanosToMillis(time.Now().UnixNano()) - int64(numberOfEvents)*eventsInterval
+	var expectedTimeColumn []int64
+	for i := 0; i < numberOfEvents; i++ {
+		expectedTimeColumn = append(expectedTimeColumn, baseTime+int64(i)*tsdbtest.MinuteInMillis)
+	}
+
+	appender, err := adapter.Appender()
+	if err != nil {
+		suite.T().Fatalf("failed to create v3io appender. reason: %s", err)
+	}
+
+	ref, err := appender.Add(labels, expectedTimeColumn[0], dataToIngest[0])
+	if err != nil {
+		suite.T().Fatalf("Failed to add data to the TSDB appender. Reason: %s", err)
+	}
+	for i := 1; i < numberOfEvents; i++ {
+		appender.AddFast(labels, ref, expectedTimeColumn[i], dataToIngest[i])
+	}
+
+	if _, err := appender.WaitForCompletion(0); err != nil {
+		suite.T().Fatalf("Failed to wait for TSDB append completion. Reason: %s", err)
+	}
+
+	querierV2, err := adapter.QuerierV2()
+	if err != nil {
+		suite.T().Fatalf("Failed to create querier v2, err: %v", err)
+	}
+
+	params := &pquerier.SelectParams{RequestedColumns: []pquerier.RequestedColumn{{Metric: metricName}},
+		From: baseTime - tsdbtest.DaysInMillis, To: baseTime + tsdbtest.DaysInMillis}
+	iter, err := querierV2.SelectDataFrame(params)
+	if err != nil {
+		suite.T().Fatalf("Failed to exeute query, err: %v", err)
+	}
+	var seriesCount int
+	for iter.NextFrame() {
+		seriesCount++
+		frame := iter.GetFrame()
+		in := frame.Index()
+		cols := frame.Columns()
+
+		for i := 0; i < frame.Index().Len(); i++ {
+			t, _ := in.TimeAt(i)
+			assert.Equal(suite.T(), expectedTimeColumn[i], t, "time column does not match at index %v", i)
+			for _, column := range cols {
+				v, _ := column.StringAt(i)
+
+				expected := dataToIngest[i]
+
+				assert.Equal(suite.T(), expected, v, "column %v does not match at index %v", column.Name(), i)
+			}
+		}
+	}
+
+	assert.Equal(suite.T(), 1, seriesCount, "series count didn't match expected")
+}
+
+func (suite *testQuerySuite) TestVariantTypeQueryWithSeries() {
+	adapter, err := tsdb.NewV3ioAdapter(suite.v3ioConfig, nil, nil)
+	if err != nil {
+		suite.T().Fatalf("failed to create v3io adapter. reason: %s", err)
+	}
+
+	metricName := "log"
+	labels := utils.LabelsFromStringList("os", "linux", "__name__", metricName)
+
+	dataToIngest := []string{"a", "b", "c", "d", "e"}
+	numberOfEvents := len(dataToIngest)
+	eventsInterval := int64(tsdbtest.MinuteInMillis)
+	baseTime := tsdbtest.NanosToMillis(time.Now().UnixNano()) - int64(numberOfEvents)*eventsInterval
+	var expectedTimeColumn []int64
+	for i := 0; i < numberOfEvents; i++ {
+		expectedTimeColumn = append(expectedTimeColumn, baseTime+int64(i)*tsdbtest.MinuteInMillis)
+	}
+
+	appender, err := adapter.Appender()
+	if err != nil {
+		suite.T().Fatalf("failed to create v3io appender. reason: %s", err)
+	}
+
+	ref, err := appender.Add(labels, expectedTimeColumn[0], dataToIngest[0])
+	if err != nil {
+		suite.T().Fatalf("Failed to add data to the TSDB appender. Reason: %s", err)
+	}
+	for i := 1; i < numberOfEvents; i++ {
+		appender.AddFast(labels, ref, expectedTimeColumn[i], dataToIngest[i])
+	}
+
+	if _, err := appender.WaitForCompletion(0); err != nil {
+		suite.T().Fatalf("Failed to wait for TSDB append completion. Reason: %s", err)
+	}
+
+	querierV2, err := adapter.QuerierV2()
+	if err != nil {
+		suite.T().Fatalf("Failed to create querier v2, err: %v", err)
+	}
+
+	params := &pquerier.SelectParams{RequestedColumns: []pquerier.RequestedColumn{{Metric: metricName}},
+		From: baseTime - tsdbtest.DaysInMillis, To: baseTime + tsdbtest.DaysInMillis}
+	iter, err := querierV2.Select(params)
+	if err != nil {
+		suite.T().Fatalf("Failed to exeute query, err: %v", err)
+	}
+	var seriesCount int
+	for iter.Next() {
+		seriesCount++
+		iter := iter.At().Iterator()
+		var i int
+		for iter.Next() {
+			t, v := iter.AtString()
+			assert.Equal(suite.T(), expectedTimeColumn[i], t, "time does not match at index %v", i)
+			assert.Equal(suite.T(), dataToIngest[i], v, "value does not match at index %v", i)
+			i++
+		}
+	}
+
+	assert.Equal(suite.T(), 1, seriesCount, "series count didn't match expected")
 }
 
 func (suite *testQuerySuite) TestCrossSeriesAggregatesSinglePartition() {
@@ -1522,10 +1653,10 @@ func (suite *testQuerySuite) TestCrossSeriesAggregatesSinglePartition() {
 	tsdbtest.InsertData(suite.T(), testParams)
 
 	expected := map[string][]tsdbtest.DataPoint{"sum": {{Time: baseTime, Value: 30}},
-		"min":   {{Time: baseTime, Value: 10}},
-		"max":   {{Time: baseTime, Value: 20}},
+		"min": {{Time: baseTime, Value: 10}},
+		"max": {{Time: baseTime, Value: 20}},
 		"count": {{Time: baseTime, Value: 2}},
-		"avg":   {{Time: baseTime, Value: 15}}}
+		"avg": {{Time: baseTime, Value: 15}}}
 
 	querierV2, err := adapter.QuerierV2()
 	suite.Require().NoError(err, "failed to create querier v2")
@@ -1599,10 +1730,10 @@ func (suite *testQuerySuite) TestGroupByOneLabelSinglePartition() {
 
 	params := &pquerier.SelectParams{Name: "cpu",
 		Functions: "sum,count",
-		Step:      2 * 60 * 1000,
-		From:      baseTime,
-		To:        baseTime + int64(numberOfEvents*eventsInterval),
-		GroupBy:   "os"}
+		Step: 2 * 60 * 1000,
+		From: baseTime,
+		To: baseTime + int64(numberOfEvents*eventsInterval),
+		GroupBy: "os"}
 	set, err := querierV2.Select(params)
 	suite.Require().NoError(err, "failed to exeute query")
 
@@ -1679,10 +1810,10 @@ func (suite *testQuerySuite) TestGroupByMultipleLabelsSinglePartition() {
 
 	params := &pquerier.SelectParams{Name: "cpu",
 		Functions: "sum,count",
-		Step:      2 * 60 * 1000,
-		From:      baseTime,
-		To:        baseTime + int64(numberOfEvents*eventsInterval),
-		GroupBy:   strings.Join(groupBy, ",")}
+		Step: 2 * 60 * 1000,
+		From: baseTime,
+		To: baseTime + int64(numberOfEvents*eventsInterval),
+		GroupBy: strings.Join(groupBy, ",")}
 	set, err := querierV2.Select(params)
 	suite.Require().NoError(err, "failed to exeute query")
 
@@ -1732,10 +1863,10 @@ func (suite *testQuerySuite) TestGroupByNotExistingLabel() {
 
 	params := &pquerier.SelectParams{Name: "cpu",
 		Functions: "sum,count",
-		Step:      2 * 60 * 1000,
-		From:      baseTime,
-		To:        baseTime + int64(numberOfEvents*eventsInterval),
-		GroupBy:   "something that does not exist"}
+		Step: 2 * 60 * 1000,
+		From: baseTime,
+		To: baseTime + int64(numberOfEvents*eventsInterval),
+		GroupBy: "something that does not exist"}
 	_, err = querierV2.Select(params)
 	if err == nil {
 		suite.T().Fatalf("expected fail but continued normally")

@@ -11,6 +11,13 @@ type Context struct {
 	numWorkers  int
 }
 
+type SessionConfig struct {
+	Username	string
+	Password	string
+	Label		string
+	SessionKey	string
+}
+
 func NewContext(parentLogger logger.Logger, clusterURL string, numWorkers int) (*Context, error) {
 	newSyncContext, err := newSyncContext(parentLogger, clusterURL)
 	if err != nil {
@@ -32,7 +39,11 @@ func NewContext(parentLogger logger.Logger, clusterURL string, numWorkers int) (
 }
 
 func (c *Context) NewSession(username string, password string, label string) (*Session, error) {
-	return newSession(c.logger, c, username, password, label)
+	return newSession(c.logger, c, username, password, label, "")
+}
+
+func (c *Context) NewSessionFromConfig(sc *SessionConfig) (*Session, error) {
+	return newSession(c.logger, c, sc.Username, sc.Password, sc.Label, sc.SessionKey)
 }
 
 func (c *Context) sendRequest(request *Request) error {

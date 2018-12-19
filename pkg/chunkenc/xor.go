@@ -56,6 +56,7 @@ package chunkenc
 import (
 	"math"
 	"math/bits"
+	"strconv"
 
 	"github.com/nuclio/logger"
 )
@@ -70,7 +71,7 @@ type XORChunk struct {
 }
 
 // NewXORChunk returns a new chunk with XOR encoding of the given size.
-func NewXORChunk(logger logger.Logger) Chunk {
+func newXORChunk(logger logger.Logger) Chunk {
 	//b := make([]byte, 32, 32)
 	return &XORChunk{logger: logger, b: newBWriter(256)}
 }
@@ -161,13 +162,18 @@ type xorAppender struct {
 	trailing uint8
 }
 
+func (a *xorAppender) Encoding() Encoding {
+	return a.Chunk().Encoding()
+}
+
 func (a *xorAppender) Chunk() Chunk {
 	return a.c
 }
 
-func (a *xorAppender) Append(t int64, v float64) {
+func (a *xorAppender) Append(t int64, vvar interface{}) {
 	var tDelta uint64
 	num := *a.samples
+	v := vvar.(float64)
 
 	// Do not append if sample is too old.
 	if t < a.t {
@@ -277,6 +283,10 @@ type xorIterator struct {
 
 func (it *xorIterator) At() (int64, float64) {
 	return it.t, it.val
+}
+
+func (it *xorIterator) AtString() (int64, string) {
+	return it.t, strconv.FormatFloat(it.val, 'f', -1, 64)
 }
 
 func (it *xorIterator) Err() error {
