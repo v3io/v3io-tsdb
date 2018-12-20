@@ -56,11 +56,17 @@ func (s *SelectParams) getRequestedColumns() []RequestedColumn {
 		return s.RequestedColumns
 	}
 	functions := strings.Split(s.Functions, ",")
-	columns := make([]RequestedColumn, len(functions))
-	for i, function := range functions {
-		trimmed := strings.TrimSpace(function)
-		newCol := RequestedColumn{Function: trimmed, Metric: s.Name, Interpolator: "next"}
-		columns[i] = newCol
+	metricNames := strings.Split(s.Name, ",")
+	columns := make([]RequestedColumn, len(functions)*len(metricNames))
+	var index int
+	for _, metric := range metricNames {
+		for _, function := range functions {
+			trimmed := strings.TrimSpace(function)
+			metricName := strings.TrimSpace(metric)
+			newCol := RequestedColumn{Function: trimmed, Metric: metricName, Interpolator: "next"}
+			columns[index] = newCol
+			index++
+		}
 	}
 	return columns
 }
