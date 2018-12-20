@@ -32,7 +32,8 @@ type AggrType uint16
 
 // Aggregation functions
 const (
-	AggregateLabel = "Aggregate"
+	AggregateLabel    = "Aggregate"
+	CrossSeriesSuffix = "_all"
 
 	aggrTypeNone  AggrType = 0
 	aggrTypeCount AggrType = 1

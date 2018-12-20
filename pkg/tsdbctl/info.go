@@ -84,7 +84,7 @@ func (ic *infoCommandeer) info() error {
 
 	if ic.getNames {
 		// Create a Querier
-		qry, err := ic.rootCommandeer.adapter.QuerierV2(nil)
+		qry, err := ic.rootCommandeer.adapter.QuerierV2()
 		if err != nil {
 			return errors.Wrap(err, "Failed to create a Querier object.")
 		}

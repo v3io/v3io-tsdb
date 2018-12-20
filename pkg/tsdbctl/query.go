@@ -46,6 +46,7 @@ type queryCommandeer struct {
 	step           string
 	output         string
 	oldQuerier     bool
+	groupBy        string
 }
 
 func newQueryCommandeer(rootCommandeer *RootCommandeer) *queryCommandeer {
@@ -107,9 +108,11 @@ Arguments:
 	// any other aggregate). However, it was decided that documenting this
 	// would over complicate the documentation.
 	cmd.Flags().StringVarP(&commandeer.functions, "aggregates", "a", "",
-		"Aggregation information to return, as a comma-separated\nlist of supported aggregation functions - count | avg |\nsum | min | max | stddev | stdvar | last | rate.\nExample: \"sum,min,max,count\".")
+		"Aggregation information to return, as a comma-separated\nlist of supported aggregation functions - count | avg |\nsum | min | max | stddev | stdvar | last | rate.\nFor cross series aggregations add an \"_all\" suffix for the wanted aggregate.\nNote: you can query either over time aggregates or cross series aggregate but not both in the same query.\nExample: \"sum,min,max,count\", \"sum_all,avg_all\".")
 	cmd.Flags().StringVarP(&commandeer.step, "aggregation-interval", "i", "",
 		"Aggregation interval for applying the aggregation functions\n(if set - see the -a|--aggregates flag), of the format\n\"[0-9]+[mhd]\" (where 'm' = minutes, 'h' = hours, and\n'd' = days). Examples: \"1h\"; \"150m\". (default =\n<end time> - <start time>)")
+	cmd.Flags().StringVar(&commandeer.groupBy, "groupBy", "",
+		"Comma separated list of labels to group the result by. (Only supported in new querier)")
 	cmd.Flags().BoolVarP(&commandeer.oldQuerier, "oldQuerier", "q", false, "use old querier")
 	cmd.Flags().Lookup("oldQuerier").Hidden = true
 	commandeer.cmd = cmd
@@ -167,7 +170,7 @@ func (qc *queryCommandeer) query() error {
 	}
 
 	qc.rootCommandeer.logger.DebugWith("Query", "from", from, "to", to, "name", qc.name,
-		"filter", qc.filter, "functions", qc.functions, "step", qc.step)
+		"filter", qc.filter, "functions", qc.functions, "step", qc.step, "groupBy", qc.groupBy)
 
 	if !qc.oldQuerier {
 		return qc.newQuery(from, to, step)
@@ -177,13 +180,13 @@ func (qc *queryCommandeer) query() error {
 }
 
 func (qc *queryCommandeer) newQuery(from, to, step int64) error {
-	qry, err := qc.rootCommandeer.adapter.QuerierV2(nil)
+	qry, err := qc.rootCommandeer.adapter.QuerierV2()
 	if err != nil {
 		return errors.Wrap(err, "Failed to initialize the Querier object.")
 	}
 
 	selectParams := &pquerier.SelectParams{Name: qc.name, Functions: qc.functions,
-		Step: step, Filter: qc.filter, From: from, To: to}
+		Step: step, Filter: qc.filter, From: from, To: to, GroupBy: qc.groupBy}
 	set, err := qry.Select(selectParams)
 
 	if err != nil {
