@@ -204,7 +204,7 @@ which returns an iterator over the series or aggregate values.
 The `Select()` call accepts a `SelectParams` parameter which has the following properties:
 * From (int64) - a timestamp in milliseconds specifying the start time of the query
 * To (int64) - a timestamp in milliseconds specifying the end time of the query
-* Name (string) - optional, metric type (e.g. cpu, memory, ..), specifying it accelerate performance (use range queries)   
+* Name (string) - optional, comma separated metric types (e.g. cpu, memory, ..), specifying it accelerate performance (use range queries)   
 * Step (int64) - optional, the step interval in milliseconds used for the aggregation functions or for downsampling raw data
 * Functions (string) - optional, a comma separated list of aggregation functions e.g. `"count,sum,avg,stddev"` 
 * Filter (string) - optional, V3IO GetItems filter expression for selecting the desired metrics e.g. `_name=='http_req'`

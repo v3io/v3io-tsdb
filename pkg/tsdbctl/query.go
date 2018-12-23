@@ -72,6 +72,7 @@ Notes:
 - You must set the metric-name argument (<metric>) and/or the query-filter flag (-f|--filter).
 - Queries that set the metric-name argument (<metric>) use range scan and are therefore faster.
   But you can't use such queries to scan multiple metrics.
+- metric-name argument also supports a list of comma separated metric names. 
 - To query the full TSDB content, set the -f|--filter to a query filter that always evaluates
   to true (such as "1==1"), don't set the <metric> argument, and set the -b|--begin flag to 0.
 
