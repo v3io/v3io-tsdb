@@ -399,7 +399,10 @@ func (cs *chunkStore) writeChunks(mc *MetricsCache, metric *MetricState) (hasPen
 			// Initialize aggregate arrays
 			lblexpr = lblexpr + cs.aggrList.InitExpr("v", numBuckets)
 
-			encodingExpr := fmt.Sprintf("%v='%d'; ", config.EncodingAttrName, activeChunk.appender.Encoding())
+			var encodingExpr string
+			if !cs.isAggr() {
+				encodingExpr = fmt.Sprintf("%v='%d'; ", config.EncodingAttrName, activeChunk.appender.Encoding())
+			}
 			lsetExpr := fmt.Sprintf("%v='%s'; ", config.LabelSetAttrName, metric.key)
 			expr = lblexpr + encodingExpr + lsetExpr + expr
 		}
