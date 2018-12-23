@@ -65,8 +65,8 @@ func TestCreateColumnSpecs(t *testing.T) {
 	for _, test := range testCases {
 		t.Run(test.desc, func(t *testing.T) {
 			ctx := selectQueryContext{}
-
-			columnsSpec, columnsSpecByMetric, err := ctx.createColumnSpecs(&test.params)
+			ctx.queryParams = &test.params
+			columnsSpec, columnsSpecByMetric, err := ctx.createColumnSpecs()
 
 			if err != nil {
 				t.Fatal(err)

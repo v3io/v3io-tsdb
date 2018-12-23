@@ -40,7 +40,7 @@ func (suite *testAddSuite) TestStrToTV() {
 
 	suite.Require().Nil(err)
 	suite.Require().Equal(ts, []int64{1533814796000, 1533894796000})
-	suite.Require().Equal(vs, []float64{10.1, 202})
+	suite.Require().Equal(vs, []interface{}{10.1, 202.0})
 }
 
 func (suite *testAddSuite) TestStrToTVSpecialValues() {
@@ -49,8 +49,8 @@ func (suite *testAddSuite) TestStrToTVSpecialValues() {
 
 	suite.Require().Nil(err)
 	suite.Require().Equal(ts, []int64{1533814796000, 1533894796000, 1533899796000})
-	suite.Require().True(math.IsNaN(vs[0])) // NaN != NaN, so we have to check this explicitly
-	suite.Require().Equal(vs[1:], []float64{math.Inf(1), math.Inf(-1)})
+	suite.Require().True(math.IsNaN(vs[0].(float64))) // NaN != NaN, so we have to check this explicitly
+	suite.Require().Equal(vs[1:], []interface{}{math.Inf(1), math.Inf(-1)})
 }
 
 func (suite *testAddSuite) TestStrToTVInvalidValue() {

@@ -61,6 +61,7 @@ func (suite *testTsdbctlSuite) TestPopulateConfigWithTenant() {
 		TablePath:      "/x/y/z",
 		Username:       "Vel@Odar",
 		Password:       "p455w0rd",
+		SessionKey:     "sess10n-key",
 	})
 
 	suite.Require().Nil(err)
@@ -80,6 +81,7 @@ func (suite *testTsdbctlSuite) TestContainerConfig() {
 		TablePath:      "/x/y/z",
 		Username:       "Vel@Odar",
 		Password:       "p455w0rd",
+		SessionKey:     "sess10n-key",
 	})
 
 	suite.Require().Nil(err)

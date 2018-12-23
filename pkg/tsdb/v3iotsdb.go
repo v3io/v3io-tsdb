@@ -196,7 +196,7 @@ func (a *V3ioAdapter) Querier(_ context.Context, mint, maxt int64) (*querier.V3i
 }
 
 // Create a Querier interface, used for time-series queries
-func (a *V3ioAdapter) QuerierV2(_ context.Context) (*pquerier.V3ioQuerier, error) {
+func (a *V3ioAdapter) QuerierV2() (*pquerier.V3ioQuerier, error) {
 	return pquerier.NewV3ioQuerier(a.container, a.logger, a.cfg, a.partitionMngr), nil
 }
 
@@ -284,12 +284,12 @@ type v3ioAppender struct {
 }
 
 // Add a t/v value to a metric item and return refID (for AddFast)
-func (a v3ioAppender) Add(lset utils.Labels, t int64, v float64) (uint64, error) {
+func (a v3ioAppender) Add(lset utils.Labels, t int64, v interface{}) (uint64, error) {
 	return a.metricsCache.Add(lset, t, v)
 }
 
 // Faster Add using refID obtained from Add (avoid some hash/lookup overhead)
-func (a v3ioAppender) AddFast(lset utils.Labels, ref uint64, t int64, v float64) error {
+func (a v3ioAppender) AddFast(lset utils.Labels, ref uint64, t int64, v interface{}) error {
 	return a.metricsCache.AddFast(ref, t, v)
 }
 
@@ -304,8 +304,8 @@ func (a v3ioAppender) Rollback() error { return nil }
 
 // The Appender interface provides batched appends against a storage.
 type Appender interface {
-	Add(l utils.Labels, t int64, v float64) (uint64, error)
-	AddFast(l utils.Labels, ref uint64, t int64, v float64) error
+	Add(l utils.Labels, t int64, v interface{}) (uint64, error)
+	AddFast(l utils.Labels, ref uint64, t int64, v interface{}) error
 	WaitForCompletion(timeout time.Duration) (int, error)
 	Commit() error
 	Rollback() error

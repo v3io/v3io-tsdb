@@ -19,9 +19,10 @@ func newSession(parentLogger logger.Logger,
 	context *Context,
 	username string,
 	password string,
-	label string) (*Session, error) {
+	label string,
+	sessionKey string) (*Session, error) {
 
-	newSyncSession, err := newSyncSession(parentLogger, context.Sync, username, password, label)
+	newSyncSession, err := newSyncSession(parentLogger, context.Sync, username, password, label, sessionKey)
 	if err != nil {
 		return nil, err
 	}

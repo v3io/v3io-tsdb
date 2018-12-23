@@ -8,6 +8,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/v3io/v3io-tsdb/pkg/aggregate"
+	"github.com/v3io/v3io-tsdb/pkg/chunkenc"
 	"github.com/v3io/v3io-tsdb/pkg/config"
 	"github.com/v3io/v3io-tsdb/pkg/utils"
 )
@@ -96,8 +97,8 @@ func (fi *frameIterator) Err() error {
 }
 
 // data frame, holds multiple value columns and an index (time) column
-func NewDataFrame(columnsSpec []columnMeta, indexColumn Column, lset utils.Labels, hash uint64, isRawQuery, getAllMetrics bool, columnSize int, useServerAggregates, showAggregateLabel bool) (*dataFrame, error) {
-	df := &dataFrame{lset: lset, hash: hash, isRawSeries: isRawQuery, showAggregateLabel: showAggregateLabel}
+func NewDataFrame(columnsSpec []columnMeta, indexColumn Column, lset utils.Labels, hash uint64, isRawQuery, getAllMetrics bool, columnSize int, useServerAggregates, showAggregateLabel bool, encoding chunkenc.Encoding) (*dataFrame, error) {
+	df := &dataFrame{lset: lset, hash: hash, isRawSeries: isRawQuery, showAggregateLabel: showAggregateLabel, encoding: encoding}
 	// is raw query
 	if isRawQuery {
 		df.columnByName = make(map[string]int, len(columnsSpec))
@@ -172,10 +173,14 @@ func getAggreagteFunction(aggrType aggregate.AggrType, useServerAggregates bool)
 func fillDependantColumns(wantedColumn Column, df *dataFrame) {
 	wantedAggregations := aggregate.GetDependantAggregates(wantedColumn.GetColumnSpec().function)
 	var columns []Column
-	for _, col := range df.columns {
-		if col.GetColumnSpec().metric == wantedColumn.GetColumnSpec().metric &&
-			aggregate.ContainsAggregate(wantedAggregations, col.GetColumnSpec().function) {
-			columns = append(columns, col)
+
+	// Order of the dependent columns should be the same as `wantedAggregations`.
+	for _, agg := range wantedAggregations {
+		for _, col := range df.columns {
+			if col.GetColumnSpec().metric == wantedColumn.GetColumnSpec().metric &&
+				agg == col.GetColumnSpec().function {
+				columns = append(columns, col)
+			}
 		}
 	}
 	wantedColumn.(*virtualColumn).dependantColumns = columns
@@ -216,6 +221,8 @@ type dataFrame struct {
 
 	metrics             map[string]struct{}
 	metricToCountColumn map[string]Column
+
+	encoding chunkenc.Encoding
 }
 
 func (d *dataFrame) addMetricIfNotExist(metricName string, columnSize int, useServerAggregates bool) error {
@@ -322,7 +329,8 @@ func (d *dataFrame) TimeSeries(i int) (utils.Series, error) {
 			d.metricToCountColumn[currentColumn.GetColumnSpec().metric],
 			d.Labels(),
 			d.hash,
-			d.showAggregateLabel), nil
+			d.showAggregateLabel,
+			d.encoding), nil
 	}
 }
 
@@ -340,7 +348,7 @@ func (d *dataFrame) TimeSeries(i int) (utils.Series, error) {
 //
 func (d *dataFrame) rawSeriesToColumns() {
 	var timeData []int64
-	columns := make([][]float64, len(d.rawColumns))
+	columns := make([][]interface{}, len(d.rawColumns))
 	nonExhaustedIterators := len(d.rawColumns)
 
 	currentTime := int64(math.MaxInt64)
@@ -361,7 +369,16 @@ func (d *dataFrame) rawSeriesToColumns() {
 
 		for seriesIndex, rawSeries := range d.rawColumns {
 			iter := rawSeries.Iterator()
-			t, v := iter.At()
+
+			var v interface{}
+			var t int64
+
+			if d.encoding == chunkenc.EncVariant {
+				t, v = iter.AtString()
+			} else {
+				t, v = iter.At()
+			}
+
 			if t == currentTime {
 				columns[seriesIndex] = append(columns[seriesIndex], v)
 				if iter.Next() {
@@ -500,6 +517,13 @@ func (dc *dataColumn) FloatAt(i int) (float64, error) {
 
 	typedCol, ok := dc.data.([]float64)
 	if !ok {
+		genericCol, ok := dc.data.([]interface{})
+		if ok {
+			f, ok := genericCol[i].(float64)
+			if ok {
+				return f, nil
+			}
+		}
 		return 0, fmt.Errorf("wrong type (type is %s)", dc.DType())
 	}
 
@@ -514,6 +538,13 @@ func (dc *dataColumn) StringAt(i int) (string, error) {
 
 	typedCol, ok := dc.data.([]string)
 	if !ok {
+		genericCol, ok := dc.data.([]interface{})
+		if ok {
+			s, ok := genericCol[i].(string)
+			if ok {
+				return s, nil
+			}
+		}
 		return "", fmt.Errorf("wrong type (type is %s)", dc.DType())
 	}
 
@@ -528,6 +559,13 @@ func (dc *dataColumn) TimeAt(i int) (int64, error) {
 
 	typedCol, ok := dc.data.([]int64)
 	if !ok {
+		genericCol, ok := dc.data.([]interface{})
+		if ok {
+			i, ok := genericCol[i].(int64)
+			if ok {
+				return i, nil
+			}
+		}
 		return 0, fmt.Errorf("wrong type (type is %s)", dc.DType())
 	}
 

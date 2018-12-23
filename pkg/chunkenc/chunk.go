@@ -29,7 +29,6 @@ And was modified to suit Iguazio needs
 package chunkenc
 
 import (
-	"encoding/binary"
 	"fmt"
 
 	"github.com/nuclio/logger"
@@ -44,14 +43,17 @@ func (e Encoding) String() string {
 		return "none"
 	case EncXOR:
 		return "XOR"
+	case EncVariant:
+		return "Variant"
 	}
 	return "<unknown>"
 }
 
 // Available chunk encodings
 const (
-	EncNone Encoding = 0
-	EncXOR  Encoding = 1
+	EncNone    Encoding = 0
+	EncXOR     Encoding = 1
+	EncVariant Encoding = 2
 )
 
 // Chunk holds a sequence of sample pairs that can be iterated over and appended to.
@@ -63,43 +65,35 @@ type Chunk interface {
 	Iterator() Iterator
 }
 
+func NewChunk(logger logger.Logger, variant bool) Chunk {
+	if variant {
+		return newVarChunk(logger)
+	}
+	return newXORChunk(logger)
+}
+
 // FromData returns a chunk from a byte slice of chunk data.
 func FromData(logger logger.Logger, e Encoding, d []byte, samples uint16) (Chunk, error) {
 	switch e {
 	case EncXOR:
 		return &XORChunk{logger: logger, b: &bstream{count: 0, stream: d}, samples: samples}, nil
+	case EncVariant:
+		return &VarChunk{logger: logger, b: d, samples: samples}, nil
 	}
 	return nil, fmt.Errorf("Unknown chunk encoding: %d", e)
 }
 
-func ToUint64(bytes []byte) []uint64 {
-	array := []uint64{}
-
-	rem := len(bytes) - (len(bytes)/8)*8
-	if rem > 0 {
-		for b := rem; b < 8; b++ {
-			bytes = append(bytes, 0)
-		}
-	}
-
-	for i := 0; i+8 <= len(bytes); i += 8 {
-		val := binary.LittleEndian.Uint64(bytes[i : i+8])
-		array = append(array, val)
-	}
-
-	return array
-
-}
-
 // Appender adds metric-sample pairs to a chunk.
 type Appender interface {
-	Append(int64, float64)
+	Append(int64, interface{})
 	Chunk() Chunk
+	Encoding() Encoding
 }
 
 // Iterator is a simple iterator that can only get the next value.
 type Iterator interface {
 	At() (int64, float64)
+	AtString() (int64, string)
 	Err() error
 	Next() bool
 }
@@ -111,6 +105,7 @@ func NewNopIterator() Iterator {
 
 type nopIterator struct{}
 
-func (nopIterator) At() (int64, float64) { return 0, 0 }
-func (nopIterator) Next() bool           { return false }
-func (nopIterator) Err() error           { return nil }
+func (nopIterator) At() (int64, float64)      { return 0, 0 }
+func (nopIterator) AtString() (int64, string) { return 0, "" }
+func (nopIterator) Next() bool                { return false }
+func (nopIterator) Err() error                { return nil }

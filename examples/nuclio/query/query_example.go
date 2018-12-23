@@ -61,7 +61,7 @@ func Handler(context *nuclio.Context, event nuclio.Event) (interface{}, error) {
 	// Create a TSDB Querier
 	context.Logger.DebugWith("Query", "params", query)
 	adapter := context.UserData.(*tsdb.V3ioAdapter)
-	qry, err := adapter.QuerierV2(nil)
+	qry, err := adapter.QuerierV2()
 	if err != nil {
 		return nil, errors.Wrap(err, "Failed to initialize Querier")
 	}
