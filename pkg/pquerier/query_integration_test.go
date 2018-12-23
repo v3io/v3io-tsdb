@@ -59,7 +59,9 @@ func (suite *testQuerySuite) SetupTest() {
 
 func (suite *testQuerySuite) TearDownTest() {
 	suite.v3ioConfig.TablePath = suite.T().Name()
-	tsdbtest.DeleteTSDB(suite.T(), suite.v3ioConfig)
+	if !suite.T().Failed() {
+		tsdbtest.DeleteTSDB(suite.T(), suite.v3ioConfig)
+	}
 }
 
 func (suite *testQuerySuite) TestRawDataSinglePartition() {
