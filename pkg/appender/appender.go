@@ -223,10 +223,9 @@ func (mc *MetricsCache) Add(lset utils.LabelsIfc, t int64, v interface{}) (uint6
 		for _, layer := range mc.partitionMngr.GetConfig().TableSchemaInfo.RollupLayers {
 			for _, preAggr := range layer.PreAggregates {
 				subLset := lset.Filter(preAggr.Labels)
-				_, _, hash := subLset.GetKey()
+				name, key, hash := subLset.GetKey()
 				aggrMetric, ok := mc.getMetric(name, hash)
 				if !ok {
-					name, key, hash := subLset.GetKey()
 					aggrMetric = &MetricState{Lset: subLset, key: key, name: name, hash: hash}
 					aggrMetric.store = NewChunkStore(mc.logger, subLset.LabelNames(), true)
 					mc.addMetric(hash, name, aggrMetric)
