@@ -41,12 +41,14 @@ import (
 const maxLateArrivalInterval = 59 * 60 * 1000 // Max late arrival of 59min
 
 // Create a chunk store with two chunks (current, previous)
-func NewChunkStore(logger logger.Logger) *chunkStore {
+func NewChunkStore(logger logger.Logger, labelNames []string, aggrsOnly bool) *chunkStore {
 	store := chunkStore{logger: logger}
-	store.chunks[0] = &attrAppender{}
-	store.chunks[1] = &attrAppender{}
+	if !aggrsOnly {
+		store.chunks[0] = &attrAppender{}
+		store.chunks[1] = &attrAppender{}
+	}
+	store.labelNames = labelNames
 	store.performanceReporter, _ = performance.DefaultReporterInstance()
-
 	return &store
 }
 
@@ -59,11 +61,16 @@ type chunkStore struct {
 	lastTid  int64
 	chunks   [2]*attrAppender
 
+	labelNames    []string
 	aggrList      *aggregate.AggregatesList
 	pending       pendingList
 	maxTime       int64
 	initMaxTime   int64 // Max time read from DB metric before first append
 	delRawSamples bool  // TODO: for metrics w aggregates only
+}
+
+func (cs *chunkStore) isAggr() bool {
+	return cs.chunks[0] == nil
 }
 
 func (cs *chunkStore) samplesQueueLength() int {
@@ -133,13 +140,15 @@ func (cs *chunkStore) getChunksState(mc *MetricsCache, metric *MetricState) (boo
 	if err != nil {
 		return false, err
 	}
-	cs.chunks[0].initialize(part, t)
+	if !cs.isAggr() {
+		cs.chunks[0].initialize(part, t)
+	}
 	cs.aggrList = aggregate.NewAggregatesList(part.AggrType())
 
 	// TODO: if policy to merge w old chunks needs to get prev chunk, vs restart appender
 
 	// Issue a GetItem command to the DB to load last state of metric
-	path := part.GetMetricPath(metric.name, metric.hash)
+	path := part.GetMetricPath(metric.name, metric.hash, cs.labelNames, cs.isAggr())
 	getInput := v3io.GetItemInput{
 		Path: path, AttributeNames: []string{config.MaxTimeAttrName}}
 
@@ -156,11 +165,13 @@ func (cs *chunkStore) getChunksState(mc *MetricsCache, metric *MetricState) (boo
 // Process the GetItem response from the DB and initialize or restore the current chunk
 func (cs *chunkStore) processGetResp(mc *MetricsCache, metric *MetricState, resp *v3io.Response) {
 
-	// TODO: init based on schema, use init function, recover old state vs append based on policy
-	chunk := chunkenc.NewChunk(cs.logger, metric.isVariant)
-	app, _ := chunk.Appender()
-	cs.chunks[0].appender = app
-	cs.chunks[0].state |= chunkStateFirst
+	if !cs.isAggr() {
+		// TODO: init based on schema, use init function, recover old state vs append based on policy
+		chunk := chunkenc.NewChunk(cs.logger, metric.isVariant)
+		app, _ := chunk.Appender()
+		cs.chunks[0].appender = app
+		cs.chunks[0].state |= chunkStateFirst
+	}
 
 	latencyNano := time.Now().UnixNano() - resp.Request().SendTimeNanoseconds
 	cs.performanceReporter.UpdateHistogram("UpdateMetricLatencyHistogram", latencyNano)
@@ -201,12 +212,14 @@ func (cs *chunkStore) processGetResp(mc *MetricsCache, metric *MetricState, resp
 		cs.initMaxTime = maxTime
 	}
 
-	if cs.chunks[0].inRange(maxTime) && !mc.cfg.OverrideOld {
-		cs.chunks[0].state |= chunkStateMerge
-	}
+	if !cs.isAggr() {
+		if cs.chunks[0].inRange(maxTime) && !mc.cfg.OverrideOld {
+			cs.chunks[0].state |= chunkStateMerge
+		}
 
-	// Set Last TableId - indicate that there is no need to create metric object
-	cs.lastTid = cs.chunks[0].partition.GetStartTime()
+		// Set Last TableId - indicate that there is no need to create metric object
+		cs.lastTid = cs.chunks[0].partition.GetStartTime()
+	}
 }
 
 // Append data to the right chunk and table based on the time and state
@@ -309,7 +322,7 @@ func (cs *chunkStore) writeChunks(mc *MetricsCache, metric *MetricState) (hasPen
 
 			// Init activeChunk if nil (when samples are too old); if still too
 			// old, skip to next sample
-			if activeChunk == nil {
+			if !cs.isAggr() && activeChunk == nil {
 				activeChunk = cs.chunkByTime(sampleTime, metric.isVariant)
 				if activeChunk == nil {
 					pendingSampleIndex++
@@ -326,8 +339,10 @@ func (cs *chunkStore) writeChunks(mc *MetricsCache, metric *MetricState) (hasPen
 			// Add a value to the aggregates list
 			cs.aggrList.Aggregate(sampleTime, cs.pending[pendingSampleIndex].v)
 
-			// Add a value to the compressed raw-values chunk
-			activeChunk.appendAttr(sampleTime, cs.pending[pendingSampleIndex].v)
+			if activeChunk != nil {
+				// Add a value to the compressed raw-values chunk
+				activeChunk.appendAttr(sampleTime, cs.pending[pendingSampleIndex].v)
+			}
 
 			// If this is the last item or last item in the same partition, add
 			// expressions and break
@@ -352,7 +367,7 @@ func (cs *chunkStore) writeChunks(mc *MetricsCache, metric *MetricState) (hasPen
 
 			// If the next item is in a new chunk, generate an expression and
 			// initialize the new chunk
-			if !activeChunk.inRange(nextT) {
+			if activeChunk != nil && !activeChunk.inRange(nextT) {
 				expr = expr + cs.appendExpression(activeChunk)
 				activeChunk = cs.chunkByTime(nextT, metric.isVariant)
 			}
@@ -385,14 +400,17 @@ func (cs *chunkStore) writeChunks(mc *MetricsCache, metric *MetricState) (hasPen
 			// Initialize aggregate arrays
 			lblexpr = lblexpr + cs.aggrList.InitExpr("v", numBuckets)
 
-			encodingExpr := fmt.Sprintf("%v='%d'; ", config.EncodingAttrName, activeChunk.appender.Encoding())
+			var encodingExpr string
+			if !cs.isAggr() {
+				encodingExpr = fmt.Sprintf("%v='%d'; ", config.EncodingAttrName, activeChunk.appender.Encoding())
+			}
 			lsetExpr := fmt.Sprintf("%v='%s'; ", config.LabelSetAttrName, metric.key)
 			expr = lblexpr + encodingExpr + lsetExpr + expr
 		}
 
 		// Call the V3IO async UpdateItem method
 		expr += fmt.Sprintf("%v=%d;", config.MaxTimeAttrName, cs.maxTime) // TODO: use max() expr
-		path := partition.GetMetricPath(metric.name, metric.hash)
+		path := partition.GetMetricPath(metric.name, metric.hash, cs.labelNames, cs.isAggr())
 		request, err := mc.container.UpdateItem(
 			&v3io.UpdateItemInput{Path: path, Expression: &expr}, metric, mc.responseChan)
 		if err != nil {

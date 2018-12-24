@@ -26,9 +26,11 @@ import (
 	"math"
 	"path"
 	"strconv"
+	"strings"
 	"sync"
 
 	"github.com/pkg/errors"
+	"github.com/prometheus/prometheus/pkg/labels"
 	"github.com/v3io/v3io-go-http"
 	"github.com/v3io/v3io-tsdb/internal/pkg/performance"
 	"github.com/v3io/v3io-tsdb/pkg/aggregate"
@@ -343,8 +345,22 @@ func (p *DBPartition) GetShardingKeys(name string) []string {
 }
 
 // Return the full path to the specified metric item
-func (p *DBPartition) GetMetricPath(name string, hash uint64) string {
-	return fmt.Sprintf("%s%s_%x.%016x", p.path, name, int(hash%uint64(p.GetHashingBuckets())), hash)
+func (p *DBPartition) GetMetricPath(name string, hash uint64, labelNames []string, isAggr bool) string {
+	agg := ""
+	if isAggr {
+		if len(labelNames) == 0 {
+			agg = "agg/"
+		} else {
+			var namelessLabelNames []string
+			for _, l := range labelNames {
+				if l != labels.MetricName {
+					namelessLabelNames = append(namelessLabelNames, l)
+				}
+			}
+			agg = fmt.Sprintf("agg/%s/", strings.Join(namelessLabelNames, ","))
+		}
+	}
+	return fmt.Sprintf("%s%s%s_%x.%016x", p.path, agg, name, int(hash%uint64(p.GetHashingBuckets())), hash)
 }
 
 func (p *DBPartition) AggrType() aggregate.AggrType {
