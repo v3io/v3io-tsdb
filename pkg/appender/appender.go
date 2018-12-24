@@ -233,7 +233,7 @@ func (mc *MetricsCache) Add(lset utils.LabelsIfc, t int64, v interface{}) (uint6
 				}
 			}
 		}
-		metric = &MetricState{Lset: lset, key: key, name: name, hash: hash}
+		metric = &MetricState{Lset: lset, key: key, name: name, hash: hash, aggrs: aggrMetrics}
 		// if the (first) value is not float, use variant encoding, TODO: test w schema
 		if _, ok := v.(float64); !ok {
 			metric.isVariant = true
