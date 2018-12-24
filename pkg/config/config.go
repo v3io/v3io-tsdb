@@ -183,7 +183,14 @@ type Rollup struct {
 	SampleRetention int `json:"sampleRetention"`
 	// Layer retention time, in months ('m'), days ('d'), or hours ('h').
 	// Format: "[0-9]+[hmd]". For example: "3h", "7d", "1m"
-	LayerRetentionTime string `json:"layerRetentionTime"`
+	LayerRetentionTime string         `json:"layerRetentionTime"`
+	PreAggregates      []PreAggregate `json:"preAggregates"`
+}
+
+type PreAggregate struct {
+	Labels      []string `json:"labels"`
+	Granularity string   `json:"granularity"`
+	Aggregates  []string `json:"aggregates"`
 }
 
 type TableSchema struct {
