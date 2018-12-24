@@ -45,6 +45,7 @@ type SelectParams struct {
 	Windows          []int
 	Filter           string
 	RequestedColumns []RequestedColumn
+	GroupBy          string
 
 	disableAllAggr    bool
 	disableClientAggr bool
@@ -55,11 +56,17 @@ func (s *SelectParams) getRequestedColumns() []RequestedColumn {
 		return s.RequestedColumns
 	}
 	functions := strings.Split(s.Functions, ",")
-	columns := make([]RequestedColumn, len(functions))
-	for i, function := range functions {
-		trimmed := strings.TrimSpace(function)
-		newCol := RequestedColumn{Function: trimmed, Metric: s.Name, Interpolator: "next"}
-		columns[i] = newCol
+	metricNames := strings.Split(s.Name, ",")
+	columns := make([]RequestedColumn, len(functions)*len(metricNames))
+	var index int
+	for _, metric := range metricNames {
+		for _, function := range functions {
+			trimmed := strings.TrimSpace(function)
+			metricName := strings.TrimSpace(metric)
+			newCol := RequestedColumn{Function: trimmed, Metric: metricName, Interpolator: "next"}
+			columns[index] = newCol
+			index++
+		}
 	}
 	return columns
 }
@@ -116,9 +123,9 @@ func (q *V3ioQuerier) baseSelectQry(params *SelectParams, showAggregateLabel boo
 	}
 
 	selectContext := selectQueryContext{
-		mint: params.From, maxt: params.To, step: params.Step, filter: params.Filter,
-		container: q.container, logger: q.logger, workers: q.cfg.QryWorkers,
-		disableAllAggr: params.disableAllAggr, disableClientAggr: params.disableClientAggr,
+		container:          q.container,
+		logger:             q.logger,
+		workers:            q.cfg.QryWorkers,
 		showAggregateLabel: showAggregateLabel,
 	}
 
@@ -126,7 +133,7 @@ func (q *V3ioQuerier) baseSelectQry(params *SelectParams, showAggregateLabel boo
 		"Step: %d\n\tFilter: %s\n\tWindows: %v\n\tDisable All Aggr: %t\n\tDisable Client Aggr: %t",
 		params.Name, time.Unix(params.From/1000, 0).String(), params.From, time.Unix(params.To/1000, 0).String(),
 		params.To, params.Functions, params.Step,
-		params.Filter, params.Windows, selectContext.disableAllAggr, selectContext.disableClientAggr)
+		params.Filter, params.Windows, params.disableAllAggr, params.disableClientAggr)
 
 	q.performanceReporter.WithTimer("QueryTimer", func() {
 		params.Filter = strings.Replace(params.Filter, config.PrometheusMetricNameAttribute, config.MetricNameAttrName, -1)
@@ -134,6 +141,14 @@ func (q *V3ioQuerier) baseSelectQry(params *SelectParams, showAggregateLabel boo
 		parts := q.partitionMngr.PartsForRange(params.From, params.To, true)
 		if len(parts) == 0 {
 			return
+		}
+
+		minExistingTime, maxExistingTime := parts[0].GetStartTime(), parts[len(parts)-1].GetEndTime()
+		if params.From < minExistingTime {
+			params.From = minExistingTime
+		}
+		if params.To > maxExistingTime {
+			params.To = maxExistingTime
 		}
 
 		iter, err = selectContext.start(parts, params)

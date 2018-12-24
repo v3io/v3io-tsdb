@@ -93,6 +93,7 @@ func mainCollector(ctx *selectQueryContext, responseChannel chan *qryResults) {
 }
 
 func rawCollector(ctx *selectQueryContext, res *qryResults) {
+	ctx.logger.Debug("using Raw Collector for metric %v", res.name)
 	frameIndex, ok := res.frame.columnByName[res.name]
 	if ok {
 		res.frame.rawColumns[frameIndex].(*V3ioRawSeries).AddChunks(res)
@@ -108,10 +109,11 @@ func rawCollector(ctx *selectQueryContext, res *qryResults) {
 }
 
 func aggregateClientAggregates(ctx *selectQueryContext, res *qryResults) {
+	ctx.logger.Debug("using Client Aggregates Collector for metric %v", res.name)
 	it := newRawChunkIterator(res, nil)
 	for it.Next() {
 		t, v := it.At()
-		currentCell := (t - ctx.mint) / res.query.aggregationParams.Interval
+		currentCell := (t - ctx.queryParams.From) / res.query.aggregationParams.Interval
 
 		for _, col := range res.frame.columns {
 			if col.GetColumnSpec().metric == res.name {
@@ -122,6 +124,8 @@ func aggregateClientAggregates(ctx *selectQueryContext, res *qryResults) {
 }
 
 func aggregateServerAggregates(ctx *selectQueryContext, res *qryResults) {
+	ctx.logger.Debug("using Server Aggregates Collector for metric %v", res.name)
+
 	partitionStartTime := res.query.partition.GetStartTime()
 	rollupInterval := res.query.aggregationParams.GetRollupTime()
 	for _, col := range res.frame.columns {
@@ -140,7 +144,7 @@ func aggregateServerAggregates(ctx *selectQueryContext, res *qryResults) {
 					val := binary.LittleEndian.Uint64(bytes[i : i+8])
 					currentValueIndex := (i - 16) / 8
 					currentValueTime := partitionStartTime + int64(currentValueIndex+1)*rollupInterval
-					currentCell := (currentValueTime - ctx.mint) / res.query.aggregationParams.Interval
+					currentCell := (currentValueTime - ctx.queryParams.From) / res.query.aggregationParams.Interval
 
 					var floatVal float64
 					if aggregate.IsCountAggregate(col.GetColumnSpec().function) {
@@ -157,6 +161,8 @@ func aggregateServerAggregates(ctx *selectQueryContext, res *qryResults) {
 
 func downsampleRawData(ctx *selectQueryContext, res *qryResults,
 	previousPartitionLastTime int64, previousPartitionLastValue float64) (int64, float64, error) {
+	ctx.logger.Debug("using Downsample Collector for metric %v", res.name)
+
 	var lastT int64
 	var lastV float64
 	it := newRawChunkIterator(res, nil).(*rawChunkIterator)
@@ -165,10 +171,10 @@ func downsampleRawData(ctx *selectQueryContext, res *qryResults,
 		return previousPartitionLastTime, previousPartitionLastValue, err
 	}
 	for currBucket := 0; currBucket < col.Len(); currBucket++ {
-		currBucketTime := int64(currBucket)*ctx.step + ctx.mint
+		currBucketTime := int64(currBucket)*ctx.queryParams.Step + ctx.queryParams.From
 		if it.Seek(currBucketTime) {
 			t, v := it.At()
-			tBucketIndex := (t - ctx.mint) / ctx.step
+			tBucketIndex := (t - ctx.queryParams.From) / ctx.queryParams.Step
 			if t == currBucketTime {
 				col.SetDataAt(currBucket, v)
 			} else if tBucketIndex == int64(currBucket) {

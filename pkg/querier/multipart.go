@@ -3,6 +3,7 @@ package querier
 import (
 	"sort"
 
+	"github.com/v3io/v3io-tsdb/pkg/chunkenc"
 	"github.com/v3io/v3io-tsdb/pkg/utils"
 )
 
@@ -183,6 +184,12 @@ func (it *mergedSeriesIterator) At() (t int64, v float64) {
 	return it.cur.At()
 }
 
+func (it *mergedSeriesIterator) AtString() (t int64, v string) { return it.cur.AtString() }
+
 func (it *mergedSeriesIterator) Err() error {
 	return it.cur.Err()
+}
+
+func (it *mergedSeriesIterator) Encoding() chunkenc.Encoding {
+	return chunkenc.EncXOR
 }

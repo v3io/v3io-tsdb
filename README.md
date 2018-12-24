@@ -195,33 +195,37 @@ Example:
 
 ### Creating and using a Querier (read metrics and aggregates) 
 
-The `Querier` interface is used to query the database and return one or more metrics, we first need to create a `Querier`
-and specify the query window (min and max times), once we did we can use `Select()` or `SelectOverlap()` commands which will 
-return a list of series (as an iterator object).
+The `Querier` interface is used to query the database and return one or more metrics, we first need to create a `Querier`,
+once we did we can use `Select()` which will return a list of series (as an iterator object).
 
 Every returned series have two interfaces, `Labels()` which returns the series or aggregate labels, and `Iterator()`
 which returns an iterator over the series or aggregate values.
 
-The `Select()` call accepts 4 parameters:
-* name (string) - optional, metric type (e.g. cpu, memory, ..), specifying it accelerate performance (use range queries)   
-* functions (string) - optional, a comma separated list of aggregation functions e.g. `"count,sum,avg,stddev"`
-* step (int64) - optional, the step interval used for the aggregation functions in milisec 
-* filter (string) - V3IO GetItems filter string for selecting the desired metrics e.g. `__name__=='http_req'`
+The `Select()` call accepts a `SelectParams` parameter which has the following properties:
+* From (int64) - a timestamp in milliseconds specifying the start time of the query
+* To (int64) - a timestamp in milliseconds specifying the end time of the query
+* Name (string) - optional, comma separated metric types (e.g. cpu, memory, ..), specifying it accelerate performance (use range queries)   
+* Step (int64) - optional, the step interval in milliseconds used for the aggregation functions or for downsampling raw data
+* Functions (string) - optional, a comma separated list of aggregation functions e.g. `"count,sum,avg,stddev"` 
+* Filter (string) - optional, V3IO GetItems filter expression for selecting the desired metrics e.g. `_name=='http_req'`
+* GroupBy (string) - optional, a comma seperated list of labels to group the results by e.g. `"method"`
+* RequestedColumns ([]RequestedColumn) - optional, as an alternative to `Name` & `Function` a user can pass a list of `RequestedColumn` object that specify which metrics and aggregates to query.
+ Using this API it is possible to query several metrics in the same query. 
 
-using `functions` and `step` is optional, use it only when you are interested in pre-aggregation and the step is >> than 
-the sampling interval (and preferably equal or greater than the partition RollupMin interval). when using aggregates it will
-return one series per aggregate function, the `Aggregate` label will be added to that series with the function name.
 
-In some cases we would like to retrieve overlapping aggregates instead of fixed interval ones, e.g. stats for last 1hr, 6hr, 24hr
-the `SelectOverlap()` call adds the `win` integer array ([]int) which allow specifying the requested windows. the windows are 
-multiplied by the step value and start from the querier maxt value e.g. for 1hr, 6hr, and 24hr windows use `Step=3600 * 1000` 
-(1hr), `win=[1,6,24]`, and `maxt` should be the current time. The result set (series iterator) in this case will only contain 3 
-elements sorted from the oldest to newest (24, 6, 1).
+Using `Functions` and `Step` is optional, use it only when you are interested in pre-aggregation and the step is >> than 
+the sampling interval (and preferably equal or greater than the partition RollupMin interval).  
+There are two types of aggregates:
+* aggregates over time - aggregates the data into buckets over a period of time. This will result in a series for every unique label set per aggregate.
+* aggregates across series - aggregates the data for all the different label sets into one series per aggregate. Add an `_all` suffix to the aggregate name to use this kind of aggregation. 
+
+In both cases, the `Aggregate` label will be added to that series with the function name.
+But, a user can use an aggregate over time **or** aggregate across series but not both in the same query.
 
 creating a querier:
 
 ```go
-	qry, err := adapter.Querier(nil, minTime, maxTime)
+	qry, err := adapter.QuerierV2()
 	if err != nil {
 		panic(err)
 	}
@@ -229,19 +233,38 @@ creating a querier:
 
 Simple select example (no aggregates):
 ```go
-	set, err := qry.Select("http_req", "", 0, "method=='post'")
+    params := &pquerier.SelectParams{Name: "http_req",
+                                     Filter: "method=='post'",
+                                     From: minTime,
+                                     To: maxTime}
+    set, err := qry.Select(params)
 ```
 
 Select using aggregates:
 
 ```go
-	set, err := qry.Select("http_req", "count,avg,sum,max", 1000*3600, "method=='post'")
+    params := &pquerier.SelectParams{Name: "http_req",
+                                     Filter: "method=='post'",
+                                     From: minTime,
+                                     To: maxTime,
+                                     Step: 1000*3600,
+                                     Functions: "count,avg,sum,max"}
+    set, err := qry.Select(params)
 ```
 
-Using SelectOverlap (overlapping windows): 
+Select using RequestedColumns:
 
 ```go
-	set, err := qry.SelectOverlap("http_req", "count,avg,sum", 1000*3600, []int{24,6,1}, "method=='post'")
+    wantedColumns: []pquerier.RequestedColumn{{Metric: "http_req", Function: "avg"},
+                                              {Metric: "http_req", Function: "count"},
+                                              {Metric: "http_req", Function: "max"},
+                                              {Metric: "tcp_req", Function: "avg"}}
+    params := &pquerier.SelectParams{RequestedColumns: wantedColumns
+                                     Filter: "method=='post'",
+                                     From: minTime,
+                                     To: maxTime,
+                                     Step: 1000*3600}
+    set, err := qry.Select(params)
 ```
 
 Once we obtain a set using one of the methods above we can iterate over the set and the individual series in the following way:

@@ -61,12 +61,28 @@ func TestCreateColumnSpecs(t *testing.T) {
 				{metric: "cpu", function: toAggr("sum")},
 				{metric: "cpu", function: toAggr("count"), isHidden: true}},
 				"disk": {{metric: "disk", function: toAggr("count")}}}},
+
+		{params: SelectParams{Name: "cpu,diskio"},
+			expectedSpecs: []columnMeta{{metric: "cpu", interpolationType: interpolateNext},
+				{metric: "diskio", interpolationType: interpolateNext}},
+			expectedSpecsMap: map[string][]columnMeta{"cpu": {{metric: "cpu", interpolationType: interpolateNext}},
+				"diskio": {{metric: "diskio", interpolationType: interpolateNext}}}},
+
+		{params: SelectParams{Name: "cpu, diskio", Functions: "sum,count"},
+			expectedSpecs: []columnMeta{{metric: "cpu", function: toAggr("count"), interpolationType: interpolateNext},
+				{metric: "cpu", function: toAggr("sum"), interpolationType: interpolateNext},
+				{metric: "diskio", function: toAggr("count"), interpolationType: interpolateNext},
+				{metric: "diskio", function: toAggr("sum"), interpolationType: interpolateNext}},
+			expectedSpecsMap: map[string][]columnMeta{"cpu": {{metric: "cpu", function: toAggr("sum"), interpolationType: interpolateNext},
+				{metric: "cpu", function: toAggr("count"), interpolationType: interpolateNext}},
+				"diskio": {{metric: "diskio", function: toAggr("sum"), interpolationType: interpolateNext},
+					{metric: "diskio", function: toAggr("count"), interpolationType: interpolateNext}}}},
 	}
 	for _, test := range testCases {
 		t.Run(test.desc, func(t *testing.T) {
 			ctx := selectQueryContext{}
-
-			columnsSpec, columnsSpecByMetric, err := ctx.createColumnSpecs(&test.params)
+			ctx.queryParams = &test.params
+			columnsSpec, columnsSpecByMetric, err := ctx.createColumnSpecs()
 
 			if err != nil {
 				t.Fatal(err)

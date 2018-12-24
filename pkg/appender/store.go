@@ -105,9 +105,8 @@ func (a *attrAppender) isAhead(t int64) bool {
 }
 
 // Append a single t/v pair to a chunk
-// TODO: change appender from float to interface (allow map[str]interface cols)
 func (a *attrAppender) appendAttr(t int64, v interface{}) {
-	a.appender.Append(t, v.(float64))
+	a.appender.Append(t, v)
 }
 
 // struct/list storing uncommitted samples, with time sorting support
@@ -158,7 +157,7 @@ func (cs *chunkStore) getChunksState(mc *MetricsCache, metric *MetricState) (boo
 func (cs *chunkStore) processGetResp(mc *MetricsCache, metric *MetricState, resp *v3io.Response) {
 
 	// TODO: init based on schema, use init function, recover old state vs append based on policy
-	chunk := chunkenc.NewXORChunk(cs.logger)
+	chunk := chunkenc.NewChunk(cs.logger, metric.isVariant)
 	app, _ := chunk.Appender()
 	cs.chunks[0].appender = app
 	cs.chunks[0].state |= chunkStateFirst
@@ -224,7 +223,7 @@ func (cs *chunkStore) Append(t int64, v interface{}) {
 }
 
 // Return current, previous, or create new  chunk based on sample time
-func (cs *chunkStore) chunkByTime(t int64) *attrAppender {
+func (cs *chunkStore) chunkByTime(t int64, isVariantEncoding bool) *attrAppender {
 
 	// Sample is in the current chunk
 	cur := cs.chunks[cs.curChunk]
@@ -238,7 +237,7 @@ func (cs *chunkStore) chunkByTime(t int64) *attrAppender {
 		part := cur.partition
 		cur = cs.chunks[cs.curChunk^1]
 
-		chunk := chunkenc.NewXORChunk(cs.logger) // TODO: init based on schema, use init function
+		chunk := chunkenc.NewChunk(cs.logger, isVariantEncoding) // TODO: init based on schema, use init function
 		app, err := chunk.Appender()
 		if err != nil {
 			return nil
@@ -311,7 +310,7 @@ func (cs *chunkStore) writeChunks(mc *MetricsCache, metric *MetricState) (hasPen
 			// Init activeChunk if nil (when samples are too old); if still too
 			// old, skip to next sample
 			if activeChunk == nil {
-				activeChunk = cs.chunkByTime(sampleTime)
+				activeChunk = cs.chunkByTime(sampleTime, metric.isVariant)
 				if activeChunk == nil {
 					pendingSampleIndex++
 					mc.logger.DebugWith("nil active chunk", "T", sampleTime)
@@ -328,7 +327,7 @@ func (cs *chunkStore) writeChunks(mc *MetricsCache, metric *MetricState) (hasPen
 			cs.aggrList.Aggregate(sampleTime, cs.pending[pendingSampleIndex].v)
 
 			// Add a value to the compressed raw-values chunk
-			activeChunk.appendAttr(sampleTime, cs.pending[pendingSampleIndex].v.(float64))
+			activeChunk.appendAttr(sampleTime, cs.pending[pendingSampleIndex].v)
 
 			// If this is the last item or last item in the same partition, add
 			// expressions and break
@@ -355,7 +354,7 @@ func (cs *chunkStore) writeChunks(mc *MetricsCache, metric *MetricState) (hasPen
 			// initialize the new chunk
 			if !activeChunk.inRange(nextT) {
 				expr = expr + cs.appendExpression(activeChunk)
-				activeChunk = cs.chunkByTime(nextT)
+				activeChunk = cs.chunkByTime(nextT, metric.isVariant)
 			}
 
 			pendingSampleIndex++
@@ -386,7 +385,9 @@ func (cs *chunkStore) writeChunks(mc *MetricsCache, metric *MetricState) (hasPen
 			// Initialize aggregate arrays
 			lblexpr = lblexpr + cs.aggrList.InitExpr("v", numBuckets)
 
-			expr = lblexpr + fmt.Sprintf("%v='%s'; ", config.LabelSetAttrName, metric.key) + expr
+			encodingExpr := fmt.Sprintf("%v='%d'; ", config.EncodingAttrName, activeChunk.appender.Encoding())
+			lsetExpr := fmt.Sprintf("%v='%s'; ", config.LabelSetAttrName, metric.key)
+			expr = lblexpr + encodingExpr + lsetExpr + expr
 		}
 
 		// Call the V3IO async UpdateItem method

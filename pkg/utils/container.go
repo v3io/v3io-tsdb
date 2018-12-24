@@ -32,7 +32,7 @@ import (
 	"github.com/v3io/v3io-tsdb/pkg/config"
 )
 
-const defaultHttpTimeout = 10 * time.Second
+const defaultHttpTimeout = 30 * time.Second
 
 func NewLogger(level string) (logger.Logger, error) {
 	var logLevel nucliozap.Level
@@ -76,7 +76,13 @@ func CreateContainer(logger logger.Logger, cfg *config.V3ioConfig) (*v3io.Contai
 	}
 
 	// Create session
-	session, err := context.NewSession(cfg.Username, cfg.Password, "v3test")
+	sessionConfig := &v3io.SessionConfig{
+		Username:   cfg.Username,
+		Password:   cfg.Password,
+		Label:      "tsdb",
+		SessionKey: cfg.SessionKey,
+	}
+	session, err := context.NewSessionFromConfig(sessionConfig)
 	if err != nil {
 		return nil, errors.Wrap(err, "Failed to create a session.")
 	}

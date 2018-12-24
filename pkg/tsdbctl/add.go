@@ -247,7 +247,7 @@ func (ac *addCommandeer) appendMetrics(append tsdb.Appender, lset utils.Labels) 
 }
 
 func (ac *addCommandeer) appendMetric(
-	append tsdb.Appender, lset utils.Labels, tarray []int64, varray []float64) (uint64, error) {
+	append tsdb.Appender, lset utils.Labels, tarray []int64, varray []interface{}) (uint64, error) {
 
 	ac.rootCommandeer.logger.DebugWith("Adding a sample value to a metric.", "lset", lset, "t", tarray, "v", varray)
 
@@ -266,7 +266,7 @@ func (ac *addCommandeer) appendMetric(
 	return ref, nil
 }
 
-func strToTV(tarr, varr string) ([]int64, []float64, error) {
+func strToTV(tarr, varr string) ([]int64, []interface{}, error) {
 
 	tlist := strings.Split(tarr, ArraySeparator)
 	vlist := strings.Split(varr, ArraySeparator)
@@ -280,15 +280,20 @@ func strToTV(tarr, varr string) ([]int64, []float64, error) {
 	}
 
 	var tarray []int64
-	var varray []float64
+	var varray []interface{}
 
+	var isFloats bool
 	for i := 0; i < len(vlist); i++ {
 		v, err := strconv.ParseFloat(vlist[i], 64)
-		if err != nil {
+		// If we can parse it as float, use float. Otherwise keep the value as is and it will be encoded using the variant encoder
+		if err != nil && !isFloats {
+			varray = append(varray, vlist[i])
+		} else if err != nil && isFloats {
 			return nil, nil, errors.WithStack(err)
+		} else {
+			isFloats = true
+			varray = append(varray, v)
 		}
-
-		varray = append(varray, v)
 	}
 
 	now := int64(time.Now().Unix() * 1000)

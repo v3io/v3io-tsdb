@@ -56,6 +56,7 @@ type MetricState struct {
 	err        error
 	retryCount uint8
 	newName    bool
+	isVariant  bool
 }
 
 // Metric store states
@@ -217,6 +218,10 @@ func (mc *MetricsCache) Add(lset utils.LabelsIfc, t int64, v interface{}) (uint6
 
 	if !ok {
 		metric = &MetricState{Lset: lset, key: key, name: name, hash: hash}
+		// if the (first) value is not float, use variant encoding, TODO: test w schema
+		if _, ok := v.(float64); !ok {
+			metric.isVariant = true
+		}
 		metric.store = NewChunkStore(mc.logger)
 		mc.addMetric(hash, name, metric)
 	}

@@ -281,13 +281,13 @@ func (cc *checkCommandeer) printValues(bytes []byte) error {
 			return errors.Wrap(iter.Err(), "Failed to read the iterator.")
 		}
 
-		compressionRatio := 0.0
+		avgSampleSize := 0.0
 		bytesCount := len(bytes)
 		if count > 0 {
-			compressionRatio = float64(bytesCount) / float64(count)
+			avgSampleSize = float64(bytesCount) / float64(count)
 		}
-		fmt.Printf("Total size=%d, Count=%d, Compression ratio=%.2f\n",
-			bytesCount, count, compressionRatio)
+		fmt.Printf("Total size=%d, Count=%d, Avg sample size=%.2f\n",
+			bytesCount, count, avgSampleSize)
 	}
 	return nil
 }
