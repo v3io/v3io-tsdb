@@ -41,14 +41,14 @@ import (
 const maxLateArrivalInterval = 59 * 60 * 1000 // Max late arrival of 59min
 
 // Create a chunk store with two chunks (current, previous)
-func NewChunkStore(logger logger.Logger, aggrsOnly bool) *chunkStore {
+func NewChunkStore(logger logger.Logger, labelNames []string, aggrsOnly bool) *chunkStore {
 	store := chunkStore{logger: logger}
 	if !aggrsOnly {
 		store.chunks[0] = &attrAppender{}
 		store.chunks[1] = &attrAppender{}
 	}
+	store.labelNames = labelNames
 	store.performanceReporter, _ = performance.DefaultReporterInstance()
-
 	return &store
 }
 
@@ -61,6 +61,7 @@ type chunkStore struct {
 	lastTid  int64
 	chunks   [2]*attrAppender
 
+	labelNames    []string
 	aggrList      *aggregate.AggregatesList
 	pending       pendingList
 	maxTime       int64
@@ -147,7 +148,7 @@ func (cs *chunkStore) getChunksState(mc *MetricsCache, metric *MetricState) (boo
 	// TODO: if policy to merge w old chunks needs to get prev chunk, vs restart appender
 
 	// Issue a GetItem command to the DB to load last state of metric
-	path := part.GetMetricPath(metric.name, metric.hash, cs.isAggr())
+	path := part.GetMetricPath(metric.name, metric.hash, cs.labelNames, cs.isAggr())
 	getInput := v3io.GetItemInput{
 		Path: path, AttributeNames: []string{config.MaxTimeAttrName}}
 
@@ -409,7 +410,7 @@ func (cs *chunkStore) writeChunks(mc *MetricsCache, metric *MetricState) (hasPen
 
 		// Call the V3IO async UpdateItem method
 		expr += fmt.Sprintf("%v=%d;", config.MaxTimeAttrName, cs.maxTime) // TODO: use max() expr
-		path := partition.GetMetricPath(metric.name, metric.hash, cs.isAggr())
+		path := partition.GetMetricPath(metric.name, metric.hash, cs.labelNames, cs.isAggr())
 		request, err := mc.container.UpdateItem(
 			&v3io.UpdateItemInput{Path: path, Expression: &expr}, metric, mc.responseChan)
 		if err != nil {

@@ -53,13 +53,14 @@ type LabelsIfc interface {
 	GetKey() (string, string, uint64)
 	GetExpr() string
 	Filter([]string) LabelsIfc
+	LabelNames() []string
 }
 
 func (ls Labels) Filter(keep []string) LabelsIfc {
 	var res Labels
 	for _, l := range ls {
 		for _, keepLabel := range keep {
-			if l.Name == keepLabel {
+			if l.Name == MetricName || l.Name == keepLabel {
 				res = append(res, l)
 			}
 		}
@@ -97,6 +98,14 @@ func (ls Labels) GetExpr() string {
 	}
 
 	return lblexpr
+}
+
+func (ls Labels) LabelNames() []string {
+	var res []string
+	for _, l := range ls {
+		res = append(res, l.Name)
+	}
+	return res
 }
 
 func (ls Labels) Len() int           { return len(ls) }

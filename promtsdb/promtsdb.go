@@ -250,6 +250,14 @@ func (ls Labels) GetExpr() string {
 	return lblexpr
 }
 
+func (ls Labels) LabelNames() []string {
+	var res []string
+	for _, l := range *ls.lbls {
+		res = append(res, l.Name)
+	}
+	return res
+}
+
 func newMetadataSeriesSet(labels []utils.Labels) utils.SeriesSet {
 	return &metadataSeriesSet{labels: labels, currentIndex: -1, size: len(labels)}
 }
@@ -283,7 +291,7 @@ func (ls Labels) Filter(keep []string) utils.LabelsIfc {
 	var res labels.Labels
 	for _, l := range *ls.lbls {
 		for _, keepLabel := range keep {
-			if l.Name == keepLabel {
+			if l.Name == labels.MetricName || l.Name == keepLabel {
 				res = append(res, l)
 			}
 		}
