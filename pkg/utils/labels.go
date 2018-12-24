@@ -40,11 +40,6 @@ type Label struct {
 	Name, Value string
 }
 
-type LabelIfc interface {
-	GetName() string
-	GetValue() string
-}
-
 // Labels is a sorted set of labels. Order has to be guaranteed upon
 // instantiation.
 type Labels []Label
