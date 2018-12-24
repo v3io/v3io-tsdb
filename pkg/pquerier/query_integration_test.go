@@ -23,6 +23,7 @@ such restriction.
 package pquerier_test
 
 import (
+	"fmt"
 	"math"
 	"strings"
 	"testing"
@@ -40,7 +41,8 @@ import (
 
 type testQuerySuite struct {
 	suite.Suite
-	v3ioConfig *config.V3ioConfig
+	v3ioConfig     *config.V3ioConfig
+	suiteTimestamp int64
 }
 
 func (suite *testQuerySuite) SetupSuite() {
@@ -50,16 +52,19 @@ func (suite *testQuerySuite) SetupSuite() {
 	}
 
 	suite.v3ioConfig = v3ioConfig
+	suite.suiteTimestamp = time.Now().Unix()
 }
 
 func (suite *testQuerySuite) SetupTest() {
-	suite.v3ioConfig.TablePath = suite.T().Name()
+	suite.v3ioConfig.TablePath = fmt.Sprintf("%s-%v", suite.T().Name(), suite.suiteTimestamp)
 	tsdbtest.CreateTestTSDB(suite.T(), suite.v3ioConfig)
 }
 
 func (suite *testQuerySuite) TearDownTest() {
-	suite.v3ioConfig.TablePath = suite.T().Name()
-	tsdbtest.DeleteTSDB(suite.T(), suite.v3ioConfig)
+	suite.v3ioConfig.TablePath = fmt.Sprintf("%s-%v", suite.T().Name(), suite.suiteTimestamp)
+	if !suite.T().Failed() {
+		tsdbtest.DeleteTSDB(suite.T(), suite.v3ioConfig)
+	}
 }
 
 func (suite *testQuerySuite) TestRawDataSinglePartition() {
