@@ -67,11 +67,13 @@ instead of using the -s|--server, -u|--username, -p|--password, and -c|--contain
 - tsdbctl add http_req method=get -t mytsdb -d 99.9
 - tsdbctl add cpu "host=A,os=win" -t metrics-table -d "73.2,45.1" -m "1533026403000,now-1d"
 - tsdbctl add -t perfstats -f ~/tsdb/tsdb_input.csv
+- tsdbctl add log -t mytsdb -m now-2h -d "This thing has just happened"
 
 Notes:
-The command requires a metric name and one or more sample values. You can provide this
-information either by using the <metric> argument and the -d|--values flag, or by using the
--f|--file flag to point to a CSV file that contains the required information.
+- The command requires a metric name and one or more sample values.
+  You can provide this information either by using the <metric> argument and the -d|--values flag,
+  or by using the -f|--file flag to point to a CSV file that contains the required information.  
+- It is possible to ingest metrics containing string values, Though a single metric can contain either Floats or Strings, But not both.
 
 Arguments:
   <metric> (string) The name of the metric for which to add samples.
@@ -109,7 +111,7 @@ Arguments:
 	cmd.Flags().StringVarP(&commandeer.tArr, "times", "m", "",
 		"An array of metric-sample times, as a comma-separated list of times\nspecified as Unix timestamps in milliseconds or as relative times of the\nformat \"now\" or \"now-[0-9]+[mhd]\" (where 'm' = minutes, 'h' = hours,\nand 'd' = days). Note that an ingested sample time cannot be earlier\nthan the latest previously ingested sample time for the same metric.\nThis includes metrics ingested in the same command, so specify the\ningestion times in ascending chronological order. Example:\n\"1537971020000,now-2d,now-95m,now\".\nThe default sample time is the current time (\"now\").")
 	cmd.Flags().StringVarP(&commandeer.vArr, "values", "d", "",
-		"An array of metric-sample data values, as a comma-separated list of\ninteger or float values. Example: \"99.3,82.12,25.87,100\".\nThe command requires at least one metric value, which can be provided\nwith this flag or in a CSV file that is set with the -f|--file flag.")
+		"An array of metric-sample data values, as a comma-separated list of\ninteger, float or string values. Example: \"99.3,82.12,25.87,100\".\nThe command requires at least one metric value, which can be provided\nwith this flag or in a CSV file that is set with the -f|--file flag.")
 	cmd.Flags().StringVarP(&commandeer.inFile, "file", "f", "",
 		"Path to a CSV metric-samples input file with rows of this format:\n  <metric name>,[<labels>],<sample data value>[,<sample time>]\nNote that all rows must have the same number of columns.\nExamples: \"~/tests/tsdb_samples.csv\" where the file has this content:\n  temp,degree=cel,28,1529659800000\n  cpu,\"os=win,id=82\",78.5,now-1h\n  volume,,6104.02,\n\"my_metrics.csv\" where the file has this content (no time column):\n  noise,,50\n  cpu2,\"os=linux,id=2\",95")
 	cmd.Flags().BoolVar(&commandeer.stdin, "stdin", false,
