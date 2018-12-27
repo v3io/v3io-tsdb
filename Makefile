@@ -1,7 +1,7 @@
 # All top-level dirs except for vendor/.
-TOPLEVEL_DIRS=`ls -d ./*/. | grep -v '^./vendor/.$$' | sed 's/\.$$/.../'`
-TOPLEVEL_DIRS_GOFMT_SYNTAX=`ls -d ./*/. | grep -v '^./vendor/.$$'`
-TOPLEVEL_DIRS_IMPI_SYNTAX=`ls -d ./*/. | grep -v '^./vendor/.$$' | sed 's/$$/../'`
+TOPLEVEL_DIRS=`ls -d ./*/. | grep -v '^./vendor/.$$' | grep -v '^./examples/.$$' | sed 's/\.$$/.../'`
+TOPLEVEL_DIRS_GOFMT_SYNTAX=`ls -d ./*/. | grep -v '^./vendor/.$$'` | grep -v '^./examples/.$$'
+TOPLEVEL_DIRS_IMPI_SYNTAX=`ls -d ./*/. | grep -v '^./vendor/.$$' | grep -v '^./examples/.$$' | sed 's/$$/../'`
 
 GIT_COMMIT_HASH := $(shell git rev-parse HEAD)
 GIT_BRANCH=$(shell git rev-parse --abbrev-ref HEAD)
