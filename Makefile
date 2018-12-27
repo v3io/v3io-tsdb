@@ -37,8 +37,6 @@ BUILD_OPTS := -ldflags " \
   -X $(CONFIG_PKG).branch=$(GIT_BRANCH)" \
  -v -o "$(GOPATH)/bin/$(TSDBCTL_BIN_NAME)"
 
-TSDB_BUILD_COMMAND ?= CGO_ENABLED=0 go build $(BUILD_OPTS) ./cmd/tsdbctl
-
 .PHONY: get
 get:
 	go get -v -t -tags "unit integration" $(TOPLEVEL_DIRS)
@@ -56,19 +54,8 @@ bench: get
 	go test -run=XXX -bench='^BenchmarkIngest$$' -benchtime 10s -timeout 5m ./test/benchmark/...
 
 .PHONY: build
-build:
-	docker run \
-	  --volume $(shell pwd):/go/src/github.com/v3io/v3io-tsdb \
-	  --volume $(shell pwd):/go/bin \
-	  --workdir /go/src/github.com/v3io/v3io-tsdb \
-	  --env GOOS=$(GOOS) \
-	  --env GOARCH=$(GOARCH) \
-	  golang:1.11 \
-	  make bin
-
-.PHONY: bin
-bin: get
-	${TSDB_BUILD_COMMAND}
+build: get
+	CGO_ENABLED=0 go build $(BUILD_OPTS) ./cmd/tsdbctl
 
 .PHONY: lint
 lint:
