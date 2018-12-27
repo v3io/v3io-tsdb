@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"os"
 	"strings"
+	"sync"
 
 	"github.com/nuclio/nuclio-sdk-go"
 	"github.com/pkg/errors"
@@ -34,9 +35,8 @@ type request struct {
 	Last             string   `json:"last"`
 }
 
-type userData struct {
-	querier *pquerier.V3ioQuerier
-}
+var tsdbQuerier *pquerier.V3ioQuerier
+var tsdbQuerierMtx sync.Mutex
 
 func Handler(context *nuclio.Context, event nuclio.Event) (interface{}, error) {
 	request := request{}
@@ -53,9 +53,6 @@ func Handler(context *nuclio.Context, event nuclio.Event) (interface{}, error) {
 	if err != nil {
 		return nil, nuclio.WrapErrBadRequest(errors.Wrap(err, "Error parsing query time range"))
 	}
-
-	// get user data from context, as initialized by InitContext
-	tsdbQuerier := context.UserData.(*userData).querier
 
 	params := &pquerier.SelectParams{Name: request.Metric,
 		Functions: strings.Join(request.Aggregators, ","),
@@ -93,38 +90,40 @@ func InitContext(context *nuclio.Context) error {
 	context.Logger.InfoWith("Initializing", "tsdbTablePath", tsdbTablePath)
 
 	// create v3io adapter
-	tsdbQuerier, err := createV3ioQuerier(context, tsdbTablePath)
+	err := createV3ioQuerier(context, tsdbTablePath)
 	if err != nil {
 		return errors.Wrap(err, "Failed to initialize querier")
 	}
-	context.UserData = userData{tsdbQuerier}
 	return nil
 }
 
-func createV3ioQuerier(context *nuclio.Context, path string) (*pquerier.V3ioQuerier, error) {
+func createV3ioQuerier(context *nuclio.Context, path string) error {
 	context.Logger.InfoWith("Creating v3io adapter", "path", path)
 
-	var err error
+	defer tsdbQuerierMtx.Unlock()
+	tsdbQuerierMtx.Lock()
 
-	v3ioConfig, err := config.GetOrLoadFromStruct(&config.V3ioConfig{
-		TablePath: path,
-	})
-	if err != nil {
-		return nil, err
+	if tsdbQuerier == nil {
+		v3ioConfig, err := config.GetOrLoadFromStruct(&config.V3ioConfig{
+			TablePath: path,
+		})
+		if err != nil {
+			return err
+		}
+		container, err := tsdb.NewContainerFromEnv(context.Logger)
+		if err != nil {
+			return err
+		}
+		// create adapter once for all contexts
+		adapter, err := tsdb.NewV3ioAdapter(v3ioConfig, container, context.Logger)
+		if err != nil {
+			return err
+		}
+		// Create TSDB Querier
+		tsdbQuerier, err = adapter.QuerierV2()
+		if err != nil {
+			return errors.Wrap(err, "Failed to initialize querier")
+		}
 	}
-	container, err := tsdb.NewContainerFromEnv(context.Logger)
-	if err != nil {
-		return nil, err
-	}
-	// create adapter once for all contexts
-	adapter, err := tsdb.NewV3ioAdapter(v3ioConfig, container, context.Logger)
-	if err != nil {
-		return nil, err
-	}
-	// Create TSDB Querier
-	querierInstance, err := adapter.QuerierV2()
-	if err != nil {
-		return nil, errors.Wrap(err, "Failed to initialize querier")
-	}
-	return querierInstance, nil
+	return nil
 }

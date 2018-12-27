@@ -5,6 +5,7 @@ import (
 	"os"
 	"sort"
 	"strings"
+	"sync"
 
 	"github.com/nuclio/nuclio-sdk-go"
 	"github.com/pkg/errors"
@@ -52,9 +53,8 @@ type request struct {
 	Samples []sample          `json:"samples"`
 }
 
-type userData struct {
-	tsdbAppender tsdb.Appender
-}
+var tsdbAppender tsdb.Appender
+var tsdbAppenderMtx sync.Mutex
 
 func Handler(context *nuclio.Context, event nuclio.Event) (interface{}, error) {
 	var request request
@@ -71,9 +71,6 @@ func Handler(context *nuclio.Context, event nuclio.Event) (interface{}, error) {
 	// convert the map[string]string -> []Labels
 	labels := getLabelsFromRequest(request.Metric, request.Labels)
 
-	// get user data from context, as initialized by InitContext
-	userData := context.UserData.(*userData)
-
 	// iterate over request samples
 	for _, sample := range request.Samples {
 
@@ -89,7 +86,7 @@ func Handler(context *nuclio.Context, event nuclio.Event) (interface{}, error) {
 		}
 
 		// append sample to metric
-		_, err = userData.tsdbAppender.Add(labels, sampleTime, sample.Value.N)
+		_, err = tsdbAppender.Add(labels, sampleTime, sample.Value.N)
 		if err != nil {
 			return "", errors.Wrap(err, "Failed to add sample")
 		}
@@ -101,7 +98,6 @@ func Handler(context *nuclio.Context, event nuclio.Event) (interface{}, error) {
 // InitContext runs only once when the function runtime starts
 func InitContext(context *nuclio.Context) error {
 	var err error
-	var userData userData
 
 	// get configuration from env
 	tsdbTablePath := os.Getenv("INGEST_V3IO_TSDB_PATH")
@@ -112,13 +108,10 @@ func InitContext(context *nuclio.Context) error {
 	context.Logger.InfoWith("Initializing", "tsdbTablePath", tsdbTablePath)
 
 	// create TSDB appender
-	userData.tsdbAppender, err = createTSDBAppender(context, tsdbTablePath)
+	err = createTSDBAppender(context, tsdbTablePath)
 	if err != nil {
 		return err
 	}
-
-	// set user data into the context
-	context.UserData = &userData
 
 	return nil
 }
@@ -147,30 +140,33 @@ func getLabelsFromRequest(metricName string, labelsFromRequest map[string]string
 	return labels
 }
 
-func createTSDBAppender(context *nuclio.Context, path string) (tsdb.Appender, error) {
+func createTSDBAppender(context *nuclio.Context, path string) error {
 	context.Logger.InfoWith("Creating TSDB appender", "path", path)
 
-	var err error
+	defer tsdbAppenderMtx.Unlock()
+	tsdbAppenderMtx.Lock()
 
-	v3ioConfig, err := config.GetOrLoadFromStruct(&config.V3ioConfig{
-		TablePath: path,
-	})
-	if err != nil {
-		return nil, err
-	}
-	container, err := tsdb.NewContainerFromEnv(context.Logger)
-	if err != nil {
-		return nil, err
-	}
-	// create adapter once for all contexts
-	adapter, err := tsdb.NewV3ioAdapter(v3ioConfig, container, context.Logger)
-	if err != nil {
-		return nil, err
-	}
-	appender, err := adapter.Appender()
-	if err != nil {
-		return nil, err
+	if tsdbAppender == nil {
+		v3ioConfig, err := config.GetOrLoadFromStruct(&config.V3ioConfig{
+			TablePath: path,
+		})
+		if err != nil {
+			return err
+		}
+		container, err := tsdb.NewContainerFromEnv(context.Logger)
+		if err != nil {
+			return err
+		}
+		// create adapter once for all contexts
+		adapter, err := tsdb.NewV3ioAdapter(v3ioConfig, container, context.Logger)
+		if err != nil {
+			return err
+		}
+		tsdbAppender, err = adapter.Appender()
+		if err != nil {
+			return err
+		}
 	}
 
-	return appender, nil
+	return nil
 }
