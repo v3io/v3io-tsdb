@@ -263,7 +263,7 @@ func (q *V3ioQuerier) getLabelValues(labelKey string) ([]string, error) {
 }
 
 // Returns all unique labels sets we have in the data
-func (q *V3ioQuerier) GetLabelSets(metric string) ([]utils.Labels, error) {
+func (q *V3ioQuerier) GetLabelSets(metric string, filter string) ([]utils.Labels, error) {
 	err := q.partitionMngr.ReadAndUpdateSchema()
 	if err != nil {
 		return nil, err
@@ -286,6 +286,7 @@ func (q *V3ioQuerier) GetLabelSets(metric string) ([]utils.Labels, error) {
 	// Get all label sets
 	input := v3io.GetItemsInput{
 		Path:           partitionPaths[0],
+		Filter:         filter,
 		AttributeNames: []string{config.LabelSetAttrName},
 	}
 
