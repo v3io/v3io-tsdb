@@ -85,15 +85,15 @@ func Handler(context *nuclio.Context, event nuclio.Event) (interface{}, error) {
 func InitContext(context *nuclio.Context) error {
 
 	// get configuration from env
-	v3ioAdapterPath := os.Getenv("QUERY_V3IO_TSDB_PATH")
-	if v3ioAdapterPath == "" {
+	tsdbTablePath := os.Getenv("QUERY_V3IO_TSDB_PATH")
+	if tsdbTablePath == "" {
 		return errors.New("QUERY_V3IO_TSDB_PATH must be set")
 	}
 
-	context.Logger.InfoWith("Initializing", "v3ioAdapterPath", v3ioAdapterPath)
+	context.Logger.InfoWith("Initializing", "tsdbTablePath", tsdbTablePath)
 
 	// create v3io adapter
-	tsdbQuerier, err := createV3ioQuerier(context, v3ioAdapterPath)
+	tsdbQuerier, err := createV3ioQuerier(context, tsdbTablePath)
 	if err != nil {
 		return errors.Wrap(err, "Failed to initialize querier")
 	}

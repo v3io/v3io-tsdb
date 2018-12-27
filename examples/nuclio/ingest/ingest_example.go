@@ -104,15 +104,15 @@ func InitContext(context *nuclio.Context) error {
 	var userData userData
 
 	// get configuration from env
-	tsdbAppenderPath := os.Getenv("INGEST_V3IO_TSDB_PATH")
-	if tsdbAppenderPath == "" {
+	tsdbTablePath := os.Getenv("INGEST_V3IO_TSDB_PATH")
+	if tsdbTablePath == "" {
 		return errors.New("INGEST_V3IO_TSDB_PATH must be set")
 	}
 
-	context.Logger.InfoWith("Initializing", "tsdbAppenderPath", tsdbAppenderPath)
+	context.Logger.InfoWith("Initializing", "tsdbTablePath", tsdbTablePath)
 
 	// create TSDB appender
-	userData.tsdbAppender, err = createTSDBAppender(context, tsdbAppenderPath)
+	userData.tsdbAppender, err = createTSDBAppender(context, tsdbTablePath)
 	if err != nil {
 		return err
 	}
