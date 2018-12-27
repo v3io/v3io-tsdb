@@ -5,7 +5,6 @@ import (
 	"os"
 	"sort"
 	"strings"
-	"sync"
 
 	"github.com/nuclio/nuclio-sdk-go"
 	"github.com/pkg/errors"
@@ -56,9 +55,6 @@ type request struct {
 type userData struct {
 	tsdbAppender tsdb.Appender
 }
-
-var adapter *tsdb.V3ioAdapter
-var adapterLock sync.Mutex
 
 func Handler(context *nuclio.Context, event nuclio.Event) (interface{}, error) {
 	var request request
@@ -154,33 +150,27 @@ func getLabelsFromRequest(metricName string, labelsFromRequest map[string]string
 func createTSDBAppender(context *nuclio.Context, path string) (tsdb.Appender, error) {
 	context.Logger.InfoWith("Creating TSDB appender", "path", path)
 
-	adapterLock.Lock()
-	defer adapterLock.Unlock()
+	var err error
 
-	if adapter == nil {
-		var err error
-
-		v3ioConfig, err := config.GetOrLoadFromStruct(&config.V3ioConfig{
-			TablePath: path,
-		})
-		if err != nil {
-			return nil, err
-		}
-		container, err := tsdb.NewContainerFromEnv(context.Logger)
-		if err != nil {
-			return nil, err
-		}
-		// create adapter once for all contexts
-		adapter, err = tsdb.NewV3ioAdapter(v3ioConfig, container, context.Logger)
-		if err != nil {
-			return nil, err
-		}
+	v3ioConfig, err := config.GetOrLoadFromStruct(&config.V3ioConfig{
+		TablePath: path,
+	})
+	if err != nil {
+		return nil, err
 	}
-
-	tsdbAppender, err := adapter.Appender()
+	container, err := tsdb.NewContainerFromEnv(context.Logger)
+	if err != nil {
+		return nil, err
+	}
+	// create adapter once for all contexts
+	adapter, err := tsdb.NewV3ioAdapter(v3ioConfig, container, context.Logger)
+	if err != nil {
+		return nil, err
+	}
+	appender, err := adapter.Appender()
 	if err != nil {
 		return nil, err
 	}
 
-	return tsdbAppender, nil
+	return appender, nil
 }
