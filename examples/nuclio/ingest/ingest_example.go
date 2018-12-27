@@ -71,6 +71,7 @@ func Handler(context *nuclio.Context, event nuclio.Event) (interface{}, error) {
 	// convert the map[string]string -> []Labels
 	labels := getLabelsFromRequest(request.Metric, request.Labels)
 
+	var ref uint64
 	// iterate over request samples
 	for _, sample := range request.Samples {
 
@@ -78,15 +79,17 @@ func Handler(context *nuclio.Context, event nuclio.Event) (interface{}, error) {
 		if sample.Time == "" {
 			sample.Time = "now"
 		}
-
 		// convert time string to time int, string can be: now, now-2h, int (unix milisec time), or RFC3339 date string
 		sampleTime, err := utils.Str2unixTime(sample.Time)
 		if err != nil {
 			return "", errors.Wrap(err, "Failed to parse time: "+sample.Time)
 		}
-
 		// append sample to metric
-		_, err = tsdbAppender.Add(labels, sampleTime, sample.Value.N)
+		if ref == 0 {
+			ref, err = tsdbAppender.Add(labels, sampleTime, sample.Value.N)
+		} else {
+			err = tsdbAppender.AddFast(labels, ref, sampleTime, sample.Value.N)
+		}
 		if err != nil {
 			return "", errors.Wrap(err, "Failed to add sample")
 		}
