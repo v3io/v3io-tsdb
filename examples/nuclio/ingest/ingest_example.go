@@ -1,84 +1,175 @@
-package ingest
+package main
 
 import (
 	"encoding/json"
+	"os"
+	"sort"
+	"strings"
 	"sync"
 
 	"github.com/nuclio/nuclio-sdk-go"
-	"github.com/v3io/v3io-go-http"
+	"github.com/pkg/errors"
 	"github.com/v3io/v3io-tsdb/pkg/config"
 	"github.com/v3io/v3io-tsdb/pkg/tsdb"
-	"github.com/v3io/v3io-tsdb/pkg/tsdb/tsdbtest"
 	"github.com/v3io/v3io-tsdb/pkg/utils"
 )
 
-// Configuration
-// Note: the TSDB instance (`path`) must first be created using the CLI or API.
-// The user must also define the V3IO data binding in the Nuclio function - including path, username, and password - and name it "db0".
-var tsdbConfig = `
-path: "pmetric"
-`
+// Example event:
+//
+// {
+//		"metric": "cpu",
+//		"labels": {
+//			"dc": "7",
+//			"hostname": "mybesthost"
+//		},
+//		"samples": [
+//			{
+//				"t": "1532595945142",
+//				"v": {
+//					"N": 95.2
+//				}
+//			},
+//			{
+//				"t": "1532595948517",
+//				"v": {
+//					"n": 86.8
+//				}
+//			}
+//		]
+// }
 
-// Example event
-const pushEvent = `
-{
-  "Lset": { "__name__":"cpu", "os" : "win", "node" : "xyz123"},
-  "Time" : "now-5m",
-  "Value" : 3.7
+type value struct {
+	N float64 `json:"n,omitempty"`
 }
-`
 
-var adapter *tsdb.V3ioAdapter
-var adapterMtx sync.RWMutex
+type sample struct {
+	Time  string `json:"t"`
+	Value value  `json:"v"`
+}
+
+type request struct {
+	Metric  string            `json:"metric"`
+	Labels  map[string]string `json:"labels,omitempty"`
+	Samples []sample          `json:"samples"`
+}
+
+var tsdbAppender tsdb.Appender
+var tsdbAppenderMtx sync.Mutex
 
 func Handler(context *nuclio.Context, event nuclio.Event) (interface{}, error) {
-	sample := tsdbtest.Sample{}
-	err := json.Unmarshal(event.GetBody(), &sample)
-	if err != nil {
-		return nil, err
-	}
-	app := context.UserData.(tsdb.Appender)
+	var request request
 
-	// If time isn't specified, assume "now" (default)
-	if sample.Time == "" {
-		sample.Time = "now"
+	// parse body
+	if err := json.Unmarshal(event.GetBody(), &request); err != nil {
+		return "", nuclio.WrapErrBadRequest(err)
 	}
 
-	// Convert a time string to a Unix timestamp in milliseconds integer.
-	// The input time string can be of the format "now", "now-[0-9]+[mdh]"
-	// (for example, "now-2h"), "<Unix timestamp in milliseconds>", or
-	// "<RFC 3339 time>" (for example, "2018-09-26T14:10:20Z").
-	t, err := utils.Str2unixTime(sample.Time)
-	if err != nil {
-		return "", err
+	if strings.TrimSpace(request.Metric) == "" {
+		return nil, nuclio.WrapErrBadRequest(errors.New(`request is missing the mandatory 'metric' field`))
 	}
 
-	// Append sample to metric
-	_, err = app.Add(sample.Lset, t, sample.Value)
-	return "", err
+	// convert the map[string]string -> []Labels
+	labels := getLabelsFromRequest(request.Metric, request.Labels)
+
+	var ref uint64
+	// iterate over request samples
+	for _, sample := range request.Samples {
+
+		// if time is not specified assume "now"
+		if sample.Time == "" {
+			sample.Time = "now"
+		}
+		// convert time string to time int, string can be: now, now-2h, int (unix milisec time), or RFC3339 date string
+		sampleTime, err := utils.Str2unixTime(sample.Time)
+		if err != nil {
+			return "", errors.Wrap(err, "Failed to parse time: "+sample.Time)
+		}
+		// append sample to metric
+		if ref == 0 {
+			ref, err = tsdbAppender.Add(labels, sampleTime, sample.Value.N)
+		} else {
+			err = tsdbAppender.AddFast(labels, ref, sampleTime, sample.Value.N)
+		}
+		if err != nil {
+			return "", errors.Wrap(err, "Failed to add sample")
+		}
+	}
+
+	return "", nil
 }
 
-// InitContext runs only once, when the function runtime starts
+// InitContext runs only once when the function runtime starts
 func InitContext(context *nuclio.Context) error {
-
 	var err error
-	defer adapterMtx.Unlock()
-	adapterMtx.Lock()
 
-	if adapter == nil {
-		// Create an adapter once for all contexts
-		cfg, _ := config.GetOrLoadFromData([]byte(tsdbConfig))
-		data := context.DataBinding["db0"].(*v3io.Container)
-		adapter, err = tsdb.NewV3ioAdapter(cfg, data, context.Logger)
+	// get configuration from env
+	tsdbTablePath := os.Getenv("INGEST_V3IO_TSDB_PATH")
+	if tsdbTablePath == "" {
+		return errors.New("INGEST_V3IO_TSDB_PATH must be set")
+	}
+
+	context.Logger.InfoWith("Initializing", "tsdbTablePath", tsdbTablePath)
+
+	// create TSDB appender
+	err = createTSDBAppender(context, tsdbTablePath)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// convert map[string]string -> utils.Labels
+func getLabelsFromRequest(metricName string, labelsFromRequest map[string]string) utils.Labels {
+
+	// adding 1 for metric name
+	labels := make(utils.Labels, 0, len(labelsFromRequest)+1)
+
+	// add the metric name
+	labels = append(labels, utils.Label{
+		Name:  "__name__",
+		Value: metricName,
+	})
+
+	for labelKey, labelValue := range labelsFromRequest {
+		labels = append(labels, utils.Label{
+			Name:  labelKey,
+			Value: labelValue,
+		})
+	}
+
+	sort.Sort(labels)
+
+	return labels
+}
+
+func createTSDBAppender(context *nuclio.Context, path string) error {
+	context.Logger.InfoWith("Creating TSDB appender", "path", path)
+
+	defer tsdbAppenderMtx.Unlock()
+	tsdbAppenderMtx.Lock()
+
+	if tsdbAppender == nil {
+		v3ioConfig, err := config.GetOrLoadFromStruct(&config.V3ioConfig{
+			TablePath: path,
+		})
+		if err != nil {
+			return err
+		}
+		container, err := tsdb.NewContainerFromEnv(context.Logger)
+		if err != nil {
+			return err
+		}
+		// create adapter once for all contexts
+		adapter, err := tsdb.NewV3ioAdapter(v3ioConfig, container, context.Logger)
+		if err != nil {
+			return err
+		}
+		tsdbAppender, err = adapter.Appender()
 		if err != nil {
 			return err
 		}
 	}
 
-	appender, err := adapter.Appender()
-	if err != nil {
-		return err
-	}
-	context.UserData = appender
 	return nil
 }
