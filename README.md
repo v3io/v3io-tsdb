@@ -95,7 +95,7 @@ it has built-in help, see the following add/query examples:
 	
 ```
 
-For use with nuclio function you can see function examples in [tsdb-nuclio](https://github.com/v3io/tsdb-nuclio).
+For use with nuclio function you can see function example under [\nuclio](examples/nuclio)
 
 ## API Walkthrough 
 
@@ -134,7 +134,7 @@ you already have container and logger (when using nuclio data bindings).
 Configuration is specified in a YAML or JSON format, and can be read from a file using `config.GetOrLoadFromFile(path string)` 
 or can be loaded from a local buffer using `config.GetOrLoadFromData(data []byte)`.
 You can see details on the configuration options in the V3IO TSDB [**config.go**](pkg/config/config.go) source file.
-A template configuration file is found at **v3io-tsdb-config.yaml.template**.
+A template configuration file is found at **examples/v3io-tsdb-config.yaml.template**.
 You can use it as a reference for creating your own TSDB configuration file.
 For example:
 
