@@ -3,3 +3,4 @@ workers: 1
 webApiEndpoint: "webapi.iguazio.app.fnqtlobecymq.dev.trl.iguazio.com:8081"
 username: "iguazio"
 password: "IqXUHmIe2op3Q02S"
+loglevel: "debug"
