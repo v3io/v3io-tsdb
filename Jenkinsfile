@@ -73,16 +73,31 @@ def build_nuclio(V3IO_TSDB_VERSION) {
         stage('git push') {
             container('jnlp') {
                 try {
-                    sh """
-                        git config --global user.email '${GIT_USERNAME}@iguazio.com'
-                        git config --global user.name '${GIT_USERNAME}'
-                        cd ${BUILD_FOLDER}/src/github.com/v3io/${git_project}
-                        git add *
-                        git commit -am 'Updated TSDB to ${V3IO_TSDB_VERSION}';
-                        git push origin master
-                    """
+                    dir("${BUILD_FOLDER}/src/github.com/v3io/${git_project}") {
+                        sh """
+                            git config --global user.email '${GIT_USERNAME}@iguazio.com'
+                            git config --global user.name '${GIT_USERNAME}'
+                            git add vendor/github.com;
+                            git commit -am 'Updated TSDB to ${V3IO_TSDB_VERSION}';
+                            git push origin master
+                        """
+                    }
                 } catch (err) {
-                    echo "Can not push code to git"
+                    echo "Can not push code to master"
+                }
+            }
+
+            container('jnlp') {
+                try {
+                    dir("${BUILD_FOLDER}/src/github.com/v3io/${git_project}") {
+                        sh """
+                            git checkout development
+                            git merge origin/master
+                            git push origin development
+                        """
+                    }
+                } catch (err) {
+                    echo "Can not push code to development"
                 }
             }
         }
@@ -114,16 +129,31 @@ def build_demo(V3IO_TSDB_VERSION) {
         stage('git push') {
             container('jnlp') {
                 try {
-                    sh """
-                        git config --global user.email '${GIT_USERNAME}@iguazio.com'
-                        git config --global user.name '${GIT_USERNAME}'
-                        cd ${BUILD_FOLDER}/src/github.com/v3io/${git_project}/netops
-                        git add *
-                        git commit -am 'Updated TSDB to ${V3IO_TSDB_VERSION}';
-                        git push origin master
-                    """
+                    dir("${BUILD_FOLDER}/src/github.com/v3io/${git_project}/netops") {
+                        sh """
+                            git config --global user.email '${GIT_USERNAME}@iguazio.com'
+                            git config --global user.name '${GIT_USERNAME}'
+                            git add vendor/github.com;
+                            git commit -am 'Updated TSDB to ${V3IO_TSDB_VERSION}';
+                            git push origin master
+                        """
+                    }
                 } catch (err) {
-                    echo "Can not push code to git"
+                    echo "Can not push code to master"
+                }
+            }
+
+            container('jnlp') {
+                try {
+                    dir("${BUILD_FOLDER}/src/github.com/v3io/${git_project}/netops") {
+                        sh """
+                            git checkout development
+                            git merge origin/master
+                            git push origin development
+                        """
+                    }
+                } catch (err) {
+                    echo "Can not push code to development"
                 }
             }
         }
@@ -157,16 +187,17 @@ def build_prometheus(V3IO_TSDB_VERSION) {
         stage('git push') {
             container('jnlp') {
                 try {
-                    sh """
-                        git config --global user.email '${GIT_USERNAME}@iguazio.com'
-                        git config --global user.name '${GIT_USERNAME}'
-                        cd ${BUILD_FOLDER}/src/github.com/${git_project}/${git_project};
-                        git add vendor/github.com/v3io/v3io-tsdb;
-                        git commit -am 'Updated TSDB to ${V3IO_TSDB_VERSION}';
-                        git push origin master
-                    """
+                    dir("${BUILD_FOLDER}/src/github.com/${git_project}/${git_project}") {
+                        sh """
+                            git config --global user.email '${GIT_USERNAME}@iguazio.com'
+                            git config --global user.name '${GIT_USERNAME}'
+                            git add vendor/github.com;
+                            git commit -am 'Updated TSDB to ${V3IO_TSDB_VERSION}';
+                            git push origin master
+                        """
+                    }
                 } catch (err) {
-                    echo "Can not push code to git"
+                    echo "Can not push code to master"
                 }
             }
         }
