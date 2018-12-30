@@ -25,13 +25,14 @@ def build_v3io_tsdb(TAG_VERSION) {
 
         stage("build ${git_project} binaries in dood") {
             container('golang') {
-                sh """
-                    cd ${BUILD_FOLDER}/src/github.com/v3io/${git_project}
-                    GOOS=linux GOARCH=amd64 TRAVIS_TAG=${TAG_VERSION} make bin
-                    GOOS=darwin GOARCH=amd64 TRAVIS_TAG=${TAG_VERSION} make bin
-                    GOOS=windows GOARCH=amd64 TRAVIS_TAG=${TAG_VERSION} make bin
-                    ls -la /go/bin
-                """
+                dir("${BUILD_FOLDER}/src/github.com/v3io/${git_project}") {
+                    sh """
+                        GOOS=linux GOARCH=amd64 TRAVIS_TAG=${TAG_VERSION} make bin
+                        GOOS=darwin GOARCH=amd64 TRAVIS_TAG=${TAG_VERSION} make bin
+                        GOOS=windows GOARCH=amd64 TRAVIS_TAG=${TAG_VERSION} make bin
+                        ls -la /go/bin
+                    """
+                }
             }
         }
 
@@ -55,18 +56,19 @@ def build_nuclio(V3IO_TSDB_VERSION) {
         def git_project = 'tsdb-nuclio'
         stage('prepare sources') {
             container('jnlp') {
-                sh """
-                    cd ${BUILD_FOLDER}
-                    git clone https://${GIT_USERNAME}:${GIT_PASSWORD}@github.com/${git_project_user}/${git_project}.git src/github.com/v3io/${git_project}
-                    cd ${BUILD_FOLDER}/src/github.com/v3io/${git_project}
-                    rm -rf functions/ingest/vendor/github.com/v3io/v3io-tsdb functions/query/vendor/github.com/v3io/v3io-tsdb
-                    git clone https://${GIT_USERNAME}:${GIT_PASSWORD}@github.com/${git_project_user}/v3io-tsdb.git functions/ingest/vendor/github.com/v3io/v3io-tsdb
-                    cd functions/ingest/vendor/github.com/v3io/v3io-tsdb
-                    git checkout ${V3IO_TSDB_VERSION}
-                    rm -rf .git vendor/github.com/v3io vendor/github.com/nuclio
-                    cd ${BUILD_FOLDER}/src/github.com/v3io/${git_project}
-                    cp -R functions/ingest/vendor/github.com/v3io/v3io-tsdb functions/query/vendor/github.com/v3io/v3io-tsdb
-                """
+                dir("${BUILD_FOLDER}") {
+                    sh """
+                        git clone https://${GIT_USERNAME}:${GIT_PASSWORD}@github.com/${git_project_user}/${git_project}.git src/github.com/v3io/${git_project}
+                        cd ${BUILD_FOLDER}/src/github.com/v3io/${git_project}
+                        rm -rf functions/ingest/vendor/github.com/v3io/v3io-tsdb functions/query/vendor/github.com/v3io/v3io-tsdb
+                        git clone https://${GIT_USERNAME}:${GIT_PASSWORD}@github.com/${git_project_user}/v3io-tsdb.git functions/ingest/vendor/github.com/v3io/v3io-tsdb
+                        cd functions/ingest/vendor/github.com/v3io/v3io-tsdb
+                        git checkout ${V3IO_TSDB_VERSION}
+                        rm -rf .git vendor/github.com/v3io vendor/github.com/nuclio
+                        cd ${BUILD_FOLDER}/src/github.com/v3io/${git_project}
+                        cp -R functions/ingest/vendor/github.com/v3io/v3io-tsdb functions/query/vendor/github.com/v3io/v3io-tsdb
+                    """
+                }
             }
         }
 
@@ -77,7 +79,7 @@ def build_nuclio(V3IO_TSDB_VERSION) {
                         sh """
                             git config --global user.email '${GIT_USERNAME}@iguazio.com'
                             git config --global user.name '${GIT_USERNAME}'
-                            git add vendor/github.com;
+                            git add functions/ingest/vendor/github.com/vendor/github.com functions/query/vendor/github.com/vendor/github.com;
                             git commit -am 'Updated TSDB to ${V3IO_TSDB_VERSION}';
                             git push origin master
                         """
@@ -113,16 +115,17 @@ def build_demo(V3IO_TSDB_VERSION) {
 
         stage('prepare sources') {
             container('jnlp') {
-                sh """
-                    cd ${BUILD_FOLDER}
-                    git clone https://${GIT_USERNAME}:${GIT_PASSWORD}@github.com/${git_project_user}/${git_project}.git src/github.com/v3io/${git_project}
-                    cd ${BUILD_FOLDER}/src/github.com/v3io/${git_project}/netops/golang/src/github.com/v3io/demos
-                    rm -rf vendor/github.com/v3io/v3io-tsdb/
-                    git clone https://${GIT_USERNAME}:${GIT_PASSWORD}@github.com/${git_project_user}/v3io-tsdb.git vendor/github.com/v3io/v3io-tsdb
-                    cd vendor/github.com/v3io/v3io-tsdb
-                    git checkout ${V3IO_TSDB_VERSION}
-                    rm -rf .git vendor/github.com/v3io vendor/github.com/nuclio
-                """
+                dir("${BUILD_FOLDER}") {
+                    sh """
+                        git clone https://${GIT_USERNAME}:${GIT_PASSWORD}@github.com/${git_project_user}/${git_project}.git src/github.com/v3io/${git_project}
+                        cd ${BUILD_FOLDER}/src/github.com/v3io/${git_project}/netops/golang/src/github.com/v3io/demos
+                        rm -rf vendor/github.com/v3io/v3io-tsdb/
+                        git clone https://${GIT_USERNAME}:${GIT_PASSWORD}@github.com/${git_project_user}/v3io-tsdb.git vendor/github.com/v3io/v3io-tsdb
+                        cd vendor/github.com/v3io/v3io-tsdb
+                        git checkout ${V3IO_TSDB_VERSION}
+                        rm -rf .git vendor/github.com/v3io vendor/github.com/nuclio
+                    """
+                }
             }
         }
 
@@ -133,7 +136,7 @@ def build_demo(V3IO_TSDB_VERSION) {
                         sh """
                             git config --global user.email '${GIT_USERNAME}@iguazio.com'
                             git config --global user.name '${GIT_USERNAME}'
-                            git add vendor/github.com;
+                            git add golang/src/github.com/v3io/demos/vendor/github.com;
                             git commit -am 'Updated TSDB to ${V3IO_TSDB_VERSION}';
                             git push origin master
                         """
@@ -169,18 +172,19 @@ def build_prometheus(V3IO_TSDB_VERSION) {
 
         stage('prepare sources') {
             container('jnlp') {
-                sh """ 
-                    cd ${BUILD_FOLDER}
-                    if [[ ! -d src/github.com/${git_project}/${git_project} ]]; then 
-                        git clone https://${GIT_USERNAME}:${GIT_PASSWORD}@github.com/${git_project_user}/${git_project}.git src/github.com/${git_project}/${git_project}
-                    fi
-                    cd ${BUILD_FOLDER}/src/github.com/${git_project}/${git_project}
-                    rm -rf vendor/github.com/v3io/v3io-tsdb/
-                    git clone https://${GIT_USERNAME}:${GIT_PASSWORD}@github.com/${git_project_user}/v3io-tsdb.git vendor/github.com/v3io/v3io-tsdb
-                    cd vendor/github.com/v3io/v3io-tsdb
-                    git checkout ${V3IO_TSDB_VERSION}
-                    rm -rf .git vendor/github.com/${git_project}
-                """
+                dir("${BUILD_FOLDER}") {
+                    sh """ 
+                        if [[ ! -d src/github.com/${git_project}/${git_project} ]]; then 
+                            git clone https://${GIT_USERNAME}:${GIT_PASSWORD}@github.com/${git_project_user}/${git_project}.git src/github.com/${git_project}/${git_project}
+                        fi
+                        cd ${BUILD_FOLDER}/src/github.com/${git_project}/${git_project}
+                        rm -rf vendor/github.com/v3io/v3io-tsdb/
+                        git clone https://${GIT_USERNAME}:${GIT_PASSWORD}@github.com/${git_project_user}/v3io-tsdb.git vendor/github.com/v3io/v3io-tsdb
+                        cd vendor/github.com/v3io/v3io-tsdb
+                        git checkout ${V3IO_TSDB_VERSION}
+                        rm -rf .git vendor/github.com/${git_project}
+                    """
+                }
             }
         }
 
