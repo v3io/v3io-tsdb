@@ -37,7 +37,7 @@ def build_v3io_tsdb(TAG_VERSION) {
 
         stage('upload release assets') {
             container('jnlp') {
-                RELEASE_ID = github.get_release_id(git_project, git_project_user, "v${TAG_VERSION}", GIT_TOKEN)
+                RELEASE_ID = github.get_release_id(git_project, git_project_user, "${TAG_VERSION}", GIT_TOKEN)
 
                 github.upload_asset(git_project, git_project_user, "tsdbctl-${TAG_VERSION}-linux-amd64", RELEASE_ID, GIT_TOKEN)
                 github.upload_asset(git_project, git_project_user, "tsdbctl-${TAG_VERSION}-darwin-amd64", RELEASE_ID, GIT_TOKEN)
@@ -47,7 +47,7 @@ def build_v3io_tsdb(TAG_VERSION) {
     }
 }
 
-def build_nuclio() {
+def build_nuclio(V3IO_TSDB_VERSION) {
     withCredentials([
             usernamePassword(credentialsId: git_deploy_user, passwordVariable: 'GIT_PASSWORD', usernameVariable: 'GIT_USERNAME'),
             string(credentialsId: git_deploy_user_token, variable: 'GIT_TOKEN')
@@ -62,11 +62,11 @@ def build_nuclio() {
                     rm -rf functions/ingest/vendor/github.com/v3io/v3io-tsdb functions/query/vendor/github.com/v3io/v3io-tsdb
                     git clone https://${GIT_USERNAME}:${GIT_PASSWORD}@github.com/${git_project_user}/v3io-tsdb.git functions/ingest/vendor/github.com/v3io/v3io-tsdb
                     cd functions/ingest/vendor/github.com/v3io/v3io-tsdb
+                    git checkout ${V3IO_TSDB_VERSION}
                     rm -rf .git vendor/github.com/v3io vendor/github.com/nuclio
                     cd ${BUILD_FOLDER}/src/github.com/v3io/${git_project}
                     cp -R functions/ingest/vendor/github.com/v3io/v3io-tsdb functions/query/vendor/github.com/v3io/v3io-tsdb
                 """
-//                    git checkout ${V3IO_TSDB_VERSION}
             }
         }
 
@@ -78,7 +78,7 @@ def build_nuclio() {
                         git config --global user.name '${GIT_USERNAME}'
                         cd ${BUILD_FOLDER}/src/github.com/v3io/${git_project}
                         git add *
-                        git commit -am 'Updated TSDB to latest';
+                        git commit -am 'Updated TSDB to ${V3IO_TSDB_VERSION}';
                         git push origin master
                     """
                 } catch (err) {
@@ -89,7 +89,7 @@ def build_nuclio() {
     }
 }
 
-def build_demo() {
+def build_demo(V3IO_TSDB_VERSION) {
     withCredentials([
             usernamePassword(credentialsId: git_deploy_user, passwordVariable: 'GIT_PASSWORD', usernameVariable: 'GIT_USERNAME'),
             string(credentialsId: git_deploy_user_token, variable: 'GIT_TOKEN')
@@ -105,9 +105,9 @@ def build_demo() {
                     rm -rf vendor/github.com/v3io/v3io-tsdb/
                     git clone https://${GIT_USERNAME}:${GIT_PASSWORD}@github.com/${git_project_user}/v3io-tsdb.git vendor/github.com/v3io/v3io-tsdb
                     cd vendor/github.com/v3io/v3io-tsdb
+                    git checkout ${V3IO_TSDB_VERSION}
                     rm -rf .git vendor/github.com/v3io vendor/github.com/nuclio
                 """
-//                    git checkout ${V3IO_TSDB_VERSION}
             }
         }
 
@@ -119,7 +119,7 @@ def build_demo() {
                         git config --global user.name '${GIT_USERNAME}'
                         cd ${BUILD_FOLDER}/src/github.com/v3io/${git_project}/netops
                         git add *
-                        git commit -am 'Updated TSDB to latest';
+                        git commit -am 'Updated TSDB to ${V3IO_TSDB_VERSION}';
                         git push origin master
                     """
                 } catch (err) {
@@ -148,7 +148,7 @@ def build_prometheus(V3IO_TSDB_VERSION) {
                     rm -rf vendor/github.com/v3io/v3io-tsdb/
                     git clone https://${GIT_USERNAME}:${GIT_PASSWORD}@github.com/${git_project_user}/v3io-tsdb.git vendor/github.com/v3io/v3io-tsdb
                     cd vendor/github.com/v3io/v3io-tsdb
-                    git checkout "v${V3IO_TSDB_VERSION}"
+                    git checkout ${V3IO_TSDB_VERSION}
                     rm -rf .git vendor/github.com/${git_project}
                 """
             }
@@ -162,7 +162,7 @@ def build_prometheus(V3IO_TSDB_VERSION) {
                         git config --global user.name '${GIT_USERNAME}'
                         cd ${BUILD_FOLDER}/src/github.com/${git_project}/${git_project};
                         git add vendor/github.com/v3io/v3io-tsdb;
-                        git commit -am 'Updated TSDB to v${V3IO_TSDB_VERSION}';
+                        git commit -am 'Updated TSDB to ${V3IO_TSDB_VERSION}';
                         git push origin master
                     """
                 } catch (err) {
@@ -280,7 +280,7 @@ spec:
                                 }
                             }
 
-                            build_nuclio()
+                            build_nuclio(TAG_NAME)
 
                             stage('create tsdb-nuclio prerelease') {
                                 container('jnlp') {
@@ -308,7 +308,7 @@ spec:
                                 }
                             }
 
-                            build_demo()
+                            build_demo(TAG_NAME)
 
                             stage('create demos prerelease') {
                                 container('jnlp') {
