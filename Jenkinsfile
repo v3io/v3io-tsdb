@@ -18,7 +18,7 @@ def build_v3io_tsdb(TAG_VERSION) {
             container('jnlp') {
                 dir("${BUILD_FOLDER}/src/github.com/v3io/${git_project}") {
                     git(changelog: false, credentialsId: git_deploy_user_private_key, poll: false, url: "git@github.com:${git_project_user}/${git_project}.git")
-                    sh("git checkout v${TAG_VERSION}")
+                    sh("git checkout ${TAG_VERSION}")
                 }
             }
         }
@@ -27,9 +27,9 @@ def build_v3io_tsdb(TAG_VERSION) {
             container('golang') {
                 sh """
                     cd ${BUILD_FOLDER}/src/github.com/v3io/${git_project}
-                    GOOS=linux GOARCH=amd64 TRAVIS_TAG=v${TAG_VERSION} make bin
-                    GOOS=darwin GOARCH=amd64 TRAVIS_TAG=v${TAG_VERSION} make bin
-                    GOOS=windows GOARCH=amd64 TRAVIS_TAG=v${TAG_VERSION} make bin
+                    GOOS=linux GOARCH=amd64 TRAVIS_TAG=${TAG_VERSION} make bin
+                    GOOS=darwin GOARCH=amd64 TRAVIS_TAG=${TAG_VERSION} make bin
+                    GOOS=windows GOARCH=amd64 TRAVIS_TAG=${TAG_VERSION} make bin
                     ls -la /go/bin
                 """
             }
@@ -39,9 +39,9 @@ def build_v3io_tsdb(TAG_VERSION) {
             container('jnlp') {
                 RELEASE_ID = github.get_release_id(git_project, git_project_user, "v${TAG_VERSION}", GIT_TOKEN)
 
-                github.upload_asset(git_project, git_project_user, "tsdbctl-v${TAG_VERSION}-linux-amd64", RELEASE_ID, GIT_TOKEN)
-                github.upload_asset(git_project, git_project_user, "tsdbctl-v${TAG_VERSION}-darwin-amd64", RELEASE_ID, GIT_TOKEN)
-                github.upload_asset(git_project, git_project_user, "tsdbctl-v${TAG_VERSION}-windows-amd64", RELEASE_ID, GIT_TOKEN)
+                github.upload_asset(git_project, git_project_user, "tsdbctl-${TAG_VERSION}-linux-amd64", RELEASE_ID, GIT_TOKEN)
+                github.upload_asset(git_project, git_project_user, "tsdbctl-${TAG_VERSION}-darwin-amd64", RELEASE_ID, GIT_TOKEN)
+                github.upload_asset(git_project, git_project_user, "tsdbctl-${TAG_VERSION}-windows-amd64", RELEASE_ID, GIT_TOKEN)
             }
         }
     }
@@ -130,21 +130,15 @@ def build_demo() {
     }
 }
 
-def build_prometheus(TAG_VERSION) {
+def build_prometheus(V3IO_TSDB_VERSION) {
     withCredentials([
             usernamePassword(credentialsId: git_deploy_user, passwordVariable: 'GIT_PASSWORD', usernameVariable: 'GIT_USERNAME'),
             string(credentialsId: git_deploy_user_token, variable: 'GIT_TOKEN')
     ]) {
         def git_project = 'prometheus'
-        def V3IO_TSDB_VERSION
 
         stage('prepare sources') {
             container('jnlp') {
-                V3IO_TSDB_VERSION = sh(
-                        script: "echo ${TAG_VERSION} | awk -F '-v' '{print \$2}'",
-                        returnStdout: true
-                ).trim()
-
                 sh """ 
                     cd ${BUILD_FOLDER}
                     if [[ ! -d src/github.com/${git_project}/${git_project} ]]; then 
@@ -244,7 +238,7 @@ spec:
             stage('get tag data') {
                 container('jnlp') {
                     MAIN_TAG_VERSION = github.get_tag_version(TAG_NAME)
-                    PUBLISHED_BEFORE = github.get_tag_published_before(git_project, git_project_user, "v${MAIN_TAG_VERSION}", GIT_TOKEN)
+                    PUBLISHED_BEFORE = github.get_tag_published_before(git_project, git_project_user, "${MAIN_TAG_VERSION}", GIT_TOKEN)
 
                     echo "$MAIN_TAG_VERSION"
                     echo "$PUBLISHED_BEFORE"
@@ -305,7 +299,6 @@ spec:
                     }
                 }
             },
-
             'demos': {
                 podTemplate(label: "demos-${label}", inheritFrom: "${git_project}-${label}") {
                     node("demos-${label}") {
@@ -377,7 +370,7 @@ spec:
                                     }
                                 }
 
-                                build_prometheus(NEXT_VERSION)
+                                build_prometheus(TAG_NAME)
 
                                 stage('create prometheus prerelease') {
                                     container('jnlp') {
@@ -480,7 +473,7 @@ spec:
 
             stage('update release status') {
                 container('jnlp') {
-                    github.update_release_status(git_project, git_project_user, "v${MAIN_TAG_VERSION}", GIT_TOKEN)
+                    github.update_release_status(git_project, git_project_user, "${MAIN_TAG_VERSION}", GIT_TOKEN)
                 }
             }
         }
