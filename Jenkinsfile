@@ -273,15 +273,7 @@ spec:
 
                             stage('get previous release version') {
                                 container('jnlp') {
-                                    sh """
-                                        curl -H "Authorization: bearer ${GIT_TOKEN}" -X POST -d '{"query": "query { repository(owner: \\"${git_project_user}\\", name: \\"tsdb-nuclio\\") { refs(refPrefix: \\"refs/tags/\\", first: 1, orderBy: { field: ALPHABETICAL, direction: DESC }) { nodes { name } } } }" }' https://api.github.com/graphql > ~/last_tag;
-                                        cat ~/last_tag | python -c 'import json,sys;obj=json.load(sys.stdin);print obj["data"]["repository"]["refs"]["nodes"][0]["name"]' | sed "s/v//" > ~/tmp_tag
-                                        cat ~/tmp_tag | awk -F. -v OFS=. 'NF==1{print ++\$NF}; NF>1{if(length(\$NF+1)>length(\$NF))\$(NF-1)++; \$NF=sprintf("%0*d", length(\$NF), (\$NF+1)%(10^length(\$NF))); print}' > ~/next_version
-                                    """
-                                    NEXT_VERSION = sh(
-                                            script: "cat ~/next_version",
-                                            returnStdout: true
-                                    ).trim()
+                                    NEXT_VERSION = github.get_next_tag_version("tsdb-nuclio", git_project_user, GIT_TOKEN)
 
                                     echo "$NEXT_VERSION"
                                     next_versions.putAt('tsdb-nuclio', NEXT_VERSION)
@@ -292,7 +284,7 @@ spec:
 
                             stage('create tsdb-nuclio prerelease') {
                                 container('jnlp') {
-                                    sh "curl -H \"Content-Type: application/json\" -H \"Authorization: token ${GIT_TOKEN}\" https://api.github.com/repos/${git_project_user}/tsdb-nuclio/releases -d '{\"tag_name\": \"v${NEXT_VERSION}\", \"target_commitish\": \"master\", \"name\": \"v${NEXT_VERSION}\", \"body\": \"Autorelease, triggered by v3io-tsdb\", \"prerelease\": true}'"
+                                    sh "curl -H \"Content-Type: application/json\" -H \"Authorization: token ${GIT_TOKEN}\" https://api.github.com/repos/${git_project_user}/tsdb-nuclio/releases -d '{\"tag_name\": \"${NEXT_VERSION}\", \"target_commitish\": \"master\", \"name\": \"${NEXT_VERSION}\", \"body\": \"Autorelease, triggered by v3io-tsdb\", \"prerelease\": true}'"
                                 }
                             }
                         }
@@ -309,16 +301,7 @@ spec:
 
                             stage('get previous release version') {
                                 container('jnlp') {
-                                    sh """
-                                        curl -H "Authorization: bearer ${GIT_TOKEN}" -X POST -d '{"query": "query { repository(owner: \\"${git_project_user}\\", name: \\"demos\\") { refs(refPrefix: \\"refs/tags/\\", first: 1, orderBy: { field: ALPHABETICAL, direction: DESC }) { nodes { name } } } }" }' https://api.github.com/graphql > last_tag;
-                                        cat last_tag | python -c 'import json,sys;obj=json.load(sys.stdin);print obj["data"]["repository"]["refs"]["nodes"][0]["name"]' | sed "s/v//" > tmp_tag
-                                        cat tmp_tag | awk -F. -v OFS=. 'NF==1{print ++\$NF}; NF>1{if(length(\$NF+1)>length(\$NF))\$(NF-1)++; \$NF=sprintf("%0*d", length(\$NF), (\$NF+1)%(10^length(\$NF))); print}' > next_version
-                                    """
-
-                                    NEXT_VERSION = sh(
-                                            script: "cat next_version",
-                                            returnStdout: true
-                                    ).trim()
+                                    NEXT_VERSION = github.get_next_tag_version("demos", git_project_user, GIT_TOKEN)
 
                                     echo "$NEXT_VERSION"
                                     next_versions.putAt('demos', NEXT_VERSION)
@@ -329,7 +312,7 @@ spec:
 
                             stage('create demos prerelease') {
                                 container('jnlp') {
-                                    sh "curl -H \"Content-Type: application/json\" -H \"Authorization: token ${GIT_TOKEN}\" https://api.github.com/repos/${git_project_user}/demos/releases -d '{\"tag_name\": \"v${NEXT_VERSION}\", \"target_commitish\": \"master\", \"name\": \"v${NEXT_VERSION}\", \"body\": \"Autorelease, triggered by v3io-tsdb\", \"prerelease\": true}'"
+                                    sh "curl -H \"Content-Type: application/json\" -H \"Authorization: token ${GIT_TOKEN}\" https://api.github.com/repos/${git_project_user}/demos/releases -d '{\"tag_name\": \"${NEXT_VERSION}\", \"target_commitish\": \"master\", \"name\": \"${NEXT_VERSION}\", \"body\": \"Autorelease, triggered by v3io-tsdb\", \"prerelease\": true}'"
                                 }
                             }
                         }
@@ -363,7 +346,7 @@ spec:
                             if (TAG_VERSION) {
                                 stage('get previous release version') {
                                     container('jnlp') {
-                                        NEXT_VERSION = "${TAG_VERSION}-${TAG_NAME}"
+                                        NEXT_VERSION = "v${TAG_VERSION}-${TAG_NAME}"
 
                                         echo "$NEXT_VERSION"
                                         next_versions.putAt('prometheus', NEXT_VERSION)
@@ -374,7 +357,7 @@ spec:
 
                                 stage('create prometheus prerelease') {
                                     container('jnlp') {
-                                        sh "curl -H \"Content-Type: application/json\" -H \"Authorization: token ${GIT_TOKEN}\" https://api.github.com/repos/${git_project_user}/prometheus/releases -d '{\"tag_name\": \"v${NEXT_VERSION}\", \"target_commitish\": \"master\", \"name\": \"v${NEXT_VERSION}\", \"body\": \"Autorelease, triggered by v3io-tsdb\", \"prerelease\": true}'"
+                                        sh "curl -H \"Content-Type: application/json\" -H \"Authorization: token ${GIT_TOKEN}\" https://api.github.com/repos/${git_project_user}/prometheus/releases -d '{\"tag_name\": \"v${NEXT_VERSION}\", \"target_commitish\": \"master\", \"name\": \"${NEXT_VERSION}\", \"body\": \"Autorelease, triggered by v3io-tsdb\", \"prerelease\": true}'"
                                     }
                                 }
                             }
@@ -410,7 +393,7 @@ spec:
                         tasks_list.each { project, status ->
                             if (status == null) {
                                 def RELEASE_SUCCESS = sh(
-                                        script: "curl --silent -H \"Content-Type: application/json\" -H \"Authorization: token ${GIT_TOKEN}\" -X GET https://api.github.com/repos/${git_project_user}/${project}/releases/tags/v${next_versions[project]} | python -c 'import json,sys;obj=json.load(sys.stdin);print obj[\"prerelease\"]' | if grep -iq false; then echo 'release'; else echo 'prerelease'; fi",
+                                        script: "curl --silent -H \"Content-Type: application/json\" -H \"Authorization: token ${GIT_TOKEN}\" -X GET https://api.github.com/repos/${git_project_user}/${project}/releases/tags/${next_versions[project]} | python -c 'import json,sys;obj=json.load(sys.stdin);print obj[\"prerelease\"]' | if grep -iq false; then echo 'release'; else echo 'prerelease'; fi",
                                         returnStdout: true
                                 ).trim()
 
@@ -421,7 +404,7 @@ spec:
                                     success_count++
                                 } else {
                                     def TAG_SHA = sh(
-                                            script: "curl --silent -H \"Content-Type: application/json\" -H \"Authorization: token ${GIT_TOKEN}\" -X GET https://api.github.com/repos/${git_project_user}/${project}/git/refs/tags/v${next_versions[project]} | python -c 'import json,sys;obj=json.load(sys.stdin);print obj[\"object\"][\"sha\"]'",
+                                            script: "curl --silent -H \"Content-Type: application/json\" -H \"Authorization: token ${GIT_TOKEN}\" -X GET https://api.github.com/repos/${git_project_user}/${project}/git/refs/tags/${next_versions[project]} | python -c 'import json,sys;obj=json.load(sys.stdin);print obj[\"object\"][\"sha\"]'",
                                             returnStdout: true
                                     ).trim()
 
@@ -496,7 +479,7 @@ spec:
                         tasks_list.each { project, status ->
                             if (status == null) {
                                 def RELEASE_SUCCESS = sh(
-                                        script: "curl --silent -H \"Content-Type: application/json\" -H \"Authorization: token ${GIT_TOKEN}\" -X GET https://api.github.com/repos/${git_project_user}/${project}/releases/tags/v${next_versions[project]} | python -c 'import json,sys;obj=json.load(sys.stdin);print obj[\"prerelease\"]' | if grep -iq false; then echo 'release'; else echo 'prerelease'; fi",
+                                        script: "curl --silent -H \"Content-Type: application/json\" -H \"Authorization: token ${GIT_TOKEN}\" -X GET https://api.github.com/repos/${git_project_user}/${project}/releases/tags/${next_versions[project]} | python -c 'import json,sys;obj=json.load(sys.stdin);print obj[\"prerelease\"]' | if grep -iq false; then echo 'release'; else echo 'prerelease'; fi",
                                         returnStdout: true
                                 ).trim()
 
@@ -507,7 +490,7 @@ spec:
                                     success_count++
                                 } else {
                                     def TAG_SHA = sh(
-                                            script: "curl --silent -H \"Content-Type: application/json\" -H \"Authorization: token ${GIT_TOKEN}\" -X GET https://api.github.com/repos/${git_project_user}/${project}/git/refs/tags/v${next_versions[project]} | python -c 'import json,sys;obj=json.load(sys.stdin);print obj[\"object\"][\"sha\"]'",
+                                            script: "curl --silent -H \"Content-Type: application/json\" -H \"Authorization: token ${GIT_TOKEN}\" -X GET https://api.github.com/repos/${git_project_user}/${project}/git/refs/tags/${next_versions[project]} | python -c 'import json,sys;obj=json.load(sys.stdin);print obj[\"object\"][\"sha\"]'",
                                             returnStdout: true
                                     ).trim()
 
