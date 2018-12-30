@@ -88,3 +88,6 @@ endif
 		--scheme stdLocalThirdParty \
 		$(TOPLEVEL_DIRS_IMPI_SYNTAX)
 	# Imports OK
+ifneq ("$(wildcard .gitignore)","")
+	$(error .gitignore not allowed)
+endif

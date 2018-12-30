@@ -484,7 +484,6 @@ spec:
                         }
                     }
                 }
-
                 stage('update release status') {
                     container('jnlp') {
                         github.update_release_status(git_project, git_project_user, "${MAIN_TAG_VERSION}", GIT_TOKEN)

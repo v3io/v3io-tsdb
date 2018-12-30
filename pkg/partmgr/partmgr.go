@@ -45,7 +45,10 @@ func NewPartitionMngr(schemaConfig *config.Schema, cont *v3io.Container, v3ioCon
 		return nil, err
 	}
 	newMngr := &PartitionManager{schemaConfig: schemaConfig, cyclic: false, container: cont, currentPartitionInterval: currentPartitionInterval, v3ioConfig: v3ioConfig}
-	newMngr.updatePartitionsFromSchema(schemaConfig)
+	err = newMngr.updatePartitionsFromSchema(schemaConfig)
+	if err != nil {
+		return nil, err
+	}
 	return newMngr, nil
 }
 
@@ -193,7 +196,7 @@ func (p *PartitionManager) updateSchema() (err error) {
 	return
 }
 
-func (p *PartitionManager) DeletePartitionsFromSchema(partitionsToDelete []*DBPartition) {
+func (p *PartitionManager) DeletePartitionsFromSchema(partitionsToDelete []*DBPartition) error {
 	for i := len(p.partitions) - 1; i >= 0; i-- {
 		for _, partToDelete := range partitionsToDelete {
 			if p.partitions[i].startTime == partToDelete.startTime {
@@ -212,7 +215,7 @@ func (p *PartitionManager) DeletePartitionsFromSchema(partitionsToDelete []*DBPa
 		}
 
 	}
-	p.updateSchema()
+	return p.updateSchema()
 }
 
 func (p *PartitionManager) ReadAndUpdateSchema() (err error) {
@@ -257,8 +260,10 @@ func (p *PartitionManager) ReadAndUpdateSchema() (err error) {
 				err = errors.Wrapf(err, "Failed to unmarshal schema at path '%s'.", fullPath)
 			}
 			p.schemaConfig = schema
-			p.updatePartitionsFromSchema(schema)
-
+			err = p.updatePartitionsFromSchema(schema)
+			if err != nil {
+				err = errors.Wrapf(err, "Failed to update partitions from schema.", fullPath)
+			}
 		})
 	}
 	return

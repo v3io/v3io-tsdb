@@ -267,7 +267,10 @@ func (a *V3ioAdapter) DeleteDB(deleteAll bool, ignoreErrors bool, fromTime int64
 			return errors.Wrapf(err, "Failed to delete partition object '%s'.", part.GetTablePath())
 		}
 	}
-	a.partitionMngr.DeletePartitionsFromSchema(partitions)
+	err := a.partitionMngr.DeletePartitionsFromSchema(partitions)
+	if err != nil {
+		return err
+	}
 
 	if len(a.partitionMngr.GetPartitionsPaths()) == 0 {
 		path := filepath.Join(a.cfg.TablePath, config.NamesDirectory) + "/" // Need a trailing slash

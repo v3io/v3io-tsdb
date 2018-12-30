@@ -75,7 +75,7 @@ func (promQuery *V3ioPromQuerier) Select(params *storage.SelectParams, oms ...*l
 
 	// if a nil params is passed we assume it's a metadata query, so we fetch only the different labelsets withtout data.
 	if params == nil {
-		labelSets, err := promQuery.v3ioQuerier.GetLabelSets(name)
+		labelSets, err := promQuery.v3ioQuerier.GetLabelSets(name, filter)
 		if err != nil {
 			return nil, err
 		}
