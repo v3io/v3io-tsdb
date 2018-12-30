@@ -92,6 +92,18 @@ func getPartitionManager(tst *testing.T) *PartitionManager {
 	return manager
 }
 
+func TestNewPartitionMngrBadInput(t *testing.T) {
+	schemaConfig := &config.Schema{
+		Partitions: []*config.Partition{{}},
+		PartitionSchemaInfo: config.PartitionSchema{
+			AggregationGranularity: "boo",
+		},
+	}
+	v3ioConfig := &config.V3ioConfig{}
+	_, err := NewPartitionMngr(schemaConfig, nil, v3ioConfig)
+	assert.Error(t, err)
+}
+
 func TestPartsForRange(tst *testing.T) {
 	numPartitions := 5
 	manager := getPartitionManager(tst)
