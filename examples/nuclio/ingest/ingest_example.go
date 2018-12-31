@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -14,29 +15,30 @@ import (
 	"github.com/v3io/v3io-tsdb/pkg/utils"
 )
 
-// Example event:
-//
-// {
-//		"metric": "cpu",
-//		"labels": {
-//			"dc": "7",
-//			"hostname": "mybesthost"
-//		},
-//		"samples": [
-//			{
-//				"t": "1532595945142",
-//				"v": {
-//					"N": 95.2
-//				}
-//			},
-//			{
-//				"t": "1532595948517",
-//				"v": {
-//					"n": 86.8
-//				}
-//			}
-//		]
-// }
+/*
+Example event:
+{
+		"metric": "cpu",
+		"labels": {
+			"dc": "7",
+			"hostname": "mybesthost"
+		},
+		"samples": [
+			{
+				"t": "1532595945142",
+				"v": {
+					"N": 95.2
+				}
+			},
+			{
+				"t": "1532595948517",
+				"v": {
+					"n": 86.8
+				}
+			}
+		]
+}
+*/
 
 type value struct {
 	N float64 `json:"n,omitempty"`
@@ -156,7 +158,27 @@ func createTSDBAppender(context *nuclio.Context, path string) error {
 		if err != nil {
 			return err
 		}
-		container, err := tsdb.NewContainerFromEnv(context.Logger)
+		v3ioUrl := os.Getenv("V3IO_URL")
+		numWorkersStr := os.Getenv("V3IO_NUM_WORKERS")
+		var numWorkers int
+		if len(numWorkersStr) > 0 {
+			numWorkers, err = strconv.Atoi(numWorkersStr)
+			if err != nil {
+				return err
+			}
+		} else {
+			numWorkers = 8
+		}
+		username := os.Getenv("V3IO_USERNAME")
+		if username == "" {
+			username = "iguazio"
+		}
+		password := os.Getenv("V3IO_PASSWORD")
+		containerName := os.Getenv("V3IO_CONTAINER")
+		if containerName == "" {
+			containerName = "bigdata"
+		}
+		container, err := tsdb.NewContainer(v3ioUrl, numWorkers, username, password, containerName, context.Logger)
 		if err != nil {
 			return err
 		}
