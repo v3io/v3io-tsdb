@@ -256,6 +256,7 @@ spec:
     def MAIN_TAG_VERSION
     def PUBLISHED_BEFORE
     def next_versions = ['demos':null, 'prometheus':null, 'tsdb-nuclio':null]
+
     pipelinex = library(identifier: 'pipelinex@DEVOPS-204-pipelinex', retriever: modernSCM(
             [$class: 'GitSCMSource',
              credentialsId: git_deploy_user_private_key,
@@ -484,6 +485,7 @@ spec:
                         }
                     }
                 }
+
                 stage('update release status') {
                     container('jnlp') {
                         github.update_release_status(git_project, git_project_user, "${MAIN_TAG_VERSION}", GIT_TOKEN)
@@ -493,4 +495,3 @@ spec:
         }
     }
 }
-
