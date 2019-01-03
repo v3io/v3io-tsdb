@@ -178,7 +178,10 @@ func (queryCtx *selectQueryContext) queryPartition(partition *partmgr.DBPartitio
 			}
 		}
 
-		groupBy := queryCtx.groupBy(partition)
+		var groupBy []string
+		if newQuery.useServerSideAggregates && !requestAggregatesAndRaw {
+			groupBy = queryCtx.groupBy(partition)
+		}
 		err = newQuery.getItems(queryCtx, metric, groupBy, requestAggregatesAndRaw)
 		queries = append(queries, newQuery)
 	}
@@ -442,7 +445,7 @@ type partQuery struct {
 func (query *partQuery) getItems(ctx *selectQueryContext, name string, groupBy []string, aggregatesAndChunk bool) error {
 
 	path := query.partition.GetTablePath()
-	if query.useServerSideAggregates && !aggregatesAndChunk && len(groupBy) > 0 {
+	if len(groupBy) > 0 {
 		path = fmt.Sprintf("%sagg/%s/", path, strings.Join(groupBy, ","))
 	}
 
