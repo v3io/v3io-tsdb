@@ -12,10 +12,10 @@ type Context struct {
 }
 
 type SessionConfig struct {
-	Username	string
-	Password	string
-	Label		string
-	SessionKey	string
+	Username  string
+	Password  string
+	Label     string
+	AccessKey string
 }
 
 func NewContext(parentLogger logger.Logger, clusterURL string, numWorkers int) (*Context, error) {
@@ -43,7 +43,7 @@ func (c *Context) NewSession(username string, password string, label string) (*S
 }
 
 func (c *Context) NewSessionFromConfig(sc *SessionConfig) (*Session, error) {
-	return newSession(c.logger, c, sc.Username, sc.Password, sc.Label, sc.SessionKey)
+	return newSession(c.logger, c, sc.Username, sc.Password, sc.Label, sc.AccessKey)
 }
 
 func (c *Context) sendRequest(request *Request) error {
