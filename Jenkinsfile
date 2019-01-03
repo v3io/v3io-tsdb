@@ -64,7 +64,7 @@ def build_nuclio(V3IO_TSDB_VERSION) {
                     git clone https://${GIT_USERNAME}:${GIT_PASSWORD}@github.com/${git_project_user}/v3io-tsdb.git functions/ingest/vendor/github.com/v3io/v3io-tsdb
                     cd functions/ingest/vendor/github.com/v3io/v3io-tsdb
                     git checkout ${V3IO_TSDB_VERSION}
-                    rm -rf .git vendor/github.com/v3io vendor/github.com/nuclio
+                    rm -rf .git vendor/github.com/nuclio
                     cd ${BUILD_FOLDER}/src/github.com/v3io/${git_project}
                     cp -R functions/ingest/vendor/github.com/v3io/v3io-tsdb functions/query/vendor/github.com/v3io/v3io-tsdb
                 """
