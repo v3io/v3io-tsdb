@@ -80,7 +80,7 @@ func CreateContainer(logger logger.Logger, cfg *config.V3ioConfig) (*v3io.Contai
 		Username:  cfg.Username,
 		Password:  cfg.Password,
 		Label:     "tsdb",
-		AccessKey: cfg.AccessKey,
+		SessionKey: cfg.AccessKey,
 	}
 	session, err := context.NewSessionFromConfig(sessionConfig)
 	if err != nil {
