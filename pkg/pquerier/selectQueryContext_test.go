@@ -97,3 +97,17 @@ func toAggr(str string) aggregate.AggrType {
 	aggr, _ := aggregate.AggregateFromString(str)
 	return aggr
 }
+
+func TestBla(t *testing.T){
+	sql := `
+		SELECT first as fr, COUT(last.a), linear.second as bil, max(a)
+		FROM employees
+		WHERE last IS NOT NULL AND bilbil > 5
+		GROUP BY dept
+		`
+
+	_, err := ParseQuery(sql)
+	if err != nil {
+		panic(err)
+	}
+}

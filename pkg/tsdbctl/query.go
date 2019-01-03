@@ -34,19 +34,20 @@ import (
 )
 
 type queryCommandeer struct {
-	cmd            *cobra.Command
-	rootCommandeer *RootCommandeer
-	name           string
-	filter         string
-	to             string
-	from           string
-	last           string
-	windows        string
-	functions      string
-	step           string
-	output         string
-	oldQuerier     bool
-	groupBy        string
+	cmd             *cobra.Command
+	rootCommandeer  *RootCommandeer
+	name            string
+	filter          string
+	to              string
+	from            string
+	last            string
+	windows         string
+	functions       string
+	step            string
+	output          string
+	oldQuerier      bool
+	groupBy         string
+	selectStatement string
 }
 
 func newQueryCommandeer(rootCommandeer *RootCommandeer) *queryCommandeer {
@@ -113,6 +114,9 @@ Arguments:
 		"Aggregation interval for applying the aggregation functions\n(if set - see the -a|--aggregates flag), of the format\n\"[0-9]+[mhd]\" (where 'm' = minutes, 'h' = hours, and\n'd' = days). Examples: \"1h\"; \"150m\". (default =\n<end time> - <start time>)")
 	cmd.Flags().StringVar(&commandeer.groupBy, "groupBy", "",
 		"Comma separated list of labels to group the result by")
+	cmd.Flags().StringVar(&commandeer.selectStatement, "select", "",
+		"sql select statement")
+
 	cmd.Flags().BoolVarP(&commandeer.oldQuerier, "oldQuerier", "q", false, "use old querier")
 	cmd.Flags().Lookup("oldQuerier").Hidden = true
 	cmd.Flags().Lookup("windows").Hidden = true // hidden, because only supported in old querier.
@@ -123,7 +127,7 @@ Arguments:
 
 func (qc *queryCommandeer) query() error {
 
-	if qc.name == "" && qc.filter == "" {
+	if qc.name == "" && qc.filter == "" && qc.selectStatement == "" {
 		return errors.New("The query command must receive either a metric-name paramter (<metrics>) or a query filter (set via the -f|--filter flag).")
 	}
 
@@ -186,8 +190,20 @@ func (qc *queryCommandeer) newQuery(from, to, step int64) error {
 		return errors.Wrap(err, "Failed to initialize the Querier object.")
 	}
 
-	selectParams := &pquerier.SelectParams{Name: qc.name, Functions: qc.functions,
-		Step: step, Filter: qc.filter, From: from, To: to, GroupBy: qc.groupBy}
+	var selectParams *pquerier.SelectParams
+
+	if qc.selectStatement != "" {
+		selectParams, err = pquerier.ParseQuery(qc.selectStatement)
+		if err != nil {
+			return errors.Wrap(err, "failed to parse sql")
+		}
+		selectParams.Step = step
+		selectParams.From = from
+		selectParams.To = to
+	} else {
+		selectParams = &pquerier.SelectParams{Name: qc.name, Functions: qc.functions,
+			Step: step, Filter: qc.filter, From: from, To: to, GroupBy: qc.groupBy}
+	}
 	set, err := qry.Select(selectParams)
 
 	if err != nil {

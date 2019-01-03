@@ -1,1 +1,5 @@
 *.iml
+.idea/
+darwin_amd64/
+tsdbctl-f9fc7ba-darwin-amd64
+v3io-tsdb-config.yaml
