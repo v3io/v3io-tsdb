@@ -36,8 +36,8 @@ func (fi *frameIterator) NextFrame() bool {
 }
 
 // get current data frame
-func (fi *frameIterator) GetFrame() *dataFrame {
-	return fi.ctx.frameList[fi.setIndex-1]
+func (fi *frameIterator) GetFrame() (frames.Frame, error) {
+	return fi.ctx.frameList[fi.setIndex-1].GetFrame()
 }
 
 // advance to the next time series (for Prometheus mode)
@@ -458,6 +458,15 @@ func (d *dataFrame) rawSeriesToColumns() {
 
 func (d *dataFrame) shouldGenerateRawColumns() bool { return d.isRawSeries && !d.isRawColumnsGenerated }
 
+func (d *dataFrame) GetFrame() (frames.Frame, error) {
+	framesColumns := make([]frames.Column, len(d.columns))
+	for i, col := range d.columns {
+		framesColumns[i] = col.FramesColumn()
+	}
+
+	return frames.NewFrame(framesColumns, []frames.Column{d.index.FramesColumn()}, d.Labels().Map())
+}
+
 // Column object, store a single value or index column/array
 // There can be data columns or calculated columns (e.g. Avg built from count & sum columns)
 
@@ -475,6 +484,7 @@ type Column interface {
 	GetInterpolationFunction() (InterpolationFunction, int64)
 	setMetricName(name string)
 	finish() error
+	FramesColumn() frames.Column
 }
 
 type basicColumn struct {
@@ -490,6 +500,9 @@ type basicColumn struct {
 func (c *basicColumn) finish() error {
 	c.framesCol = c.builder.Finish()
 	return nil
+}
+func (c *basicColumn) FramesColumn() frames.Column {
+	return c.framesCol
 }
 
 // Name returns the column name
