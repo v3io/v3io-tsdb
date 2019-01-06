@@ -459,9 +459,11 @@ func (d *dataFrame) rawSeriesToColumns() {
 func (d *dataFrame) shouldGenerateRawColumns() bool { return d.isRawSeries && !d.isRawColumnsGenerated }
 
 func (d *dataFrame) GetFrame() (frames.Frame, error) {
-	framesColumns := make([]frames.Column, len(d.columns))
-	for i, col := range d.columns {
-		framesColumns[i] = col.FramesColumn()
+	var framesColumns []frames.Column
+	for _, col := range d.columns {
+		if !col.GetColumnSpec().isHidden {
+			framesColumns = append(framesColumns, col.FramesColumn())
+		}
 	}
 
 	return frames.NewFrame(framesColumns, []frames.Column{d.index.FramesColumn()}, d.Labels().Map())
