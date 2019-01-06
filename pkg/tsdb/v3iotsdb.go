@@ -114,7 +114,7 @@ func NewContainer(v3ioUrl string, numWorkers int, accessKey string, username str
 		return nil, err
 	}
 
-	// Create session - accessKey will take precedence on user/password if exists
+	// Create session - accessKey will take precedence over user/password if exists
 	sessionConfig := &v3io.SessionConfig{
 		Username:   username,
 		Password:   password,
@@ -126,10 +126,9 @@ func NewContainer(v3ioUrl string, numWorkers int, accessKey string, username str
 		return nil, errors.Wrap(err, "Failed to create a session.")
 	}
 
-	// Create the container
 	container, err := session.NewContainer(containerName)
 	if err != nil {
-		return nil, errors.Wrap(err, "Failed to create a container.")
+		return nil, err
 	}
 	return container, nil
 }
