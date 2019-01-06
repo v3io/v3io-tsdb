@@ -34,11 +34,11 @@ func ParseQuery(sql string) (*SelectParams, error) {
 			case *sqlparser.FuncExpr:
 				cc := expr.Exprs[0].(*sqlparser.AliasedExpr).Expr.(*sqlparser.ColName)
 				currCol.Function = sqlparser.String(expr.Name)
-				currCol.Interpolator = sqlparser.String(cc.Qualifier.Name)
+				currCol.Interpolator = removeComma(sqlparser.String(cc.Qualifier.Name)) // Some of the interpolators are parsed with a `
 				currCol.Metric = sqlparser.String(cc.Name)
 			case *sqlparser.ColName:
 				currCol.Metric = sqlparser.String(expr.Name)
-				currCol.Interpolator = sqlparser.String(expr.Qualifier.Name)
+				currCol.Interpolator = removeComma(sqlparser.String(expr.Qualifier.Name)) // Some of the interpolators are parsed with a `
 			default:
 				return nil, fmt.Errorf("unknown columns type - %T", col.Expr)
 			}
@@ -64,4 +64,8 @@ func ParseQuery(sql string) (*SelectParams, error) {
 
 func parseFilter(originalFilter string) (string, error) {
 	return strings.Replace(originalFilter, " = ", " == ", -1), nil
+}
+
+func removeComma(origin string) string {
+	return strings.Replace(origin, "`", "", -1)
 }
