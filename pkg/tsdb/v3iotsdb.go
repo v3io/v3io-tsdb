@@ -25,10 +25,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
-	"os"
 	pathUtil "path"
 	"path/filepath"
-	"strconv"
 	"time"
 
 	"github.com/nuclio/logger"
@@ -110,45 +108,25 @@ func NewV3ioAdapter(cfg *config.V3ioConfig, container *v3io.Container, logger lo
 	return &newV3ioAdapter, err
 }
 
-func NewContainer(v3ioUrl string, numWorkers int, username string, password string, containerName string, logger logger.Logger) (*v3io.Container, error) {
+func NewContainer(v3ioUrl string, numWorkers int, accessKey string, username string, password string, containerName string, logger logger.Logger) (*v3io.Container, error) {
 	ctx, err := v3io.NewContext(logger, v3ioUrl, numWorkers)
 	if err != nil {
 		return nil, err
 	}
-	session, err := ctx.NewSession(username, password, "")
-	if err != nil {
-		return nil, err
-	}
-	if containerName == "" {
-		containerName = "bigdata"
-	}
-	container, err := session.NewContainer(containerName)
-	if err != nil {
-		return nil, err
-	}
-	return container, nil
-}
 
-func NewContainerFromEnv(logger logger.Logger) (*v3io.Container, error) {
-	v3ioUrl := os.Getenv("V3IO_URL")
-	numWorkersStr := os.Getenv("V3IO_NUM_WORKERS")
-	var numWorkers int
-	var err error
-	if len(numWorkersStr) > 0 {
-		numWorkers, err = strconv.Atoi(numWorkersStr)
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		numWorkers = 8
+	// Create session - accessKey will take precedence over user/password if exists
+	sessionConfig := &v3io.SessionConfig{
+		Username:   username,
+		Password:   password,
+		Label:      "tsdb",
+		SessionKey: accessKey,
 	}
-	username := os.Getenv("V3IO_USERNAME")
-	password := os.Getenv("V3IO_PASSWORD")
-	containerName := os.Getenv("V3IO_CONTAINER")
-	if containerName == "" {
-		containerName = "bigdata"
+	session, err := ctx.NewSessionFromConfig(sessionConfig)
+	if err != nil {
+		return nil, errors.Wrap(err, "Failed to create a session.")
 	}
-	container, err := NewContainer(v3ioUrl, numWorkers, username, password, containerName, logger)
+
+	container, err := session.NewContainer(containerName)
 	if err != nil {
 		return nil, err
 	}
