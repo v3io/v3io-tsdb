@@ -2,9 +2,9 @@ package pquerier
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/xwb1989/sqlparser"
-	"strings"
 )
 
 func ParseQuery(sql string) (*SelectParams, error) {
