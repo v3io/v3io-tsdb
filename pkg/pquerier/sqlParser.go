@@ -53,11 +53,15 @@ func ParseQuery(sql string) (*SelectParams, error) {
 	selectParams.RequestedColumns = columns
 
 	if slct.Where != nil {
-		selectParams.Filter = strings.TrimPrefix(sqlparser.String(slct.Where), " where ")
+		selectParams.Filter, _ = parseFilter(strings.TrimPrefix(sqlparser.String(slct.Where), " where "))
 	}
 	if slct.GroupBy != nil {
 		selectParams.GroupBy = strings.TrimPrefix(sqlparser.String(slct.GroupBy), " group by ")
 	}
 
 	return selectParams, nil
+}
+
+func parseFilter(originalFilter string) (string, error) {
+	return strings.Replace(originalFilter, " = ", " == ", -1), nil
 }
