@@ -460,6 +460,9 @@ func (d *dataFrame) shouldGenerateRawColumns() bool { return d.isRawSeries && !d
 
 func (d *dataFrame) GetFrame() (frames.Frame, error) {
 	var framesColumns []frames.Column
+	if d.shouldGenerateRawColumns() {
+		d.rawSeriesToColumns()
+	}
 	for _, col := range d.columns {
 		if !col.GetColumnSpec().isHidden {
 			framesColumns = append(framesColumns, col.FramesColumn())
