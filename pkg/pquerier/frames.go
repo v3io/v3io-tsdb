@@ -2,13 +2,14 @@ package pquerier
 
 import (
 	"fmt"
+	"math"
+
 	"github.com/pkg/errors"
 	"github.com/v3io/frames"
 	"github.com/v3io/v3io-tsdb/pkg/aggregate"
 	"github.com/v3io/v3io-tsdb/pkg/chunkenc"
 	"github.com/v3io/v3io-tsdb/pkg/config"
 	"github.com/v3io/v3io-tsdb/pkg/utils"
-	"math"
 )
 
 type frameIterator struct {
