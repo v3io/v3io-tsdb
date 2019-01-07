@@ -235,12 +235,12 @@ func (d *dataFrame) addMetricIfNotExist(metricName string, columnSize int, useSe
 func (d *dataFrame) addMetricFromTemplate(metricName string, columnSize int, useServerAggregates bool) error {
 	newColumns := make([]Column, len(d.columnsTemplates))
 	for i, col := range d.columnsTemplates {
+		col.metric = metricName
 		newCol, err := createColumn(col, columnSize, useServerAggregates)
 		if err != nil {
 			return err
 		}
 
-		newCol.setMetricName(metricName)
 		newColumns[i] = newCol
 		if aggregate.IsCountAggregate(col.function) {
 			d.metricToCountColumn[metricName] = newCol

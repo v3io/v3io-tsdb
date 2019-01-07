@@ -70,6 +70,9 @@ func (c columnMeta) getColumnName() string {
 	if c.function == 0 {
 		return c.metric
 	}
+	if c.alias != "" {
+		return c.alias
+	}
 	return fmt.Sprintf("%v(%v)", c.function.String(), c.metric)
 }
 
