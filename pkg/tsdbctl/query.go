@@ -34,20 +34,19 @@ import (
 )
 
 type queryCommandeer struct {
-	cmd             *cobra.Command
-	rootCommandeer  *RootCommandeer
-	name            string
-	filter          string
-	to              string
-	from            string
-	last            string
-	windows         string
-	functions       string
-	step            string
-	output          string
-	oldQuerier      bool
-	groupBy         string
-	selectStatement string
+	cmd            *cobra.Command
+	rootCommandeer *RootCommandeer
+	name           string
+	filter         string
+	to             string
+	from           string
+	last           string
+	windows        string
+	functions      string
+	step           string
+	output         string
+	oldQuerier     bool
+	groupBy        string
 }
 
 func newQueryCommandeer(rootCommandeer *RootCommandeer) *queryCommandeer {
@@ -114,8 +113,6 @@ Arguments:
 		"Aggregation interval for applying the aggregation functions\n(if set - see the -a|--aggregates flag), of the format\n\"[0-9]+[mhd]\" (where 'm' = minutes, 'h' = hours, and\n'd' = days). Examples: \"1h\"; \"150m\". (default =\n<end time> - <start time>)")
 	cmd.Flags().StringVar(&commandeer.groupBy, "groupBy", "",
 		"Comma separated list of labels to group the result by")
-	cmd.Flags().StringVar(&commandeer.selectStatement, "select", "",
-		"sql select statement")
 
 	cmd.Flags().BoolVarP(&commandeer.oldQuerier, "oldQuerier", "q", false, "use old querier")
 	cmd.Flags().Lookup("oldQuerier").Hidden = true
@@ -127,7 +124,7 @@ Arguments:
 
 func (qc *queryCommandeer) query() error {
 
-	if qc.name == "" && qc.filter == "" && qc.selectStatement == "" {
+	if qc.name == "" && qc.filter == "" {
 		return errors.New("The query command must receive either a metric-name paramter (<metrics>) or a query filter (set via the -f|--filter flag).")
 	}
 
@@ -192,8 +189,8 @@ func (qc *queryCommandeer) newQuery(from, to, step int64) error {
 
 	var selectParams *pquerier.SelectParams
 
-	if qc.selectStatement != "" {
-		selectParams, err = pquerier.ParseQuery(qc.selectStatement)
+	if strings.HasPrefix(qc.name, "select") {
+		selectParams, _, err = pquerier.ParseQuery(qc.name)
 		if err != nil {
 			return errors.Wrap(err, "failed to parse sql")
 		}

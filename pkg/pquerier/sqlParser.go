@@ -7,18 +7,23 @@ import (
 	"github.com/xwb1989/sqlparser"
 )
 
-func ParseQuery(sql string) (*SelectParams, error) {
+const emptyTableName = "dual"
+
+func ParseQuery(sql string) (*SelectParams, string, error) {
 	stmt, err := sqlparser.Parse(sql)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 	slct, ok := stmt.(*sqlparser.Select)
 	if !ok {
-		return nil, fmt.Errorf("not a SELECT statement")
+		return nil, "", fmt.Errorf("not a SELECT statement")
 	}
-	if nTables := len(slct.From); nTables != 1 {
-		return nil, fmt.Errorf("select from multiple tables is not supported (got %d)", nTables)
+
+	fromTable, err := getTableName(slct)
+	if err != nil {
+		return nil, "", err
 	}
+
 	selectParams := &SelectParams{}
 	var columns []RequestedColumn
 
@@ -40,15 +45,15 @@ func ParseQuery(sql string) (*SelectParams, error) {
 				currCol.Metric = sqlparser.String(expr.Name)
 				currCol.Interpolator = removeComma(sqlparser.String(expr.Qualifier.Name)) // Some of the interpolators are parsed with a `
 			default:
-				return nil, fmt.Errorf("unknown columns type - %T", col.Expr)
+				return nil, "", fmt.Errorf("unknown columns type - %T", col.Expr)
 			}
 			columns = append(columns, currCol)
 		default:
-			return nil, fmt.Errorf("unknown SELECT column type - %T", sexpr)
+			return nil, "", fmt.Errorf("unknown SELECT column type - %T", sexpr)
 		}
 	}
 	if len(columns) == 0 {
-		return nil, fmt.Errorf("no columns")
+		return nil, "", fmt.Errorf("no columns")
 	}
 	selectParams.RequestedColumns = columns
 
@@ -59,9 +64,28 @@ func ParseQuery(sql string) (*SelectParams, error) {
 		selectParams.GroupBy = strings.TrimPrefix(sqlparser.String(slct.GroupBy), " group by ")
 	}
 
-	return selectParams, nil
+	return selectParams, fromTable, nil
 }
 
+func getTableName(slct *sqlparser.Select) (string, error) {
+	if nTables := len(slct.From); nTables != 1 {
+		return "", fmt.Errorf("select from multiple tables is not supported (got %d)", nTables)
+	}
+	aliased, ok := slct.From[0].(*sqlparser.AliasedTableExpr)
+	if !ok {
+		return "", fmt.Errorf("not a table select")
+	}
+	table, ok := aliased.Expr.(sqlparser.TableName)
+	if !ok {
+		return "", fmt.Errorf("not a table in FROM field")
+	}
+
+	tableStr := sqlparser.String(table)
+	if tableStr == emptyTableName {
+		return "", nil
+	}
+	return tableStr, nil
+}
 func parseFilter(originalFilter string) (string, error) {
 	return strings.Replace(originalFilter, " = ", " == ", -1), nil
 }

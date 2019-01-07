@@ -10,8 +10,9 @@ import (
 
 func TestParseQuery(t *testing.T) {
 	testCases := []struct {
-		input  string
-		output *SelectParams
+		input       string
+		output      *SelectParams
+		outputTable string
 	}{
 		{input: "select columnA, columnB",
 			output: &SelectParams{RequestedColumns: []RequestedColumn{{Metric: "columnA"}, {Metric: "columnB"}}}},
@@ -33,15 +34,21 @@ func TestParseQuery(t *testing.T) {
 			output: &SelectParams{RequestedColumns: []RequestedColumn{{Metric: "columnA", Function: "min", Alias: "bambi"},
 				{Metric: "columnB", Function: "max", Interpolator: "linear", Alias: "bimba"}},
 				Filter: "columnB >= 123", GroupBy: "columnB, columnC"}},
+
+		{input: "select min(columnA) from my_table where columnB >= 123",
+			output: &SelectParams{RequestedColumns: []RequestedColumn{{Metric: "columnA", Function: "min"}},
+				Filter: "columnB >= 123"},
+			outputTable: "my_table"},
 	}
 	for _, test := range testCases {
 		t.Run(test.input, func(tt *testing.T) {
-			queryParams, err := ParseQuery(test.input)
+			queryParams, table, err := ParseQuery(test.input)
 			if err != nil {
 				tt.Fatal(err)
 			}
 
 			assert.Equal(tt, test.output, queryParams)
+			assert.Equal(tt, test.outputTable, table)
 		})
 	}
 }
