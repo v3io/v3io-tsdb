@@ -9,6 +9,12 @@ import (
 
 const emptyTableName = "dual"
 
+// ParseQuery Parses an sql query into `tsdb.selectParams`
+// Currently supported syntax:
+// select - selecting multiple metrics, aggregations, interpolation functions and aliasing
+// from   - only one table
+// where  - equality, and range operators. Not supporting regex,`IS NULL`, etc..
+// group by
 func ParseQuery(sql string) (*SelectParams, string, error) {
 	stmt, err := sqlparser.Parse(sql)
 	if err != nil {
@@ -89,7 +95,6 @@ func getTableName(slct *sqlparser.Select) (string, error) {
 func parseFilter(originalFilter string) (string, error) {
 	return strings.Replace(originalFilter, " = ", " == ", -1), nil
 }
-
 func removeComma(origin string) string {
 	return strings.Replace(origin, "`", "", -1)
 }
