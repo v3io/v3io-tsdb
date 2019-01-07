@@ -66,6 +66,9 @@ func (c *columnMeta) isWildcard() bool { return c.metric == "*" }
 // Concrete Column = has real data behind it, Virtual column = described as a function on top of concrete columns
 func (c columnMeta) isConcrete() bool { return c.function == 0 || aggregate.IsRawAggregate(c.function) }
 func (c columnMeta) getColumnName() string {
+	if c.alias != "" {
+		return c.alias
+	}
 	// If no aggregations are requested (raw down sampled data)
 	if c.function == 0 {
 		return c.metric
