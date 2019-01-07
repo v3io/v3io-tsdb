@@ -3,8 +3,9 @@
 package pquerier
 
 import (
-	"github.com/stretchr/testify/assert"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestParseQuery(t *testing.T) {
