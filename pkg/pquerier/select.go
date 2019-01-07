@@ -46,17 +46,17 @@ type selectQueryContext struct {
 func (queryCtx *selectQueryContext) start(parts []*partmgr.DBPartition, params *SelectParams) (*frameIterator, error) {
 	queryCtx.dataFrames = make(map[uint64]*dataFrame)
 
-	// If step isn't passed (e.g., when using the console), the step is the
-	// difference between the end (maxt) and start (mint) times (e.g., 5 minutes)
-	if params.Functions != "" && params.Step == 0 {
-		params.Step = params.To - params.From
-	}
-
 	queryCtx.queryParams = params
 	var err error
 	queryCtx.columnsSpec, queryCtx.columnsSpecByMetric, err = queryCtx.createColumnSpecs()
 	if err != nil {
 		return nil, err
+	}
+
+	// If step isn't passed (e.g., when using the console), the step is the
+	// difference between the end (maxt) and start (mint) times (e.g., 5 minutes)
+	if queryCtx.hasAtLeastOneFunction() && params.Step == 0 {
+		queryCtx.queryParams.Step = params.To - params.From
 	}
 
 	// We query every partition for every requested metric
@@ -388,7 +388,18 @@ func (queryCtx *selectQueryContext) generateTimeColumn() Column {
 }
 
 func (queryCtx *selectQueryContext) isRawQuery() bool {
-	return (queryCtx.queryParams.Functions == "" && queryCtx.queryParams.Step == 0) || queryCtx.queryParams.disableClientAggr
+	return (!queryCtx.hasAtLeastOneFunction() && queryCtx.queryParams.Step == 0) || queryCtx.queryParams.disableClientAggr
+}
+
+func (queryCtx *selectQueryContext) hasAtLeastOneFunction() bool {
+	atLeastOneFunction := false
+	for _, col := range queryCtx.columnsSpec {
+		if col.function != 0 {
+			atLeastOneFunction = true
+			break
+		}
+	}
+	return atLeastOneFunction
 }
 
 func (queryCtx *selectQueryContext) getResultBucketsSize() int {

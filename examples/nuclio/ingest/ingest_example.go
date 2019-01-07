@@ -178,7 +178,7 @@ func createTSDBAppender(context *nuclio.Context, path string) error {
 		if containerName == "" {
 			containerName = "bigdata"
 		}
-		container, err := tsdb.NewContainer(v3ioUrl, numWorkers, username, password, containerName, context.Logger)
+		container, err := tsdb.NewContainer(v3ioUrl, numWorkers, "", username, password, containerName, context.Logger)
 		if err != nil {
 			return err
 		}
