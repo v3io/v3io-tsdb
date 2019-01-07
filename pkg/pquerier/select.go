@@ -9,6 +9,7 @@ import (
 
 	"github.com/nuclio/logger"
 	"github.com/pkg/errors"
+	"github.com/v3io/frames"
 	"github.com/v3io/v3io-go-http"
 	"github.com/v3io/v3io-tsdb/pkg/aggregate"
 	"github.com/v3io/v3io-tsdb/pkg/chunkenc"
@@ -45,17 +46,17 @@ type selectQueryContext struct {
 func (queryCtx *selectQueryContext) start(parts []*partmgr.DBPartition, params *SelectParams) (*frameIterator, error) {
 	queryCtx.dataFrames = make(map[uint64]*dataFrame)
 
-	// If step isn't passed (e.g., when using the console), the step is the
-	// difference between the end (maxt) and start (mint) times (e.g., 5 minutes)
-	if params.Functions != "" && params.Step == 0 {
-		params.Step = params.To - params.From
-	}
-
 	queryCtx.queryParams = params
 	var err error
 	queryCtx.columnsSpec, queryCtx.columnsSpecByMetric, err = queryCtx.createColumnSpecs()
 	if err != nil {
 		return nil, err
+	}
+
+	// If step isn't passed (e.g., when using the console), the step is the
+	// difference between the end (maxt) and start (mint) times (e.g., 5 minutes)
+	if queryCtx.hasAtLeastOneFunction() && params.Step == 0 {
+		queryCtx.queryParams.Step = params.To - params.From
 	}
 
 	// We query every partition for every requested metric
@@ -103,8 +104,8 @@ func (queryCtx *selectQueryContext) start(parts []*partmgr.DBPartition, params *
 		queryCtx.totalColumns = queryCtx.frameList[0].Len()
 	}
 
-	frameIter := NewFrameIterator(queryCtx)
-	return frameIter, nil
+	frameIter, err := NewFrameIterator(queryCtx)
+	return frameIter, err
 }
 
 func (queryCtx *selectQueryContext) metricsAggregatesToString(metric string) (string, bool) {
@@ -376,17 +377,29 @@ func (queryCtx *selectQueryContext) getOrCreateTimeColumn() Column {
 
 func (queryCtx *selectQueryContext) generateTimeColumn() Column {
 	columnMeta := columnMeta{metric: "time"}
-	timeColumn := NewDataColumn("time", columnMeta, queryCtx.getResultBucketsSize(), IntType)
+	timeColumn := NewDataColumn("time", columnMeta, queryCtx.getResultBucketsSize(), frames.IntType)
 	i := 0
 	for t := queryCtx.queryParams.From; t <= queryCtx.queryParams.To; t += queryCtx.queryParams.Step {
 		timeColumn.SetDataAt(i, t)
 		i++
 	}
+	timeColumn.finish()
 	return timeColumn
 }
 
 func (queryCtx *selectQueryContext) isRawQuery() bool {
-	return (queryCtx.queryParams.Functions == "" && queryCtx.queryParams.Step == 0) || queryCtx.queryParams.disableClientAggr
+	return (!queryCtx.hasAtLeastOneFunction() && queryCtx.queryParams.Step == 0) || queryCtx.queryParams.disableClientAggr
+}
+
+func (queryCtx *selectQueryContext) hasAtLeastOneFunction() bool {
+	atLeastOneFunction := false
+	for _, col := range queryCtx.columnsSpec {
+		if col.function != 0 {
+			atLeastOneFunction = true
+			break
+		}
+	}
+	return atLeastOneFunction
 }
 
 func (queryCtx *selectQueryContext) getResultBucketsSize() int {
