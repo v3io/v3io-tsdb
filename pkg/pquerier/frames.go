@@ -235,12 +235,12 @@ func (d *dataFrame) addMetricIfNotExist(metricName string, columnSize int, useSe
 func (d *dataFrame) addMetricFromTemplate(metricName string, columnSize int, useServerAggregates bool) error {
 	newColumns := make([]Column, len(d.columnsTemplates))
 	for i, col := range d.columnsTemplates {
+		col.metric = metricName
 		newCol, err := createColumn(col, columnSize, useServerAggregates)
 		if err != nil {
 			return err
 		}
 
-		newCol.setMetricName(metricName)
 		newColumns[i] = newCol
 		if aggregate.IsCountAggregate(col.function) {
 			d.metricToCountColumn[metricName] = newCol
@@ -347,7 +347,7 @@ func (d *dataFrame) TimeSeries(i int) (utils.Series, error) {
 //	t2		  v1		  v3
 //
 func (d *dataFrame) rawSeriesToColumns() {
-	var timeData []int64
+	var timeData []time.Time
 	columns := make([][]interface{}, len(d.rawColumns))
 	nonExhaustedIterators := len(d.rawColumns)
 
@@ -365,7 +365,7 @@ func (d *dataFrame) rawSeriesToColumns() {
 	for nonExhaustedIterators > 0 {
 		currentTime = nextTime
 		nextTime = int64(math.MaxInt64)
-		timeData = append(timeData, currentTime)
+		timeData = append(timeData, time.Unix(currentTime/1000, (currentTime%1000)*1e6))
 
 		for seriesIndex, rawSeries := range d.rawColumns {
 			iter := rawSeries.Iterator()
@@ -398,7 +398,7 @@ func (d *dataFrame) rawSeriesToColumns() {
 
 	numberOfRows := len(timeData)
 	colSpec := columnMeta{metric: "time"}
-	d.index = NewDataColumn("time", colSpec, numberOfRows, IntType)
+	d.index = NewDataColumn("time", colSpec, numberOfRows, TimeType)
 	d.index.SetData(timeData, numberOfRows)
 
 	d.columns = make([]Column, len(d.rawColumns))
@@ -420,13 +420,13 @@ func (d *dataFrame) shouldGenerateRawColumns() bool { return d.isRawSeries && !d
 
 // Column is a data column
 type Column interface {
-	Len() int                       // Number of elements
-	Name() string                   // Column name
-	DType() DType                   // Data type (e.g. IntType, FloatType ...)
-	FloatAt(i int) (float64, error) // Float value at index i
-	StringAt(i int) (string, error) // String value at index i
-	TimeAt(i int) (int64, error)    // time value at index i
-	GetColumnSpec() columnMeta      // Get the column's metadata
+	Len() int                        // Number of elements
+	Name() string                    // Column name
+	DType() DType                    // Data type (e.g. IntType, FloatType ...)
+	FloatAt(i int) (float64, error)  // Float value at index i
+	StringAt(i int) (string, error)  // String value at index i
+	TimeAt(i int) (time.Time, error) // time value at index i
+	GetColumnSpec() columnMeta       // Get the column's metadata
 	SetDataAt(i int, value interface{}) error
 	SetData(d interface{}, size int) error
 	GetInterpolationFunction() (InterpolationFunction, int64)
@@ -552,21 +552,21 @@ func (dc *dataColumn) StringAt(i int) (string, error) {
 }
 
 // TimeAt returns time.Time value at index i
-func (dc *dataColumn) TimeAt(i int) (int64, error) {
+func (dc *dataColumn) TimeAt(i int) (time.Time, error) {
 	if !dc.isValidIndex(i) {
-		return 0, fmt.Errorf("index %d out of bounds [0:%d]", i, dc.size)
+		return time.Unix(0, 0), fmt.Errorf("index %d out of bounds [0:%d]", i, dc.size)
 	}
 
-	typedCol, ok := dc.data.([]int64)
+	typedCol, ok := dc.data.([]time.Time)
 	if !ok {
 		genericCol, ok := dc.data.([]interface{})
 		if ok {
-			i, ok := genericCol[i].(int64)
+			i, ok := genericCol[i].(time.Time)
 			if ok {
 				return i, nil
 			}
 		}
-		return 0, fmt.Errorf("wrong type (type is %s)", dc.DType())
+		return time.Unix(0, 0), fmt.Errorf("wrong type (type is %s)", dc.DType())
 	}
 
 	return typedCol[i], nil
@@ -630,8 +630,8 @@ func (c *ConcreteColumn) FloatAt(i int) (float64, error) {
 func (c *ConcreteColumn) StringAt(i int) (string, error) {
 	return "", errors.New("aggregated column does not support string type")
 }
-func (c *ConcreteColumn) TimeAt(i int) (int64, error) {
-	return 0, errors.New("aggregated column does not support time type")
+func (c *ConcreteColumn) TimeAt(i int) (time.Time, error) {
+	return time.Unix(0, 0), errors.New("aggregated column does not support time type")
 }
 func (c *ConcreteColumn) SetDataAt(i int, val interface{}) error {
 	if !c.isValidIndex(i) {
@@ -681,14 +681,6 @@ func (c *virtualColumn) StringAt(i int) (string, error) {
 	}
 	return value.(string), nil
 }
-func (c *virtualColumn) TimeAt(i int) (int64, error) {
-	if !c.isValidIndex(i) {
-		return 0, fmt.Errorf("index %d out of bounds [0:%d]", i, c.size)
-	}
-
-	value, err := c.function(c.dependantColumns, i)
-	if err != nil {
-		return 0, err
-	}
-	return value.(int64), nil
+func (c *virtualColumn) TimeAt(i int) (time.Time, error) {
+	return time.Unix(0, 0), errors.New("aggregated column does not support time type")
 }

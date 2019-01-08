@@ -2,6 +2,7 @@ package pquerier
 
 import (
 	"math"
+	"time"
 
 	"github.com/v3io/v3io-tsdb/pkg/aggregate"
 	"github.com/v3io/v3io-tsdb/pkg/chunkenc"
@@ -73,7 +74,7 @@ func (it *dataFrameColumnSeriesIterator) At() (int64, float64) {
 	if err != nil {
 		it.err = err
 	}
-	return t, v
+	return t.UnixNano() / int64(time.Millisecond), v
 }
 
 func (it *dataFrameColumnSeriesIterator) AtString() (int64, string) {
@@ -85,7 +86,7 @@ func (it *dataFrameColumnSeriesIterator) AtString() (int64, string) {
 	if err != nil {
 		it.err = err
 	}
-	return t, v
+	return t.UnixNano() / int64(time.Millisecond), v
 }
 
 func (it *dataFrameColumnSeriesIterator) Next() bool {

@@ -287,7 +287,7 @@ func (q *V3ioQuerier) GetLabelSets(metric string, filter string) ([]utils.Labels
 	input := v3io.GetItemsInput{
 		Path:           partitionPaths[0],
 		Filter:         filter,
-		AttributeNames: []string{config.LabelSetAttrName},
+		AttributeNames: []string{config.LabelSetAttrName, config.MetricNameAttrName},
 	}
 
 	iter, err := utils.NewAsyncItemsCursor(q.container, &input, q.cfg.QryWorkers, shardingKeys, q.logger)
@@ -298,11 +298,13 @@ func (q *V3ioQuerier) GetLabelSets(metric string, filter string) ([]utils.Labels
 	// Iterate over the results
 	for iter.Next() {
 		labelSet := iter.GetField(config.LabelSetAttrName).(string)
-
 		currLabels, err := utils.LabelsFromString(labelSet)
 		if err != nil {
 			return nil, err
 		}
+
+		currLabels = append(utils.LabelsFromStringList(config.PrometheusMetricNameAttribute,
+			iter.GetField(config.MetricNameAttrName).(string)), currLabels...)
 
 		labelsMap[currLabels.Hash()] = currLabels
 	}

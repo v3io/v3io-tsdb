@@ -113,6 +113,7 @@ Arguments:
 		"Aggregation interval for applying the aggregation functions\n(if set - see the -a|--aggregates flag), of the format\n\"[0-9]+[mhd]\" (where 'm' = minutes, 'h' = hours, and\n'd' = days). Examples: \"1h\"; \"150m\". (default =\n<end time> - <start time>)")
 	cmd.Flags().StringVar(&commandeer.groupBy, "groupBy", "",
 		"Comma separated list of labels to group the result by")
+
 	cmd.Flags().BoolVarP(&commandeer.oldQuerier, "oldQuerier", "q", false, "use old querier")
 	cmd.Flags().Lookup("oldQuerier").Hidden = true
 	cmd.Flags().Lookup("windows").Hidden = true // hidden, because only supported in old querier.
@@ -186,8 +187,20 @@ func (qc *queryCommandeer) newQuery(from, to, step int64) error {
 		return errors.Wrap(err, "Failed to initialize the Querier object.")
 	}
 
-	selectParams := &pquerier.SelectParams{Name: qc.name, Functions: qc.functions,
-		Step: step, Filter: qc.filter, From: from, To: to, GroupBy: qc.groupBy}
+	var selectParams *pquerier.SelectParams
+
+	if strings.HasPrefix(qc.name, "select") {
+		selectParams, _, err = pquerier.ParseQuery(qc.name)
+		if err != nil {
+			return errors.Wrap(err, "failed to parse sql")
+		}
+		selectParams.Step = step
+		selectParams.From = from
+		selectParams.To = to
+	} else {
+		selectParams = &pquerier.SelectParams{Name: qc.name, Functions: qc.functions,
+			Step: step, Filter: qc.filter, From: from, To: to, GroupBy: qc.groupBy}
+	}
 	set, err := qry.Select(selectParams)
 
 	if err != nil {
