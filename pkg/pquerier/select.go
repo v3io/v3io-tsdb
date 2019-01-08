@@ -380,7 +380,7 @@ func (queryCtx *selectQueryContext) generateTimeColumn() Column {
 	timeColumn := NewDataColumn("time", columnMeta, queryCtx.getResultBucketsSize(), TimeType)
 	i := 0
 	for t := queryCtx.queryParams.From; t <= queryCtx.queryParams.To; t += queryCtx.queryParams.Step {
-		timeColumn.SetDataAt(i, time.Unix(t/1000, (t%1000)*1000000))
+		timeColumn.SetDataAt(i, time.Unix(t/1000, (t%1000)*1e6))
 		i++
 	}
 	return timeColumn

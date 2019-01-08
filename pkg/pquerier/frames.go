@@ -365,7 +365,7 @@ func (d *dataFrame) rawSeriesToColumns() {
 	for nonExhaustedIterators > 0 {
 		currentTime = nextTime
 		nextTime = int64(math.MaxInt64)
-		timeData = append(timeData, time.Unix(currentTime/1000, (currentTime%1000)*1000000))
+		timeData = append(timeData, time.Unix(currentTime/1000, (currentTime%1000)*1e6))
 
 		for seriesIndex, rawSeries := range d.rawColumns {
 			iter := rawSeries.Iterator()
