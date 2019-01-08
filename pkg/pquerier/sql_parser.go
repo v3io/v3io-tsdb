@@ -43,16 +43,25 @@ func ParseQuery(sql string) (*SelectParams, string, error) {
 
 			switch expr := col.Expr.(type) {
 			case *sqlparser.FuncExpr:
-				cc := expr.Exprs[0].(*sqlparser.AliasedExpr).Expr.(*sqlparser.ColName)
-				currCol.Function = sqlparser.String(expr.Name)
-				currCol.Interpolator = removeComma(sqlparser.String(cc.Qualifier.Name)) // Some of the interpolators are parsed with a `
-				currCol.Metric = sqlparser.String(cc.Name)
+				switch firstExpr := expr.Exprs[0].(type) {
+				case *sqlparser.AliasedExpr:
+					cc := firstExpr.Expr.(*sqlparser.ColName)
+					currCol.Function = sqlparser.String(expr.Name)
+					currCol.Interpolator = removeBackticks(sqlparser.String(cc.Qualifier.Name)) // Some of the interpolators are parsed with a `
+					currCol.Metric = sqlparser.String(cc.Name)
+				case *sqlparser.StarExpr:
+					// Appending column with empty metric name, meaning a column template with the given aggregate
+					currCol.Function = sqlparser.String(expr.Name)
+				}
 			case *sqlparser.ColName:
 				currCol.Metric = sqlparser.String(expr.Name)
-				currCol.Interpolator = removeComma(sqlparser.String(expr.Qualifier.Name)) // Some of the interpolators are parsed with a `
+				currCol.Interpolator = removeBackticks(sqlparser.String(expr.Qualifier.Name)) // Some of the interpolators are parsed with a `
 			default:
 				return nil, "", fmt.Errorf("unknown columns type - %T", col.Expr)
 			}
+			columns = append(columns, currCol)
+		case *sqlparser.StarExpr:
+			// Appending empty column, meaning a column template for raw data
 			columns = append(columns, currCol)
 		default:
 			return nil, "", fmt.Errorf("unknown SELECT column type - %T", sexpr)
@@ -95,6 +104,6 @@ func getTableName(slct *sqlparser.Select) (string, error) {
 func parseFilter(originalFilter string) (string, error) {
 	return strings.Replace(originalFilter, " = ", " == ", -1), nil
 }
-func removeComma(origin string) string {
+func removeBackticks(origin string) string {
 	return strings.Replace(origin, "`", "", -1)
 }
