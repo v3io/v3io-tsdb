@@ -3,6 +3,7 @@ package pquerier
 import (
 	"fmt"
 	"math"
+	"time"
 
 	"github.com/pkg/errors"
 	"github.com/v3io/frames"
@@ -10,7 +11,6 @@ import (
 	"github.com/v3io/v3io-tsdb/pkg/chunkenc"
 	"github.com/v3io/v3io-tsdb/pkg/config"
 	"github.com/v3io/v3io-tsdb/pkg/utils"
-	"time"
 )
 
 type frameIterator struct {
