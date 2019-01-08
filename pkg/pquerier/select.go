@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/nuclio/logger"
 	"github.com/pkg/errors"
@@ -377,10 +378,10 @@ func (queryCtx *selectQueryContext) getOrCreateTimeColumn() Column {
 
 func (queryCtx *selectQueryContext) generateTimeColumn() Column {
 	columnMeta := columnMeta{metric: "time"}
-	timeColumn := NewDataColumn("time", columnMeta, queryCtx.getResultBucketsSize(), frames.IntType)
+	timeColumn := NewDataColumn("time", columnMeta, queryCtx.getResultBucketsSize(), frames.TimeType)
 	i := 0
 	for t := queryCtx.queryParams.From; t <= queryCtx.queryParams.To; t += queryCtx.queryParams.Step {
-		timeColumn.SetDataAt(i, t)
+		timeColumn.SetDataAt(i, time.Unix(t/1000, (t%1000)*1e6))
 		i++
 	}
 	timeColumn.finish()

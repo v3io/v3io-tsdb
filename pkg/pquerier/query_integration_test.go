@@ -1424,7 +1424,8 @@ func (suite *testQuerySuite) TestRawDataMultipleMetrics() {
 //
 //		for i := 0; i < frame.Index().Len(); i++ {
 //			t, _ := in.TimeAt(i)
-//			assert.Equal(suite.T(), expectedTimeColumn[i], t, "time column does not match at index %v", i)
+//			timeMillis := t.UnixNano() / int64(time.Millisecond)
+//			assert.Equal(suite.T(), expectedTimeColumn[i], timeMillis, "time column does not match at index %v", i)
 //			for _, column := range cols {
 //				v, _ := column.FloatAt(i)
 //
@@ -1550,12 +1551,13 @@ func (suite *testQuerySuite) TestQueryAllData() {
 //	for iter.NextFrame() {
 //		seriesCount++
 //		frame := iter.GetFrame()
-//		in := frame.Indices()[0]
+//		in := frame.Index()
 //		cols := frame.Columns()
 //
 //		for i := 0; i < frame.Index().Len(); i++ {
 //			t, _ := in.TimeAt(i)
-//			assert.Equal(suite.T(), expectedTimeColumn[i], t, "time column does not match at index %v", i)
+//			timeMillis := t.UnixNano() / int64(time.Millisecond)
+//			assert.Equal(suite.T(), expectedTimeColumn[i], timeMillis, "time column does not match at index %v", i)
 //			for _, column := range cols {
 //				v, _ := column.StringAt(i)
 //

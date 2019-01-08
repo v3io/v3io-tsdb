@@ -10,6 +10,7 @@ import (
 	"github.com/v3io/v3io-tsdb/pkg/chunkenc"
 	"github.com/v3io/v3io-tsdb/pkg/config"
 	"github.com/v3io/v3io-tsdb/pkg/utils"
+	"time"
 )
 
 type frameIterator struct {
@@ -369,7 +370,7 @@ func (d *dataFrame) finishAllColumns() error {
 //	t2		  v1		  v3
 //
 func (d *dataFrame) rawSeriesToColumns() {
-	var timeData []int64
+	var timeData []time.Time
 
 	columns := make([]frames.ColumnBuilder, len(d.rawColumns))
 	nonExhaustedIterators := len(d.rawColumns)
@@ -403,7 +404,7 @@ func (d *dataFrame) rawSeriesToColumns() {
 	for nonExhaustedIterators > 0 {
 		currentTime = nextTime
 		nextTime = int64(math.MaxInt64)
-		timeData = append(timeData, currentTime)
+		timeData = append(timeData, time.Unix(currentTime/1000, (currentTime%1000)*1e6))
 
 		for seriesIndex, rawSeries := range d.rawColumns {
 			iter := rawSeries.Iterator()
@@ -436,7 +437,7 @@ func (d *dataFrame) rawSeriesToColumns() {
 
 	numberOfRows := len(timeData)
 	colSpec := columnMeta{metric: "time"}
-	d.index = NewDataColumn("time", colSpec, numberOfRows, frames.IntType)
+	d.index = NewDataColumn("time", colSpec, numberOfRows, frames.TimeType)
 	d.index.SetData(timeData, numberOfRows)
 
 	d.columns = make([]Column, len(d.rawColumns))
@@ -483,7 +484,7 @@ type Column interface {
 	DType() frames.DType            // Data type (e.g. IntType, FloatType ...)
 	FloatAt(i int) (float64, error) // Float value at index i
 	StringAt(i int) (string, error) // String value at index i
-	TimeAt(i int) (int64, error)    // time value at index i
+	TimeAt(i int) (time.Time, error)    // time value at index i
 	GetColumnSpec() columnMeta      // Get the column's metadata
 	SetDataAt(i int, value interface{}) error
 	SetData(d interface{}, size int) error
@@ -567,8 +568,8 @@ func (dc *dataColumn) StringAt(i int) (string, error) {
 }
 
 // TimeAt returns time.Time value at index i
-func (dc *dataColumn) TimeAt(i int) (int64, error) {
-	return dc.framesCol.IntAt(i)
+func (dc *dataColumn) TimeAt(i int) (time.Time, error) {
+	return dc.framesCol.TimeAt(i)
 }
 
 func (dc *dataColumn) SetData(d interface{}, size int) error {
@@ -620,8 +621,8 @@ func (c *ConcreteColumn) FloatAt(i int) (float64, error) {
 func (c *ConcreteColumn) StringAt(i int) (string, error) {
 	return "", errors.New("aggregated column does not support string type")
 }
-func (c *ConcreteColumn) TimeAt(i int) (int64, error) {
-	return 0, errors.New("aggregated column does not support time type")
+func (c *ConcreteColumn) TimeAt(i int) (time.Time, error) {
+	return time.Unix(0, 0), errors.New("aggregated column does not support time type")
 }
 func (c *ConcreteColumn) SetDataAt(i int, val interface{}) error {
 	if !c.isValidIndex(i) {
@@ -673,6 +674,6 @@ func (c *virtualColumn) FloatAt(i int) (float64, error) {
 func (c *virtualColumn) StringAt(i int) (string, error) {
 	return c.framesCol.StringAt(i)
 }
-func (c *virtualColumn) TimeAt(i int) (int64, error) {
-	return c.framesCol.IntAt(i)
+func (c *virtualColumn) TimeAt(i int) (time.Time, error) {
+	return time.Unix(0, 0), errors.New("aggregated column does not support time type")
 }

@@ -39,6 +39,14 @@ func TestParseQuery(t *testing.T) {
 			output: &SelectParams{RequestedColumns: []RequestedColumn{{Metric: "columnA", Function: "min"}},
 				Filter: "columnB >= 123"},
 			outputTable: "my_table"},
+
+		{input: "select * from my_table",
+			output:      &SelectParams{RequestedColumns: []RequestedColumn{{Metric: ""}}},
+			outputTable: "my_table"},
+
+		{input: "select max(*), avg(*) from my_table",
+			output:      &SelectParams{RequestedColumns: []RequestedColumn{{Metric: "", Function: "max"}, {Metric: "", Function: "avg"}}},
+			outputTable: "my_table"},
 	}
 	for _, test := range testCases {
 		t.Run(test.input, func(tt *testing.T) {
