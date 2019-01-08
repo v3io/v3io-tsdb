@@ -479,13 +479,13 @@ func (d *dataFrame) GetFrame() (frames.Frame, error) {
 
 // Column is a data column
 type Column interface {
-	Len() int                       // Number of elements
-	Name() string                   // Column name
-	DType() frames.DType            // Data type (e.g. IntType, FloatType ...)
-	FloatAt(i int) (float64, error) // Float value at index i
-	StringAt(i int) (string, error) // String value at index i
-	TimeAt(i int) (time.Time, error)    // time value at index i
-	GetColumnSpec() columnMeta      // Get the column's metadata
+	Len() int                        // Number of elements
+	Name() string                    // Column name
+	DType() frames.DType             // Data type (e.g. IntType, FloatType ...)
+	FloatAt(i int) (float64, error)  // Float value at index i
+	StringAt(i int) (string, error)  // String value at index i
+	TimeAt(i int) (time.Time, error) // time value at index i
+	GetColumnSpec() columnMeta       // Get the column's metadata
 	SetDataAt(i int, value interface{}) error
 	SetData(d interface{}, size int) error
 	GetInterpolationFunction() (InterpolationFunction, int64)
