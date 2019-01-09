@@ -185,12 +185,12 @@ func downsampleRawData(ctx *selectQueryContext, res *qryResults,
 					prevT = previousPartitionLastTime
 					prevV = previousPartitionLastValue
 				}
-				// If previous point is too old for interpolation
-				interpolateFunc, tolerance := col.GetInterpolationFunction()
-				if prevT != 0 && t-prevT > tolerance {
+				interpolatedT, interpolatedV := col.GetInterpolationFunction()(prevT, t, currBucketTime, prevV, v)
+
+				// Check if the interpolation was successful in terms of exceeding tolerance
+				if interpolatedT == 0 && interpolatedV == 0 {
 					col.SetDataAt(currBucket, math.NaN())
 				} else {
-					_, interpolatedV := interpolateFunc(prevT, t, currBucketTime, prevV, v)
 					col.SetDataAt(currBucket, interpolatedV)
 				}
 			} else {
