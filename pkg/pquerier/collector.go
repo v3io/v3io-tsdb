@@ -204,3 +204,79 @@ func downsampleRawData(ctx *selectQueryContext, res *qryResults,
 
 	return lastT, lastV, nil
 }
+
+func aggregateClientAggregatesCrossSeries(ctx *selectQueryContext, res *qryResults, previousPartitionLastTime int64, previousPartitionLastValue float64) {
+	ctx.logger.Debug("using Client Aggregates Collector for metric %v", res.name)
+	it := newRawChunkIterator(res, nil).(*rawChunkIterator)
+
+	for currBucket := 0; currBucket < ctx.getResultBucketsSize(); currBucket++ {
+		currBucketTime := int64(currBucket)*ctx.queryParams.Step + ctx.queryParams.From
+		if it.Seek(currBucketTime) {
+			t, v := it.At()
+			if t == currBucketTime {
+				for _, col := range res.frame.columns {
+					if col.GetColumnSpec().metric == res.name {
+						col.SetDataAt(currBucket, v)
+					}
+				}
+			} else {
+				prevT, prevV := it.PeakBack()
+
+				// In case it's the first point in the partition use the last point of the previous partition for the interpolation
+				if prevT == 0 {
+					prevT = previousPartitionLastTime
+					prevV = previousPartitionLastValue
+				}
+
+				for _, col := range res.frame.columns {
+					if col.GetColumnSpec().metric == res.name {
+						interpolatedT, interpolatedV := col.GetInterpolationFunction()(prevT, t, currBucketTime, prevV, v)
+						if interpolatedT != 0 && interpolatedV != 0 {
+							col.SetDataAt(currBucket, interpolatedV)
+						}
+					}
+				}
+			}
+		}
+	}
+}
+
+func updateAllColumns(frame *dataFrame, metricName string, cell int, value float64) {
+	for _, col := range frame.columns {
+		if col.GetColumnSpec().metric == metricName {
+			col.SetDataAt(cell, value)
+		}
+	}
+}
+
+func seekAndInterpolate(it *rawChunkIterator,
+	wantedTime int64,
+	previousKnownTime int64,
+	previousKnownValue float64,
+	interpolationFunc InterpolationFunction,
+	interpolationTolerance int64) (int64, float64) {
+
+	if it.Seek(wantedTime) {
+		t, v := it.At()
+		if t == wantedTime {
+			return t, v
+		} else {
+			prevT, prevV := it.PeakBack()
+
+			// In case it's the first point in the partition use the last point of the previous partition for the interpolation
+			if prevT == 0 {
+				prevT = previousKnownTime
+				prevV = previousKnownValue
+			}
+
+			// If previous point is too far behind for interpolation or the next point is too far ahead then return NaN
+			if (prevT != 0 && wantedTime-prevT > interpolationTolerance) || t-wantedTime > interpolationTolerance {
+				return wantedTime, math.NaN()
+			} else {
+				return interpolationFunc(prevT, t, wantedTime, prevV, v)
+			}
+		}
+	} else {
+		return wantedTime, math.NaN()
+	}
+}
