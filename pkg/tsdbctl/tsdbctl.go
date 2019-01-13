@@ -46,7 +46,7 @@ type RootCommandeer struct {
 	container   string
 	username    string
 	password    string
-	sessionKey  string
+	accessKey   string
 	Reporter    *performance.MetricReporter
 	BuildInfo   *config.BuildInfo
 }
@@ -83,8 +83,8 @@ func NewRootCommandeer() *RootCommandeer {
 		"Username of an Iguazio Continuous Data Platform user.")
 	cmd.PersistentFlags().StringVarP(&commandeer.password, "password", "p", "",
 		"Password of the configured user (see -u|--username).")
-	cmd.PersistentFlags().StringVarP(&commandeer.sessionKey, "session-key", "k", "",
-		"Session key for accessing the required table.\nIf session-key is passed, it will take precedence on user/password authentication.")
+	cmd.PersistentFlags().StringVarP(&commandeer.accessKey, "access-key", "k", "",
+		"Access-key for accessing the required table.\nIf access-key is passed, it will take precedence on user/password authentication.")
 
 	// Add children
 	cmd.AddCommand(
@@ -144,8 +144,8 @@ func (rc *RootCommandeer) populateConfig(cfg *config.V3ioConfig) error {
 		cfg.Password = rc.password
 	}
 
-	if rc.sessionKey != "" {
-		cfg.SessionKey = rc.sessionKey
+	if rc.accessKey != "" {
+		cfg.AccessKey = rc.accessKey
 	}
 
 	if rc.v3ioPath != "" {

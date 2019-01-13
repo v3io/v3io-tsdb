@@ -12,10 +12,10 @@ type Context struct {
 }
 
 type SessionConfig struct {
-	Username	string
-	Password	string
-	Label		string
-	SessionKey	string
+	Username  string
+	Password  string
+	Label     string
+	SessionKey string
 }
 
 func NewContext(parentLogger logger.Logger, clusterURL string, numWorkers int) (*Context, error) {

@@ -1424,7 +1424,8 @@ func (suite *testQuerySuite) TestDataFrameRawDataMultipleMetrics() {
 
 		for i := 0; i < frame.Index().Len(); i++ {
 			t, _ := in.TimeAt(i)
-			assert.Equal(suite.T(), expectedTimeColumn[i], t, "time column does not match at index %v", i)
+			timeMillis := t.UnixNano() / int64(time.Millisecond)
+			assert.Equal(suite.T(), expectedTimeColumn[i], timeMillis, "time column does not match at index %v", i)
 			for _, column := range cols {
 				v, _ := column.FloatAt(i)
 
@@ -1555,7 +1556,8 @@ func (suite *testQuerySuite) TestVariantTypeQueryWithDataFrame() {
 
 		for i := 0; i < frame.Index().Len(); i++ {
 			t, _ := in.TimeAt(i)
-			assert.Equal(suite.T(), expectedTimeColumn[i], t, "time column does not match at index %v", i)
+			timeMillis := t.UnixNano() / int64(time.Millisecond)
+			assert.Equal(suite.T(), expectedTimeColumn[i], timeMillis, "time column does not match at index %v", i)
 			for _, column := range cols {
 				v, _ := column.StringAt(i)
 
@@ -1878,6 +1880,129 @@ func (suite *testQuerySuite) TestGroupByNotExistingLabel() {
 	}
 }
 
+func (suite *testQuerySuite) TestAggregatesWithZeroStep() {
+	adapter, err := tsdb.NewV3ioAdapter(suite.v3ioConfig, nil, nil)
+	if err != nil {
+		suite.T().Fatalf("failed to create v3io adapter. reason: %s", err)
+	}
+
+	labels1 := utils.LabelsFromStringList("os", "linux")
+	numberOfEvents := 10
+	eventsInterval := 60 * 1000
+	baseTime := tsdbtest.NanosToMillis(time.Now().UnixNano()) - int64(numberOfEvents*eventsInterval)
+
+	ingestedData := []tsdbtest.DataPoint{{baseTime, 10},
+		{int64(baseTime + tsdbtest.MinuteInMillis), 20},
+		{baseTime + 2*tsdbtest.MinuteInMillis, 30},
+		{baseTime + 3*tsdbtest.MinuteInMillis, 40}}
+	testParams := tsdbtest.NewTestParams(suite.T(),
+		tsdbtest.TestOption{
+			Key: tsdbtest.OptTimeSeries,
+			Value: tsdbtest.TimeSeries{tsdbtest.Metric{
+				Name:   "cpu",
+				Labels: labels1,
+				Data:   ingestedData},
+			}})
+	tsdbtest.InsertData(suite.T(), testParams)
+
+	expected := map[string][]tsdbtest.DataPoint{"max": {{Time: baseTime, Value: 40}},
+		"min":   {{Time: baseTime, Value: 10}},
+		"sum":   {{Time: baseTime, Value: 100}},
+		"count": {{Time: baseTime, Value: 4}},
+	}
+
+	querierV2, err := adapter.QuerierV2()
+	if err != nil {
+		suite.T().Fatalf("Failed to create querier v2, err: %v", err)
+	}
+
+	params := &pquerier.SelectParams{Name: "cpu", Functions: "max, sum,count,min", Step: 0, From: baseTime, To: baseTime + int64(numberOfEvents*eventsInterval)}
+	set, err := querierV2.Select(params)
+	if err != nil {
+		suite.T().Fatalf("Failed to exeute query, err: %v", err)
+	}
+
+	var seriesCount int
+	for set.Next() {
+		seriesCount++
+		iter := set.At().Iterator()
+
+		data, err := tsdbtest.IteratorToSlice(iter)
+		agg := set.At().Labels().Get(aggregate.AggregateLabel)
+		if err != nil {
+			suite.T().Fatal(err)
+		}
+
+		assert.Equal(suite.T(), expected[agg], data, "queried data does not match expected")
+	}
+
+	assert.Equal(suite.T(), 4, seriesCount, "series count didn't match expected")
+}
+
+func (suite *testQuerySuite) TestAggregatesWithZeroStepSelectDataframe() {
+	adapter, err := tsdb.NewV3ioAdapter(suite.v3ioConfig, nil, nil)
+	if err != nil {
+		suite.T().Fatalf("failed to create v3io adapter. reason: %s", err)
+	}
+
+	labels1 := utils.LabelsFromStringList("os", "linux")
+	numberOfEvents := 10
+	eventsInterval := 60 * 1000
+	baseTime := tsdbtest.NanosToMillis(time.Now().UnixNano()) - int64(numberOfEvents*eventsInterval)
+
+	ingestedData := []tsdbtest.DataPoint{{baseTime, 10},
+		{int64(baseTime + tsdbtest.MinuteInMillis), 20},
+		{baseTime + 2*tsdbtest.MinuteInMillis, 30},
+		{baseTime + 3*tsdbtest.MinuteInMillis, 40}}
+	testParams := tsdbtest.NewTestParams(suite.T(),
+		tsdbtest.TestOption{
+			Key: tsdbtest.OptTimeSeries,
+			Value: tsdbtest.TimeSeries{tsdbtest.Metric{
+				Name:   "cpu",
+				Labels: labels1,
+				Data:   ingestedData},
+			}})
+	tsdbtest.InsertData(suite.T(), testParams)
+
+	expected := map[string]tsdbtest.DataPoint{"max": {Time: baseTime, Value: 40},
+		"min":   {Time: baseTime, Value: 10},
+		"sum":   {Time: baseTime, Value: 100},
+		"count": {Time: baseTime, Value: 4},
+	}
+
+	querierV2, err := adapter.QuerierV2()
+	if err != nil {
+		suite.T().Fatalf("Failed to create querier v2, err: %v", err)
+	}
+
+	params := &pquerier.SelectParams{Name: "cpu", Functions: "max, sum,count,min", Step: 0, From: baseTime, To: baseTime + int64(numberOfEvents*eventsInterval)}
+	set, err := querierV2.SelectDataFrame(params)
+	if err != nil {
+		suite.T().Fatalf("Failed to exeute query, err: %v", err)
+	}
+
+	var seriesCount int
+	for set.NextFrame() {
+		seriesCount++
+		frame := set.GetFrame()
+
+		assert.Equal(suite.T(), 1, frame.Index().Len())
+		t, err := frame.Index().TimeAt(0)
+		assert.NoError(suite.T(), err)
+		assert.Equal(suite.T(), baseTime, t.UnixNano()/int64(time.Millisecond))
+
+		for _, col := range frame.Columns() {
+			assert.Equal(suite.T(), 1, col.Len())
+			currentColAggregate := strings.Split(col.Name(), "(")[0]
+			f, err := col.FloatAt(0)
+			assert.NoError(suite.T(), err)
+			assert.Equal(suite.T(), expected[currentColAggregate].Value, f)
+		}
+	}
+
+	assert.Equal(suite.T(), 1, seriesCount, "series count didn't match expected")
+}
+
 func (suite *testQuerySuite) toMillis(date string) int64 {
 	t, err := time.Parse(time.RFC3339, date)
 	if err != nil {
@@ -1922,7 +2047,7 @@ func (suite *getLabelSetsSuite) TestGetLabels() {
 	adapter, err := tsdb.NewV3ioAdapter(suite.v3ioConfig, nil, nil)
 	suite.Require().NoError(err, "failed to create v3io adapter")
 
-	expectedLabels := []utils.Labels{utils.LabelsFromStringList("os", "linux", "region", "europe"),
+	labels := []utils.Labels{utils.LabelsFromStringList("os", "linux", "region", "europe"),
 		utils.LabelsFromStringList("os", "linux", "region", "asia"),
 		utils.LabelsFromStringList("os", "mac", "region", "europe")}
 	numberOfEvents := 10
@@ -1935,18 +2060,21 @@ func (suite *getLabelSetsSuite) TestGetLabels() {
 			Key: tsdbtest.OptTimeSeries,
 			Value: tsdbtest.TimeSeries{tsdbtest.Metric{
 				Name:   "cpu",
-				Labels: expectedLabels[0],
+				Labels: labels[0],
 				Data:   ingestedData},
 				tsdbtest.Metric{
 					Name:   "cpu",
-					Labels: expectedLabels[1],
+					Labels: labels[1],
 					Data:   ingestedData},
 				tsdbtest.Metric{
 					Name:   "cpu",
-					Labels: expectedLabels[2],
+					Labels: labels[2],
 					Data:   ingestedData},
 			}})
 	tsdbtest.InsertData(suite.T(), testParams)
+	expectedLabels := []utils.Labels{utils.LabelsFromStringList("os", "linux", "region", "europe", config.PrometheusMetricNameAttribute, "cpu"),
+		utils.LabelsFromStringList("os", "linux", "region", "asia", config.PrometheusMetricNameAttribute, "cpu"),
+		utils.LabelsFromStringList("os", "mac", "region", "europe", config.PrometheusMetricNameAttribute, "cpu")}
 
 	querierV2, err := adapter.QuerierV2()
 	suite.Require().NoError(err, "failed to create querier v2")
@@ -1963,7 +2091,7 @@ func (suite *getLabelSetsSuite) TestGetLabelsAllMetrics() {
 	adapter, err := tsdb.NewV3ioAdapter(suite.v3ioConfig, nil, nil)
 	suite.Require().NoError(err, "failed to create v3io adapter")
 
-	expectedLabels := []utils.Labels{utils.LabelsFromStringList("os", "linux", "region", "europe"),
+	labels := []utils.Labels{utils.LabelsFromStringList("os", "linux", "region", "europe"),
 		utils.LabelsFromStringList("os", "linux", "region", "asia"),
 		utils.LabelsFromStringList("os", "mac", "region", "europe")}
 	numberOfEvents := 10
@@ -1976,18 +2104,21 @@ func (suite *getLabelSetsSuite) TestGetLabelsAllMetrics() {
 			Key: tsdbtest.OptTimeSeries,
 			Value: tsdbtest.TimeSeries{tsdbtest.Metric{
 				Name:   "cpu",
-				Labels: expectedLabels[0],
+				Labels: labels[0],
 				Data:   ingestedData},
 				tsdbtest.Metric{
 					Name:   "cpu",
-					Labels: expectedLabels[1],
+					Labels: labels[1],
 					Data:   ingestedData},
 				tsdbtest.Metric{
 					Name:   "diskio",
-					Labels: expectedLabels[2],
+					Labels: labels[2],
 					Data:   ingestedData},
 			}})
 	tsdbtest.InsertData(suite.T(), testParams)
+	expectedLabels := []utils.Labels{utils.LabelsFromStringList("os", "linux", "region", "europe", config.PrometheusMetricNameAttribute, "cpu"),
+		utils.LabelsFromStringList("os", "linux", "region", "asia", config.PrometheusMetricNameAttribute, "cpu"),
+		utils.LabelsFromStringList("os", "mac", "region", "europe", config.PrometheusMetricNameAttribute, "diskio")}
 
 	querierV2, err := adapter.QuerierV2()
 	suite.Require().NoError(err, "failed to create querier v2")
@@ -2004,7 +2135,7 @@ func (suite *getLabelSetsSuite) TestGetLabelsAllSpecificMetric() {
 	adapter, err := tsdb.NewV3ioAdapter(suite.v3ioConfig, nil, nil)
 	suite.Require().NoError(err, "failed to create v3io adapter")
 
-	expectedLabels := []utils.Labels{utils.LabelsFromStringList("os", "linux", "region", "europe"),
+	labels := []utils.Labels{utils.LabelsFromStringList("os", "linux", "region", "europe"),
 		utils.LabelsFromStringList("os", "linux", "region", "asia"),
 		utils.LabelsFromStringList("os", "mac", "region", "europe")}
 	numberOfEvents := 10
@@ -2017,18 +2148,20 @@ func (suite *getLabelSetsSuite) TestGetLabelsAllSpecificMetric() {
 			Key: tsdbtest.OptTimeSeries,
 			Value: tsdbtest.TimeSeries{tsdbtest.Metric{
 				Name:   "cpu",
-				Labels: expectedLabels[0],
+				Labels: labels[0],
 				Data:   ingestedData},
 				tsdbtest.Metric{
 					Name:   "cpu",
-					Labels: expectedLabels[1],
+					Labels: labels[1],
 					Data:   ingestedData},
 				tsdbtest.Metric{
 					Name:   "diskio",
-					Labels: expectedLabels[2],
+					Labels: labels[2],
 					Data:   ingestedData},
 			}})
 	tsdbtest.InsertData(suite.T(), testParams)
+	expectedLabels := []utils.Labels{utils.LabelsFromStringList("os", "linux", "region", "europe", config.PrometheusMetricNameAttribute, "cpu"),
+		utils.LabelsFromStringList("os", "linux", "region", "asia", config.PrometheusMetricNameAttribute, "cpu")}
 
 	querierV2, err := adapter.QuerierV2()
 	suite.Require().NoError(err, "failed to create querier v2")
@@ -2038,14 +2171,14 @@ func (suite *getLabelSetsSuite) TestGetLabelsAllSpecificMetric() {
 		suite.T().Fatalf("failed to get label sets, err:%v\n", err)
 	}
 
-	suite.ElementsMatch(expectedLabels[:2], labelsList, "actual label sets does not match expected")
+	suite.ElementsMatch(expectedLabels, labelsList, "actual label sets does not match expected")
 }
 
 func (suite *getLabelSetsSuite) TestGetLabelsWithFilter() {
 	adapter, err := tsdb.NewV3ioAdapter(suite.v3ioConfig, nil, nil)
 	suite.Require().NoError(err, "failed to create v3io adapter")
 
-	expectedLabels := []utils.Labels{utils.LabelsFromStringList("os", "linux", "region", "europe"),
+	labels := []utils.Labels{utils.LabelsFromStringList("os", "linux", "region", "europe"),
 		utils.LabelsFromStringList("os", "linux", "region", "asia"),
 		utils.LabelsFromStringList("os", "mac", "region", "europe")}
 	numberOfEvents := 10
@@ -2058,18 +2191,20 @@ func (suite *getLabelSetsSuite) TestGetLabelsWithFilter() {
 			Key: tsdbtest.OptTimeSeries,
 			Value: tsdbtest.TimeSeries{tsdbtest.Metric{
 				Name:   "cpu",
-				Labels: expectedLabels[0],
+				Labels: labels[0],
 				Data:   ingestedData},
 				tsdbtest.Metric{
 					Name:   "cpu",
-					Labels: expectedLabels[1],
+					Labels: labels[1],
 					Data:   ingestedData},
 				tsdbtest.Metric{
 					Name:   "cpu",
-					Labels: expectedLabels[2],
+					Labels: labels[2],
 					Data:   ingestedData},
 			}})
 	tsdbtest.InsertData(suite.T(), testParams)
+	expectedLabels := []utils.Labels{utils.LabelsFromStringList("os", "linux", "region", "europe", config.PrometheusMetricNameAttribute, "cpu"),
+		utils.LabelsFromStringList("os", "linux", "region", "asia", config.PrometheusMetricNameAttribute, "cpu")}
 
 	querierV2, err := adapter.QuerierV2()
 	suite.Require().NoError(err, "failed to create querier v2")
@@ -2079,7 +2214,7 @@ func (suite *getLabelSetsSuite) TestGetLabelsWithFilter() {
 		suite.T().Fatalf("failed to get label sets, err:%v\n", err)
 	}
 
-	suite.ElementsMatch(expectedLabels[:2], labelsList, "actual label sets does not match expected")
+	suite.ElementsMatch(expectedLabels, labelsList, "actual label sets does not match expected")
 }
 
 func TestGetLabelSetsSuite(t *testing.T) {

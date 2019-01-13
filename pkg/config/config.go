@@ -122,7 +122,7 @@ type V3ioConfig struct {
 	TablePath      string `json:"tablePath"`
 	Username       string `json:"username,omitempty"`
 	Password       string `json:"password,omitempty"`
-	SessionKey     string `json:"sessionKey,omitempty"`
+	AccessKey      string `json:"accessKey,omitempty"`
 
 	HttpTimeout string `json:"httpTimeout,omitempty"`
 
