@@ -5,6 +5,8 @@ import (
 	"math"
 
 	"github.com/v3io/v3io-tsdb/pkg/aggregate"
+	"github.com/v3io/v3io-tsdb/pkg/config"
+	"github.com/v3io/v3io-tsdb/pkg/utils"
 )
 
 /* main query flow logic
@@ -59,8 +61,8 @@ once collectors are done (wg.done) return SeriesSet (prom compatible) or FrameSe
 func mainCollector(ctx *selectQueryContext, responseChannel chan *qryResults) {
 	defer ctx.wg.Done()
 
-	lastTimePerMetric := make(map[string]int64, len(ctx.columnsSpecByMetric))
-	lastValuePerMetric := make(map[string]float64, len(ctx.columnsSpecByMetric))
+	lastTimePerMetric := make(map[uint64]int64, len(ctx.columnsSpecByMetric))
+	lastValuePerMetric := make(map[uint64]float64, len(ctx.columnsSpecByMetric))
 
 	for res := range responseChannel {
 		if res.IsRawQuery() {
@@ -72,16 +74,25 @@ func mainCollector(ctx *selectQueryContext, responseChannel chan *qryResults) {
 				ctx.errorChannel <- err
 				return
 			}
+			lsetAttr, _ := res.fields[config.LabelSetAttrName].(string)
+			lset, _ := utils.LabelsFromString(lsetAttr)
+			currentResultHash := lset.Hash()
 
-			if res.IsServerAggregates() {
-				aggregateServerAggregates(ctx, res)
-			} else if res.IsClientAggregates() {
-				aggregateClientAggregates(ctx, res)
+			// Aggregating cross series aggregates, only supported over raw data.
+			if ctx.isCrossSeriesAggregate && res.IsClientAggregates() {
+				lastTimePerMetric[currentResultHash], lastValuePerMetric[currentResultHash], _ = aggregateClientAggregatesCrossSeries(ctx, res, lastTimePerMetric[currentResultHash], lastValuePerMetric[currentResultHash])
+				// Aggregating over time aggregates
+			} else {
+				if res.IsServerAggregates() {
+					aggregateServerAggregates(ctx, res)
+				} else if res.IsClientAggregates() {
+					aggregateClientAggregates(ctx, res)
+				}
 			}
 
 			// It is possible to query an aggregate and down sample raw chunks in the same df.
 			if res.IsDownsample() {
-				lastTimePerMetric[res.name], lastValuePerMetric[res.name], err = downsampleRawData(ctx, res, lastTimePerMetric[res.name], lastValuePerMetric[res.name])
+				lastTimePerMetric[currentResultHash], lastValuePerMetric[currentResultHash], err = downsampleRawData(ctx, res, lastTimePerMetric[currentResultHash], lastValuePerMetric[currentResultHash])
 				if err != nil {
 					ctx.logger.Error("problem downsampling '%v', lset: %v, err:%v", res.name, res.frame.lset, err)
 					ctx.errorChannel <- err
@@ -205,12 +216,25 @@ func downsampleRawData(ctx *selectQueryContext, res *qryResults,
 	return lastT, lastV, nil
 }
 
-func aggregateClientAggregatesCrossSeries(ctx *selectQueryContext, res *qryResults, previousPartitionLastTime int64, previousPartitionLastValue float64) {
+func aggregateClientAggregatesCrossSeries(ctx *selectQueryContext, res *qryResults, previousPartitionLastTime int64, previousPartitionLastValue float64) (int64, float64, error) {
 	ctx.logger.Debug("using Client Aggregates Collector for metric %v", res.name)
 	it := newRawChunkIterator(res, nil).(*rawChunkIterator)
 
-	for currBucket := 0; currBucket < ctx.getResultBucketsSize(); currBucket++ {
+	var lastT int64
+	var lastV float64
+
+	var previousPartitionEndBucket int
+	if previousPartitionLastTime != 0 {
+		previousPartitionEndBucket = int((previousPartitionLastTime-ctx.queryParams.From)/ctx.queryParams.Step) + 1
+	}
+	maxBucketForPartition := int((res.query.partition.GetEndTime() - ctx.queryParams.From) / ctx.queryParams.Step)
+	if maxBucketForPartition > ctx.getResultBucketsSize() {
+		maxBucketForPartition = ctx.getResultBucketsSize()
+	}
+
+	for currBucket := previousPartitionEndBucket; currBucket < maxBucketForPartition; currBucket++ {
 		currBucketTime := int64(currBucket)*ctx.queryParams.Step + ctx.queryParams.From
+
 		if it.Seek(currBucketTime) {
 			t, v := it.At()
 			if t == currBucketTime {
@@ -237,46 +261,11 @@ func aggregateClientAggregatesCrossSeries(ctx *selectQueryContext, res *qryResul
 					}
 				}
 			}
-		}
-	}
-}
-
-func updateAllColumns(frame *dataFrame, metricName string, cell int, value float64) {
-	for _, col := range frame.columns {
-		if col.GetColumnSpec().metric == metricName {
-			col.SetDataAt(cell, value)
-		}
-	}
-}
-
-func seekAndInterpolate(it *rawChunkIterator,
-	wantedTime int64,
-	previousKnownTime int64,
-	previousKnownValue float64,
-	interpolationFunc InterpolationFunction,
-	interpolationTolerance int64) (int64, float64) {
-
-	if it.Seek(wantedTime) {
-		t, v := it.At()
-		if t == wantedTime {
-			return t, v
 		} else {
-			prevT, prevV := it.PeakBack()
-
-			// In case it's the first point in the partition use the last point of the previous partition for the interpolation
-			if prevT == 0 {
-				prevT = previousKnownTime
-				prevV = previousKnownValue
-			}
-
-			// If previous point is too far behind for interpolation or the next point is too far ahead then return NaN
-			if (prevT != 0 && wantedTime-prevT > interpolationTolerance) || t-wantedTime > interpolationTolerance {
-				return wantedTime, math.NaN()
-			} else {
-				return interpolationFunc(prevT, t, wantedTime, prevV, v)
-			}
+			break
 		}
-	} else {
-		return wantedTime, math.NaN()
 	}
+
+	lastT, lastV = it.At()
+	return lastT, lastV, nil
 }

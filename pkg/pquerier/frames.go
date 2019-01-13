@@ -601,7 +601,7 @@ func (dc *dataColumn) SetDataAt(i int, value interface{}) error {
 
 func NewConcreteColumn(name string, colSpec columnMeta, size int, setFunc func(old, new interface{}) interface{}) *ConcreteColumn {
 	col := &ConcreteColumn{basicColumn: basicColumn{name: name, spec: colSpec, size: size,
-		interpolationFunction: GetInterpolateFunc(interpolateNone, colSpec.interpolationTolerance)}, setFunc: setFunc}
+		interpolationFunction: GetInterpolateFunc(colSpec.interpolationType, colSpec.interpolationTolerance)}, setFunc: setFunc}
 	col.data = make([]interface{}, size)
 	return col
 }
@@ -642,7 +642,7 @@ func (c *ConcreteColumn) SetDataAt(i int, val interface{}) error {
 
 func NewVirtualColumn(name string, colSpec columnMeta, size int, function func([]Column, int) (interface{}, error)) Column {
 	col := &virtualColumn{basicColumn: basicColumn{name: name, spec: colSpec, size: size,
-		interpolationFunction: GetInterpolateFunc(interpolateNone, colSpec.interpolationTolerance)},
+		interpolationFunction: GetInterpolateFunc(colSpec.interpolationType, colSpec.interpolationTolerance)},
 		function: function}
 	return col
 }
