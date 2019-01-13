@@ -1,8 +1,8 @@
 container: "bigdata"
 workers: 8
-webApiEndpoint: "webapi.iguazio.app.fnqtlobecymq.dev.trl.iguazio.com:8081"
+webApiEndpoint: "webapi.iguazio.app.tsdb-integration.iguazio-cd0.com"
 username: "iguazio"
-password: "IqXUHmIe2op3Q02S"
+password: "e244737b57d86fde05f747e47514c4c2"
 batchSize: 2048
 
 performance:
