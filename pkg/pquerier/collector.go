@@ -79,7 +79,7 @@ func mainCollector(ctx *selectQueryContext, responseChannel chan *qryResults) {
 			currentResultHash := lset.Hash()
 
 			// Aggregating cross series aggregates, only supported over raw data.
-			if ctx.isCrossSeriesAggregate && res.IsClientAggregates() {
+			if ctx.isCrossSeriesAggregate {
 				lastTimePerMetric[currentResultHash], lastValuePerMetric[currentResultHash], _ = aggregateClientAggregatesCrossSeries(ctx, res, lastTimePerMetric[currentResultHash], lastValuePerMetric[currentResultHash])
 				// Aggregating over time aggregates
 			} else {
