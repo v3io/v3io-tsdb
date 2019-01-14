@@ -16,8 +16,13 @@ func NewDataFrameColumnSeries(indexColumn, dataColumn, countColumn Column, label
 		labels = append(labels, utils.LabelsFromStringList(aggregate.AggregateLabel, dataColumn.GetColumnSpec().function.String())...)
 	}
 
+	wantedMetricName := dataColumn.GetColumnSpec().alias
+	if wantedMetricName == "" {
+		wantedMetricName = dataColumn.GetColumnSpec().metric
+	}
+
 	// The labels we get from the Dataframe are agnostic to the metric name, since there might be several metrics in one Dataframe
-	labels = append(labels, utils.LabelsFromStringList(config.PrometheusMetricNameAttribute, dataColumn.GetColumnSpec().metric)...)
+	labels = append(labels, utils.LabelsFromStringList(config.PrometheusMetricNameAttribute, wantedMetricName)...)
 	s := &DataFrameColumnSeries{labels: labels, key: hash}
 	s.iter = &dataFrameColumnSeriesIterator{indexColumn: indexColumn, dataColumn: dataColumn, countColumn: countColumn, currentIndex: -1, encoding: encoding}
 	return s
