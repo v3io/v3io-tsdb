@@ -217,7 +217,12 @@ func (s *V3ioRawSeries) GetKey() uint64 {
 func (s *V3ioRawSeries) Iterator() utils.SeriesIterator { return s.iter }
 
 func (s *V3ioRawSeries) AddChunks(results *qryResults) {
-	s.iter.(*rawChunkIterator).AddChunks(results)
+	switch iter := s.iter.(type) {
+	case *rawChunkIterator:
+		iter.AddChunks(results)
+	case utils.NullSeriesIterator:
+		s.iter = newRawChunkIterator(results, s.logger)
+	}
 }
 
 // Initialize the label set from _lset and _name attributes

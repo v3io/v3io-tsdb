@@ -355,10 +355,13 @@ func (d *dataFrame) rawSeriesToColumns() {
 	nextTime := int64(math.MaxInt64)
 
 	for _, rawSeries := range d.rawColumns {
-		rawSeries.Iterator().Next()
-		t, _ := rawSeries.Iterator().At()
-		if t < nextTime {
-			nextTime = t
+		if rawSeries.Iterator().Next() {
+			t, _ := rawSeries.Iterator().At()
+			if t < nextTime {
+				nextTime = t
+			}
+		} else {
+			nonExhaustedIterators--
 		}
 	}
 
