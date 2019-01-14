@@ -179,18 +179,18 @@ func (queryCtx *selectQueryContext) queryPartition(partition *partmgr.DBPartitio
 			}
 		}
 
-		var groupBy []string
+		var preAggregateLabels []string
 		if newQuery.useServerSideAggregates && !requestAggregatesAndRaw {
-			groupBy = queryCtx.groupBy(partition)
+			preAggregateLabels = queryCtx.parsePreAggregateLabels(partition)
 		}
-		err = newQuery.getItems(queryCtx, metric, groupBy, requestAggregatesAndRaw)
+		err = newQuery.getItems(queryCtx, metric, preAggregateLabels, requestAggregatesAndRaw)
 		queries = append(queries, newQuery)
 	}
 
 	return queries, err
 }
 
-func (queryCtx *selectQueryContext) groupBy(partition *partmgr.DBPartition) []string {
+func (queryCtx *selectQueryContext) parsePreAggregateLabels(partition *partmgr.DBPartition) []string {
 	if queryCtx.queryParams.GroupBy != "" {
 		groupByLabelSlice := strings.Split(queryCtx.queryParams.GroupBy, ",")
 		groupByLabelSet := make(map[string]bool)
