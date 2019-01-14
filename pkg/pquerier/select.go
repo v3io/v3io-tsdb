@@ -457,11 +457,11 @@ type partQuery struct {
 	aggregationParams       *aggregate.AggregationParams
 }
 
-func (query *partQuery) getItems(ctx *selectQueryContext, name string, groupBy []string, aggregatesAndChunk bool) error {
+func (query *partQuery) getItems(ctx *selectQueryContext, name string, preAggregateLabels []string, aggregatesAndChunk bool) error {
 
 	path := query.partition.GetTablePath()
-	if len(groupBy) > 0 {
-		path = fmt.Sprintf("%sagg/%s/", path, strings.Join(groupBy, ","))
+	if len(preAggregateLabels) > 0 {
+		path = fmt.Sprintf("%sagg/%s/", path, strings.Join(preAggregateLabels, ","))
 	}
 
 	var shardingKeys []string
