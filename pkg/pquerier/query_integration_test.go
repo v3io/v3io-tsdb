@@ -2119,8 +2119,8 @@ func (suite *testQuerySuite) TestCrossSeriesAggregatesWithInterpolation() {
 
 	expected := map[string][]tsdbtest.DataPoint{
 		"sum": {{Time: baseTime, Value: 30},
-			{Time: baseTime + 2*tsdbtest.MinuteInMillis, Value: 55},
-			{Time: baseTime + 4*tsdbtest.MinuteInMillis, Value: 75}},
+			{Time: baseTime + 2*tsdbtest.MinuteInMillis, Value: 50},
+			{Time: baseTime + 4*tsdbtest.MinuteInMillis, Value: 70}},
 		"min": {{Time: baseTime, Value: 10},
 			{Time: baseTime + 2*tsdbtest.MinuteInMillis, Value: 20},
 			{Time: baseTime + 4*tsdbtest.MinuteInMillis, Value: 30}},
@@ -2131,7 +2131,7 @@ func (suite *testQuerySuite) TestCrossSeriesAggregatesWithInterpolation() {
 	querierV2, err := adapter.QuerierV2()
 	suite.Require().NoError(err, "failed to create querier v2")
 
-	selectParams, _, err := pquerier.ParseQuery("select sum_all(linear.cpu), min_all(prev.cpu), max_all(nan.cpu)")
+	selectParams, _, err := pquerier.ParseQuery("select sum_all(prev.cpu), min_all(prev.cpu), max_all(prev.cpu)")
 	suite.NoError(err)
 	selectParams.Step = 2 * tsdbtest.MinuteInMillis
 	selectParams.From = baseTime
