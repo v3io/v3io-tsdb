@@ -311,6 +311,10 @@ type DBPartition struct {
 	rollupBuckets     int                // Total number of aggregation buckets per partition
 }
 
+func (p *DBPartition) PreAggregates() []config.PreAggregate {
+	return p.manager.GetConfig().TableSchemaInfo.PreAggregates
+}
+
 func (p *DBPartition) IsCyclic() bool {
 	return p.manager.cyclic
 }
