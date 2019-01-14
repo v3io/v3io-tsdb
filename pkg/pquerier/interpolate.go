@@ -28,6 +28,23 @@ import (
 
 type InterpolationType uint8
 
+func (it InterpolationType) String() string {
+	switch it {
+	case interpolateNone:
+		return "none"
+	case interpolateNaN:
+		return "nan"
+	case interpolatePrev:
+		return "prev"
+	case interpolateNext:
+		return "next"
+	case interpolateLinear:
+		return "linear"
+	default:
+		return "unknown"
+	}
+}
+
 const (
 	interpolateNone      InterpolationType = 0
 	interpolateNaN       InterpolationType = 1
