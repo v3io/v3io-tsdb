@@ -133,7 +133,25 @@ func (ic *AsyncItemsCursor) Next() bool {
 // NextItem gets the next matching item. this may potentially block as this lazy loads items from the collection
 func (ic *AsyncItemsCursor) NextItem() (v3io.Item, error) {
 	for {
-		res, err := ic.processItem()
+		// are there any more items left in the previous response we received?
+		if ic.itemIndex < len(ic.items) {
+			ic.currentItem = ic.items[ic.itemIndex]
+			ic.currentError = nil
+
+			// next time we'll give next item
+			ic.itemIndex++
+			ic.Cnt++
+
+			return ic.currentItem, nil
+		}
+
+		// are there any more items up stream? did all the shards complete ?
+		if ic.lastShards == ic.workers {
+			ic.currentError = nil
+			return nil, nil
+		}
+
+		res, err := ic.processResponse()
 		if err != nil {
 			return nil, err
 		}
@@ -143,25 +161,7 @@ func (ic *AsyncItemsCursor) NextItem() (v3io.Item, error) {
 	}
 }
 
-func (ic *AsyncItemsCursor) processItem() (v3io.Item, error) {
-	// are there any more items left in the previous response we received?
-	if ic.itemIndex < len(ic.items) {
-		ic.currentItem = ic.items[ic.itemIndex]
-		ic.currentError = nil
-
-		// next time we'll give next item
-		ic.itemIndex++
-		ic.Cnt++
-
-		return ic.currentItem, nil
-	}
-
-	// are there any more items up stream? did all the shards complete ?
-	if ic.lastShards == ic.workers {
-		ic.currentError = nil
-		return nil, nil
-	}
-
+func (ic *AsyncItemsCursor) processResponse() (v3io.Item, error) {
 	// Read response from channel
 	resp := <-ic.responseChan
 	defer resp.Release()
