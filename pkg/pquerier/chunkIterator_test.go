@@ -16,6 +16,8 @@ import (
 	"github.com/v3io/v3io-tsdb/pkg/utils"
 )
 
+const baseTestTime = int64(1547510400000) // 15/01/2019 00:00:00
+
 type testRawChunkIterSuite struct {
 	suite.Suite
 	v3ioConfig     *config.V3ioConfig
@@ -46,18 +48,15 @@ func (suite *testRawChunkIterSuite) TearDownTest() {
 
 func (suite *testRawChunkIterSuite) TestRawChunkIteratorWithZeroValue() {
 	adapter, err := tsdb.NewV3ioAdapter(suite.v3ioConfig, nil, nil)
-	if err != nil {
-		suite.T().Fatalf("failed to create v3io adapter. reason: %s", err)
-	}
+	suite.Require().NoError(err)
 
 	labels1 := utils.LabelsFromStringList("os", "linux")
 	numberOfEvents := 10
 	eventsInterval := 60 * 1000
-	baseTime := tsdbtest.NanosToMillis(time.Now().UnixNano()) - int64(numberOfEvents*eventsInterval)
-	ingestData := []tsdbtest.DataPoint{{baseTime, 10},
-		{int64(baseTime + tsdbtest.MinuteInMillis), 0},
-		{baseTime + 2*tsdbtest.MinuteInMillis, 30},
-		{baseTime + 3*tsdbtest.MinuteInMillis, 40}}
+	ingestData := []tsdbtest.DataPoint{{baseTestTime, 10},
+		{int64(baseTestTime + tsdbtest.MinuteInMillis), 0},
+		{baseTestTime + 2*tsdbtest.MinuteInMillis, 30},
+		{baseTestTime + 3*tsdbtest.MinuteInMillis, 40}}
 	testParams := tsdbtest.NewTestParams(suite.T(),
 		tsdbtest.TestOption{
 			Key: tsdbtest.OptTimeSeries,
@@ -69,18 +68,14 @@ func (suite *testRawChunkIterSuite) TestRawChunkIteratorWithZeroValue() {
 	tsdbtest.InsertData(suite.T(), testParams)
 
 	querierV2, err := adapter.QuerierV2()
-	if err != nil {
-		suite.T().Fatalf("Failed to create querier v2, err: %v", err)
-	}
+	suite.Require().NoError(err)
 
 	params, _, _ := pquerier.ParseQuery("select cpu")
-	params.From = baseTime
-	params.To = baseTime + int64(numberOfEvents*eventsInterval)
+	params.From = baseTestTime
+	params.To = baseTestTime + int64(numberOfEvents*eventsInterval)
 
 	set, err := querierV2.Select(params)
-	if err != nil {
-		suite.T().Fatalf("Failed to exeute query, err: %v", err)
-	}
+	suite.Require().NoError(err)
 
 	var seriesCount int
 	for set.Next() {
