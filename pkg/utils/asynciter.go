@@ -132,7 +132,18 @@ func (ic *AsyncItemsCursor) Next() bool {
 
 // NextItem gets the next matching item. this may potentially block as this lazy loads items from the collection
 func (ic *AsyncItemsCursor) NextItem() (v3io.Item, error) {
+	for {
+		res, err := ic.processItem()
+		if err != nil {
+			return nil, err
+		}
+		if res != nil {
+			return res, nil
+		}
+	}
+}
 
+func (ic *AsyncItemsCursor) processItem() (v3io.Item, error) {
 	// are there any more items left in the previous response we received?
 	if ic.itemIndex < len(ic.items) {
 		ic.currentItem = ic.items[ic.itemIndex]
@@ -159,7 +170,7 @@ func (ic *AsyncItemsCursor) NextItem() (v3io.Item, error) {
 	if e, hasErrorCode := resp.Error.(v3io.ErrorWithStatusCode); hasErrorCode && e.StatusCode() == http.StatusNotFound {
 		ic.logger.Debug("Got 404 - error: %v, request: %v", resp.Error, resp.Request().Input)
 		ic.lastShards++
-		return ic.NextItem()
+		return nil, nil
 	}
 	if resp.Error != nil {
 		ic.logger.Warn("error reading from response channel: %v, error: %v, request: %v", resp, resp.Error, resp.Request().Input)
@@ -190,8 +201,7 @@ func (ic *AsyncItemsCursor) NextItem() (v3io.Item, error) {
 		ic.lastShards++
 	}
 
-	// and recurse into next now that we repopulated response
-	return ic.NextItem()
+	return nil, nil
 }
 
 // gets all items
