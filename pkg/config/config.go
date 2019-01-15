@@ -43,7 +43,7 @@ const (
 	defaultTimeoutInSeconds      = 24 * 60 * 60 // 24 hours
 
 	defaultMaximumSampleSize    = 8       // bytes
-	defaultMaximumPartitionSize = 1700000 // 1.7MB
+	defaultMaximumPartitionSize = 1000000 // 1.7MB
 	defaultMinimumChunkSize     = 200     // bytes
 	defaultMaximumChunkSize     = 32000   // bytes
 
