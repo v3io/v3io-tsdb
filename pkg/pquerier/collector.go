@@ -121,7 +121,7 @@ func rawCollector(ctx *selectQueryContext, res *qryResults) {
 
 func aggregateClientAggregates(ctx *selectQueryContext, res *qryResults) {
 	ctx.logger.Debug("using Client Aggregates Collector for metric %v", res.name)
-	it := newRawChunkIterator(res, ctx.logger.GetChild("rawChunkIterator"))
+	it := newRawChunkIterator(res, ctx.logger)
 	for it.Next() {
 		t, v := it.At()
 		currentCell := (t - ctx.queryParams.From) / res.query.aggregationParams.Interval
@@ -176,7 +176,7 @@ func downsampleRawData(ctx *selectQueryContext, res *qryResults,
 
 	var lastT int64
 	var lastV float64
-	it := newRawChunkIterator(res, ctx.logger.GetChild("rawChunkIterator")).(*rawChunkIterator)
+	it := newRawChunkIterator(res, ctx.logger).(*rawChunkIterator)
 	col, err := res.frame.Column(res.name)
 	if err != nil {
 		return previousPartitionLastTime, previousPartitionLastValue, err
@@ -218,7 +218,7 @@ func downsampleRawData(ctx *selectQueryContext, res *qryResults,
 
 func aggregateClientAggregatesCrossSeries(ctx *selectQueryContext, res *qryResults, previousPartitionLastTime int64, previousPartitionLastValue float64) (int64, float64, error) {
 	ctx.logger.Debug("using Client Aggregates Collector for metric %v", res.name)
-	it := newRawChunkIterator(res, ctx.logger.GetChild("rawChunkIterator")).(*rawChunkIterator)
+	it := newRawChunkIterator(res, ctx.logger).(*rawChunkIterator)
 
 	var previousPartitionEndBucket int
 	if previousPartitionLastTime != 0 {

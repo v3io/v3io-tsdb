@@ -34,7 +34,7 @@ func newRawChunkIterator(queryResult *qryResults, log logger.Logger) utils.Serie
 	}
 
 	newIterator := rawChunkIterator{
-		mint: queryResult.query.mint, maxt: maxt, log: log, encoding: queryResult.encoding}
+		mint: queryResult.query.mint, maxt: maxt, log: log.GetChild("rawChunkIterator"), encoding: queryResult.encoding}
 
 	newIterator.AddChunks(queryResult)
 
