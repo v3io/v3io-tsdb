@@ -81,8 +81,8 @@ func mainCollector(ctx *selectQueryContext, responseChannel chan *qryResults) {
 			// Aggregating cross series aggregates, only supported over raw data.
 			if ctx.isCrossSeriesAggregate {
 				lastTimePerMetric[currentResultHash], lastValuePerMetric[currentResultHash], _ = aggregateClientAggregatesCrossSeries(ctx, res, lastTimePerMetric[currentResultHash], lastValuePerMetric[currentResultHash])
-				// Aggregating over time aggregates
 			} else {
+				// Aggregating over time aggregates
 				if res.IsServerAggregates() {
 					aggregateServerAggregates(ctx, res)
 				} else if res.IsClientAggregates() {
@@ -121,14 +121,14 @@ func rawCollector(ctx *selectQueryContext, res *qryResults) {
 
 func aggregateClientAggregates(ctx *selectQueryContext, res *qryResults) {
 	ctx.logger.Debug("using Client Aggregates Collector for metric %v", res.name)
-	it := newRawChunkIterator(res, nil)
+	it := newRawChunkIterator(res, ctx.logger.GetChild("rawChunkIterator"))
 	for it.Next() {
 		t, v := it.At()
 		currentCell := (t - ctx.queryParams.From) / res.query.aggregationParams.Interval
 
 		for _, col := range res.frame.columns {
 			if col.GetColumnSpec().metric == res.name {
-				col.SetDataAt(int(currentCell), v)
+				_ = col.SetDataAt(int(currentCell), v)
 			}
 		}
 	}
@@ -163,7 +163,7 @@ func aggregateServerAggregates(ctx *selectQueryContext, res *qryResults) {
 					} else {
 						floatVal = math.Float64frombits(val)
 					}
-					col.SetDataAt(int(currentCell), floatVal)
+					_ = col.SetDataAt(int(currentCell), floatVal)
 				}
 			}
 		}
@@ -176,7 +176,7 @@ func downsampleRawData(ctx *selectQueryContext, res *qryResults,
 
 	var lastT int64
 	var lastV float64
-	it := newRawChunkIterator(res, nil).(*rawChunkIterator)
+	it := newRawChunkIterator(res, ctx.logger.GetChild("rawChunkIterator")).(*rawChunkIterator)
 	col, err := res.frame.Column(res.name)
 	if err != nil {
 		return previousPartitionLastTime, previousPartitionLastValue, err
@@ -187,7 +187,7 @@ func downsampleRawData(ctx *selectQueryContext, res *qryResults,
 			t, v := it.At()
 			tBucketIndex := (t - ctx.queryParams.From) / ctx.queryParams.Step
 			if t == currBucketTime {
-				col.SetDataAt(currBucket, v)
+				_ = col.SetDataAt(currBucket, v)
 			} else if tBucketIndex == int64(currBucket) {
 				prevT, prevV := it.PeakBack()
 
@@ -200,16 +200,16 @@ func downsampleRawData(ctx *selectQueryContext, res *qryResults,
 
 				// Check if the interpolation was successful in terms of exceeding tolerance
 				if interpolatedT == 0 && interpolatedV == 0 {
-					col.SetDataAt(currBucket, math.NaN())
+					_ = col.SetDataAt(currBucket, math.NaN())
 				} else {
-					col.SetDataAt(currBucket, interpolatedV)
+					_ = col.SetDataAt(currBucket, interpolatedV)
 				}
 			} else {
-				col.SetDataAt(currBucket, math.NaN())
+				_ = col.SetDataAt(currBucket, math.NaN())
 			}
 		} else {
 			lastT, lastV = it.At()
-			col.SetDataAt(currBucket, math.NaN())
+			_ = col.SetDataAt(currBucket, math.NaN())
 		}
 	}
 
@@ -218,10 +218,7 @@ func downsampleRawData(ctx *selectQueryContext, res *qryResults,
 
 func aggregateClientAggregatesCrossSeries(ctx *selectQueryContext, res *qryResults, previousPartitionLastTime int64, previousPartitionLastValue float64) (int64, float64, error) {
 	ctx.logger.Debug("using Client Aggregates Collector for metric %v", res.name)
-	it := newRawChunkIterator(res, nil).(*rawChunkIterator)
-
-	var lastT int64
-	var lastV float64
+	it := newRawChunkIterator(res, ctx.logger.GetChild("rawChunkIterator")).(*rawChunkIterator)
 
 	var previousPartitionEndBucket int
 	if previousPartitionLastTime != 0 {
@@ -240,7 +237,7 @@ func aggregateClientAggregatesCrossSeries(ctx *selectQueryContext, res *qryResul
 			if t == currBucketTime {
 				for _, col := range res.frame.columns {
 					if col.GetColumnSpec().metric == res.name {
-						col.SetDataAt(currBucket, v)
+						_ = col.SetDataAt(currBucket, v)
 					}
 				}
 			} else {
@@ -255,8 +252,8 @@ func aggregateClientAggregatesCrossSeries(ctx *selectQueryContext, res *qryResul
 				for _, col := range res.frame.columns {
 					if col.GetColumnSpec().metric == res.name {
 						interpolatedT, interpolatedV := col.GetInterpolationFunction()(prevT, t, currBucketTime, prevV, v)
-						if interpolatedT != 0 && interpolatedV != 0 {
-							col.SetDataAt(currBucket, interpolatedV)
+						if !(interpolatedT == 0 && interpolatedV == 0) {
+							_ = col.SetDataAt(currBucket, interpolatedV)
 						}
 					}
 				}
@@ -266,6 +263,6 @@ func aggregateClientAggregatesCrossSeries(ctx *selectQueryContext, res *qryResul
 		}
 	}
 
-	lastT, lastV = it.At()
+	lastT, lastV := it.At()
 	return lastT, lastV, nil
 }

@@ -2285,7 +2285,6 @@ func (suite *testQuerySuite) TestCrossSeriesAggregatesMultiPartition() {
 	eventsInterval := 60 * 1000
 	baseTime := tsdbtest.NanosToMillis(time.Now().UnixNano()) - int64(numberOfEvents*eventsInterval)
 
-	fmt.Println("the base time is: ", baseTime)
 	ingestedData := []tsdbtest.DataPoint{{baseTime - 7*tsdbtest.DaysInMillis, 10},
 		{baseTime - 7*tsdbtest.DaysInMillis + 1*tsdbtest.MinuteInMillis, 1},
 		{baseTime, 20},
@@ -2419,7 +2418,6 @@ func (suite *testQuerySuite) TestCrossSeriesAggregatesMultiPartitionExactlyOnSte
 	eventsInterval := 60 * 1000
 	baseTime := tsdbtest.NanosToMillis(time.Now().UnixNano()) - int64(numberOfEvents*eventsInterval)
 
-	fmt.Println("the base time is: ", baseTime)
 	ingestedData := []tsdbtest.DataPoint{{baseTime - 7*tsdbtest.DaysInMillis, 10},
 		{baseTime - 7*tsdbtest.DaysInMillis + 1*tsdbtest.MinuteInMillis, 1},
 		{baseTime, 20},
@@ -2493,7 +2491,6 @@ func (suite *testQuerySuite) TestCrossSeriesAggregatesMultiPartitionWithInterpol
 	eventsInterval := 60 * 1000
 	baseTime := tsdbtest.NanosToMillis(time.Now().UnixNano()) - int64(numberOfEvents*eventsInterval)
 
-	fmt.Println("the base time is: ", baseTime)
 	ingestedData := []tsdbtest.DataPoint{{baseTime - 7*tsdbtest.DaysInMillis, 10},
 		{baseTime - 7*tsdbtest.DaysInMillis + 1*tsdbtest.MinuteInMillis, 1},
 		{baseTime - 7*tsdbtest.DaysInMillis + 3*tsdbtest.MinuteInMillis, 20},
