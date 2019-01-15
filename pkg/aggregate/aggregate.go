@@ -284,51 +284,36 @@ func GetServerAggregationsFunction(aggr AggrType) (func(interface{}, interface{}
 	switch aggr {
 	case aggrTypeCount:
 		return func(old, next interface{}) interface{} {
-			if old == nil && !math.IsNaN(next.(float64)) {
+			if old == nil {
 				return next
-			}
-			if math.IsNaN(next.(float64)) {
-				return old
 			}
 			return old.(float64) + next.(float64)
 		}, nil
 	case aggrTypeSum:
 		return func(old, next interface{}) interface{} {
-			if old == nil && !math.IsNaN(next.(float64)) {
+			if old == nil {
 				return next
-			}
-			if math.IsNaN(next.(float64)) {
-				return old
 			}
 			return old.(float64) + next.(float64)
 		}, nil
 	case aggrTypeSqr:
 		return func(old, next interface{}) interface{} {
-			if old == nil && !math.IsNaN(next.(float64)) {
+			if old == nil {
 				return next
-			}
-			if math.IsNaN(next.(float64)) {
-				return old
 			}
 			return old.(float64) + next.(float64)
 		}, nil
 	case aggrTypeMin:
 		return func(old, next interface{}) interface{} {
-			if old == nil && !math.IsNaN(next.(float64)) {
+			if old == nil {
 				return next
-			}
-			if math.IsNaN(next.(float64)) {
-				return old
 			}
 			return math.Min(old.(float64), next.(float64))
 		}, nil
 	case aggrTypeMax:
 		return func(old, next interface{}) interface{} {
-			if old == nil && !math.IsNaN(next.(float64)) {
+			if old == nil {
 				return next
-			}
-			if math.IsNaN(next.(float64)) {
-				return old
 			}
 			return math.Max(old.(float64), next.(float64))
 		}, nil
@@ -379,11 +364,8 @@ func GetClientAggregationsFunction(aggr AggrType) (func(interface{}, interface{}
 		}, nil
 	case aggrTypeSqr:
 		return func(old, next interface{}) interface{} {
-			if old == nil && !math.IsNaN(next.(float64)) {
+			if old == nil {
 				return next.(float64) * next.(float64)
-			}
-			if math.IsNaN(next.(float64)) {
-				return old
 			}
 			return old.(float64) + next.(float64)*next.(float64)
 		}, nil

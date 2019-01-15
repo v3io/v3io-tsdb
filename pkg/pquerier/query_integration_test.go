@@ -2562,6 +2562,78 @@ func (suite *testQuerySuite) TestCrossSeriesAggregatesMultiPartitionWithInterpol
 	suite.Require().Equal(len(expected), seriesCount, "series count didn't match expected")
 }
 
+func (suite *testQuerySuite) TestCrossSeriesAggregatesWithInterpolationOverTolerance() {
+	adapter, err := tsdb.NewV3ioAdapter(suite.v3ioConfig, nil, nil)
+	suite.Require().NoError(err, "failed to create v3io adapter")
+
+	labels1 := utils.LabelsFromStringList("os", "linux")
+	labels2 := utils.LabelsFromStringList("os", "mac")
+	numberOfEvents := 10
+	eventsInterval := 60 * 1000
+	baseTime := tsdbtest.NanosToMillis(time.Now().UnixNano()) - int64(numberOfEvents*eventsInterval)
+
+	ingestedData := []tsdbtest.DataPoint{{baseTime, 10},
+		{baseTime + 1*tsdbtest.MinuteInMillis, 20},
+		{baseTime + 10*tsdbtest.MinuteInMillis, 30}}
+	ingestedData2 := []tsdbtest.DataPoint{{baseTime, 20},
+		{baseTime + 5*tsdbtest.MinuteInMillis, 30},
+		{baseTime + 10*tsdbtest.MinuteInMillis, 40}}
+	testParams := tsdbtest.NewTestParams(suite.T(),
+		tsdbtest.TestOption{
+			Key: tsdbtest.OptTimeSeries,
+			Value: tsdbtest.TimeSeries{tsdbtest.Metric{
+				Name:   "cpu",
+				Labels: labels1,
+				Data:   ingestedData},
+				tsdbtest.Metric{
+					Name:   "cpu",
+					Labels: labels2,
+					Data:   ingestedData2},
+			}})
+	tsdbtest.InsertData(suite.T(), testParams)
+
+	expected := map[string][]tsdbtest.DataPoint{
+		"sum": {{Time: baseTime, Value: 30},
+			{Time: baseTime + 5*tsdbtest.MinuteInMillis, Value: 30},
+			{Time: baseTime + 10*tsdbtest.MinuteInMillis, Value: 70}},
+		"min": {{Time: baseTime, Value: 10},
+			{Time: baseTime + 5*tsdbtest.MinuteInMillis, Value: 30},
+			{Time: baseTime + 10*tsdbtest.MinuteInMillis, Value: 30}},
+		"max": {{Time: baseTime, Value: 20},
+			{Time: baseTime + 5*tsdbtest.MinuteInMillis, Value: 30},
+			{Time: baseTime + 10*tsdbtest.MinuteInMillis, Value: 40}}}
+
+	querierV2, err := adapter.QuerierV2()
+	suite.Require().NoError(err, "failed to create querier v2")
+
+	selectParams, _, err := pquerier.ParseQuery("select sum_all(prev.cpu), min_all(prev.cpu), max_all(prev.cpu)")
+	suite.NoError(err)
+	selectParams.Step = 5 * tsdbtest.MinuteInMillis
+	selectParams.From = baseTime
+	selectParams.To = baseTime + 10*tsdbtest.MinuteInMillis
+	for i := 0; i < len(selectParams.RequestedColumns); i++ {
+		selectParams.RequestedColumns[i].InterpolationTolerance = tsdbtest.MinuteInMillis
+	}
+	set, err := querierV2.Select(selectParams)
+	suite.Require().NoError(err, "Failed to execute query")
+
+	var seriesCount int
+	for set.Next() {
+		seriesCount++
+		iter := set.At().Iterator()
+
+		data, err := tsdbtest.IteratorToSlice(iter)
+		agg := set.At().Labels().Get(aggregate.AggregateLabel)
+		if err != nil {
+			suite.T().Fatal(err)
+		}
+
+		suite.Require().Equal(expected[agg], data, "queried data does not match expected")
+	}
+
+	suite.Require().Equal(len(expected), seriesCount, "series count didn't match expected")
+}
+
 func TestQueryV2Suite(t *testing.T) {
 	suite.Run(t, new(testQuerySuite))
 }
