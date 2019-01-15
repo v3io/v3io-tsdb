@@ -167,7 +167,7 @@ func (ic *AsyncItemsCursor) NextItem() (v3io.Item, error) {
 	}
 
 	getItemsResp := resp.Output.(*v3io.GetItemsOutput)
-	resp.Output = nil;
+	resp.Output = nil
 
 	// set the cursor items and reset the item index
 	ic.items = getItemsResp.Items
