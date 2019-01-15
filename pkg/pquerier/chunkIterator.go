@@ -192,7 +192,7 @@ func NewRawSeries(results *qryResults, logger logger.Logger) (utils.Series, erro
 	if err != nil {
 		return nil, err
 	}
-	newSeries.iter = newRawChunkIterator(results, nil)
+	newSeries.iter = newRawChunkIterator(results, logger)
 	return &newSeries, nil
 }
 
