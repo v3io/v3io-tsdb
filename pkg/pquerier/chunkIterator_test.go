@@ -26,9 +26,7 @@ type testRawChunkIterSuite struct {
 
 func (suite *testRawChunkIterSuite) SetupSuite() {
 	v3ioConfig, err := tsdbtest.LoadV3ioConfig()
-	if err != nil {
-		suite.T().Fatalf("unable to load configuration. Error: %v", err)
-	}
+	suite.Require().NoError(err)
 
 	suite.v3ioConfig = v3ioConfig
 	suite.suiteTimestamp = time.Now().Unix()
