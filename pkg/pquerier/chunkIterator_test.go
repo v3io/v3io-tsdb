@@ -7,7 +7,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 	"github.com/v3io/v3io-tsdb/pkg/config"
 	"github.com/v3io/v3io-tsdb/pkg/pquerier"
@@ -52,7 +51,7 @@ func (suite *testRawChunkIterSuite) TestRawChunkIteratorWithZeroValue() {
 	numberOfEvents := 10
 	eventsInterval := 60 * 1000
 	ingestData := []tsdbtest.DataPoint{{baseTestTime, 10},
-		{int64(baseTestTime + tsdbtest.MinuteInMillis), 0},
+		{baseTestTime + tsdbtest.MinuteInMillis, 0},
 		{baseTestTime + 2*tsdbtest.MinuteInMillis, 30},
 		{baseTestTime + 3*tsdbtest.MinuteInMillis, 40}}
 	testParams := tsdbtest.NewTestParams(suite.T(),
@@ -96,7 +95,7 @@ func (suite *testRawChunkIterSuite) TestRawChunkIteratorWithZeroValue() {
 		}
 	}
 
-	assert.Equal(suite.T(), 1, seriesCount, "series count didn't match expected")
+	suite.Require().Equal(1, seriesCount, "series count didn't match expected")
 }
 
 func TestRawChunkIterSuite(t *testing.T) {
