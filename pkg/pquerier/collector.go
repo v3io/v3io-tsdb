@@ -165,7 +165,10 @@ func downsampleRawData(ctx *selectQueryContext, res *qryResults,
 
 	var lastT int64
 	var lastV float64
-	it := newRawChunkIterator(res, nil).(*rawChunkIterator)
+	it, ok := newRawChunkIterator(res, nil).(*RawChunkIterator)
+	if !ok {
+		return previousPartitionLastTime, previousPartitionLastValue, nil
+	}
 	col, err := res.frame.Column(res.name)
 	if err != nil {
 		return previousPartitionLastTime, previousPartitionLastValue, err

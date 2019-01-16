@@ -386,10 +386,13 @@ func (d *dataFrame) rawSeriesToColumns() {
 	}
 
 	for i, rawSeries := range d.rawColumns {
-		rawSeries.Iterator().Next()
-		t, _ := rawSeries.Iterator().At()
-		if t < nextTime {
-			nextTime = t
+		if rawSeries.Iterator().Next() {
+			t, _ := rawSeries.Iterator().At()
+			if t < nextTime {
+				nextTime = t
+			}
+		} else {
+			nonExhaustedIterators--
 		}
 
 		if isVariant {
