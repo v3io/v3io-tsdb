@@ -151,17 +151,14 @@ func (ic *AsyncItemsCursor) NextItem() (v3io.Item, error) {
 			return nil, nil
 		}
 
-		res, err := ic.processResponse()
+		err := ic.processResponse()
 		if err != nil {
 			return nil, err
-		}
-		if res != nil {
-			return res, nil
 		}
 	}
 }
 
-func (ic *AsyncItemsCursor) processResponse() (v3io.Item, error) {
+func (ic *AsyncItemsCursor) processResponse() error {
 	// Read response from channel
 	resp := <-ic.responseChan
 	defer resp.Release()
@@ -170,11 +167,11 @@ func (ic *AsyncItemsCursor) processResponse() (v3io.Item, error) {
 	if e, hasErrorCode := resp.Error.(v3io.ErrorWithStatusCode); hasErrorCode && e.StatusCode() == http.StatusNotFound {
 		ic.logger.Debug("Got 404 - error: %v, request: %v", resp.Error, resp.Request().Input)
 		ic.lastShards++
-		return nil, nil
+		return nil
 	}
 	if resp.Error != nil {
 		ic.logger.Warn("error reading from response channel: %v, error: %v, request: %v", resp, resp.Error, resp.Request().Input)
-		return nil, errors.Wrap(resp.Error, "Failed to get next items")
+		return errors.Wrap(resp.Error, "Failed to get next items")
 	}
 
 	getItemsResp := resp.Output.(*v3io.GetItemsOutput)
@@ -193,7 +190,7 @@ func (ic *AsyncItemsCursor) processResponse() (v3io.Item, error) {
 
 		_, err := ic.container.GetItems(input, input, ic.responseChan)
 		if err != nil {
-			return nil, errors.Wrap(err, "Failed to request next items")
+			return errors.Wrap(err, "Failed to request next items")
 		}
 
 	} else {
@@ -201,7 +198,7 @@ func (ic *AsyncItemsCursor) processResponse() (v3io.Item, error) {
 		ic.lastShards++
 	}
 
-	return nil, nil
+	return nil
 }
 
 // gets all items
