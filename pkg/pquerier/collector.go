@@ -174,8 +174,6 @@ func downsampleRawData(ctx *selectQueryContext, res *qryResults,
 	previousPartitionLastTime int64, previousPartitionLastValue float64) (int64, float64, error) {
 	ctx.logger.Debug("using Downsample Collector for metric %v", res.name)
 
-	var lastT int64
-	var lastV float64
 	it := newRawChunkIterator(res, ctx.logger).(*rawChunkIterator)
 	col, err := res.frame.Column(res.name)
 	if err != nil {
@@ -208,11 +206,11 @@ func downsampleRawData(ctx *selectQueryContext, res *qryResults,
 				_ = col.SetDataAt(currBucket, math.NaN())
 			}
 		} else {
-			lastT, lastV = it.At()
 			_ = col.SetDataAt(currBucket, math.NaN())
 		}
 	}
 
+	lastT, lastV := it.At()
 	return lastT, lastV, nil
 }
 

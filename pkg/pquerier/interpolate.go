@@ -77,28 +77,25 @@ func GetInterpolateFunc(alg InterpolationType, tolerance int64) InterpolationFun
 	switch alg {
 	case interpolateNaN:
 		return func(tprev, tnext, tseek int64, vprev, vnext float64) (int64, float64) {
-			if !validateTolerance(tolerance, tseek, tprev, tnext) {
-				return 0, 0
-			}
 			return tseek, math.NaN()
 		}
 	case interpolatePrev:
 		return func(tprev, tnext, tseek int64, vprev, vnext float64) (int64, float64) {
-			if !validateTolerance(tolerance, tseek, tprev, tnext) {
+			if absoluteDiff(tseek, tprev) > tolerance {
 				return 0, 0
 			}
 			return tseek, vprev
 		}
 	case interpolateNext:
 		return func(tprev, tnext, tseek int64, vprev, vnext float64) (int64, float64) {
-			if !validateTolerance(tolerance, tseek, tprev, tnext) {
+			if absoluteDiff(tnext, tseek) > tolerance {
 				return 0, 0
 			}
 			return tseek, vnext
 		}
 	case interpolateLinear:
 		return func(tprev, tnext, tseek int64, vprev, vnext float64) (int64, float64) {
-			if !validateTolerance(tolerance, tseek, tprev, tnext) {
+			if (absoluteDiff(tseek, tprev) > tolerance) || absoluteDiff(tnext, tseek) > tolerance {
 				return 0, 0
 			}
 			if math.IsNaN(vprev) || math.IsNaN(vnext) {
@@ -110,18 +107,14 @@ func GetInterpolateFunc(alg InterpolationType, tolerance int64) InterpolationFun
 	default:
 		// None interpolation
 		return func(tprev, tnext, tseek int64, vprev, vnext float64) (int64, float64) {
-			if !validateTolerance(tolerance, tseek, tprev, tnext) {
-				return 0, 0
-			}
 			return tnext, vnext
 		}
 	}
 }
 
-func validateTolerance(tolerance, tseek, tprev, tnext int64) bool {
-	// If previous point is too far behind for interpolation or the next point is too far ahead then return NaN
-	if (tprev != 0 && tseek-tprev > tolerance) || tnext-tseek > tolerance {
-		return false
+func absoluteDiff(a, b int64) int64 {
+	if a > b {
+		return a - b
 	}
-	return true
+	return b - a
 }
