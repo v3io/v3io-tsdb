@@ -216,7 +216,7 @@ func downsampleRawData(ctx *selectQueryContext, res *qryResults,
 
 func aggregateClientAggregatesCrossSeries(ctx *selectQueryContext, res *qryResults, previousPartitionLastTime int64, previousPartitionLastValue float64) (int64, float64, error) {
 	ctx.logger.Debug("using Client Aggregates Collector for metric %v", res.name)
-	it := newRawChunkIterator(res, ctx.logger).(*rawChunkIterator)
+	it := newRawChunkIterator(res, ctx.logger).(*RawChunkIterator)
 
 	var previousPartitionEndBucket int
 	if previousPartitionLastTime != 0 {
