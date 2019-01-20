@@ -79,7 +79,7 @@ func getPartitionManager(tst *testing.T) *PartitionManager {
 		tst.Fatalf("Failed to obtain a TSDB configuration. Error: %v", err)
 	}
 
-	schm, err := schema.NewSchema(v3ioConfig, "1/s", "1h", "*")
+	schm, err := schema.NewSchema(v3ioConfig, "1/s", "1h", "*", "")
 	if err != nil {
 		tst.Fatalf("Failed to create a TSDB schema. Error: %v", err)
 	}
