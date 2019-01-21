@@ -2194,35 +2194,29 @@ func (suite *testQuerySuite) TestAggregateSeriesWithAlias() {
 
 func (suite *testQuerySuite) TestStringAndFloatMetricsDataframe() {
 	adapter, err := tsdb.NewV3ioAdapter(suite.v3ioConfig, nil, nil)
-	if err != nil {
-		suite.T().Fatalf("failed to create v3io adapter. reason: %s", err)
-	}
+	suite.NoError(err, "failed to create v3io adapter")
+
 	metricName1 := "cpu"
 	metricName2 := "log"
 	labels := utils.LabelsFromStringList("os", "linux")
 	labelsWithName := append(labels, utils.LabelsFromStringList("__name__", metricName2)...)
 
-	baseTime := tsdbtest.NanosToMillis(time.Now().UnixNano())
+	baseTime := suite.toMillis("2019-01-21T00:00:00Z")
 	expectedTimeColumn := []int64{baseTime, baseTime + tsdbtest.MinuteInMillis, baseTime + 2*tsdbtest.MinuteInMillis}
 	logData := []interface{}{"a", "b", "c"}
 	expectedColumns := map[string][]interface{}{metricName1: {10.0, 20.0, 30.0},
 		metricName2: logData}
 	appender, err := adapter.Appender()
-	if err != nil {
-		suite.T().Fatalf("failed to create v3io appender. reason: %s", err)
-	}
+	suite.NoError(err, "failed to create v3io appender")
 
 	ref, err := appender.Add(labelsWithName, expectedTimeColumn[0], logData[0])
-	if err != nil {
-		suite.T().Fatalf("Failed to add data to the TSDB appender. Reason: %s", err)
-	}
+	suite.NoError(err, "failed to add data to the TSDB appender")
 	for i := 1; i < len(expectedTimeColumn); i++ {
 		appender.AddFast(labels, ref, expectedTimeColumn[i], logData[i])
 	}
 
-	if _, err := appender.WaitForCompletion(0); err != nil {
-		suite.T().Fatalf("Failed to wait for TSDB append completion. Reason: %s", err)
-	}
+	_, err = appender.WaitForCompletion(0)
+	suite.NoError(err, "failed to wait for TSDB append completion")
 
 	testParams := tsdbtest.NewTestParams(suite.T(),
 		tsdbtest.TestOption{
@@ -2238,16 +2232,13 @@ func (suite *testQuerySuite) TestStringAndFloatMetricsDataframe() {
 	tsdbtest.InsertData(suite.T(), testParams)
 
 	querierV2, err := adapter.QuerierV2()
-	if err != nil {
-		suite.T().Fatalf("Failed to create querier v2, err: %v", err)
-	}
+	suite.NoError(err, "failed to create querier")
 
 	params := &pquerier.SelectParams{RequestedColumns: []pquerier.RequestedColumn{{Metric: metricName1}, {Metric: metricName2}},
 		From: baseTime, To: baseTime + 5*tsdbtest.MinuteInMillis}
 	iter, err := querierV2.SelectDataFrame(params)
-	if err != nil {
-		suite.T().Fatalf("Failed to exeute query, err: %v", err)
-	}
+	suite.NoError(err, "failed to execute query")
+
 	var seriesCount int
 	for iter.NextFrame() {
 		seriesCount++
@@ -2270,7 +2261,7 @@ func (suite *testQuerySuite) TestStringAndFloatMetricsDataframe() {
 					suite.Failf("column type is not as expected: %v", column.DType().String())
 				}
 
-				assert.Equal(suite.T(), expectedColumns[column.Name()][i], v, "column %v does not match at index %v", column.Name(), i)
+				suite.Require().Equal(expectedColumns[column.Name()][i], v, "column %v does not match at index %v", column.Name(), i)
 			}
 		}
 	}

@@ -348,7 +348,7 @@ func (d *dataFrame) rawSeriesToColumns() {
 	var timeData []time.Time
 	columns := make([][]interface{}, len(d.rawColumns))
 	nonExhaustedIterators := len(d.rawColumns)
-	seriesToDataType := make(map[int]DType)
+	seriesToDataType := make([]DType, len(d.rawColumns))
 	currentTime := int64(math.MaxInt64)
 	nextTime := int64(math.MaxInt64)
 
