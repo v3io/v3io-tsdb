@@ -2249,7 +2249,7 @@ func (suite *testQuerySuite) TestStringAndFloatMetricsDataframe() {
 		for i := 0; i < frame.Index().Len(); i++ {
 			t, _ := in.TimeAt(i)
 			timeMillis := t.UnixNano() / int64(time.Millisecond)
-			assert.Equal(suite.T(), expectedTimeColumn[i], timeMillis, "time column does not match at index %v", i)
+			suite.Require().Equal(expectedTimeColumn[i], timeMillis, "time column does not match at index %v", i)
 			for _, column := range cols {
 				var v interface{}
 
