@@ -131,7 +131,7 @@ func RawAggregatesToStringList(aggregates string) ([]string, error) {
 
 func ParseCrossLabelSets(str string) [][]string {
 	var res [][]string
-	labelSetStrings := strings.Split(str, ".")
+	labelSetStrings := strings.Split(str, ";")
 	for _, labelSetString := range labelSetStrings {
 		labelSet := strings.Split(strings.TrimSpace(labelSetString), ",")
 		var trimmedLabelSet []string
