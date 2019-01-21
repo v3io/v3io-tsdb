@@ -236,14 +236,13 @@ func (sc *SyncContainer) GetItems(input *GetItemsInput) (*Response, error) {
 		return nil, err
 	}
 
-	//validate range scan loop
+	//validate getItems response to avoid infinite loop
 	if getItemsResponse.LastItemIncluded != "TRUE" && (getItemsResponse.NextMarker == "" || getItemsResponse.NextMarker == input.Marker) {
-		errMsg := fmt.Sprintf("Invalid getItems response: lastItemIncluded='false' && nextMarker='%s', " +
+		errMsg := fmt.Sprintf("Invalid getItems response: lastItemIncluded='false' and nextMarker='%s', " +
 			"startMarker='%s', probably due to object size bigger than 2M. Query is: %+v", getItemsResponse.NextMarker, input.Marker, input)
 		sc.logger.Error(errMsg)
 		return nil, errors.New(errMsg)
 	}
-
 
 	getItemsOutput := GetItemsOutput{
 		NextMarker: getItemsResponse.NextMarker,
