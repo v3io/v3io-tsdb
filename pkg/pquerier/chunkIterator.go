@@ -93,6 +93,10 @@ func (it *RawChunkIterator) Seek(t int64) bool {
 			if it.chunkIndex == len(it.chunks)-1 {
 				return false
 			}
+
+			// Free up memory of old chunk
+			it.chunks[it.chunkIndex] = nil
+
 			it.chunkIndex++
 			it.iter = it.chunks[it.chunkIndex].Iterator()
 		}
@@ -131,6 +135,9 @@ func (it *RawChunkIterator) Next() bool {
 	if it.chunkIndex == len(it.chunks)-1 {
 		return false
 	}
+
+	// Free up memory of old chunk
+	it.chunks[it.chunkIndex] = nil
 
 	it.chunkIndex++
 	it.iter = it.chunks[it.chunkIndex].Iterator()
