@@ -81,8 +81,9 @@ A user can run the CLI to add (append) or query the DB, to use the CLI, build th
 it has built-in help, see the following add/query examples:
 
 ```
-	# create a DB with expected ingestion rate of one sample per second and some aggregates (at 30 min interval) 
-	tsdbctl create -t <table> --ingestion-rate 1/s -a count,sum,max -i 30m
+	# create a DB with expected ingestion rate of one sample per second and some aggregates (at 30 min interval)
+	# and cross-label aggregates for "host" 
+	tsdbctl create -t <table> --ingestion-rate 1/s -a count,sum,max -i 30m -l label1
 
 	# display DB info with metric names (types) 
 	tsdbctl info -t <table> -n
@@ -115,7 +116,8 @@ such as partitioning strategy, retention, aggregates, etc. this can be done via 
 	samplesIngestionRate = "1/s"
 	aggregationGranularity = "1h"
 	aggregatesList = "scount,avg,min,max"
-	schema, err := schema.NewSchema(v3iocfg, samplesIngestionRate, aggregationGranularity, aggregatesList)
+	crossLabel = "label1,label2;label3"
+	schema, err := schema.NewSchema(v3iocfg, samplesIngestionRate, aggregationGranularity, aggregatesList, crossLabel)
 	if err != nil {
 		// TODO: handle error
 	}
