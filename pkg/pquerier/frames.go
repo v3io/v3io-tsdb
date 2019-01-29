@@ -97,8 +97,8 @@ func (fi *frameIterator) Err() error {
 }
 
 // data frame, holds multiple value columns and an index (time) column
-func NewDataFrame(columnsSpec []columnMeta, indexColumn Column, lset utils.Labels, hash uint64, isRawQuery, getAllMetrics bool, columnSize int, useServerAggregates, showAggregateLabel bool, encoding chunkenc.Encoding) (*dataFrame, error) {
-	df := &dataFrame{lset: lset, hash: hash, isRawSeries: isRawQuery, showAggregateLabel: showAggregateLabel, encoding: encoding}
+func NewDataFrame(columnsSpec []columnMeta, indexColumn Column, lset utils.Labels, hash uint64, isRawQuery, getAllMetrics bool, columnSize int, useServerAggregates, showAggregateLabel bool) (*dataFrame, error) {
+	df := &dataFrame{lset: lset, hash: hash, isRawSeries: isRawQuery, showAggregateLabel: showAggregateLabel}
 	// is raw query
 	if isRawQuery {
 		df.columnByName = make(map[string]int, len(columnsSpec))
@@ -221,8 +221,6 @@ type dataFrame struct {
 
 	metrics             map[string]struct{}
 	metricToCountColumn map[string]Column
-
-	encoding chunkenc.Encoding
 }
 
 func (d *dataFrame) addMetricIfNotExist(metricName string, columnSize int, useServerAggregates bool) error {
@@ -324,13 +322,13 @@ func (d *dataFrame) TimeSeries(i int) (utils.Series, error) {
 		if err != nil {
 			return nil, err
 		}
+
 		return NewDataFrameColumnSeries(d.index,
 			currentColumn,
 			d.metricToCountColumn[currentColumn.GetColumnSpec().metric],
 			d.Labels(),
 			d.hash,
-			d.showAggregateLabel,
-			d.encoding), nil
+			d.showAggregateLabel), nil
 	}
 }
 
@@ -350,11 +348,11 @@ func (d *dataFrame) rawSeriesToColumns() {
 	var timeData []time.Time
 	columns := make([][]interface{}, len(d.rawColumns))
 	nonExhaustedIterators := len(d.rawColumns)
-
+	seriesToDataType := make([]DType, len(d.rawColumns))
 	currentTime := int64(math.MaxInt64)
 	nextTime := int64(math.MaxInt64)
 
-	for _, rawSeries := range d.rawColumns {
+	for seriesIndex, rawSeries := range d.rawColumns {
 		if rawSeries.Iterator().Next() {
 			t, _ := rawSeries.Iterator().At()
 			if t < nextTime {
@@ -362,6 +360,16 @@ func (d *dataFrame) rawSeriesToColumns() {
 			}
 		} else {
 			nonExhaustedIterators--
+		}
+
+		currentEnc := chunkenc.EncXOR
+		seriesToDataType[seriesIndex] = FloatType
+		if ser, ok := rawSeries.(*V3ioRawSeries); ok {
+			currentEnc = ser.encoding
+		}
+
+		if currentEnc == chunkenc.EncVariant {
+			seriesToDataType[seriesIndex] = StringType
 		}
 	}
 
@@ -376,7 +384,7 @@ func (d *dataFrame) rawSeriesToColumns() {
 			var v interface{}
 			var t int64
 
-			if d.encoding == chunkenc.EncVariant {
+			if seriesToDataType[seriesIndex] == StringType {
 				t, v = iter.AtString()
 			} else {
 				t, v = iter.At()
@@ -408,7 +416,7 @@ func (d *dataFrame) rawSeriesToColumns() {
 	for i, series := range d.rawColumns {
 		name := series.Labels().Get(config.PrometheusMetricNameAttribute)
 		spec := columnMeta{metric: name}
-		col := NewDataColumn(name, spec, numberOfRows, FloatType)
+		col := NewDataColumn(name, spec, numberOfRows, seriesToDataType[i])
 		col.SetData(columns[i], numberOfRows)
 		d.columns[i] = col
 	}
@@ -477,7 +485,7 @@ type DType reflect.Type
 func NewDataColumn(name string, colSpec columnMeta, size int, datatype DType) *dataColumn {
 	dc := &dataColumn{basicColumn: basicColumn{name: name, spec: colSpec, size: size,
 		interpolationFunction:  GetInterpolateFunc(colSpec.interpolationType),
-		interpolationTolerance: colSpec.interpolationTolerance}}
+		interpolationTolerance: colSpec.interpolationTolerance}, dtype: datatype}
 	dc.initializeData(datatype)
 	return dc
 
@@ -485,7 +493,8 @@ func NewDataColumn(name string, colSpec columnMeta, size int, datatype DType) *d
 
 type dataColumn struct {
 	basicColumn
-	data interface{}
+	data  interface{}
+	dtype DType
 }
 
 func (dc *dataColumn) initializeData(dataType DType) {
@@ -509,7 +518,7 @@ func (dc *dataColumn) initializeData(dataType DType) {
 
 // DType returns the data type
 func (dc *dataColumn) DType() DType {
-	return reflect.TypeOf(dc.data)
+	return dc.dtype
 }
 
 // FloatAt returns float64 value at index i
