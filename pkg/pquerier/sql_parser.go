@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/v3io/v3io-tsdb/pkg/utils"
 	"github.com/xwb1989/sqlparser"
 )
 
@@ -43,19 +44,9 @@ func ParseQuery(sql string) (*SelectParams, string, error) {
 
 			switch expr := col.Expr.(type) {
 			case *sqlparser.FuncExpr:
-				switch firstExpr := expr.Exprs[0].(type) {
-				case *sqlparser.AliasedExpr:
-					cc := firstExpr.Expr.(*sqlparser.ColName)
-					currCol.Function = sqlparser.String(expr.Name)
-					currCol.Interpolator = removeBackticks(sqlparser.String(cc.Qualifier.Name)) // Some of the interpolators are parsed with a `
-					currCol.Metric = sqlparser.String(cc.Name)
-				case *sqlparser.StarExpr:
-					// Appending column with empty metric name, meaning a column template with the given aggregate
-					currCol.Function = sqlparser.String(expr.Name)
-				}
+				parseFuncExpr(expr, &currCol)
 			case *sqlparser.ColName:
 				currCol.Metric = sqlparser.String(expr.Name)
-				currCol.Interpolator = removeBackticks(sqlparser.String(expr.Qualifier.Name)) // Some of the interpolators are parsed with a `
 			default:
 				return nil, "", fmt.Errorf("unknown columns type - %T", col.Expr)
 			}
@@ -80,6 +71,47 @@ func ParseQuery(sql string) (*SelectParams, string, error) {
 	}
 
 	return selectParams, fromTable, nil
+}
+
+func parseFuncExpr(expr *sqlparser.FuncExpr, destCol *RequestedColumn) error {
+	possibleInterpolator := removeBackticks(sqlparser.String(expr.Name))
+	if _, err := StrToInterpolateType(possibleInterpolator); err == nil {
+		destCol.Interpolator = possibleInterpolator
+		numOfParameters := len(expr.Exprs)
+		if numOfParameters == 1 {
+			collName := expr.Exprs[0].(*sqlparser.AliasedExpr).Expr.(*sqlparser.ColName)
+			destCol.Metric = sqlparser.String(collName)
+		} else if numOfParameters == 2 {
+			collName := expr.Exprs[0].(*sqlparser.AliasedExpr).Expr.(*sqlparser.ColName)
+			destCol.Metric = sqlparser.String(collName)
+			toleranceVal := expr.Exprs[1].(*sqlparser.AliasedExpr).Expr.(*sqlparser.SQLVal)
+			toleranceString := sqlparser.String(toleranceVal)
+
+			// SQLVal cannot start with a number so it has to be surrounded with ticks.
+			// Stripping ticks
+			tolerance, err := utils.Str2duration(toleranceString[1 : len(toleranceString)-1])
+			if err != nil {
+				return err
+			}
+			destCol.InterpolationTolerance = tolerance
+		} else {
+			return fmt.Errorf("unssoported number of parameters for function %v", possibleInterpolator)
+		}
+	} else {
+		destCol.Function = sqlparser.String(expr.Name)
+
+		switch firstExpr := expr.Exprs[0].(type) {
+		case *sqlparser.AliasedExpr:
+			switch innerExpr := firstExpr.Expr.(type) {
+			case *sqlparser.ColName:
+				destCol.Metric = sqlparser.String(innerExpr.Name)
+			case *sqlparser.FuncExpr:
+				parseFuncExpr(innerExpr, destCol)
+			}
+		}
+	}
+
+	return nil
 }
 
 func getTableName(slct *sqlparser.Select) (string, error) {

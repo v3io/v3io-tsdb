@@ -93,8 +93,8 @@ func (fi *frameIterator) Err() error {
 }
 
 // data frame, holds multiple value columns and an index (time) column
-func NewDataFrame(columnsSpec []columnMeta, indexColumn Column, lset utils.Labels, hash uint64, isRawQuery, getAllMetrics bool, columnSize int, useServerAggregates, showAggregateLabel bool, encoding chunkenc.Encoding) (*dataFrame, error) {
-	df := &dataFrame{lset: lset, hash: hash, isRawSeries: isRawQuery, showAggregateLabel: showAggregateLabel, encoding: encoding}
+func NewDataFrame(columnsSpec []columnMeta, indexColumn Column, lset utils.Labels, hash uint64, isRawQuery, getAllMetrics bool, columnSize int, useServerAggregates, showAggregateLabel bool) (*dataFrame, error) {
+	df := &dataFrame{lset: lset, hash: hash, isRawSeries: isRawQuery, showAggregateLabel: showAggregateLabel}
 	// is raw query
 	if isRawQuery {
 		df.columnByName = make(map[string]int, len(columnsSpec))
@@ -217,8 +217,6 @@ type dataFrame struct {
 
 	metrics             map[string]struct{}
 	metricToCountColumn map[string]Column
-
-	encoding chunkenc.Encoding
 }
 
 func (d *dataFrame) addMetricIfNotExist(metricName string, columnSize int, useServerAggregates bool) error {
@@ -320,13 +318,13 @@ func (d *dataFrame) TimeSeries(i int) (utils.Series, error) {
 		if err != nil {
 			return nil, err
 		}
+
 		return NewDataFrameColumnSeries(d.index,
 			currentColumn,
 			d.metricToCountColumn[currentColumn.GetColumnSpec().metric],
 			d.Labels(),
 			d.hash,
-			d.showAggregateLabel,
-			d.encoding), nil
+			d.showAggregateLabel), nil
 	}
 }
 
@@ -374,16 +372,10 @@ func (d *dataFrame) rawSeriesToColumns() {
 
 	columns := make([]frames.ColumnBuilder, len(d.rawColumns))
 	nonExhaustedIterators := len(d.rawColumns)
-
+	seriesToDataType := make([]frames.DType, len(d.rawColumns))
+	seriesTodefaultValue := make([]interface{}, len(d.rawColumns))
 	currentTime := int64(math.MaxInt64)
 	nextTime := int64(math.MaxInt64)
-	isVariant := d.encoding == chunkenc.EncVariant
-	var defaultValue interface{}
-	if isVariant {
-		defaultValue = ""
-	} else {
-		defaultValue = math.NaN()
-	}
 
 	for i, rawSeries := range d.rawColumns {
 		if rawSeries.Iterator().Next() {
@@ -395,12 +387,21 @@ func (d *dataFrame) rawSeriesToColumns() {
 			nonExhaustedIterators--
 		}
 
-		if isVariant {
+		currentEnc := chunkenc.EncXOR
+		if ser, ok := rawSeries.(*V3ioRawSeries); ok {
+			currentEnc = ser.encoding
+		}
+
+		if currentEnc == chunkenc.EncVariant {
 			columns[i] = frames.NewSliceColumnBuilder(rawSeries.Labels().Get(config.PrometheusMetricNameAttribute),
 				frames.StringType, 0)
+			seriesToDataType[i] = frames.StringType
+			seriesTodefaultValue[i] = ""
 		} else {
 			columns[i] = frames.NewSliceColumnBuilder(rawSeries.Labels().Get(config.PrometheusMetricNameAttribute),
 				frames.FloatType, 0)
+			seriesToDataType[i] = frames.FloatType
+			seriesTodefaultValue[i] = math.NaN()
 		}
 	}
 
@@ -415,7 +416,7 @@ func (d *dataFrame) rawSeriesToColumns() {
 			var v interface{}
 			var t int64
 
-			if isVariant {
+			if seriesToDataType[seriesIndex] == frames.StringType {
 				t, v = iter.AtString()
 			} else {
 				t, v = iter.At()
@@ -429,7 +430,7 @@ func (d *dataFrame) rawSeriesToColumns() {
 					nonExhaustedIterators--
 				}
 			} else if t > currentTime {
-				columns[seriesIndex].Append(defaultValue)
+				columns[seriesIndex].Append(seriesTodefaultValue[seriesIndex])
 			}
 
 			if t < nextTime {
@@ -447,13 +448,7 @@ func (d *dataFrame) rawSeriesToColumns() {
 	for i, series := range d.rawColumns {
 		name := series.Labels().Get(config.PrometheusMetricNameAttribute)
 		spec := columnMeta{metric: name}
-		var colType frames.DType
-		if d.encoding == chunkenc.EncVariant {
-			colType = frames.StringType
-		} else {
-			colType = frames.FloatType
-		}
-		col := NewDataColumn(name, spec, numberOfRows, colType)
+		col := NewDataColumn(name, spec, numberOfRows, seriesToDataType[i])
 		col.framesCol = columns[i].Finish()
 		d.columns[i] = col
 	}
@@ -552,7 +547,7 @@ func NewDataColumn(name string, colSpec columnMeta, size int, datatype frames.DT
 
 type dataColumn struct {
 	basicColumn
-	data interface{}
+	data  interface{}
 }
 
 // DType returns the data type
