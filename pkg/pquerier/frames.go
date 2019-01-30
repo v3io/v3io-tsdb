@@ -547,7 +547,7 @@ func NewDataColumn(name string, colSpec columnMeta, size int, datatype frames.DT
 
 type dataColumn struct {
 	basicColumn
-	data  interface{}
+	data interface{}
 }
 
 // DType returns the data type
