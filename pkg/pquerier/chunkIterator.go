@@ -93,6 +93,10 @@ func (it *RawChunkIterator) Seek(t int64) bool {
 			if it.chunkIndex == len(it.chunks)-1 {
 				return false
 			}
+
+			// Free up memory of old chunk
+			it.chunks[it.chunkIndex] = nil
+
 			it.chunkIndex++
 			it.iter = it.chunks[it.chunkIndex].Iterator()
 		}
@@ -131,6 +135,9 @@ func (it *RawChunkIterator) Next() bool {
 	if it.chunkIndex == len(it.chunks)-1 {
 		return false
 	}
+
+	// Free up memory of old chunk
+	it.chunks[it.chunkIndex] = nil
 
 	it.chunkIndex++
 	it.iter = it.chunks[it.chunkIndex].Iterator()
@@ -187,7 +194,7 @@ func (it *RawChunkIterator) AddChunks(item *qryResults) {
 func (it *RawChunkIterator) PeakBack() (t int64, v float64) { return it.prevT, it.prevV }
 
 func NewRawSeries(results *qryResults, logger logger.Logger) (utils.Series, error) {
-	newSeries := V3ioRawSeries{fields: results.fields, logger: logger}
+	newSeries := V3ioRawSeries{fields: results.fields, logger: logger, encoding: results.encoding}
 	err := newSeries.initLabels()
 	if err != nil {
 		return nil, err
@@ -197,11 +204,12 @@ func NewRawSeries(results *qryResults, logger logger.Logger) (utils.Series, erro
 }
 
 type V3ioRawSeries struct {
-	fields map[string]interface{}
-	lset   utils.Labels
-	iter   utils.SeriesIterator
-	logger logger.Logger
-	hash   uint64
+	fields   map[string]interface{}
+	lset     utils.Labels
+	iter     utils.SeriesIterator
+	logger   logger.Logger
+	hash     uint64
+	encoding chunkenc.Encoding
 }
 
 func (s *V3ioRawSeries) Labels() utils.Labels { return s.lset }
