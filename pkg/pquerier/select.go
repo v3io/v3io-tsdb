@@ -307,8 +307,7 @@ func (queryCtx *selectQueryContext) processQueryResults(query *partQuery) error 
 				queryCtx.isAllMetrics,
 				queryCtx.getResultBucketsSize(),
 				results.IsServerAggregates(),
-				queryCtx.showAggregateLabel,
-				encoding)
+				queryCtx.showAggregateLabel)
 			if err != nil {
 				return err
 			}
