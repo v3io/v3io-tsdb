@@ -440,16 +440,15 @@ type Column interface {
 	GetColumnSpec() columnMeta       // Get the column's metadata
 	SetDataAt(i int, value interface{}) error
 	SetData(d interface{}, size int) error
-	GetInterpolationFunction() (InterpolationFunction, int64)
+	GetInterpolationFunction() InterpolationFunction
 	setMetricName(name string)
 }
 
 type basicColumn struct {
-	name                   string
-	size                   int
-	spec                   columnMeta
-	interpolationFunction  InterpolationFunction
-	interpolationTolerance int64
+	name                  string
+	size                  int
+	spec                  columnMeta
+	interpolationFunction InterpolationFunction
 }
 
 // Name returns the column name
@@ -475,8 +474,8 @@ func (c *basicColumn) SetDataAt(i int, value interface{}) error { return nil }
 func (c *basicColumn) SetData(d interface{}, size int) error {
 	return errors.New("method not supported")
 }
-func (dc *basicColumn) GetInterpolationFunction() (InterpolationFunction, int64) {
-	return dc.interpolationFunction, dc.interpolationTolerance
+func (c *basicColumn) GetInterpolationFunction() InterpolationFunction {
+	return c.interpolationFunction
 }
 
 // DType is data type
@@ -484,8 +483,7 @@ type DType reflect.Type
 
 func NewDataColumn(name string, colSpec columnMeta, size int, datatype DType) *dataColumn {
 	dc := &dataColumn{basicColumn: basicColumn{name: name, spec: colSpec, size: size,
-		interpolationFunction:  GetInterpolateFunc(colSpec.interpolationType),
-		interpolationTolerance: colSpec.interpolationTolerance}, dtype: datatype}
+		interpolationFunction: GetInterpolateFunc(colSpec.interpolationType, colSpec.interpolationTolerance)}, dtype: datatype}
 	dc.initializeData(datatype)
 	return dc
 
@@ -615,7 +613,7 @@ func (dc *dataColumn) SetDataAt(i int, value interface{}) error {
 
 func NewConcreteColumn(name string, colSpec columnMeta, size int, setFunc func(old, new interface{}) interface{}) *ConcreteColumn {
 	col := &ConcreteColumn{basicColumn: basicColumn{name: name, spec: colSpec, size: size,
-		interpolationFunction: GetInterpolateFunc(interpolateNone)}, setFunc: setFunc}
+		interpolationFunction: GetInterpolateFunc(colSpec.interpolationType, colSpec.interpolationTolerance)}, setFunc: setFunc}
 	col.data = make([]interface{}, size)
 	return col
 }
@@ -656,7 +654,7 @@ func (c *ConcreteColumn) SetDataAt(i int, val interface{}) error {
 
 func NewVirtualColumn(name string, colSpec columnMeta, size int, function func([]Column, int) (interface{}, error)) Column {
 	col := &virtualColumn{basicColumn: basicColumn{name: name, spec: colSpec, size: size,
-		interpolationFunction: GetInterpolateFunc(interpolateNone)},
+		interpolationFunction: GetInterpolateFunc(colSpec.interpolationType, colSpec.interpolationTolerance)},
 		function: function}
 	return col
 }

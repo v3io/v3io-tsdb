@@ -28,6 +28,23 @@ import (
 
 type InterpolationType uint8
 
+func (it InterpolationType) String() string {
+	switch it {
+	case interpolateNone:
+		return "none"
+	case interpolateNaN:
+		return "nan"
+	case interpolatePrev:
+		return "prev"
+	case interpolateNext:
+		return "next"
+	case interpolateLinear:
+		return "linear"
+	default:
+		return "unknown"
+	}
+}
+
 const (
 	interpolateNone      InterpolationType = 0
 	interpolateNaN       InterpolationType = 1
@@ -56,46 +73,48 @@ func StrToInterpolateType(str string) (InterpolationType, error) {
 }
 
 // return line interpolation function, estimate seek value based on previous and next points
-func GetInterpolateFunc(alg InterpolationType) InterpolationFunction {
+func GetInterpolateFunc(alg InterpolationType, tolerance int64) InterpolationFunction {
 	switch alg {
 	case interpolateNaN:
-		return projectNaN
+		return func(tprev, tnext, tseek int64, vprev, vnext float64) (int64, float64) {
+			return tseek, math.NaN()
+		}
 	case interpolatePrev:
-		return projectPrev
+		return func(tprev, tnext, tseek int64, vprev, vnext float64) (int64, float64) {
+			if absoluteDiff(tseek, tprev) > tolerance {
+				return 0, 0
+			}
+			return tseek, vprev
+		}
 	case interpolateNext:
-		return projectNext
+		return func(tprev, tnext, tseek int64, vprev, vnext float64) (int64, float64) {
+			if absoluteDiff(tnext, tseek) > tolerance {
+				return 0, 0
+			}
+			return tseek, vnext
+		}
 	case interpolateLinear:
-		return projectLinear
+		return func(tprev, tnext, tseek int64, vprev, vnext float64) (int64, float64) {
+			if (absoluteDiff(tseek, tprev) > tolerance) || absoluteDiff(tnext, tseek) > tolerance {
+				return 0, 0
+			}
+			if math.IsNaN(vprev) || math.IsNaN(vnext) {
+				return tseek, math.NaN()
+			}
+			v := vprev + (vnext-vprev)*float64(tseek-tprev)/float64(tnext-tprev)
+			return tseek, v
+		}
 	default:
-		return projectNone
+		// None interpolation
+		return func(tprev, tnext, tseek int64, vprev, vnext float64) (int64, float64) {
+			return tnext, vnext
+		}
 	}
 }
 
-// skip to next point
-func projectNone(tprev, tnext, tseek int64, vprev, vnext float64) (int64, float64) {
-	return tnext, vnext
-}
-
-// return NaN, there is no valid data in this point
-func projectNaN(tprev, tnext, tseek int64, vprev, vnext float64) (int64, float64) {
-	return tseek, math.NaN()
-}
-
-// return same value as in previous point
-func projectPrev(tprev, tnext, tseek int64, vprev, vnext float64) (int64, float64) {
-	return tseek, vprev
-}
-
-// return the same value as in the next point
-func projectNext(tprev, tnext, tseek int64, vprev, vnext float64) (int64, float64) {
-	return tseek, vnext
-}
-
-// linear estimator (smooth graph)
-func projectLinear(tprev, tnext, tseek int64, vprev, vnext float64) (int64, float64) {
-	if math.IsNaN(vprev) || math.IsNaN(vnext) {
-		return tseek, math.NaN()
+func absoluteDiff(a, b int64) int64 {
+	if a > b {
+		return a - b
 	}
-	v := vprev + (vnext-vprev)*float64(tseek-tprev)/float64(tnext-tprev)
-	return tseek, v
+	return b - a
 }

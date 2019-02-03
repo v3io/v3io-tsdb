@@ -26,19 +26,19 @@ func TestCreateColumnSpecs(t *testing.T) {
 
 		{params: SelectParams{Name: "cpu", Functions: "avg"},
 			expectedSpecs: []columnMeta{{metric: "cpu", function: toAggr("avg"), interpolationType: interpolateNext},
-				{metric: "cpu", function: toAggr("count"), isHidden: true},
-				{metric: "cpu", function: toAggr("sum"), isHidden: true}},
+				{metric: "cpu", function: toAggr("count"), isHidden: true, interpolationType: interpolateNext},
+				{metric: "cpu", function: toAggr("sum"), isHidden: true, interpolationType: interpolateNext}},
 			expectedSpecsMap: map[string][]columnMeta{"cpu": {{metric: "cpu", function: toAggr("avg"), interpolationType: interpolateNext},
-				{metric: "cpu", function: toAggr("count"), isHidden: true},
-				{metric: "cpu", function: toAggr("sum"), isHidden: true}}}},
+				{metric: "cpu", function: toAggr("count"), isHidden: true, interpolationType: interpolateNext},
+				{metric: "cpu", function: toAggr("sum"), isHidden: true, interpolationType: interpolateNext}}}},
 
 		{params: SelectParams{Name: "cpu", Functions: "avg,count"},
 			expectedSpecs: []columnMeta{{metric: "cpu", function: toAggr("avg"), interpolationType: interpolateNext},
 				{metric: "cpu", function: toAggr("count"), interpolationType: interpolateNext},
-				{metric: "cpu", function: toAggr("sum"), isHidden: true}},
+				{metric: "cpu", function: toAggr("sum"), isHidden: true, interpolationType: interpolateNext}},
 			expectedSpecsMap: map[string][]columnMeta{"cpu": {{metric: "cpu", function: toAggr("avg"), interpolationType: interpolateNext},
 				{metric: "cpu", function: toAggr("count"), interpolationType: interpolateNext},
-				{metric: "cpu", function: toAggr("sum"), isHidden: true}}}},
+				{metric: "cpu", function: toAggr("sum"), isHidden: true, interpolationType: interpolateNext}}}},
 
 		{params: SelectParams{RequestedColumns: []RequestedColumn{{Metric: "cpu", Function: "count"}}},
 			expectedSpecs:    []columnMeta{{metric: "cpu", function: toAggr("count")}},
@@ -77,6 +77,40 @@ func TestCreateColumnSpecs(t *testing.T) {
 				{metric: "cpu", function: toAggr("count"), interpolationType: interpolateNext}},
 				"diskio": {{metric: "diskio", function: toAggr("sum"), interpolationType: interpolateNext},
 					{metric: "diskio", function: toAggr("count"), interpolationType: interpolateNext}}}},
+
+		{params: SelectParams{RequestedColumns: []RequestedColumn{{Metric: "cpu", Function: "sum", Interpolator: "linear"},
+			{Metric: "cpu", Function: "count", Interpolator: "linear"}}},
+			expectedSpecs: []columnMeta{{metric: "cpu", function: toAggr("sum"), interpolationType: interpolateLinear},
+				{metric: "cpu", function: toAggr("count"), interpolationType: interpolateLinear}},
+			expectedSpecsMap: map[string][]columnMeta{"cpu": {{metric: "cpu", function: toAggr("sum"), interpolationType: interpolateLinear},
+				{metric: "cpu", function: toAggr("count"), interpolationType: interpolateLinear}}}},
+
+		{params: SelectParams{RequestedColumns: []RequestedColumn{{Metric: "cpu", Function: "sum", Interpolator: "linear"},
+			{Metric: "cpu", Function: "count"}}},
+			expectedSpecs: []columnMeta{{metric: "cpu", function: toAggr("sum"), interpolationType: interpolateLinear},
+				{metric: "cpu", function: toAggr("count"), interpolationType: interpolateLinear}},
+			expectedSpecsMap: map[string][]columnMeta{"cpu": {{metric: "cpu", function: toAggr("sum"), interpolationType: interpolateLinear},
+				{metric: "cpu", function: toAggr("count"), interpolationType: interpolateLinear}}}},
+
+		{params: SelectParams{RequestedColumns: []RequestedColumn{{Metric: "cpu", Function: "avg", Interpolator: "linear"},
+			{Metric: "cpu", Function: "count"}}},
+			expectedSpecs: []columnMeta{{metric: "cpu", function: toAggr("avg"), interpolationType: interpolateLinear},
+				{metric: "cpu", function: toAggr("sum"), interpolationType: interpolateLinear, isHidden: true},
+				{metric: "cpu", function: toAggr("count"), interpolationType: interpolateLinear}},
+			expectedSpecsMap: map[string][]columnMeta{"cpu": {{metric: "cpu", function: toAggr("avg"), interpolationType: interpolateLinear},
+				{metric: "cpu", function: toAggr("count"), interpolationType: interpolateLinear},
+				{metric: "cpu", function: toAggr("sum"), interpolationType: interpolateLinear, isHidden: true}}}},
+
+		{params: SelectParams{RequestedColumns: []RequestedColumn{{Metric: "cpu", Function: "count", Interpolator: "linear"},
+			{Metric: "diskio", Function: "count", Interpolator: "prev"},
+			{Metric: "diskio", Function: "sum"}}},
+			expectedSpecs: []columnMeta{{metric: "cpu", function: toAggr("count"), interpolationType: interpolateLinear},
+				{metric: "diskio", function: toAggr("count"), interpolationType: interpolatePrev},
+				{metric: "diskio", function: toAggr("sum"), interpolationType: interpolatePrev}},
+			expectedSpecsMap: map[string][]columnMeta{"cpu": {{metric: "cpu", function: toAggr("count"), interpolationType: interpolateLinear}},
+				"diskio": {
+					{metric: "diskio", function: toAggr("count"), interpolationType: interpolatePrev},
+					{metric: "diskio", function: toAggr("sum"), interpolationType: interpolatePrev}}}},
 	}
 	for _, test := range testCases {
 		t.Run(test.desc, func(t *testing.T) {
