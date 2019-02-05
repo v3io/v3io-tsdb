@@ -105,6 +105,7 @@ func NewDataFrame(columnsSpec []columnMeta, indexColumn Column, lset utils.Label
 		df.columns = make([]Column, 0, numOfColumns)
 		df.metricToCountColumn = map[string]Column{}
 		df.metrics = map[string]struct{}{}
+		df.nonEmptyRowsIndicator = make([]bool, columnSize)
 		// In case user wanted all metrics, save the template for every metric.
 		// Once we know what metrics we have we will create Columns out of the column Templates
 		if getAllMetrics {
@@ -210,13 +211,20 @@ type dataFrame struct {
 	isRawColumnsGenerated bool
 	rawColumns            []utils.Series
 
-	columnsTemplates []columnMeta
-	columns          []Column
-	index            Column
-	columnByName     map[string]int // name -> index in columns
+	columnsTemplates      []columnMeta
+	columns               []Column
+	index                 Column
+	columnByName          map[string]int // name -> index in columns
+	nonEmptyRowsIndicator []bool
 
 	metrics             map[string]struct{}
 	metricToCountColumn map[string]Column
+}
+
+func (d *dataFrame) updateHasValue(index int) {
+	if index >= 0 && index < len(d.nonEmptyRowsIndicator) {
+		d.nonEmptyRowsIndicator[index] = true
+	}
 }
 
 func (d *dataFrame) addMetricIfNotExist(metricName string, columnSize int, useServerAggregates bool) error {
@@ -331,6 +339,16 @@ func (d *dataFrame) TimeSeries(i int) (utils.Series, error) {
 // Creates Frames.columns out of tsdb columns.
 // First do all the concrete columns and then the virtual who are dependant on the concrete.
 func (d *dataFrame) finishAllColumns() error {
+
+	// Marking as Deleted all the indexes that has no data.
+	for i, hasData := range d.nonEmptyRowsIndicator {
+		if !hasData {
+			for _, col := range d.columns {
+				col.Delete(i)
+			}
+		}
+	}
+
 	var err error
 	for _, col := range d.columns {
 		switch col.(type) {
@@ -490,6 +508,7 @@ type Column interface {
 	setMetricName(name string)
 	finish() error
 	FramesColumn() frames.Column
+	Delete(index int) error
 }
 
 type basicColumn struct {
@@ -506,6 +525,13 @@ func (c *basicColumn) finish() error {
 	c.framesCol = c.builder.Finish()
 	return nil
 }
+
+func (c *basicColumn) Delete(index int) error {
+	// todo
+	// return c.builder.Delete(index)
+	return nil
+}
+
 func (c *basicColumn) FramesColumn() frames.Column {
 	return c.framesCol
 }
