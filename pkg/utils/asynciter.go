@@ -182,6 +182,46 @@ func (ic *AsyncItemsCursor) processResponse() error {
 	ic.items = getItemsResp.Items
 	ic.itemIndex = 0
 
+	conf, err := config.GetOrDefaultConfig()
+	if err != nil {
+		return err
+	}
+
+	// until IGZ-2.0 there is a bug in Nginx regarding range-scan, the following code is a mitigation for it.
+	if conf.DisableNginxMitigation {
+		ic.sendNextGetItemsOld(resp)
+	} else {
+		ic.sendNextGetItemsNew(resp)
+	}
+
+	return nil
+}
+
+func (ic *AsyncItemsCursor) sendNextGetItemsOld(resp *v3io.Response) error {
+	getItemsResp := resp.Output.(*v3io.GetItemsOutput)
+	if !getItemsResp.Last {
+
+		// if not last, make a new request to that shard
+		input := resp.Context.(*v3io.GetItemsInput)
+
+		// set next marker
+		input.Marker = getItemsResp.NextMarker
+
+		_, err := ic.container.GetItems(input, input, ic.responseChan)
+		if err != nil {
+			return errors.Wrap(err, "Failed to request next items")
+		}
+
+	} else {
+		// Mark one more shard as completed
+		ic.lastShards++
+	}
+
+	return nil
+}
+
+func (ic *AsyncItemsCursor) sendNextGetItemsNew(resp *v3io.Response) error {
+	getItemsResp := resp.Output.(*v3io.GetItemsOutput)
 	if len(getItemsResp.Items) > 0 {
 
 		// if not last, make a new request to that shard
