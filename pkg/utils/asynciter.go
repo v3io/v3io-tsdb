@@ -22,10 +22,12 @@ package utils
 
 import (
 	"net/http"
+	"strings"
 
 	"github.com/nuclio/logger"
 	"github.com/pkg/errors"
 	"github.com/v3io/v3io-go-http"
+	"github.com/v3io/v3io-tsdb/pkg/config"
 )
 
 type ItemsCursor interface {
@@ -180,13 +182,37 @@ func (ic *AsyncItemsCursor) processResponse() error {
 	ic.items = getItemsResp.Items
 	ic.itemIndex = 0
 
-	if !getItemsResp.Last {
+	if len(getItemsResp.Items) > 0 {
 
 		// if not last, make a new request to that shard
 		input := resp.Context.(*v3io.GetItemsInput)
 
-		// set next marker
-		input.Marker = getItemsResp.NextMarker
+		if getItemsResp.NextMarker == "" || getItemsResp.NextMarker == input.Marker {
+			lastItemObjectName, err := ic.items[len(ic.items)-1].GetFieldString(config.ObjectNameAttrName)
+
+			splittdObjectName := strings.Split(lastItemObjectName, ".")
+
+			// If we have the __name attribute and the query was a range scan query and the data is in range-scan format
+			if len(splittdObjectName) == 2 && input.ShardingKey != "" && err == nil {
+				lastSortingKey := splittdObjectName[1]
+
+				ic.logger.Info("getting next items after calculating next marker for %v%v is %v for the object=%v", input.Path, input.ShardingKey, lastSortingKey, lastItemObjectName)
+				input.SortKeyRangeStart = lastSortingKey + "0"
+				input.Marker = ""
+			} else {
+				// In case it is names query
+				if getItemsResp.Last {
+					ic.lastShards++
+					return nil
+				} else {
+					input.Marker = getItemsResp.NextMarker
+				}
+			}
+		} else {
+			// set next marker
+			input.Marker = getItemsResp.NextMarker
+			ic.logger.Info("getting next items for %v%v with given next marker %v", input.Path, input.ShardingKey, input.Marker)
+		}
 
 		_, err := ic.container.GetItems(input, input, ic.responseChan)
 		if err != nil {
