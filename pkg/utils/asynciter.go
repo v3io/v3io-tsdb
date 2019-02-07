@@ -24,6 +24,7 @@ import (
 	"net/http"
 	"strings"
 
+	"fmt"
 	"github.com/nuclio/logger"
 	"github.com/pkg/errors"
 	"github.com/v3io/v3io-go-http"
@@ -236,7 +237,7 @@ func (ic *AsyncItemsCursor) sendNextGetItemsNew(resp *v3io.Response) error {
 			if len(splittdObjectName) == 2 && input.ShardingKey != "" && err == nil {
 				lastSortingKey := splittdObjectName[1]
 
-				ic.logger.Info("getting next items after calculating next marker for %v%v is %v for the object=%v", input.Path, input.ShardingKey, lastSortingKey, lastItemObjectName)
+				ic.logger.Debug("getting next items after calculating next marker for %v%v is %v for the object=%v", input.Path, input.ShardingKey, lastSortingKey, lastItemObjectName)
 				input.SortKeyRangeStart = lastSortingKey + "0"
 				input.Marker = ""
 			} else {
@@ -251,12 +252,12 @@ func (ic *AsyncItemsCursor) sendNextGetItemsNew(resp *v3io.Response) error {
 		} else {
 			// set next marker
 			input.Marker = getItemsResp.NextMarker
-			ic.logger.Info("getting next items for %v%v with given next marker %v", input.Path, input.ShardingKey, input.Marker)
+			ic.logger.Debug("getting next items for %v%v with given next marker %v", input.Path, input.ShardingKey, input.Marker)
 		}
 
 		_, err := ic.container.GetItems(input, input, ic.responseChan)
 		if err != nil {
-			return errors.Wrap(err, "Failed to request next items")
+			return errors.Wrap(err, fmt.Sprintf("Failed to request next items for input=%v", input))
 		}
 
 	} else {
