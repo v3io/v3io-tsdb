@@ -411,7 +411,6 @@ func (queryCtx *selectQueryContext) generateTimeColumn() Column {
 		timeColumn.SetDataAt(i, time.Unix(t/1000, (t%1000)*1e6))
 		i++
 	}
-	timeColumn.finish()
 	return timeColumn
 }
 
