@@ -489,7 +489,7 @@ func (query *partQuery) getItems(ctx *selectQueryContext, name string, preAggreg
 	if name != "" {
 		shardingKeys = query.partition.GetShardingKeys(name)
 	}
-	attrs := []string{config.LabelSetAttrName, config.EncodingAttrName, config.MetricNameAttrName, config.MaxTimeAttrName}
+	attrs := []string{config.LabelSetAttrName, config.EncodingAttrName, config.MetricNameAttrName, config.MaxTimeAttrName, config.ObjectNameAttrName}
 
 	if query.useServerSideAggregates {
 		query.attrs = query.aggregationParams.GetAttrNames()

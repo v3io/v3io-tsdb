@@ -161,6 +161,8 @@ type V3ioConfig struct {
 	DisableClientAggr bool `json:"disableClientAggr,omitempty"`
 	// Build Info
 	BuildInfo *BuildInfo `json:"buildInfo,omitempty"`
+	// Override nginx bug
+	DisableNginxMitigation bool `json:"disableNginxMitigation,omitempty"`
 }
 
 type MetricsReporterConfig struct {
