@@ -21,10 +21,10 @@ such restriction.
 package utils
 
 import (
+	"fmt"
 	"net/http"
 	"strings"
 
-	"fmt"
 	"github.com/nuclio/logger"
 	"github.com/pkg/errors"
 	"github.com/v3io/v3io-go-http"
