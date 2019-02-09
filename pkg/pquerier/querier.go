@@ -63,7 +63,7 @@ func (s *SelectParams) getRequestedColumns() []RequestedColumn {
 		for _, function := range functions {
 			trimmed := strings.TrimSpace(function)
 			metricName := strings.TrimSpace(metric)
-			newCol := RequestedColumn{Function: trimmed, Metric: metricName, Interpolator: "next"}
+			newCol := RequestedColumn{Function: trimmed, Metric: metricName, Interpolator: defaultInterpolation.String()}
 			columns[index] = newCol
 			index++
 		}

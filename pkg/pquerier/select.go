@@ -173,17 +173,46 @@ func (queryCtx *selectQueryContext) queryPartition(partition *partmgr.DBPartitio
 
 		newQuery := &partQuery{mint: mint, maxt: maxt, partition: partition, step: step}
 		if aggregationParams != nil {
-			newQuery.preAggregated = aggregationParams.CanAggregate(partition.AggrType())
-			if newQuery.preAggregated || !queryCtx.queryParams.disableClientAggr {
+			// Cross series aggregations cannot use server side aggregates.
+			newQuery.useServerSideAggregates = aggregationParams.CanAggregate(partition.AggrType()) && !queryCtx.isCrossSeriesAggregate
+			if newQuery.useServerSideAggregates || !queryCtx.queryParams.disableClientAggr {
 				newQuery.aggregationParams = aggregationParams
 			}
 		}
 
-		err = newQuery.getItems(queryCtx, metric, requestAggregatesAndRaw)
+		var preAggregateLabels []string
+		if newQuery.useServerSideAggregates && !requestAggregatesAndRaw {
+			preAggregateLabels = queryCtx.parsePreAggregateLabels(partition)
+		}
+		err = newQuery.getItems(queryCtx, metric, preAggregateLabels, requestAggregatesAndRaw)
 		queries = append(queries, newQuery)
 	}
 
 	return queries, err
+}
+
+func (queryCtx *selectQueryContext) parsePreAggregateLabels(partition *partmgr.DBPartition) []string {
+	if queryCtx.queryParams.GroupBy != "" {
+		groupByLabelSlice := strings.Split(queryCtx.queryParams.GroupBy, ",")
+		groupByLabelSet := make(map[string]bool)
+		for _, groupByLabel := range groupByLabelSlice {
+			groupByLabelSet[groupByLabel] = true
+		}
+	outer:
+		for _, preAggr := range partition.PreAggregates() {
+			if len(preAggr.Labels) != len(groupByLabelSet) {
+				continue
+			}
+			for _, label := range preAggr.Labels {
+				if !groupByLabelSet[label] {
+					continue outer
+				}
+			}
+			sort.Strings(groupByLabelSlice)
+			return groupByLabelSlice
+		}
+	}
+	return nil
 }
 
 func (queryCtx *selectQueryContext) startCollectors() error {
@@ -278,8 +307,7 @@ func (queryCtx *selectQueryContext) processQueryResults(query *partQuery) error 
 				queryCtx.isAllMetrics,
 				queryCtx.getResultBucketsSize(),
 				results.IsServerAggregates(),
-				queryCtx.showAggregateLabel,
-				encoding)
+				queryCtx.showAggregateLabel)
 			if err != nil {
 				return err
 			}
@@ -341,9 +369,20 @@ func (queryCtx *selectQueryContext) createColumnSpecs() ([]columnMeta, map[strin
 	for metric, cols := range columnsSpecByMetric {
 		var aggregatesMask aggregate.AggrType
 		var aggregates []aggregate.AggrType
+		var metricInterpolationType InterpolationType
 		for _, colSpec := range cols {
 			aggregatesMask |= colSpec.function
 			aggregates = append(aggregates, colSpec.function)
+
+			if metricInterpolationType == 0 {
+				if colSpec.interpolationType != 0 {
+					metricInterpolationType = colSpec.interpolationType
+				}
+			} else if colSpec.interpolationType != 0 && colSpec.interpolationType != metricInterpolationType {
+				return nil, nil, fmt.Errorf("multiple interpolation for the same metric are not supported, got %v and %v",
+					metricInterpolationType.String(),
+					colSpec.interpolationType.String())
+			}
 		}
 
 		// Add hidden aggregates only if there the user specified aggregations
@@ -353,6 +392,16 @@ func (queryCtx *selectQueryContext) createColumnSpecs() ([]columnMeta, map[strin
 				hiddenCol := columnMeta{metric: metric, function: hiddenAggr, isHidden: true}
 				columnsSpec = append(columnsSpec, hiddenCol)
 				columnsSpecByMetric[metric] = append(columnsSpecByMetric[metric], hiddenCol)
+			}
+		}
+
+		// After creating all columns set their interpolation function
+		for i := 0; i < len(columnsSpecByMetric[metric]); i++ {
+			columnsSpecByMetric[metric][i].interpolationType = metricInterpolationType
+		}
+		for i, col := range columnsSpec {
+			if col.metric == metric {
+				columnsSpec[i].interpolationType = metricInterpolationType
 			}
 		}
 	}
@@ -405,6 +454,9 @@ func (queryCtx *selectQueryContext) getResultBucketsSize() int {
 	if queryCtx.isRawQuery() {
 		return 0
 	}
+	if queryCtx.queryParams.To-queryCtx.queryParams.From == queryCtx.queryParams.Step {
+		return 1
+	}
 	return int((queryCtx.queryParams.To-queryCtx.queryParams.From)/queryCtx.queryParams.Step + 1)
 }
 
@@ -420,27 +472,31 @@ type partQuery struct {
 	attrs      []string
 	step       int64
 
-	chunk0Time        int64
-	chunkTime         int64
-	preAggregated     bool
-	aggregationParams *aggregate.AggregationParams
+	chunk0Time              int64
+	chunkTime               int64
+	useServerSideAggregates bool
+	aggregationParams       *aggregate.AggregationParams
 }
 
-func (query *partQuery) getItems(ctx *selectQueryContext, name string, aggregatesAndChunk bool) error {
+func (query *partQuery) getItems(ctx *selectQueryContext, name string, preAggregateLabels []string, aggregatesAndChunk bool) error {
 
 	path := query.partition.GetTablePath()
+	if len(preAggregateLabels) > 0 {
+		path = fmt.Sprintf("%sagg/%s/", path, strings.Join(preAggregateLabels, ","))
+	}
+
 	var shardingKeys []string
 	if name != "" {
 		shardingKeys = query.partition.GetShardingKeys(name)
 	}
-	attrs := []string{config.LabelSetAttrName, config.EncodingAttrName, config.MetricNameAttrName, config.MaxTimeAttrName}
+	attrs := []string{config.LabelSetAttrName, config.EncodingAttrName, config.MetricNameAttrName, config.MaxTimeAttrName, config.ObjectNameAttrName}
 
-	if query.preAggregated {
+	if query.useServerSideAggregates {
 		query.attrs = query.aggregationParams.GetAttrNames()
 	}
 	// It is possible to request both server aggregates and raw chunk data (to downsample) for the same metric
 	// example: `select max(cpu), avg(cpu), cpu` with step = 1h
-	if !query.preAggregated || aggregatesAndChunk {
+	if !query.useServerSideAggregates || aggregatesAndChunk {
 		chunkAttr, chunk0Time := query.partition.Range2Attrs("v", query.mint, query.maxt)
 		query.chunk0Time = chunk0Time
 		query.attrs = append(query.attrs, chunkAttr...)

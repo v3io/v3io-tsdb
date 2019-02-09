@@ -34,6 +34,7 @@ type createCommandeer struct {
 	path                   string
 	storageClass           string
 	defaultRollups         string
+	crossLabelSets         string
 	aggregationGranularity string
 	shardingBucketsCount   int
 	sampleRetention        int
@@ -50,7 +51,7 @@ func newCreateCommandeer(rootCommandeer *RootCommandeer) *createCommandeer {
 		Short: "Create a new TSDB instance",
 		Long:  `Create a new TSDB instance (table) according to the provided configuration.`,
 		Example: `- tsdbctl create -s 192.168.1.100:8081 -u myuser -p mypassword -c mycontainer -t my_tsdb -r 1/s
-- tsdbctl create -s 192.168.204.14:8081 -u janed -p OpenSesame -c bigdata -t my_dbs/metrics_table -r 60/m -a "min,avg,stddev" -i 3h
+- tsdbctl create -s 192.168.204.14:8081 -u janed -p OpenSesame -c bigdata -t my_dbs/metrics_table -r 60/m -a "min,avg,stddev" -i 3h -l label1,label2;label3
 - tsdbctl create -g ~/my_tsdb_cfg.yaml -k 9c1f3e75-a521-4b0d-b640-68c86417df2f -c admin_container -t perf_metrics -r "100/h"
   (where ~/my_tsdb_cfg.yaml sets "webApiEndpoint" to the endpoint of the web-gateway service)`,
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -62,6 +63,8 @@ func newCreateCommandeer(rootCommandeer *RootCommandeer) *createCommandeer {
 
 	cmd.Flags().StringVarP(&commandeer.defaultRollups, "aggregates", "a", "",
 		"Default aggregates to calculate in real time during\nthe samples ingestion, as a comma-separated list of\nsupported aggregation functions - count | avg | sum |\nmin | max | stddev | stdvar | last | rate.\nExample: \"sum,avg,max\".")
+	cmd.Flags().StringVarP(&commandeer.crossLabelSets, "cross-label", "l", "",
+		"Label sets for which cross-label pre-aggregations should be created. Must be used in conjunction with -a.\nExample: \"label1,label2;label3\".")
 	cmd.Flags().StringVarP(&commandeer.aggregationGranularity, "aggregation-granularity", "i", config.DefaultAggregationGranularity,
 		"Aggregation granularity - a time interval for applying\nthe aggregation functions (if  configured - see the\n-a|--aggregates flag), of the format \"[0-9]+[mhd]\"\n(where 'm' = minutes, 'h' = hours, and 'd' = days).\nExamples: \"2h\"; \"90m\".")
 	cmd.Flags().IntVarP(&commandeer.shardingBucketsCount, "sharding-buckets", "b", config.DefaultShardingBucketsCount,
@@ -88,7 +91,8 @@ func (cc *createCommandeer) create() error {
 		cc.rootCommandeer.v3iocfg,
 		cc.samplesIngestionRate,
 		cc.aggregationGranularity,
-		cc.defaultRollups)
+		cc.defaultRollups,
+		cc.crossLabelSets)
 
 	if err != nil {
 		return errors.Wrap(err, "Failed to create a TSDB schema.")

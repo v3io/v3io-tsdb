@@ -207,6 +207,14 @@ func (sc *SyncContainer) GetItems(input *GetItemsInput) (*Response, error) {
 		body["Segment"] = input.Segment
 	}
 
+	if input.SortKeyRangeStart != "" {
+		body["SortKeyRangeStart"] = input.SortKeyRangeStart
+	}
+
+	if input.SortKeyRangeEnd != "" {
+		body["SortKeyRangeEnd"] = input.SortKeyRangeEnd
+	}
+
 	marshalledBody, err := json.Marshal(body)
 	if err != nil {
 		return nil, err
@@ -234,6 +242,13 @@ func (sc *SyncContainer) GetItems(input *GetItemsInput) (*Response, error) {
 	err = json.Unmarshal(response.Body(), &getItemsResponse)
 	if err != nil {
 		return nil, err
+	}
+
+	//validate getItems response to avoid infinite loop
+	if getItemsResponse.LastItemIncluded != "TRUE" && (getItemsResponse.NextMarker == "" || getItemsResponse.NextMarker == input.Marker) {
+		errMsg := fmt.Sprintf("Invalid getItems response: lastItemIncluded='false' and nextMarker='%s', " +
+			"startMarker='%s', probably due to object size bigger than 2M. Query is: %+v", getItemsResponse.NextMarker, input.Marker, input)
+		sc.logger.Warn(errMsg)
 	}
 
 	getItemsOutput := GetItemsOutput{

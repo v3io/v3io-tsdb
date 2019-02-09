@@ -34,7 +34,7 @@ type testInterpolationSuite struct {
 func (suite *testInterpolationSuite) TestNone() {
 	fntype, err := StrToInterpolateType("")
 	suite.Require().Nil(err)
-	fn := GetInterpolateFunc(fntype)
+	fn := GetInterpolateFunc(fntype, math.MaxInt64)
 	t, v := fn(10, 110, 60, 100, 200)
 	suite.Require().Equal(t, int64(110))
 	suite.Require().Equal(v, 200.0)
@@ -43,7 +43,7 @@ func (suite *testInterpolationSuite) TestNone() {
 func (suite *testInterpolationSuite) TestNaN() {
 	fntype, err := StrToInterpolateType("nan")
 	suite.Require().Nil(err)
-	fn := GetInterpolateFunc(fntype)
+	fn := GetInterpolateFunc(fntype, math.MaxInt64)
 	t, v := fn(10, 110, 60, 100, 200)
 	suite.Require().Equal(t, int64(60))
 	suite.Require().Equal(math.IsNaN(v), true)
@@ -52,7 +52,7 @@ func (suite *testInterpolationSuite) TestNaN() {
 func (suite *testInterpolationSuite) TestPrev() {
 	fntype, err := StrToInterpolateType("prev")
 	suite.Require().Nil(err)
-	fn := GetInterpolateFunc(fntype)
+	fn := GetInterpolateFunc(fntype, math.MaxInt64)
 	t, v := fn(10, 110, 60, 100, 200)
 	suite.Require().Equal(t, int64(60))
 	suite.Require().Equal(v, 100.0)
@@ -61,7 +61,7 @@ func (suite *testInterpolationSuite) TestPrev() {
 func (suite *testInterpolationSuite) TestNext() {
 	fntype, err := StrToInterpolateType("next")
 	suite.Require().Nil(err)
-	fn := GetInterpolateFunc(fntype)
+	fn := GetInterpolateFunc(fntype, math.MaxInt64)
 	t, v := fn(10, 110, 60, 100, 200)
 	suite.Require().Equal(t, int64(60))
 	suite.Require().Equal(v, 200.0)
@@ -70,7 +70,7 @@ func (suite *testInterpolationSuite) TestNext() {
 func (suite *testInterpolationSuite) TestLin() {
 	fntype, err := StrToInterpolateType("lin")
 	suite.Require().Nil(err)
-	fn := GetInterpolateFunc(fntype)
+	fn := GetInterpolateFunc(fntype, math.MaxInt64)
 	t, v := fn(10, 110, 60, 100, 200)
 	suite.Require().Equal(t, int64(60))
 	suite.Require().Equal(v, 150.0)

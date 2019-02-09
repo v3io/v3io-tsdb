@@ -10,16 +10,21 @@ import (
 	"github.com/v3io/v3io-tsdb/pkg/utils"
 )
 
-func NewDataFrameColumnSeries(indexColumn, dataColumn, countColumn Column, labels utils.Labels, hash uint64, showAggregateLabel bool, encoding chunkenc.Encoding) *DataFrameColumnSeries {
+func NewDataFrameColumnSeries(indexColumn, dataColumn, countColumn Column, labels utils.Labels, hash uint64, showAggregateLabel bool) *DataFrameColumnSeries {
 	// If we need to return the Aggregate label then add it, otherwise (for example in prometheus) return labels without it
 	if showAggregateLabel {
 		labels = append(labels, utils.LabelsFromStringList(aggregate.AggregateLabel, dataColumn.GetColumnSpec().function.String())...)
 	}
 
+	wantedMetricName := dataColumn.GetColumnSpec().alias
+	if wantedMetricName == "" {
+		wantedMetricName = dataColumn.GetColumnSpec().metric
+	}
+
 	// The labels we get from the Dataframe are agnostic to the metric name, since there might be several metrics in one Dataframe
-	labels = append(labels, utils.LabelsFromStringList(config.PrometheusMetricNameAttribute, dataColumn.GetColumnSpec().metric)...)
+	labels = append(labels, utils.LabelsFromStringList(config.PrometheusMetricNameAttribute, wantedMetricName)...)
 	s := &DataFrameColumnSeries{labels: labels, key: hash}
-	s.iter = &dataFrameColumnSeriesIterator{indexColumn: indexColumn, dataColumn: dataColumn, countColumn: countColumn, currentIndex: -1, encoding: encoding}
+	s.iter = &dataFrameColumnSeriesIterator{indexColumn: indexColumn, dataColumn: dataColumn, countColumn: countColumn, currentIndex: -1}
 	return s
 }
 
@@ -43,7 +48,6 @@ type dataFrameColumnSeriesIterator struct {
 
 	currentIndex int
 	err          error
-	encoding     chunkenc.Encoding
 }
 
 func (it *dataFrameColumnSeriesIterator) Seek(seekT int64) bool {
@@ -101,7 +105,13 @@ func (it *dataFrameColumnSeriesIterator) Next() bool {
 
 func (it *dataFrameColumnSeriesIterator) Err() error { return it.err }
 
-func (it *dataFrameColumnSeriesIterator) Encoding() chunkenc.Encoding { return it.encoding }
+func (it *dataFrameColumnSeriesIterator) Encoding() chunkenc.Encoding {
+	enc := chunkenc.EncXOR
+	if it.dataColumn.DType() == StringType {
+		enc = chunkenc.EncVariant
+	}
+	return enc
+}
 
 func (it *dataFrameColumnSeriesIterator) getNextValidCell(from int) (nextIndex int) {
 	for nextIndex = from + 1; nextIndex < it.dataColumn.Len() && !it.doesCellHasData(nextIndex); nextIndex++ {
