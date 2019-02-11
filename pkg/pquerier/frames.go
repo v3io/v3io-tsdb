@@ -23,13 +23,13 @@ type frameIterator struct {
 
 // create new frame set iterator, frame iter has a SeriesSet interface (for Prometheus) plus columnar interfaces
 func NewFrameIterator(ctx *selectQueryContext) (*frameIterator, error) {
-	//if !ctx.isRawQuery() {
-	for _, f := range ctx.frameList {
-		if err := f.finishAllColumns(); err != nil {
-			return nil, err
+	if !ctx.isRawQuery() {
+		for _, f := range ctx.frameList {
+			if err := f.finishAllColumns(); err != nil {
+				return nil, err
+			}
 		}
 	}
-	//}
 
 	return &frameIterator{ctx: ctx, columnNum: ctx.totalColumns, setIndex: 0, seriesIndex: -1}, nil
 }
@@ -382,9 +382,7 @@ func (d *dataFrame) finishAllColumns() error {
 		}
 	}
 
-	if d.index != nil {
-		d.index.finish()
-	}
+	d.index.finish()
 
 	return nil
 }
