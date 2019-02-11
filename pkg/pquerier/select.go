@@ -40,8 +40,6 @@ type selectQueryContext struct {
 	requestChannels []chan *qryResults
 	errorChannel    chan error
 	wg              sync.WaitGroup
-
-	timeColumn Column
 }
 
 func (queryCtx *selectQueryContext) start(parts []*partmgr.DBPartition, params *SelectParams) (*frameIterator, error) {
@@ -396,11 +394,8 @@ func (queryCtx *selectQueryContext) getOrCreateTimeColumn() Column {
 	if queryCtx.isRawQuery() {
 		return nil
 	}
-	if queryCtx.timeColumn == nil {
-		queryCtx.timeColumn = queryCtx.generateTimeColumn()
-	}
 
-	return queryCtx.timeColumn
+	return queryCtx.generateTimeColumn()
 }
 
 func (queryCtx *selectQueryContext) generateTimeColumn() Column {

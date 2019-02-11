@@ -353,6 +353,7 @@ func (d *dataFrame) finishAllColumns() error {
 		}
 	}
 
+	var columnSize int
 	var err error
 	for _, col := range d.columns {
 		switch col.(type) {
@@ -360,14 +361,20 @@ func (d *dataFrame) finishAllColumns() error {
 			err = col.finish()
 		case *ConcreteColumn:
 			err = col.finish()
+			if columnSize == 0 {
+				columnSize = col.FramesColumn().Len()
+			} else if columnSize != col.FramesColumn().Len() {
+				return fmt.Errorf("columns length mismath %v!=%v col=%v", columnSize, col.FramesColumn().Len(), col.Name())
+			}
 		}
 		if err != nil {
 			return err
 		}
 	}
 	for _, col := range d.columns {
-		switch col.(type) {
+		switch newCol := col.(type) {
 		case *virtualColumn:
+			newCol.size = columnSize
 			err = col.finish()
 		}
 		if err != nil {
