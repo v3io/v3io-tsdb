@@ -21,6 +21,7 @@ such restriction.
 package config
 
 import (
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -283,13 +284,29 @@ func WithDefaults(cfg *V3ioConfig) *V3ioConfig {
 
 // Create new configuration structure instance based on given instance.
 // All matching attributes within result structure will be overwritten with values of newCfg
-func (currentCfg *V3ioConfig) Merge(newCfg *V3ioConfig) (*V3ioConfig, error) {
-	resultCfg, err := currentCfg.merge(newCfg)
+func (config *V3ioConfig) Merge(newCfg *V3ioConfig) (*V3ioConfig, error) {
+	resultCfg, err := config.merge(newCfg)
 	if err != nil {
 		return nil, err
 	}
 
 	return resultCfg, nil
+}
+
+func (config V3ioConfig) String() string {
+	if config.Password != "" {
+		config.Password = "SANITIZED"
+	}
+	if config.AccessKey != "" {
+		config.AccessKey = "SANITIZED"
+	}
+
+	sanitizedConfigJson, err := json.Marshal(&config)
+	if err == nil {
+		return string(sanitizedConfigJson)
+	} else {
+		return fmt.Sprintf("Unable to read config: %v", err)
+	}
 }
 
 func (*V3ioConfig) merge(cfg *V3ioConfig) (*V3ioConfig, error) {
