@@ -2276,6 +2276,507 @@ func (suite *testQuerySuite) toMillis(date string) int64 {
 	return t.Unix() * 1000
 }
 
+func (suite *testQuerySuite) TestCrossSeriesAggregatesTimesFallsOnStep() {
+	adapter, err := tsdb.NewV3ioAdapter(suite.v3ioConfig, nil, nil)
+	suite.Require().NoError(err, "failed to create v3io adapter")
+
+	labels1 := utils.LabelsFromStringList("os", "linux")
+	labels2 := utils.LabelsFromStringList("os", "mac")
+	numberOfEvents := 10
+	eventsInterval := 60 * 1000
+	baseTime := tsdbtest.NanosToMillis(time.Now().UnixNano()) - int64(numberOfEvents*eventsInterval)
+
+	ingestedData := []tsdbtest.DataPoint{{baseTime, 10},
+		{baseTime + 2*tsdbtest.MinuteInMillis, 20},
+		{baseTime + 4*tsdbtest.MinuteInMillis, 30}}
+	ingestedData2 := []tsdbtest.DataPoint{{baseTime, 20},
+		{baseTime + 2*tsdbtest.MinuteInMillis, 30},
+		{baseTime + 4*tsdbtest.MinuteInMillis, 40}}
+	testParams := tsdbtest.NewTestParams(suite.T(),
+		tsdbtest.TestOption{
+			Key: tsdbtest.OptTimeSeries,
+			Value: tsdbtest.TimeSeries{tsdbtest.Metric{
+				Name:   "cpu",
+				Labels: labels1,
+				Data:   ingestedData},
+				tsdbtest.Metric{
+					Name:   "cpu",
+					Labels: labels2,
+					Data:   ingestedData2},
+			}})
+	tsdbtest.InsertData(suite.T(), testParams)
+
+	expected := map[string][]tsdbtest.DataPoint{
+		"sum": {{Time: baseTime, Value: 30},
+			{Time: baseTime + 2*tsdbtest.MinuteInMillis, Value: 50},
+			{Time: baseTime + 4*tsdbtest.MinuteInMillis, Value: 70}},
+		"min": {{Time: baseTime, Value: 10},
+			{Time: baseTime + 2*tsdbtest.MinuteInMillis, Value: 20},
+			{Time: baseTime + 4*tsdbtest.MinuteInMillis, Value: 30}},
+		"avg": {{Time: baseTime, Value: 15},
+			{Time: baseTime + 2*tsdbtest.MinuteInMillis, Value: 25},
+			{Time: baseTime + 4*tsdbtest.MinuteInMillis, Value: 35}}}
+
+	querierV2, err := adapter.QuerierV2()
+	suite.Require().NoError(err, "failed to create querier v2")
+
+	params := &pquerier.SelectParams{Name: "cpu", Functions: "sum_all,min_all,avg_all", Step: 2 * 60 * 1000, From: baseTime, To: baseTime + int64(numberOfEvents*eventsInterval)}
+	set, err := querierV2.Select(params)
+	suite.Require().NoError(err, "Failed to execute query")
+
+	var seriesCount int
+	for set.Next() {
+		seriesCount++
+		iter := set.At().Iterator()
+
+		data, err := tsdbtest.IteratorToSlice(iter)
+		agg := set.At().Labels().Get(aggregate.AggregateLabel)
+		if err != nil {
+			suite.T().Fatal(err)
+		}
+
+		suite.Require().Equal(expected[agg], data, "queried data does not match expected")
+	}
+
+	suite.Require().Equal(len(expected), seriesCount, "series count didn't match expected")
+}
+
+func (suite *testQuerySuite) TestCrossSeriesAggregates() {
+	adapter, err := tsdb.NewV3ioAdapter(suite.v3ioConfig, nil, nil)
+	suite.Require().NoError(err, "failed to create v3io adapter")
+
+	labels1 := utils.LabelsFromStringList("os", "linux")
+	labels2 := utils.LabelsFromStringList("os", "mac")
+	numberOfEvents := 10
+	eventsInterval := 60 * 1000
+	baseTime := tsdbtest.NanosToMillis(time.Now().UnixNano()) - int64(numberOfEvents*eventsInterval)
+
+	ingestedData := []tsdbtest.DataPoint{{baseTime, 10},
+		{baseTime + 1*tsdbtest.MinuteInMillis, 1},
+		{baseTime + 2*tsdbtest.MinuteInMillis, 20},
+		{baseTime + 3*tsdbtest.MinuteInMillis, 1},
+		{baseTime + 4*tsdbtest.MinuteInMillis, 30}}
+	ingestedData2 := []tsdbtest.DataPoint{{baseTime, 20},
+		{baseTime + 1*tsdbtest.MinuteInMillis, 1},
+		{baseTime + 2*tsdbtest.MinuteInMillis, 30},
+		{baseTime + 3*tsdbtest.MinuteInMillis, 1},
+		{baseTime + 4*tsdbtest.MinuteInMillis, 40}}
+	testParams := tsdbtest.NewTestParams(suite.T(),
+		tsdbtest.TestOption{
+			Key: tsdbtest.OptTimeSeries,
+			Value: tsdbtest.TimeSeries{tsdbtest.Metric{
+				Name:   "cpu",
+				Labels: labels1,
+				Data:   ingestedData},
+				tsdbtest.Metric{
+					Name:   "cpu",
+					Labels: labels2,
+					Data:   ingestedData2},
+			}})
+	tsdbtest.InsertData(suite.T(), testParams)
+
+	expected := map[string][]tsdbtest.DataPoint{
+		"sum": {{Time: baseTime, Value: 30},
+			{Time: baseTime + 2*tsdbtest.MinuteInMillis, Value: 50},
+			{Time: baseTime + 4*tsdbtest.MinuteInMillis, Value: 70}},
+		"min": {{Time: baseTime, Value: 10},
+			{Time: baseTime + 2*tsdbtest.MinuteInMillis, Value: 20},
+			{Time: baseTime + 4*tsdbtest.MinuteInMillis, Value: 30}},
+		"avg": {{Time: baseTime, Value: 15},
+			{Time: baseTime + 2*tsdbtest.MinuteInMillis, Value: 25},
+			{Time: baseTime + 4*tsdbtest.MinuteInMillis, Value: 35}}}
+
+	querierV2, err := adapter.QuerierV2()
+	suite.Require().NoError(err, "failed to create querier v2")
+
+	params := &pquerier.SelectParams{Name: "cpu", Functions: "sum_all,min_all,avg_all", Step: 2 * 60 * 1000, From: baseTime, To: baseTime + int64(numberOfEvents*eventsInterval)}
+	set, err := querierV2.Select(params)
+	suite.Require().NoError(err, "Failed to execute query")
+
+	var seriesCount int
+	for set.Next() {
+		seriesCount++
+		iter := set.At().Iterator()
+
+		data, err := tsdbtest.IteratorToSlice(iter)
+		agg := set.At().Labels().Get(aggregate.AggregateLabel)
+		if err != nil {
+			suite.T().Fatal(err)
+		}
+
+		suite.Require().Equal(expected[agg], data, "queried data does not match expected")
+	}
+
+	suite.Require().Equal(len(expected), seriesCount, "series count didn't match expected")
+}
+
+func (suite *testQuerySuite) TestCrossSeriesAggregatesMultiPartition() {
+	adapter, err := tsdb.NewV3ioAdapter(suite.v3ioConfig, nil, nil)
+	suite.Require().NoError(err, "failed to create v3io adapter")
+
+	labels1 := utils.LabelsFromStringList("os", "linux")
+	labels2 := utils.LabelsFromStringList("os", "mac")
+	numberOfEvents := 10
+	eventsInterval := 60 * 1000
+	baseTime := tsdbtest.NanosToMillis(time.Now().UnixNano()) - int64(numberOfEvents*eventsInterval)
+
+	ingestedData := []tsdbtest.DataPoint{{baseTime - 7*tsdbtest.DaysInMillis, 10},
+		{baseTime - 7*tsdbtest.DaysInMillis + 1*tsdbtest.MinuteInMillis, 1},
+		{baseTime, 20},
+		{baseTime + 1*tsdbtest.MinuteInMillis, 1},
+		{baseTime + 2*tsdbtest.MinuteInMillis, 60}}
+	ingestedData2 := []tsdbtest.DataPoint{{baseTime - 7*tsdbtest.DaysInMillis, 20},
+		{baseTime - 7*tsdbtest.DaysInMillis + 1*tsdbtest.MinuteInMillis, 1},
+		{baseTime, 30},
+		{baseTime + 1*tsdbtest.MinuteInMillis, 1},
+		{baseTime + 2*tsdbtest.MinuteInMillis, 40}}
+	testParams := tsdbtest.NewTestParams(suite.T(),
+		tsdbtest.TestOption{
+			Key: tsdbtest.OptTimeSeries,
+			Value: tsdbtest.TimeSeries{tsdbtest.Metric{
+				Name:   "cpu",
+				Labels: labels1,
+				Data:   ingestedData},
+				tsdbtest.Metric{
+					Name:   "cpu",
+					Labels: labels2,
+					Data:   ingestedData2},
+			}})
+	tsdbtest.InsertData(suite.T(), testParams)
+
+	expected := map[string][]tsdbtest.DataPoint{
+		"max": {{Time: baseTime - 7*tsdbtest.DaysInMillis, Value: 20},
+			{Time: baseTime, Value: 30},
+			{Time: baseTime + 2*tsdbtest.MinuteInMillis, Value: 60}}}
+
+	querierV2, err := adapter.QuerierV2()
+	suite.Require().NoError(err, "failed to create querier v2")
+
+	params := &pquerier.SelectParams{Name: "cpu", Functions: "max_all", Step: 2 * 60 * 1000, From: baseTime - 7*tsdbtest.DaysInMillis, To: baseTime + int64(numberOfEvents*eventsInterval)}
+	set, err := querierV2.Select(params)
+	suite.Require().NoError(err, "Failed to execute query")
+
+	var seriesCount int
+	for set.Next() {
+		seriesCount++
+		iter := set.At().Iterator()
+
+		data, err := tsdbtest.IteratorToSlice(iter)
+		agg := set.At().Labels().Get(aggregate.AggregateLabel)
+		if err != nil {
+			suite.T().Fatal(err)
+		}
+
+		suite.Require().Equal(expected[agg], data, "queried data does not match expected")
+	}
+
+	suite.Require().Equal(len(expected), seriesCount, "series count didn't match expected")
+}
+
+func (suite *testQuerySuite) TestCrossSeriesAggregatesWithInterpolation() {
+	adapter, err := tsdb.NewV3ioAdapter(suite.v3ioConfig, nil, nil)
+	suite.Require().NoError(err, "failed to create v3io adapter")
+
+	labels1 := utils.LabelsFromStringList("os", "linux")
+	labels2 := utils.LabelsFromStringList("os", "mac")
+	numberOfEvents := 10
+	eventsInterval := 60 * 1000
+	baseTime := tsdbtest.NanosToMillis(time.Now().UnixNano()) - int64(numberOfEvents*eventsInterval)
+
+	ingestedData := []tsdbtest.DataPoint{{baseTime, 10},
+		{baseTime + 1*tsdbtest.MinuteInMillis, 20},
+		{baseTime + 3*tsdbtest.MinuteInMillis, 30},
+		{baseTime + 5*tsdbtest.MinuteInMillis, 40}}
+	ingestedData2 := []tsdbtest.DataPoint{{baseTime, 20},
+		{baseTime + 2*tsdbtest.MinuteInMillis, 30},
+		{baseTime + 4*tsdbtest.MinuteInMillis, 40}}
+	testParams := tsdbtest.NewTestParams(suite.T(),
+		tsdbtest.TestOption{
+			Key: tsdbtest.OptTimeSeries,
+			Value: tsdbtest.TimeSeries{tsdbtest.Metric{
+				Name:   "cpu",
+				Labels: labels1,
+				Data:   ingestedData},
+				tsdbtest.Metric{
+					Name:   "cpu",
+					Labels: labels2,
+					Data:   ingestedData2},
+			}})
+	tsdbtest.InsertData(suite.T(), testParams)
+
+	expected := map[string][]tsdbtest.DataPoint{
+		"sum": {{Time: baseTime, Value: 30},
+			{Time: baseTime + 2*tsdbtest.MinuteInMillis, Value: 50},
+			{Time: baseTime + 4*tsdbtest.MinuteInMillis, Value: 70}},
+		"min": {{Time: baseTime, Value: 10},
+			{Time: baseTime + 2*tsdbtest.MinuteInMillis, Value: 20},
+			{Time: baseTime + 4*tsdbtest.MinuteInMillis, Value: 30}},
+		"max": {{Time: baseTime, Value: 20},
+			{Time: baseTime + 2*tsdbtest.MinuteInMillis, Value: 30},
+			{Time: baseTime + 4*tsdbtest.MinuteInMillis, Value: 40}}}
+
+	querierV2, err := adapter.QuerierV2()
+	suite.Require().NoError(err, "failed to create querier v2")
+
+	selectParams, _, err := pquerier.ParseQuery("select sum_all(prev(cpu)), min_all(prev(cpu)), max_all(prev(cpu))")
+	suite.NoError(err)
+	selectParams.Step = 2 * tsdbtest.MinuteInMillis
+	selectParams.From = baseTime
+	selectParams.To = baseTime + 5*tsdbtest.MinuteInMillis
+	set, err := querierV2.Select(selectParams)
+	suite.Require().NoError(err, "Failed to execute query")
+
+	var seriesCount int
+	for set.Next() {
+		seriesCount++
+		iter := set.At().Iterator()
+
+		data, err := tsdbtest.IteratorToSlice(iter)
+		agg := set.At().Labels().Get(aggregate.AggregateLabel)
+		if err != nil {
+			suite.T().Fatal(err)
+		}
+
+		suite.Require().Equal(expected[agg], data, "queried data does not match expected")
+	}
+
+	suite.Require().Equal(len(expected), seriesCount, "series count didn't match expected")
+}
+
+func (suite *testQuerySuite) TestCrossSeriesAggregatesMultiPartitionExactlyOnStep() {
+	adapter, err := tsdb.NewV3ioAdapter(suite.v3ioConfig, nil, nil)
+	suite.Require().NoError(err, "failed to create v3io adapter")
+
+	labels1 := utils.LabelsFromStringList("os", "linux")
+	labels2 := utils.LabelsFromStringList("os", "mac")
+	numberOfEvents := 10
+	eventsInterval := 60 * 1000
+	baseTime := tsdbtest.NanosToMillis(time.Now().UnixNano()) - int64(numberOfEvents*eventsInterval)
+
+	ingestedData := []tsdbtest.DataPoint{{baseTime - 7*tsdbtest.DaysInMillis, 10},
+		{baseTime - 7*tsdbtest.DaysInMillis + 1*tsdbtest.MinuteInMillis, 1},
+		{baseTime, 20},
+		{baseTime + 1*tsdbtest.MinuteInMillis, 1},
+		{baseTime + 2*tsdbtest.MinuteInMillis, 60}}
+	ingestedData2 := []tsdbtest.DataPoint{{baseTime - 7*tsdbtest.DaysInMillis, 20},
+		{baseTime - 7*tsdbtest.DaysInMillis + 1*tsdbtest.MinuteInMillis, 1},
+		{baseTime, 30},
+		{baseTime + 1*tsdbtest.MinuteInMillis, 1},
+		{baseTime + 2*tsdbtest.MinuteInMillis, 40}}
+	testParams := tsdbtest.NewTestParams(suite.T(),
+		tsdbtest.TestOption{
+			Key: tsdbtest.OptTimeSeries,
+			Value: tsdbtest.TimeSeries{tsdbtest.Metric{
+				Name:   "cpu",
+				Labels: labels1,
+				Data:   ingestedData},
+				tsdbtest.Metric{
+					Name:   "cpu",
+					Labels: labels2,
+					Data:   ingestedData2},
+			}})
+	tsdbtest.InsertData(suite.T(), testParams)
+
+	expected := map[string][]tsdbtest.DataPoint{
+		"sum": {{Time: baseTime - 7*tsdbtest.DaysInMillis, Value: 30},
+			{Time: baseTime, Value: 50},
+			{Time: baseTime + 2*tsdbtest.MinuteInMillis, Value: 100}},
+		"min": {{Time: baseTime - 7*tsdbtest.DaysInMillis, Value: 10},
+			{Time: baseTime, Value: 20},
+			{Time: baseTime + 2*tsdbtest.MinuteInMillis, Value: 40}},
+		"avg": {{Time: baseTime - 7*tsdbtest.DaysInMillis, Value: 15},
+			{Time: baseTime, Value: 25},
+			{Time: baseTime + 2*tsdbtest.MinuteInMillis, Value: 50}}}
+
+	querierV2, err := adapter.QuerierV2()
+	suite.Require().NoError(err, "failed to create querier v2")
+
+	selectParams, _, err := pquerier.ParseQuery("select sum_all(prev(cpu)), min_all(prev(cpu)),avg_all(prev(cpu))")
+	suite.NoError(err)
+	selectParams.Step = 2 * tsdbtest.MinuteInMillis
+	selectParams.From = baseTime - 7*tsdbtest.DaysInMillis
+	selectParams.To = baseTime + 5*tsdbtest.MinuteInMillis
+	set, err := querierV2.Select(selectParams)
+	suite.Require().NoError(err, "Failed to execute query")
+
+	var seriesCount int
+	for set.Next() {
+		seriesCount++
+		iter := set.At().Iterator()
+
+		data, err := tsdbtest.IteratorToSlice(iter)
+		agg := set.At().Labels().Get(aggregate.AggregateLabel)
+		if err != nil {
+			suite.T().Fatal(err)
+		}
+
+		suite.Require().Equal(expected[agg], data, "queried data does not match expected")
+	}
+
+	suite.Require().Equal(len(expected), seriesCount, "series count didn't match expected")
+}
+
+func (suite *testQuerySuite) TestCrossSeriesAggregatesMultiPartitionWithInterpolation() {
+	adapter, err := tsdb.NewV3ioAdapter(suite.v3ioConfig, nil, nil)
+	suite.Require().NoError(err, "failed to create v3io adapter")
+
+	labels1 := utils.LabelsFromStringList("os", "linux")
+	labels2 := utils.LabelsFromStringList("os", "mac")
+	numberOfEvents := 10
+	eventsInterval := 60 * 1000
+	baseTime := tsdbtest.NanosToMillis(time.Now().UnixNano()) - int64(numberOfEvents*eventsInterval)
+
+	ingestedData := []tsdbtest.DataPoint{{baseTime - 7*tsdbtest.DaysInMillis, 10},
+		{baseTime - 7*tsdbtest.DaysInMillis + 1*tsdbtest.MinuteInMillis, 1},
+		{baseTime - 7*tsdbtest.DaysInMillis + 3*tsdbtest.MinuteInMillis, 20},
+		{baseTime, 20},
+		{baseTime + 1*tsdbtest.MinuteInMillis, 1},
+		{baseTime + 2*tsdbtest.MinuteInMillis, 60}}
+	ingestedData2 := []tsdbtest.DataPoint{{baseTime - 7*tsdbtest.DaysInMillis, 20},
+		{baseTime - 7*tsdbtest.DaysInMillis + 2*tsdbtest.MinuteInMillis, 1},
+		{baseTime, 30},
+		{baseTime + 1*tsdbtest.MinuteInMillis, 1},
+		{baseTime + 3*tsdbtest.MinuteInMillis, 40}}
+	testParams := tsdbtest.NewTestParams(suite.T(),
+		tsdbtest.TestOption{
+			Key: tsdbtest.OptTimeSeries,
+			Value: tsdbtest.TimeSeries{tsdbtest.Metric{
+				Name:   "cpu",
+				Labels: labels1,
+				Data:   ingestedData},
+				tsdbtest.Metric{
+					Name:   "cpu",
+					Labels: labels2,
+					Data:   ingestedData2},
+			}})
+	tsdbtest.InsertData(suite.T(), testParams)
+
+	expected := map[string][]tsdbtest.DataPoint{
+		"sum": {{Time: baseTime - 7*tsdbtest.DaysInMillis, Value: 30},
+			{Time: baseTime - 7*tsdbtest.DaysInMillis + 2*tsdbtest.MinuteInMillis, Value: 2},
+			{Time: baseTime - 7*tsdbtest.DaysInMillis + 4*tsdbtest.MinuteInMillis, Value: 21},
+			{Time: baseTime - 7*tsdbtest.DaysInMillis + 6*tsdbtest.MinuteInMillis, Value: 21},
+			{Time: baseTime, Value: 50},
+			{Time: baseTime + 2*tsdbtest.MinuteInMillis, Value: 61}},
+		"count": {{Time: baseTime - 7*tsdbtest.DaysInMillis, Value: 2},
+			{Time: baseTime - 7*tsdbtest.DaysInMillis + 2*tsdbtest.MinuteInMillis, Value: 2},
+			{Time: baseTime - 7*tsdbtest.DaysInMillis + 4*tsdbtest.MinuteInMillis, Value: 2},
+			{Time: baseTime - 7*tsdbtest.DaysInMillis + 6*tsdbtest.MinuteInMillis, Value: 2},
+			{Time: baseTime, Value: 2},
+			{Time: baseTime + 2*tsdbtest.MinuteInMillis, Value: 2}},
+		"min": {{Time: baseTime - 7*tsdbtest.DaysInMillis, Value: 10},
+			{Time: baseTime - 7*tsdbtest.DaysInMillis + 2*tsdbtest.MinuteInMillis, Value: 1},
+			{Time: baseTime - 7*tsdbtest.DaysInMillis + 4*tsdbtest.MinuteInMillis, Value: 1},
+			{Time: baseTime - 7*tsdbtest.DaysInMillis + 6*tsdbtest.MinuteInMillis, Value: 1},
+			{Time: baseTime, Value: 20},
+			{Time: baseTime + 2*tsdbtest.MinuteInMillis, Value: 1}},
+		"avg": {{Time: baseTime - 7*tsdbtest.DaysInMillis, Value: 15},
+			{Time: baseTime - 7*tsdbtest.DaysInMillis + 2*tsdbtest.MinuteInMillis, Value: 1},
+			{Time: baseTime - 7*tsdbtest.DaysInMillis + 4*tsdbtest.MinuteInMillis, Value: 10.5},
+			{Time: baseTime - 7*tsdbtest.DaysInMillis + 6*tsdbtest.MinuteInMillis, Value: 10.5},
+			{Time: baseTime, Value: 25},
+			{Time: baseTime + 2*tsdbtest.MinuteInMillis, Value: 30.5}}}
+
+	querierV2, err := adapter.QuerierV2()
+	suite.Require().NoError(err, "failed to create querier v2")
+
+	selectParams, _, err := pquerier.ParseQuery("select sum_all(prev(cpu)), min_all(prev(cpu)),avg_all(prev(cpu)),count_all(prev(cpu))")
+	suite.NoError(err)
+	selectParams.Step = 2 * tsdbtest.MinuteInMillis
+	selectParams.From = baseTime - 7*tsdbtest.DaysInMillis
+	selectParams.To = baseTime + 5*tsdbtest.MinuteInMillis
+	set, err := querierV2.Select(selectParams)
+	suite.Require().NoError(err, "Failed to execute query")
+
+	var seriesCount int
+	for set.Next() {
+		seriesCount++
+		iter := set.At().Iterator()
+
+		data, err := tsdbtest.IteratorToSlice(iter)
+		agg := set.At().Labels().Get(aggregate.AggregateLabel)
+		if err != nil {
+			suite.T().Fatal(err)
+		}
+
+		suite.Require().Equal(expected[agg], data, "queried data does not match expected")
+	}
+
+	suite.Require().Equal(len(expected), seriesCount, "series count didn't match expected")
+}
+
+func (suite *testQuerySuite) TestCrossSeriesAggregatesWithInterpolationOverTolerance() {
+	adapter, err := tsdb.NewV3ioAdapter(suite.v3ioConfig, nil, nil)
+	suite.Require().NoError(err, "failed to create v3io adapter")
+
+	labels1 := utils.LabelsFromStringList("os", "linux")
+	labels2 := utils.LabelsFromStringList("os", "mac")
+	numberOfEvents := 10
+	eventsInterval := 60 * 1000
+	baseTime := tsdbtest.NanosToMillis(time.Now().UnixNano()) - int64(numberOfEvents*eventsInterval)
+
+	ingestedData := []tsdbtest.DataPoint{{baseTime, 10},
+		{baseTime + 1*tsdbtest.MinuteInMillis, 20},
+		{baseTime + 10*tsdbtest.MinuteInMillis, 30}}
+	ingestedData2 := []tsdbtest.DataPoint{{baseTime, 20},
+		{baseTime + 5*tsdbtest.MinuteInMillis, 30},
+		{baseTime + 10*tsdbtest.MinuteInMillis, 40}}
+	testParams := tsdbtest.NewTestParams(suite.T(),
+		tsdbtest.TestOption{
+			Key: tsdbtest.OptTimeSeries,
+			Value: tsdbtest.TimeSeries{tsdbtest.Metric{
+				Name:   "cpu",
+				Labels: labels1,
+				Data:   ingestedData},
+				tsdbtest.Metric{
+					Name:   "cpu",
+					Labels: labels2,
+					Data:   ingestedData2},
+			}})
+	tsdbtest.InsertData(suite.T(), testParams)
+
+	expected := map[string][]tsdbtest.DataPoint{
+		"sum": {{Time: baseTime, Value: 30},
+			{Time: baseTime + 5*tsdbtest.MinuteInMillis, Value: 30},
+			{Time: baseTime + 10*tsdbtest.MinuteInMillis, Value: 70}},
+		"min": {{Time: baseTime, Value: 10},
+			{Time: baseTime + 5*tsdbtest.MinuteInMillis, Value: 30},
+			{Time: baseTime + 10*tsdbtest.MinuteInMillis, Value: 30}},
+		"max": {{Time: baseTime, Value: 20},
+			{Time: baseTime + 5*tsdbtest.MinuteInMillis, Value: 30},
+			{Time: baseTime + 10*tsdbtest.MinuteInMillis, Value: 40}}}
+
+	querierV2, err := adapter.QuerierV2()
+	suite.Require().NoError(err, "failed to create querier v2")
+
+	selectParams, _, err := pquerier.ParseQuery("select sum_all(prev(cpu)), min_all(prev(cpu)), max_all(prev(cpu))")
+	suite.NoError(err)
+	selectParams.Step = 5 * tsdbtest.MinuteInMillis
+	selectParams.From = baseTime
+	selectParams.To = baseTime + 10*tsdbtest.MinuteInMillis
+	for i := 0; i < len(selectParams.RequestedColumns); i++ {
+		selectParams.RequestedColumns[i].InterpolationTolerance = tsdbtest.MinuteInMillis
+	}
+	set, err := querierV2.Select(selectParams)
+	suite.Require().NoError(err, "Failed to execute query")
+
+	var seriesCount int
+	for set.Next() {
+		seriesCount++
+		iter := set.At().Iterator()
+
+		data, err := tsdbtest.IteratorToSlice(iter)
+		agg := set.At().Labels().Get(aggregate.AggregateLabel)
+		if err != nil {
+			suite.T().Fatal(err)
+		}
+
+		suite.Require().Equal(expected[agg], data, "queried data does not match expected")
+	}
+
+	suite.Require().Equal(len(expected), seriesCount, "series count didn't match expected")
+}
+
 func TestQueryV2Suite(t *testing.T) {
 	suite.Run(t, new(testQuerySuite))
 }

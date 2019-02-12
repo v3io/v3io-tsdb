@@ -16,11 +16,12 @@ const (
 	Version = 2
 )
 
-func NewSchema(v3ioCfg *config.V3ioConfig, samplesIngestionRate, aggregationGranularity, aggregatesList string) (*config.Schema, error) {
+func NewSchema(v3ioCfg *config.V3ioConfig, samplesIngestionRate, aggregationGranularity, aggregatesList string, crossLabelSets string) (*config.Schema, error) {
 	return newSchema(
 		samplesIngestionRate,
 		aggregationGranularity,
 		aggregatesList,
+		crossLabelSets,
 		v3ioCfg.MinimumChunkSize,
 		v3ioCfg.MaximumChunkSize,
 		v3ioCfg.MaximumSampleSize,
@@ -29,7 +30,7 @@ func NewSchema(v3ioCfg *config.V3ioConfig, samplesIngestionRate, aggregationGran
 		v3ioCfg.ShardingBucketsCount)
 }
 
-func newSchema(samplesIngestionRate, aggregationGranularity, aggregatesList string, minChunkSize, maxChunkSize, maxSampleSize, maxPartitionSize, sampleRetention, shardingBucketsCount int) (*config.Schema, error) {
+func newSchema(samplesIngestionRate, aggregationGranularity, aggregatesList string, crossLabelSets string, minChunkSize, maxChunkSize, maxSampleSize, maxPartitionSize, sampleRetention, shardingBucketsCount int) (*config.Schema, error) {
 	rateInHours, err := rateToHours(samplesIngestionRate)
 	if err != nil {
 		return nil, errors.Wrapf(err, "Invalid samples ingestion rate (%s).", samplesIngestionRate)
@@ -49,6 +50,12 @@ func newSchema(samplesIngestionRate, aggregationGranularity, aggregatesList stri
 		return nil, errors.Wrapf(err, "Failed to parse aggregates list '%s'.", aggregatesList)
 	}
 
+	parsedCrossLabelSets := aggregate.ParseCrossLabelSets(crossLabelSets)
+
+	if len(parsedCrossLabelSets) > 0 && len(aggregates) == 0 {
+		return nil, errors.New("Cross label aggregations must be used in conjunction with aggregations.")
+	}
+
 	defaultRollup := config.Rollup{
 		Aggregates:             []string{},
 		AggregationGranularity: aggregationGranularity,
@@ -57,12 +64,23 @@ func newSchema(samplesIngestionRate, aggregationGranularity, aggregatesList stri
 		LayerRetentionTime:     config.DefaultLayerRetentionTime, //TODO: make configurable
 	}
 
+	var preaggregates []config.PreAggregate
+	for _, labelSet := range parsedCrossLabelSets {
+		preaggregate := config.PreAggregate{
+			Labels:      labelSet,
+			Granularity: aggregationGranularity,
+			Aggregates:  aggregates,
+		}
+		preaggregates = append(preaggregates, preaggregate)
+	}
+
 	tableSchema := config.TableSchema{
 		Version:              Version,
 		RollupLayers:         []config.Rollup{defaultRollup},
 		ShardingBucketsCount: shardingBucketsCount,
 		PartitionerInterval:  partitionInterval,
 		ChunckerInterval:     chunkInterval,
+		PreAggregates:        preaggregates,
 	}
 
 	if len(aggregates) == 0 {

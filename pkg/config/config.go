@@ -42,10 +42,10 @@ const (
 	defaultBatchSize             = 64
 	defaultTimeoutInSeconds      = 24 * 60 * 60 // 24 hours
 
-	defaultMaximumSampleSize    = 8           // bytes
-	defaultMaximumPartitionSize = 1024 * 1024 // 1 MB
-	defaultMinimumChunkSize     = 200         // bytes
-	defaultMaximumChunkSize     = 32000       // bytes
+	defaultMaximumSampleSize    = 8       // bytes
+	defaultMaximumPartitionSize = 1700000 // 1.7MB
+	defaultMinimumChunkSize     = 200     // bytes
+	defaultMaximumChunkSize     = 32000   // bytes
 
 	DefaultShardingBucketsCount   = 8
 	DefaultStorageClass           = "local"
@@ -161,6 +161,8 @@ type V3ioConfig struct {
 	DisableClientAggr bool `json:"disableClientAggr,omitempty"`
 	// Build Info
 	BuildInfo *BuildInfo `json:"buildInfo,omitempty"`
+	// Override nginx bug
+	DisableNginxMitigation bool `json:"disableNginxMitigation,omitempty"`
 }
 
 type MetricsReporterConfig struct {

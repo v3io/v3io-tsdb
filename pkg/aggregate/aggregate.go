@@ -129,6 +129,25 @@ func RawAggregatesToStringList(aggregates string) ([]string, error) {
 	return list, nil
 }
 
+func ParseCrossLabelSets(str string) [][]string {
+	var res [][]string
+	labelSetStrings := strings.Split(str, ";")
+	for _, labelSetString := range labelSetStrings {
+		labelSet := strings.Split(strings.TrimSpace(labelSetString), ",")
+		var trimmedLabelSet []string
+		for _, label := range labelSet {
+			trimmedLabel := strings.TrimSpace(label)
+			if trimmedLabel != "" {
+				trimmedLabelSet = append(trimmedLabelSet, trimmedLabel)
+			}
+		}
+		if len(trimmedLabelSet) > 0 {
+			res = append(res, trimmedLabelSet)
+		}
+	}
+	return res
+}
+
 // Convert a comma-separated aggregation-functions string to an aggregates mask
 func AggregatesFromStringListWithCount(split []string) (AggrType, []AggrType, error) {
 	var aggrMask AggrType
