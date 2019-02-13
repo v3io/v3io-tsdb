@@ -117,8 +117,7 @@ func aggregateClientAggregates(ctx *selectQueryContext, res *qryResults) {
 
 		for _, col := range res.frame.columns {
 			if col.GetColumnSpec().metric == res.name {
-				col.SetDataAt(int(currentCell), v)
-				res.frame.updateHasValue(int(currentCell))
+				res.frame.setDataAt(col.Name(), int(currentCell), v)
 			}
 		}
 	}
@@ -153,8 +152,7 @@ func aggregateServerAggregates(ctx *selectQueryContext, res *qryResults) {
 					} else {
 						floatVal = math.Float64frombits(val)
 					}
-					col.SetDataAt(int(currentCell), floatVal)
-					res.frame.updateHasValue(int(currentCell))
+					res.frame.setDataAt(col.Name(), int(currentCell), floatVal)
 				}
 			}
 		}
@@ -175,14 +173,14 @@ func downsampleRawData(ctx *selectQueryContext, res *qryResults,
 	if err != nil {
 		return previousPartitionLastTime, previousPartitionLastValue, err
 	}
-	for currBucket := 0; currBucket < col.Len(); currBucket++ {
-		currBucketTime := int64(currBucket)*ctx.queryParams.Step + ctx.queryParams.From
-		if it.Seek(currBucketTime) {
+	for currCell := 0; currCell < col.Len(); currCell++ {
+		currCellTime := int64(currCell)*ctx.queryParams.Step + ctx.queryParams.From
+		if it.Seek(currCellTime) {
 			t, v := it.At()
-			tBucketIndex := (t - ctx.queryParams.From) / ctx.queryParams.Step
-			if t == currBucketTime {
-				col.SetDataAt(currBucket, v)
-			} else if tBucketIndex == int64(currBucket) {
+			tCellIndex := (t - ctx.queryParams.From) / ctx.queryParams.Step
+			if t == currCellTime {
+				res.frame.setDataAt(col.Name(), int(currCell), v)
+			} else if tCellIndex == int64(currCell) {
 				prevT, prevV := it.PeakBack()
 
 				// In case it's the first point in the partition use the last point of the previous partition for the interpolation
@@ -192,19 +190,13 @@ func downsampleRawData(ctx *selectQueryContext, res *qryResults,
 				}
 				// If previous point is too old for interpolation
 				interpolateFunc, tolerance := col.GetInterpolationFunction()
-				if prevT != 0 && t-prevT > tolerance {
-					col.SetDataAt(currBucket, math.NaN())
-				} else {
-					_, interpolatedV := interpolateFunc(prevT, t, currBucketTime, prevV, v)
-					col.SetDataAt(currBucket, interpolatedV)
-					res.frame.updateHasValue(currBucket)
+				if !(prevT != 0 && t-prevT > tolerance) {
+					_, interpolatedV := interpolateFunc(prevT, t, currCellTime, prevV, v)
+					res.frame.setDataAt(col.Name(), int(currCell), interpolatedV)
 				}
-			} else {
-				col.SetDataAt(currBucket, math.NaN())
 			}
 		} else {
 			lastT, lastV = it.At()
-			col.SetDataAt(currBucket, math.NaN())
 		}
 	}
 

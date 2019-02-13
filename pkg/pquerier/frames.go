@@ -264,6 +264,20 @@ func (d *dataFrame) addMetricFromTemplate(metricName string, columnSize int, use
 	return nil
 }
 
+func (d *dataFrame) setDataAt(columnName string, index int, value interface{}) error {
+	colIndex, ok := d.columnByName[columnName]
+	if !ok {
+		return fmt.Errorf("no such column %v", columnName)
+	}
+	col := d.columns[colIndex]
+	err := col.SetDataAt(index, value)
+	if err == nil {
+		d.nonEmptyRowsIndicator[index] = true
+	}
+
+	return err
+}
+
 func (d *dataFrame) Len() int {
 	if d.isRawSeries {
 		return len(d.rawColumns)
@@ -555,6 +569,9 @@ func (c *basicColumn) Name() string {
 
 // Len returns the number of elements
 func (c *basicColumn) Len() int {
+	if c.framesCol != nil {
+		return c.framesCol.Len()
+	}
 	return c.size
 }
 
