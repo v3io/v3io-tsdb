@@ -224,12 +224,6 @@ type dataFrame struct {
 	metricToCountColumn map[string]Column
 }
 
-func (d *dataFrame) updateHasValue(index int) {
-	if index >= 0 && index < len(d.nonEmptyRowsIndicator) {
-		d.nonEmptyRowsIndicator[index] = true
-	}
-}
-
 func (d *dataFrame) addMetricIfNotExist(metricName string, columnSize int, useServerAggregates bool) error {
 	if _, ok := d.metrics[metricName]; !ok {
 		return d.addMetricFromTemplate(metricName, columnSize, useServerAggregates)
