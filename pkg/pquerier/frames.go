@@ -602,7 +602,6 @@ func NewDataColumn(name string, colSpec columnMeta, size int, datatype frames.DT
 
 type dataColumn struct {
 	basicColumn
-	data interface{}
 }
 
 // DType returns the data type
@@ -626,7 +625,6 @@ func (dc *dataColumn) TimeAt(i int) (time.Time, error) {
 }
 
 func (dc *dataColumn) SetData(d interface{}, size int) error {
-	dc.data = d
 	dc.size = size
 	var err error
 	dc.framesCol, err = frames.NewSliceColumn(dc.name, d)
@@ -655,14 +653,12 @@ func (dc *dataColumn) SetDataAt(i int, value interface{}) error {
 func NewConcreteColumn(name string, colSpec columnMeta, size int, setFunc func(old, new interface{}) interface{}) *ConcreteColumn {
 	col := &ConcreteColumn{basicColumn: basicColumn{name: name, spec: colSpec, size: size,
 		interpolationFunction: GetInterpolateFunc(interpolateNone), builder: frames.NewSliceColumnBuilder(name, frames.FloatType, size)}, setFunc: setFunc}
-	col.data = make([]interface{}, size)
 	return col
 }
 
 type ConcreteColumn struct {
 	basicColumn
 	setFunc func(old, new interface{}) interface{}
-	data    []interface{}
 }
 
 func (c *ConcreteColumn) DType() frames.DType {
