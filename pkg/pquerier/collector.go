@@ -128,7 +128,7 @@ func aggregateClientAggregates(ctx *selectQueryContext, res *qryResults) {
 
 		for _, col := range res.frame.columns {
 			if col.GetColumnSpec().metric == res.name {
-				res.frame.setDataAt(col.Name(), int(currentCell), v)
+				_ = res.frame.setDataAt(col.Name(), int(currentCell), v)
 			}
 		}
 	}
@@ -163,7 +163,7 @@ func aggregateServerAggregates(ctx *selectQueryContext, res *qryResults) {
 					} else {
 						floatVal = math.Float64frombits(val)
 					}
-					res.frame.setDataAt(col.Name(), int(currentCell), floatVal)
+					_ = res.frame.setDataAt(col.Name(), int(currentCell), floatVal)
 				}
 			}
 		}
@@ -188,7 +188,7 @@ func downsampleRawData(ctx *selectQueryContext, res *qryResults,
 			t, v := it.At()
 			tCellIndex := (t - ctx.queryParams.From) / ctx.queryParams.Step
 			if t == currCellTime {
-				res.frame.setDataAt(col.Name(), int(currCell), v)
+				_ = res.frame.setDataAt(col.Name(), int(currCell), v)
 			} else if tCellIndex == int64(currCell) {
 				prevT, prevV := it.PeakBack()
 
@@ -201,7 +201,7 @@ func downsampleRawData(ctx *selectQueryContext, res *qryResults,
 
 				// Check if the interpolation was successful in terms of exceeding tolerance
 				if !(interpolatedT == 0 && interpolatedV == 0) {
-					res.frame.setDataAt(col.Name(), int(currCell), interpolatedV)
+					_ = res.frame.setDataAt(col.Name(), int(currCell), interpolatedV)
 				}
 			}
 		}
@@ -232,7 +232,7 @@ func aggregateClientAggregatesCrossSeries(ctx *selectQueryContext, res *qryResul
 			if t == currBucketTime {
 				for _, col := range res.frame.columns {
 					if col.GetColumnSpec().metric == res.name {
-						res.frame.setDataAt(col.Name(), int(currBucket), v)
+						_ = res.frame.setDataAt(col.Name(), int(currBucket), v)
 					}
 				}
 			} else {
@@ -248,7 +248,7 @@ func aggregateClientAggregatesCrossSeries(ctx *selectQueryContext, res *qryResul
 					if col.GetColumnSpec().metric == res.name {
 						interpolatedT, interpolatedV := col.GetInterpolationFunction()(prevT, t, currBucketTime, prevV, v)
 						if !(interpolatedT == 0 && interpolatedV == 0) {
-							res.frame.setDataAt(col.Name(), int(currBucket), interpolatedV)
+							_ = res.frame.setDataAt(col.Name(), int(currBucket), interpolatedV)
 						}
 					}
 				}
