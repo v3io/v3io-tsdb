@@ -31,6 +31,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
+	"github.com/v3io/frames"
 	"github.com/v3io/v3io-tsdb/pkg/aggregate"
 	"github.com/v3io/v3io-tsdb/pkg/config"
 	"github.com/v3io/v3io-tsdb/pkg/pquerier"
@@ -1365,82 +1366,84 @@ func (suite *testQuerySuite) TestRawDataMultipleMetrics() {
 	assert.Equal(suite.T(), 2, seriesCount, "series count didn't match expected")
 }
 
-//func (suite *testQuerySuite) TestDataFrameRawDataMultipleMetrics() {
-//	adapter, err := tsdb.NewV3ioAdapter(suite.v3ioConfig, nil, nil)
-//	if err != nil {
-//		suite.T().Fatalf("failed to create v3io adapter. reason: %s", err)
-//	}
-//	metricName1 := "cpu"
-//	metricName2 := "diskio"
-//	labels1 := utils.LabelsFromStringList("os", "linux")
-//	labels2 := utils.LabelsFromStringList("os", "linux")
-//	numberOfEvents := 5
-//	eventsInterval := int64(tsdbtest.MinuteInMillis)
-//	baseTime := tsdbtest.NanosToMillis(time.Now().UnixNano()) - int64(numberOfEvents)*eventsInterval
-//	expectedTimeColumn := []int64{baseTime - 7*tsdbtest.DaysInMillis, baseTime - 5*tsdbtest.DaysInMillis,
-//		baseTime + tsdbtest.MinuteInMillis, baseTime + 2*tsdbtest.MinuteInMillis,
-//		baseTime + 3*tsdbtest.MinuteInMillis, baseTime + 4*tsdbtest.MinuteInMillis}
-//	expectedColumns := map[string][]float64{metricName1: {10, math.NaN(), 20, 30, math.NaN(), 40},
-//		metricName2: {math.NaN(), 10, math.NaN(), 20, 30, 40}}
-//
-//	testParams := tsdbtest.NewTestParams(suite.T(),
-//		tsdbtest.TestOption{
-//			Key: tsdbtest.OptTimeSeries,
-//			Value: tsdbtest.TimeSeries{tsdbtest.Metric{
-//				Name:   metricName1,
-//				Labels: labels1,
-//				Data: []tsdbtest.DataPoint{{baseTime - 7*tsdbtest.DaysInMillis, 10},
-//					{int64(baseTime + tsdbtest.MinuteInMillis), 20},
-//					{baseTime + 2*tsdbtest.MinuteInMillis, 30},
-//					{baseTime + 4*tsdbtest.MinuteInMillis, 40}}},
-//				tsdbtest.Metric{
-//					Name:   metricName2,
-//					Labels: labels2,
-//					Data: []tsdbtest.DataPoint{{baseTime - 5*tsdbtest.DaysInMillis, 10},
-//						{int64(baseTime + 2*tsdbtest.MinuteInMillis), 20},
-//						{baseTime + 3*tsdbtest.MinuteInMillis, 30},
-//						{baseTime + 4*tsdbtest.MinuteInMillis, 40}}},
-//			}})
-//
-//	tsdbtest.InsertData(suite.T(), testParams)
-//
-//	querierV2, err := adapter.QuerierV2()
-//	if err != nil {
-//		suite.T().Fatalf("Failed to create querier v2, err: %v", err)
-//	}
-//
-//	params := &pquerier.SelectParams{RequestedColumns: []pquerier.RequestedColumn{{Metric: metricName1}, {Metric: metricName2}},
-//		From: baseTime - 8*tsdbtest.DaysInMillis, To: baseTime + int64(numberOfEvents)*eventsInterval}
-//	iter, err := querierV2.SelectDataFrame(params)
-//	if err != nil {
-//		suite.T().Fatalf("Failed to exeute query, err: %v", err)
-//	}
-//	var seriesCount int
-//	for iter.NextFrame() {
-//		seriesCount++
-//		frame := iter.GetFrame()
-//		in := frame.Index()
-//		cols := frame.Columns()
-//
-//		for i := 0; i < frame.Index().Len(); i++ {
-//			t, _ := in.TimeAt(i)
-//			timeMillis := t.UnixNano() / int64(time.Millisecond)
-//			assert.Equal(suite.T(), expectedTimeColumn[i], timeMillis, "time column does not match at index %v", i)
-//			for _, column := range cols {
-//				v, _ := column.FloatAt(i)
-//
-//				expected := expectedColumns[column.Name()][i]
-//
-//				// assert can not compare NaN, so we need to check it manually
-//				if !(math.IsNaN(expected) && math.IsNaN(v)) {
-//					assert.Equal(suite.T(), expectedColumns[column.Name()][i], v, "column %v does not match at index %v", column.Name(), i)
-//				}
-//			}
-//		}
-//	}
-//
-//	assert.Equal(suite.T(), 1, seriesCount, "series count didn't match expected")
-//}
+func (suite *testQuerySuite) TestDataFrameRawDataMultipleMetrics() {
+	adapter, err := tsdb.NewV3ioAdapter(suite.v3ioConfig, nil, nil)
+	if err != nil {
+		suite.T().Fatalf("failed to create v3io adapter. reason: %s", err)
+	}
+	metricName1 := "cpu"
+	metricName2 := "diskio"
+	labels1 := utils.LabelsFromStringList("os", "linux")
+	labels2 := utils.LabelsFromStringList("os", "linux")
+	numberOfEvents := 5
+	eventsInterval := int64(tsdbtest.MinuteInMillis)
+	baseTime := tsdbtest.NanosToMillis(time.Now().UnixNano()) - int64(numberOfEvents)*eventsInterval
+	expectedTimeColumn := []int64{baseTime - 7*tsdbtest.DaysInMillis, baseTime - 5*tsdbtest.DaysInMillis,
+		baseTime + tsdbtest.MinuteInMillis, baseTime + 2*tsdbtest.MinuteInMillis,
+		baseTime + 3*tsdbtest.MinuteInMillis, baseTime + 4*tsdbtest.MinuteInMillis}
+	expectedColumns := map[string][]float64{metricName1: {10, math.NaN(), 20, 30, math.NaN(), 40},
+		metricName2: {math.NaN(), 10, math.NaN(), 20, 30, 40}}
+
+	testParams := tsdbtest.NewTestParams(suite.T(),
+		tsdbtest.TestOption{
+			Key: tsdbtest.OptTimeSeries,
+			Value: tsdbtest.TimeSeries{tsdbtest.Metric{
+				Name:   metricName1,
+				Labels: labels1,
+				Data: []tsdbtest.DataPoint{{baseTime - 7*tsdbtest.DaysInMillis, 10},
+					{int64(baseTime + tsdbtest.MinuteInMillis), 20},
+					{baseTime + 2*tsdbtest.MinuteInMillis, 30},
+					{baseTime + 4*tsdbtest.MinuteInMillis, 40}}},
+				tsdbtest.Metric{
+					Name:   metricName2,
+					Labels: labels2,
+					Data: []tsdbtest.DataPoint{{baseTime - 5*tsdbtest.DaysInMillis, 10},
+						{int64(baseTime + 2*tsdbtest.MinuteInMillis), 20},
+						{baseTime + 3*tsdbtest.MinuteInMillis, 30},
+						{baseTime + 4*tsdbtest.MinuteInMillis, 40}}},
+			}})
+
+	tsdbtest.InsertData(suite.T(), testParams)
+
+	querierV2, err := adapter.QuerierV2()
+	if err != nil {
+		suite.T().Fatalf("Failed to create querier v2, err: %v", err)
+	}
+
+	params := &pquerier.SelectParams{RequestedColumns: []pquerier.RequestedColumn{{Metric: metricName1}, {Metric: metricName2}},
+		From: baseTime - 8*tsdbtest.DaysInMillis, To: baseTime + int64(numberOfEvents)*eventsInterval}
+	iter, err := querierV2.SelectDataFrame(params)
+	if err != nil {
+		suite.T().Fatalf("Failed to exeute query, err: %v", err)
+	}
+	var seriesCount int
+	for iter.NextFrame() {
+		seriesCount++
+		frame, err := iter.GetFrame()
+		suite.NoError(err)
+		indexCol := frame.Indices()[0] // in tsdb we have only one index
+
+		for i := 0; i < indexCol.Len(); i++ {
+			t, _ := indexCol.TimeAt(i)
+			timeMillis := t.UnixNano() / int64(time.Millisecond)
+			assert.Equal(suite.T(), expectedTimeColumn[i], timeMillis, "time column does not match at index %v", i)
+			for _, columnName := range frame.Names() {
+				column, err := frame.Column(columnName)
+				suite.NoError(err)
+				v, _ := column.FloatAt(i)
+
+				expected := expectedColumns[column.Name()][i]
+
+				// assert can not compare NaN, so we need to check it manually
+				if !(math.IsNaN(expected) && math.IsNaN(v)) {
+					assert.Equal(suite.T(), expectedColumns[column.Name()][i], v, "column %v does not match at index %v", column.Name(), i)
+				}
+			}
+		}
+	}
+
+	assert.Equal(suite.T(), 1, seriesCount, "series count didn't match expected")
+}
 
 func (suite *testQuerySuite) TestQueryAllData() {
 	adapter, err := tsdb.NewV3ioAdapter(suite.v3ioConfig, nil, nil)
@@ -1501,75 +1504,77 @@ func (suite *testQuerySuite) TestQueryAllData() {
 	assert.Equal(suite.T(), 3, seriesCount, "series count didn't match expected")
 }
 
-//func (suite *testQuerySuite) TestVariantTypeQueryWithDataFrame() {
-//	adapter, err := tsdb.NewV3ioAdapter(suite.v3ioConfig, nil, nil)
-//	if err != nil {
-//		suite.T().Fatalf("failed to create v3io adapter. reason: %s", err)
-//	}
-//
-//	metricName := "log"
-//	labels := utils.LabelsFromStringList("os", "linux", "__name__", metricName)
-//
-//	dataToIngest := []string{"a", "b", "c", "d", "e"}
-//	numberOfEvents := len(dataToIngest)
-//	eventsInterval := int64(tsdbtest.MinuteInMillis)
-//	baseTime := tsdbtest.NanosToMillis(time.Now().UnixNano()) - int64(numberOfEvents)*eventsInterval
-//	var expectedTimeColumn []int64
-//	for i := 0; i < numberOfEvents; i++ {
-//		expectedTimeColumn = append(expectedTimeColumn, baseTime+int64(i)*tsdbtest.MinuteInMillis)
-//	}
-//
-//	appender, err := adapter.Appender()
-//	if err != nil {
-//		suite.T().Fatalf("failed to create v3io appender. reason: %s", err)
-//	}
-//
-//	ref, err := appender.Add(labels, expectedTimeColumn[0], dataToIngest[0])
-//	if err != nil {
-//		suite.T().Fatalf("Failed to add data to the TSDB appender. Reason: %s", err)
-//	}
-//	for i := 1; i < numberOfEvents; i++ {
-//		appender.AddFast(labels, ref, expectedTimeColumn[i], dataToIngest[i])
-//	}
-//
-//	if _, err := appender.WaitForCompletion(0); err != nil {
-//		suite.T().Fatalf("Failed to wait for TSDB append completion. Reason: %s", err)
-//	}
-//
-//	querierV2, err := adapter.QuerierV2()
-//	if err != nil {
-//		suite.T().Fatalf("Failed to create querier v2, err: %v", err)
-//	}
-//
-//	params := &pquerier.SelectParams{RequestedColumns: []pquerier.RequestedColumn{{Metric: metricName}},
-//		From: baseTime - tsdbtest.DaysInMillis, To: baseTime + tsdbtest.DaysInMillis}
-//	iter, err := querierV2.SelectDataFrame(params)
-//	if err != nil {
-//		suite.T().Fatalf("Failed to exeute query, err: %v", err)
-//	}
-//	var seriesCount int
-//	for iter.NextFrame() {
-//		seriesCount++
-//		frame := iter.GetFrame()
-//		in := frame.Index()
-//		cols := frame.Columns()
-//
-//		for i := 0; i < frame.Index().Len(); i++ {
-//			t, _ := in.TimeAt(i)
-//			timeMillis := t.UnixNano() / int64(time.Millisecond)
-//			assert.Equal(suite.T(), expectedTimeColumn[i], timeMillis, "time column does not match at index %v", i)
-//			for _, column := range cols {
-//				v, _ := column.StringAt(i)
-//
-//				expected := dataToIngest[i]
-//
-//				assert.Equal(suite.T(), expected, v, "column %v does not match at index %v", column.Name(), i)
-//			}
-//		}
-//	}
-//
-//	assert.Equal(suite.T(), 1, seriesCount, "series count didn't match expected")
-//}
+func (suite *testQuerySuite) TestVariantTypeQueryWithDataFrame() {
+	adapter, err := tsdb.NewV3ioAdapter(suite.v3ioConfig, nil, nil)
+	if err != nil {
+		suite.T().Fatalf("failed to create v3io adapter. reason: %s", err)
+	}
+
+	metricName := "log"
+	labels := utils.LabelsFromStringList("os", "linux", "__name__", metricName)
+
+	dataToIngest := []string{"a", "b", "c", "d", "e"}
+	numberOfEvents := len(dataToIngest)
+	eventsInterval := int64(tsdbtest.MinuteInMillis)
+	baseTime := tsdbtest.NanosToMillis(time.Now().UnixNano()) - int64(numberOfEvents)*eventsInterval
+	var expectedTimeColumn []int64
+	for i := 0; i < numberOfEvents; i++ {
+		expectedTimeColumn = append(expectedTimeColumn, baseTime+int64(i)*tsdbtest.MinuteInMillis)
+	}
+
+	appender, err := adapter.Appender()
+	if err != nil {
+		suite.T().Fatalf("failed to create v3io appender. reason: %s", err)
+	}
+
+	ref, err := appender.Add(labels, expectedTimeColumn[0], dataToIngest[0])
+	if err != nil {
+		suite.T().Fatalf("Failed to add data to the TSDB appender. Reason: %s", err)
+	}
+	for i := 1; i < numberOfEvents; i++ {
+		appender.AddFast(labels, ref, expectedTimeColumn[i], dataToIngest[i])
+	}
+
+	if _, err := appender.WaitForCompletion(0); err != nil {
+		suite.T().Fatalf("Failed to wait for TSDB append completion. Reason: %s", err)
+	}
+
+	querierV2, err := adapter.QuerierV2()
+	if err != nil {
+		suite.T().Fatalf("Failed to create querier v2, err: %v", err)
+	}
+
+	params := &pquerier.SelectParams{RequestedColumns: []pquerier.RequestedColumn{{Metric: metricName}},
+		From: baseTime - tsdbtest.DaysInMillis, To: baseTime + tsdbtest.DaysInMillis}
+	iter, err := querierV2.SelectDataFrame(params)
+	if err != nil {
+		suite.T().Fatalf("Failed to exeute query, err: %v", err)
+	}
+	var seriesCount int
+	for iter.NextFrame() {
+		seriesCount++
+		frame, err := iter.GetFrame()
+		suite.NoError(err)
+		indexCol := frame.Indices()[0] // in tsdb we have only one index
+
+		for i := 0; i < indexCol.Len(); i++ {
+			t, _ := indexCol.TimeAt(i)
+			timeMillis := t.UnixNano() / int64(time.Millisecond)
+			assert.Equal(suite.T(), expectedTimeColumn[i], timeMillis, "time column does not match at index %v", i)
+			for _, columnName := range frame.Names() {
+				column, err := frame.Column(columnName)
+				suite.NoError(err)
+				v, _ := column.StringAt(i)
+
+				expected := dataToIngest[i]
+
+				assert.Equal(suite.T(), expected, v, "column %v does not match at index %v", column.Name(), i)
+			}
+		}
+	}
+
+	assert.Equal(suite.T(), 1, seriesCount, "series count didn't match expected")
+}
 
 func (suite *testQuerySuite) TestVariantTypeQueryWithSeries() {
 	adapter, err := tsdb.NewV3ioAdapter(suite.v3ioConfig, nil, nil)
@@ -1939,72 +1944,74 @@ func (suite *testQuerySuite) TestAggregatesWithZeroStep() {
 	assert.Equal(suite.T(), 4, seriesCount, "series count didn't match expected")
 }
 
-// Currently disable Frames tests
-//func (suite *testQuerySuite) TestAggregatesWithZeroStepSelectDataframe() {
-//	adapter, err := tsdb.NewV3ioAdapter(suite.v3ioConfig, nil, nil)
-//	if err != nil {
-//		suite.T().Fatalf("failed to create v3io adapter. reason: %s", err)
-//	}
-//
-//	labels1 := utils.LabelsFromStringList("os", "linux")
-//	numberOfEvents := 10
-//	eventsInterval := 60 * 1000
-//	baseTime := tsdbtest.NanosToMillis(time.Now().UnixNano()) - int64(numberOfEvents*eventsInterval)
-//s
-//	ingestedData := []tsdbtest.DataPoint{{baseTime, 10},
-//		{int64(baseTime + tsdbtest.MinuteInMillis), 20},
-//		{baseTime + 2*tsdbtest.MinuteInMillis, 30},
-//		{baseTime + 3*tsdbtest.MinuteInMillis, 40}}
-//	testParams := tsdbtest.NewTestParams(suite.T(),
-//		tsdbtest.TestOption{
-//			Key: tsdbtest.OptTimeSeries,
-//			Value: tsdbtest.TimeSeries{tsdbtest.Metric{
-//				Name:   "cpu",
-//				Labels: labels1,
-//				Data:   ingestedData},
-//			}})
-//	tsdbtest.InsertData(suite.T(), testParams)
-//
-//	expected := map[string]tsdbtest.DataPoint{"max": {Time: baseTime, Value: 40},
-//		"min":   {Time: baseTime, Value: 10},
-//		"sum":   {Time: baseTime, Value: 100},
-//		"count": {Time: baseTime, Value: 4},
-//	}
-//
-//	querierV2, err := adapter.QuerierV2()
-//	if err != nil {
-//		suite.T().Fatalf("Failed to create querier v2, err: %v", err)
-//	}
-//
-//	params := &pquerier.SelectParams{Name: "cpu", Functions: "max, sum,count,min", Step: 0, From: baseTime, To: baseTime + int64(numberOfEvents*eventsInterval)}
-//	set, err := querierV2.SelectDataFrame(params)
-//	if err != nil {
-//		suite.T().Fatalf("Failed to exeute query, err: %v", err)
-//	}
-//
-//	var seriesCount int
-//	for set.NextFrame() {
-//		seriesCount++
-//		frame := set.GetFrame()
-//
-//		assert.Equal(suite.T(), 1, frame.Index().Len())
-//		t, err := frame.Index().TimeAt(0)
-//		assert.NoError(suite.T(), err)
-//		assert.Equal(suite.T(), baseTime, t.UnixNano()/int64(time.Millisecond))
-//
-//		for _, col := range frame.Columns() {
-//			assert.Equal(suite.T(), 1, col.Len())
-//			currentColAggregate := strings.Split(col.Name(), "(")[0]
-//			f, err := col.FloatAt(0)
-//			assert.NoError(suite.T(), err)
-//			assert.Equal(suite.T(), expected[currentColAggregate].Value, f)
-//		}
-//	}
-//
-//	assert.Equal(suite.T(), 1, seriesCount, "series count didn't match expected")
-//}
+func (suite *testQuerySuite) TestAggregatesWithZeroStepSelectDataframe() {
+	adapter, err := tsdb.NewV3ioAdapter(suite.v3ioConfig, nil, nil)
+	if err != nil {
+		suite.T().Fatalf("failed to create v3io adapter. reason: %s", err)
+	}
 
-/*func (suite *testQuerySuite) TestEmptyRawDataSelectDataframe() {
+	labels1 := utils.LabelsFromStringList("os", "linux")
+	numberOfEvents := 10
+	eventsInterval := 60 * 1000
+	baseTime := tsdbtest.NanosToMillis(time.Now().UnixNano()) - int64(numberOfEvents*eventsInterval)
+	ingestedData := []tsdbtest.DataPoint{{baseTime, 10},
+		{int64(baseTime + tsdbtest.MinuteInMillis), 20},
+		{baseTime + 2*tsdbtest.MinuteInMillis, 30},
+		{baseTime + 3*tsdbtest.MinuteInMillis, 40}}
+	testParams := tsdbtest.NewTestParams(suite.T(),
+		tsdbtest.TestOption{
+			Key: tsdbtest.OptTimeSeries,
+			Value: tsdbtest.TimeSeries{tsdbtest.Metric{
+				Name:   "cpu",
+				Labels: labels1,
+				Data:   ingestedData},
+			}})
+	tsdbtest.InsertData(suite.T(), testParams)
+
+	expected := map[string]tsdbtest.DataPoint{"max": {Time: baseTime, Value: 40},
+		"min":   {Time: baseTime, Value: 10},
+		"sum":   {Time: baseTime, Value: 100},
+		"count": {Time: baseTime, Value: 4},
+	}
+
+	querierV2, err := adapter.QuerierV2()
+	if err != nil {
+		suite.T().Fatalf("Failed to create querier v2, err: %v", err)
+	}
+
+	params := &pquerier.SelectParams{Name: "cpu", Functions: "max, sum,count,min", Step: 0, From: baseTime, To: baseTime + int64(numberOfEvents*eventsInterval)}
+	set, err := querierV2.SelectDataFrame(params)
+	if err != nil {
+		suite.T().Fatalf("Failed to exeute query, err: %v", err)
+	}
+
+	var seriesCount int
+	for set.NextFrame() {
+		seriesCount++
+		frame, err := set.GetFrame()
+		suite.NoError(err)
+
+		indexCol := frame.Indices()[0]
+		assert.Equal(suite.T(), 1, indexCol.Len())
+		t, err := indexCol.TimeAt(0)
+		assert.NoError(suite.T(), err)
+		assert.Equal(suite.T(), baseTime, t.UnixNano()/int64(time.Millisecond))
+
+		for _, colName := range frame.Names() {
+			col, err := frame.Column(colName)
+			suite.NoError(err)
+			suite.Require().Equal(1, col.Len())
+			currentColAggregate := strings.Split(col.Name(), "(")[0]
+			f, err := col.FloatAt(0)
+			assert.NoError(suite.T(), err)
+			suite.Require().Equal(expected[currentColAggregate].Value, f)
+		}
+	}
+
+	assert.Equal(suite.T(), 1, seriesCount, "series count didn't match expected")
+}
+
+func (suite *testQuerySuite) TestEmptyRawDataSelectDataframe() {
 	adapter, err := tsdb.NewV3ioAdapter(suite.v3ioConfig, nil, nil)
 	if err != nil {
 		suite.T().Fatalf("failed to create v3io adapter. reason: %s", err)
@@ -2043,11 +2050,13 @@ func (suite *testQuerySuite) TestAggregatesWithZeroStep() {
 	var seriesCount int
 	for set.NextFrame() {
 		seriesCount++
-		frame := set.GetFrame()
+		frame, err := set.GetFrame()
+		suite.NoError(err)
 
-		assert.Equal(suite.T(), 0, frame.Index().Len())
+		suite.Require().Equal(0, frame.Indices()[0].Len())
 
-		for _, col := range frame.Columns() {
+		for _, colName := range frame.Names() {
+			col, _ := frame.Column(colName)
 			assert.Equal(suite.T(), 0, col.Len())
 		}
 	}
@@ -2108,16 +2117,20 @@ func (suite *testQuerySuite) Test2Series1EmptySelectDataframe() {
 	var seriesCount int
 	for set.NextFrame() {
 		seriesCount++
-		frame := set.GetFrame()
+		frame, err := set.GetFrame()
+		suite.NoError(err)
 
-		assert.Equal(suite.T(), len(ingestedData), frame.Index().Len())
-		for i := 0; i < frame.Index().Len(); i++ {
-			t, err := frame.Index().TimeAt(i)
+		indexCol := frame.Indices()[0]
+		assert.Equal(suite.T(), len(ingestedData), indexCol.Len())
+		for i := 0; i < indexCol.Len(); i++ {
+			t, err := indexCol.TimeAt(i)
 			assert.NoError(suite.T(), err)
 			assert.Equal(suite.T(), ingestedData[i].Time, t.UnixNano()/int64(time.Millisecond))
 		}
 
-		for _, col := range frame.Columns() {
+		for _, colName := range frame.Names() {
+			col, err := frame.Column(colName)
+			suite.NoError(err)
 			assert.Equal(suite.T(), len(ingestedData), col.Len())
 			for i := 0; i < col.Len(); i++ {
 				currentExpected := expected[col.Name()][i].Value
@@ -2132,7 +2145,7 @@ func (suite *testQuerySuite) Test2Series1EmptySelectDataframe() {
 	}
 
 	assert.Equal(suite.T(), 1, seriesCount, "series count didn't match expected")
-}*/
+}
 
 func (suite *testQuerySuite) TestAggregateSeriesWithAlias() {
 	adapter, err := tsdb.NewV3ioAdapter(suite.v3ioConfig, nil, nil)
@@ -2193,80 +2206,82 @@ func (suite *testQuerySuite) TestAggregateSeriesWithAlias() {
 	assert.Equal(suite.T(), 1, seriesCount, "series count didn't match expected")
 }
 
-//func (suite *testQuerySuite) TestStringAndFloatMetricsDataframe() {
-//	adapter, err := tsdb.NewV3ioAdapter(suite.v3ioConfig, nil, nil)
-//	suite.NoError(err, "failed to create v3io adapter")
-//
-//	metricName1 := "cpu"
-//	metricName2 := "log"
-//	labels := utils.LabelsFromStringList("os", "linux")
-//	labelsWithName := append(labels, utils.LabelsFromStringList("__name__", metricName2)...)
-//
-//	baseTime := suite.toMillis("2019-01-21T00:00:00Z")
-//	expectedTimeColumn := []int64{baseTime, baseTime + tsdbtest.MinuteInMillis, baseTime + 2*tsdbtest.MinuteInMillis}
-//	logData := []interface{}{"a", "b", "c"}
-//	expectedColumns := map[string][]interface{}{metricName1: {10.0, 20.0, 30.0},
-//		metricName2: logData}
-//	appender, err := adapter.Appender()
-//	suite.NoError(err, "failed to create v3io appender")
-//
-//	ref, err := appender.Add(labelsWithName, expectedTimeColumn[0], logData[0])
-//	suite.NoError(err, "failed to add data to the TSDB appender")
-//	for i := 1; i < len(expectedTimeColumn); i++ {
-//		appender.AddFast(labels, ref, expectedTimeColumn[i], logData[i])
-//	}
-//
-//	_, err = appender.WaitForCompletion(0)
-//	suite.NoError(err, "failed to wait for TSDB append completion")
-//
-//	testParams := tsdbtest.NewTestParams(suite.T(),
-//		tsdbtest.TestOption{
-//			Key: tsdbtest.OptTimeSeries,
-//			Value: tsdbtest.TimeSeries{tsdbtest.Metric{
-//				Name:   metricName1,
-//				Labels: labels,
-//				Data: []tsdbtest.DataPoint{{baseTime, 10},
-//					{int64(baseTime + tsdbtest.MinuteInMillis), 20},
-//					{baseTime + 2*tsdbtest.MinuteInMillis, 30}}},
-//			}})
-//
-//	tsdbtest.InsertData(suite.T(), testParams)
-//
-//	querierV2, err := adapter.QuerierV2()
-//	suite.NoError(err, "failed to create querier")
-//
-//	params := &pquerier.SelectParams{RequestedColumns: []pquerier.RequestedColumn{{Metric: metricName1}, {Metric: metricName2}},
-//		From: baseTime, To: baseTime + 5*tsdbtest.MinuteInMillis}
-//	iter, err := querierV2.SelectDataFrame(params)
-//	suite.NoError(err, "failed to execute query")
-//
-//	var seriesCount int
-//	for iter.NextFrame() {
-//		seriesCount++
-//		frame := iter.GetFrame()
-//		in := frame.Index()
-//		cols := frame.Columns()
-//
-//		for i := 0; i < frame.Index().Len(); i++ {
-//			t, _ := in.TimeAt(i)
-//			timeMillis := t.UnixNano() / int64(time.Millisecond)
-//			suite.Require().Equal(expectedTimeColumn[i], timeMillis, "time column does not match at index %v", i)
-//			for _, column := range cols {
-//				var v interface{}
-//
-//				if column.DType() == pquerier.FloatType {
-//					v, _ = column.FloatAt(i)
-//				} else if column.DType() == pquerier.StringType {
-//					v, _ = column.StringAt(i)
-//				} else {
-//					suite.Failf("column type is not as expected: %v", column.DType().String())
-//				}
-//
-//				suite.Require().Equal(expectedColumns[column.Name()][i], v, "column %v does not match at index %v", column.Name(), i)
-//			}
-//		}
-//	}
-//}
+func (suite *testQuerySuite) TestStringAndFloatMetricsDataframe() {
+	adapter, err := tsdb.NewV3ioAdapter(suite.v3ioConfig, nil, nil)
+	suite.NoError(err, "failed to create v3io adapter")
+
+	metricName1 := "cpu"
+	metricName2 := "log"
+	labels := utils.LabelsFromStringList("os", "linux")
+	labelsWithName := append(labels, utils.LabelsFromStringList("__name__", metricName2)...)
+
+	baseTime := suite.toMillis("2019-01-21T00:00:00Z")
+	expectedTimeColumn := []int64{baseTime, baseTime + tsdbtest.MinuteInMillis, baseTime + 2*tsdbtest.MinuteInMillis}
+	logData := []interface{}{"a", "b", "c"}
+	expectedColumns := map[string][]interface{}{metricName1: {10.0, 20.0, 30.0},
+		metricName2: logData}
+	appender, err := adapter.Appender()
+	suite.NoError(err, "failed to create v3io appender")
+
+	ref, err := appender.Add(labelsWithName, expectedTimeColumn[0], logData[0])
+	suite.NoError(err, "failed to add data to the TSDB appender")
+	for i := 1; i < len(expectedTimeColumn); i++ {
+		appender.AddFast(labels, ref, expectedTimeColumn[i], logData[i])
+	}
+
+	_, err = appender.WaitForCompletion(0)
+	suite.NoError(err, "failed to wait for TSDB append completion")
+
+	testParams := tsdbtest.NewTestParams(suite.T(),
+		tsdbtest.TestOption{
+			Key: tsdbtest.OptTimeSeries,
+			Value: tsdbtest.TimeSeries{tsdbtest.Metric{
+				Name:   metricName1,
+				Labels: labels,
+				Data: []tsdbtest.DataPoint{{baseTime, 10},
+					{int64(baseTime + tsdbtest.MinuteInMillis), 20},
+					{baseTime + 2*tsdbtest.MinuteInMillis, 30}}},
+			}})
+
+	tsdbtest.InsertData(suite.T(), testParams)
+
+	querierV2, err := adapter.QuerierV2()
+	suite.NoError(err, "failed to create querier")
+
+	params := &pquerier.SelectParams{RequestedColumns: []pquerier.RequestedColumn{{Metric: metricName1}, {Metric: metricName2}},
+		From: baseTime, To: baseTime + 5*tsdbtest.MinuteInMillis}
+	iter, err := querierV2.SelectDataFrame(params)
+	suite.NoError(err, "failed to execute query")
+
+	var seriesCount int
+	for iter.NextFrame() {
+		seriesCount++
+		frame, err := iter.GetFrame()
+		suite.NoError(err)
+		indexCol := frame.Indices()[0]
+
+		for i := 0; i < indexCol.Len(); i++ {
+			t, _ := indexCol.TimeAt(i)
+			timeMillis := t.UnixNano() / int64(time.Millisecond)
+			suite.Require().Equal(expectedTimeColumn[i], timeMillis, "time column does not match at index %v", i)
+			for _, columnName := range frame.Names() {
+				var v interface{}
+
+				column, err := frame.Column(columnName)
+				suite.NoError(err)
+				if column.DType() == frames.FloatType {
+					v, _ = column.FloatAt(i)
+				} else if column.DType() == frames.StringType {
+					v, _ = column.StringAt(i)
+				} else {
+					suite.Fail(fmt.Sprintf("column type is not as expected: %v", column.DType()))
+				}
+
+				suite.Require().Equal(expectedColumns[column.Name()][i], v, "column %v does not match at index %v", column.Name(), i)
+			}
+		}
+	}
+}
 
 func (suite *testQuerySuite) toMillis(date string) int64 {
 	t, err := time.Parse(time.RFC3339, date)
