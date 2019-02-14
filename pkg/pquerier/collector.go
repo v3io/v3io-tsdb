@@ -128,7 +128,7 @@ func aggregateClientAggregates(ctx *selectQueryContext, res *qryResults) {
 
 		for _, col := range res.frame.columns {
 			if col.GetColumnSpec().metric == res.name {
-				_ = col.SetDataAt(int(currentCell), v)
+				res.frame.setDataAt(col.Name(), int(currentCell), v)
 			}
 		}
 	}
@@ -163,7 +163,7 @@ func aggregateServerAggregates(ctx *selectQueryContext, res *qryResults) {
 					} else {
 						floatVal = math.Float64frombits(val)
 					}
-					_ = col.SetDataAt(int(currentCell), floatVal)
+					res.frame.setDataAt(col.Name(), int(currentCell), floatVal)
 				}
 			}
 		}
@@ -182,14 +182,14 @@ func downsampleRawData(ctx *selectQueryContext, res *qryResults,
 	if err != nil {
 		return previousPartitionLastTime, previousPartitionLastValue, err
 	}
-	for currBucket := 0; currBucket < col.Len(); currBucket++ {
-		currBucketTime := int64(currBucket)*ctx.queryParams.Step + ctx.queryParams.From
-		if it.Seek(currBucketTime) {
+	for currCell := 0; currCell < col.Len(); currCell++ {
+		currCellTime := int64(currCell)*ctx.queryParams.Step + ctx.queryParams.From
+		if it.Seek(currCellTime) {
 			t, v := it.At()
-			tBucketIndex := (t - ctx.queryParams.From) / ctx.queryParams.Step
-			if t == currBucketTime {
-				_ = col.SetDataAt(currBucket, v)
-			} else if tBucketIndex == int64(currBucket) {
+			tCellIndex := (t - ctx.queryParams.From) / ctx.queryParams.Step
+			if t == currCellTime {
+				res.frame.setDataAt(col.Name(), int(currCell), v)
+			} else if tCellIndex == int64(currCell) {
 				prevT, prevV := it.PeakBack()
 
 				// In case it's the first point in the partition use the last point of the previous partition for the interpolation
@@ -197,19 +197,13 @@ func downsampleRawData(ctx *selectQueryContext, res *qryResults,
 					prevT = previousPartitionLastTime
 					prevV = previousPartitionLastValue
 				}
-				interpolatedT, interpolatedV := col.GetInterpolationFunction()(prevT, t, currBucketTime, prevV, v)
+				interpolatedT, interpolatedV := col.GetInterpolationFunction()(prevT, t, currCellTime, prevV, v)
 
 				// Check if the interpolation was successful in terms of exceeding tolerance
-				if interpolatedT == 0 && interpolatedV == 0 {
-					_ = col.SetDataAt(currBucket, math.NaN())
-				} else {
-					_ = col.SetDataAt(currBucket, interpolatedV)
+				if !(interpolatedT == 0 && interpolatedV == 0) {
+					res.frame.setDataAt(col.Name(), int(currCell), interpolatedV)
 				}
-			} else {
-				_ = col.SetDataAt(currBucket, math.NaN())
 			}
-		} else {
-			_ = col.SetDataAt(currBucket, math.NaN())
 		}
 	}
 
@@ -238,7 +232,7 @@ func aggregateClientAggregatesCrossSeries(ctx *selectQueryContext, res *qryResul
 			if t == currBucketTime {
 				for _, col := range res.frame.columns {
 					if col.GetColumnSpec().metric == res.name {
-						_ = col.SetDataAt(currBucket, v)
+						res.frame.setDataAt(col.Name(), int(currBucket), v)
 					}
 				}
 			} else {
@@ -254,7 +248,7 @@ func aggregateClientAggregatesCrossSeries(ctx *selectQueryContext, res *qryResul
 					if col.GetColumnSpec().metric == res.name {
 						interpolatedT, interpolatedV := col.GetInterpolationFunction()(prevT, t, currBucketTime, prevV, v)
 						if !(interpolatedT == 0 && interpolatedV == 0) {
-							_ = col.SetDataAt(currBucket, interpolatedV)
+							res.frame.setDataAt(col.Name(), int(currBucket), interpolatedV)
 						}
 					}
 				}
