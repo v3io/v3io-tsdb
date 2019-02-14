@@ -23,11 +23,14 @@ type frameIterator struct {
 
 // create new frame set iterator, frame iter has a SeriesSet interface (for Prometheus) plus columnar interfaces
 func NewFrameIterator(ctx *selectQueryContext) (*frameIterator, error) {
-	for _, f := range ctx.frameList {
-		if err := f.finishAllColumns(); err != nil {
-			return nil, err
+	if !ctx.isRawQuery() {
+		for _, f := range ctx.frameList {
+			if err := f.finishAllColumns(); err != nil {
+				return nil, err
+			}
 		}
 	}
+
 	return &frameIterator{ctx: ctx, columnNum: ctx.totalColumns, setIndex: 0, seriesIndex: -1}, nil
 }
 
@@ -105,6 +108,7 @@ func NewDataFrame(columnsSpec []columnMeta, indexColumn Column, lset utils.Label
 		df.columns = make([]Column, 0, numOfColumns)
 		df.metricToCountColumn = map[string]Column{}
 		df.metrics = map[string]struct{}{}
+		df.nonEmptyRowsIndicator = make([]bool, columnSize)
 		// In case user wanted all metrics, save the template for every metric.
 		// Once we know what metrics we have we will create Columns out of the column Templates
 		if getAllMetrics {
@@ -210,10 +214,11 @@ type dataFrame struct {
 	isRawColumnsGenerated bool
 	rawColumns            []utils.Series
 
-	columnsTemplates []columnMeta
-	columns          []Column
-	index            Column
-	columnByName     map[string]int // name -> index in columns
+	columnsTemplates      []columnMeta
+	columns               []Column
+	index                 Column
+	columnByName          map[string]int // name -> index in columns
+	nonEmptyRowsIndicator []bool
 
 	metrics             map[string]struct{}
 	metricToCountColumn map[string]Column
@@ -251,6 +256,20 @@ func (d *dataFrame) addMetricFromTemplate(metricName string, columnSize int, use
 	}
 	d.metrics[metricName] = struct{}{}
 	return nil
+}
+
+func (d *dataFrame) setDataAt(columnName string, index int, value interface{}) error {
+	colIndex, ok := d.columnByName[columnName]
+	if !ok {
+		return fmt.Errorf("no such column %v", columnName)
+	}
+	col := d.columns[colIndex]
+	err := col.SetDataAt(index, value)
+	if err == nil {
+		d.nonEmptyRowsIndicator[index] = true
+	}
+
+	return err
 }
 
 func (d *dataFrame) Len() int {
@@ -331,6 +350,18 @@ func (d *dataFrame) TimeSeries(i int) (utils.Series, error) {
 // Creates Frames.columns out of tsdb columns.
 // First do all the concrete columns and then the virtual who are dependant on the concrete.
 func (d *dataFrame) finishAllColumns() error {
+
+	// Marking as Deleted all the indexes that has no data.
+	for i, hasData := range d.nonEmptyRowsIndicator {
+		if !hasData {
+			for _, col := range d.columns {
+				_ = col.Delete(i)
+			}
+			d.index.Delete(i)
+		}
+	}
+
+	var columnSize int
 	var err error
 	for _, col := range d.columns {
 		switch col.(type) {
@@ -338,20 +369,29 @@ func (d *dataFrame) finishAllColumns() error {
 			err = col.finish()
 		case *ConcreteColumn:
 			err = col.finish()
+			if columnSize == 0 {
+				columnSize = col.FramesColumn().Len()
+			} else if columnSize != col.FramesColumn().Len() {
+				return fmt.Errorf("columns length mismatch %v!=%v col=%v", columnSize, col.FramesColumn().Len(), col.Name())
+			}
 		}
 		if err != nil {
 			return err
 		}
 	}
 	for _, col := range d.columns {
-		switch col.(type) {
+		switch newCol := col.(type) {
 		case *virtualColumn:
+			newCol.size = columnSize
 			err = col.finish()
 		}
 		if err != nil {
 			return err
 		}
 	}
+
+	d.index.finish()
+
 	return nil
 }
 
@@ -490,6 +530,7 @@ type Column interface {
 	setMetricName(name string)
 	finish() error
 	FramesColumn() frames.Column
+	Delete(index int) error
 }
 
 type basicColumn struct {
@@ -506,6 +547,11 @@ func (c *basicColumn) finish() error {
 	c.framesCol = c.builder.Finish()
 	return nil
 }
+
+func (c *basicColumn) Delete(index int) error {
+	return c.builder.Delete(index)
+}
+
 func (c *basicColumn) FramesColumn() frames.Column {
 	return c.framesCol
 }
@@ -517,6 +563,9 @@ func (c *basicColumn) Name() string {
 
 // Len returns the number of elements
 func (c *basicColumn) Len() int {
+	if c.framesCol != nil {
+		return c.framesCol.Len()
+	}
 	return c.size
 }
 
