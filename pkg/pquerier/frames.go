@@ -372,7 +372,7 @@ func (d *dataFrame) finishAllColumns() error {
 			if columnSize == 0 {
 				columnSize = col.FramesColumn().Len()
 			} else if columnSize != col.FramesColumn().Len() {
-				return fmt.Errorf("columns length mismath %v!=%v col=%v", columnSize, col.FramesColumn().Len(), col.Name())
+				return fmt.Errorf("columns length mismatch %v!=%v col=%v", columnSize, col.FramesColumn().Len(), col.Name())
 			}
 		}
 		if err != nil {
