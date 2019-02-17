@@ -326,3 +326,11 @@ func NanosToMillis(nanos int64) int64 {
 	millis := nanos / int64(time.Millisecond)
 	return millis
 }
+
+func DateStringToMillis(date string) (int64, error) {
+	t, err := time.Parse(time.RFC3339, date)
+	if err != nil {
+		return 0, err
+	}
+	return t.Unix() * 1000, nil
+}
