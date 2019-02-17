@@ -26,7 +26,7 @@ func NewFrameIterator(ctx *selectQueryContext) (*frameIterator, error) {
 	if !ctx.isRawQuery() {
 		for _, f := range ctx.frameList {
 			if err := f.finishAllColumns(); err != nil {
-				return nil, err
+				return nil, errors.Wrap(err, fmt.Sprintf("failed to create columns for DF=%v", f.Labels()))
 			}
 		}
 	}
@@ -108,7 +108,7 @@ func NewDataFrame(columnsSpec []columnMeta, indexColumn Column, lset utils.Label
 		df.columns = make([]Column, 0, numOfColumns)
 		df.metricToCountColumn = map[string]Column{}
 		df.metrics = map[string]struct{}{}
-		df.nonEmptyRowsIndicator = make([]bool, columnSize)
+		df.nonEmptyRowsIndicators = make([]bool, columnSize)
 		// In case user wanted all metrics, save the template for every metric.
 		// Once we know what metrics we have we will create Columns out of the column Templates
 		if getAllMetrics {
@@ -214,11 +214,11 @@ type dataFrame struct {
 	isRawColumnsGenerated bool
 	rawColumns            []utils.Series
 
-	columnsTemplates      []columnMeta
-	columns               []Column
-	index                 Column
-	columnByName          map[string]int // name -> index in columns
-	nonEmptyRowsIndicator []bool
+	columnsTemplates       []columnMeta
+	columns                []Column
+	index                  Column
+	columnByName           map[string]int // name -> index in columns
+	nonEmptyRowsIndicators []bool
 
 	metrics             map[string]struct{}
 	metricToCountColumn map[string]Column
@@ -266,7 +266,7 @@ func (d *dataFrame) setDataAt(columnName string, index int, value interface{}) e
 	col := d.columns[colIndex]
 	err := col.SetDataAt(index, value)
 	if err == nil {
-		d.nonEmptyRowsIndicator[index] = true
+		d.nonEmptyRowsIndicators[index] = true
 	}
 
 	return err
@@ -352,12 +352,12 @@ func (d *dataFrame) TimeSeries(i int) (utils.Series, error) {
 func (d *dataFrame) finishAllColumns() error {
 
 	// Marking as Deleted all the indexes that has no data.
-	for i, hasData := range d.nonEmptyRowsIndicator {
+	for i, hasData := range d.nonEmptyRowsIndicators {
 		if !hasData {
 			for _, col := range d.columns {
 				_ = col.Delete(i)
 			}
-			d.index.Delete(i)
+			_ = d.index.Delete(i)
 		}
 	}
 
@@ -372,11 +372,11 @@ func (d *dataFrame) finishAllColumns() error {
 			if columnSize == 0 {
 				columnSize = col.FramesColumn().Len()
 			} else if columnSize != col.FramesColumn().Len() {
-				return fmt.Errorf("columns length mismatch %v!=%v col=%v", columnSize, col.FramesColumn().Len(), col.Name())
+				return fmt.Errorf("column length mismatch %v!=%v col=%v", columnSize, col.FramesColumn().Len(), col.Name())
 			}
 		}
 		if err != nil {
-			return err
+			return errors.Wrap(err, fmt.Sprintf("failed to create column '%v'", col.Name()))
 		}
 	}
 	for _, col := range d.columns {
@@ -386,13 +386,13 @@ func (d *dataFrame) finishAllColumns() error {
 			err = col.finish()
 		}
 		if err != nil {
-			return err
+			return errors.Wrap(err, fmt.Sprintf("failed to create column '%v'", col.Name()))
 		}
 	}
 
-	d.index.finish()
+	err = d.index.finish()
 
-	return nil
+	return err
 }
 
 // Normalizing the raw data of different metrics to one timeline with both metric's times.
@@ -696,10 +696,9 @@ func (c *virtualColumn) finish() error {
 	for i := 0; i < c.Len(); i++ {
 		value, err := c.function(c.dependantColumns, i)
 		if err != nil {
-			data[i] = math.NaN()
-		} else {
-			data[i] = value.(float64)
+			return err
 		}
+		data[i] = value.(float64)
 	}
 
 	c.framesCol, err = frames.NewSliceColumn(c.name, data)

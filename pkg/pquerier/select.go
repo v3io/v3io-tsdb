@@ -103,8 +103,7 @@ func (queryCtx *selectQueryContext) start(parts []*partmgr.DBPartition, params *
 		queryCtx.totalColumns = queryCtx.frameList[0].Len()
 	}
 
-	frameIter, err := NewFrameIterator(queryCtx)
-	return frameIter, err
+	return NewFrameIterator(queryCtx)
 }
 
 func (queryCtx *selectQueryContext) metricsAggregatesToString(metric string) (string, bool) {
