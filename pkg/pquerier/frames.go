@@ -26,7 +26,7 @@ func NewFrameIterator(ctx *selectQueryContext) (*frameIterator, error) {
 	if !ctx.isRawQuery() {
 		for _, f := range ctx.frameList {
 			if err := f.finishAllColumns(); err != nil {
-				return nil, errors.Wrap(err, fmt.Sprintf("failed to create columns for DF=%v", f.Labels()))
+				return nil, errors.Wrapf(err, "failed to create columns for DF=%v", f.Labels())
 			}
 		}
 	}
@@ -351,7 +351,7 @@ func (d *dataFrame) TimeSeries(i int) (utils.Series, error) {
 // First do all the concrete columns and then the virtual who are dependant on the concrete.
 func (d *dataFrame) finishAllColumns() error {
 
-	// Marking as Deleted all the indexes that has no data.
+	// Marking as deleted every index (row) that has no data.
 	for i, hasData := range d.nonEmptyRowsIndicators {
 		if !hasData {
 			for _, col := range d.columns {
@@ -376,7 +376,7 @@ func (d *dataFrame) finishAllColumns() error {
 			}
 		}
 		if err != nil {
-			return errors.Wrap(err, fmt.Sprintf("failed to create column '%v'", col.Name()))
+			return errors.Wrapf(err, "failed to create column '%v'", col.Name())
 		}
 	}
 	for _, col := range d.columns {
@@ -386,7 +386,7 @@ func (d *dataFrame) finishAllColumns() error {
 			err = col.finish()
 		}
 		if err != nil {
-			return errors.Wrap(err, fmt.Sprintf("failed to create column '%v'", col.Name()))
+			return errors.Wrapf(err, "failed to create column '%v'", col.Name())
 		}
 	}
 
