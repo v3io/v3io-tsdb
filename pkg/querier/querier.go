@@ -298,17 +298,24 @@ func (q *V3ioQuerier) getLabelValues(labelKey string) ([]string, error) {
 	}
 
 	partitionPaths := q.partitionMngr.GetPartitionsPaths()
+	var numPartitions = len(partitionPaths)
 
 	// If there are no partitions yet, there are no labels
-	if len(partitionPaths) == 0 {
+	if numPartitions == 0 {
 		return nil, nil
+	}
+
+	//take the last FULL partition (unless there is only 1-2 partitions)
+	var partitionIndex = numPartitions - 1
+	if numPartitions > 2 {
+		partitionIndex--
 	}
 
 	labelValuesMap := map[string]struct{}{}
 
 	// Get all label sets
 	input := v3io.GetItemsInput{
-		Path:           partitionPaths[0],
+		Path:           partitionPaths[partitionIndex],
 		AttributeNames: []string{"_lset"},
 	}
 
