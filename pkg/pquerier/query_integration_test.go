@@ -434,6 +434,51 @@ func (suite *testQuerySuite) TestQueryAggregateWithFilterOnMetricName() {
 	assert.Equal(suite.T(), 1, seriesCount, "series count didn't match expected")
 }
 
+func (suite *testQuerySuite) TestDownSampleNotReturningAggrAttr() {
+	adapter, err := tsdb.NewV3ioAdapter(suite.v3ioConfig, nil, nil)
+	if err != nil {
+		suite.T().Fatalf("failed to create v3io adapter. reason: %s", err)
+	}
+
+	labels1 := utils.LabelsFromStringList("os", "linux")
+	numberOfEvents := 10
+	eventsInterval := 60 * 1000
+
+	ingestData := []tsdbtest.DataPoint{{suite.basicQueryTime, 10},
+		{int64(suite.basicQueryTime + tsdbtest.MinuteInMillis), 20},
+		{suite.basicQueryTime + 6*tsdbtest.MinuteInMillis, 30},
+		{suite.basicQueryTime + 9*tsdbtest.MinuteInMillis, 40}}
+	testParams := tsdbtest.NewTestParams(suite.T(),
+		tsdbtest.TestOption{
+			Key: tsdbtest.OptTimeSeries,
+			Value: tsdbtest.TimeSeries{tsdbtest.Metric{
+				Name:   "cpu",
+				Labels: labels1,
+				Data:   ingestData},
+			}})
+	tsdbtest.InsertData(suite.T(), testParams)
+
+	querierV2, err := adapter.QuerierV2()
+	if err != nil {
+		suite.T().Fatalf("Failed to create querier v2, err: %v", err)
+	}
+
+	params := &pquerier.SelectParams{Name: "cpu", Step: 2 * int64(tsdbtest.MinuteInMillis), From: suite.basicQueryTime, To: suite.basicQueryTime + int64(numberOfEvents*eventsInterval)}
+	set, err := querierV2.Select(params)
+	if err != nil {
+		suite.T().Fatalf("Failed to exeute query, err: %v", err)
+	}
+
+	var seriesCount int
+	for set.Next() {
+		seriesCount++
+		labels := set.At().Labels()
+		suite.Require().Empty(labels.Get(aggregate.AggregateLabel))
+	}
+
+	assert.Equal(suite.T(), 1, seriesCount, "series count didn't match expected")
+}
+
 func (suite *testQuerySuite) TestRawDataSinglePartitionWithDownSample() {
 	adapter, err := tsdb.NewV3ioAdapter(suite.v3ioConfig, nil, nil)
 	if err != nil {

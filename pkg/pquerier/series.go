@@ -12,8 +12,9 @@ import (
 
 func NewDataFrameColumnSeries(indexColumn, dataColumn, countColumn Column, labels utils.Labels, hash uint64, showAggregateLabel bool) *DataFrameColumnSeries {
 	// If we need to return the Aggregate label then add it, otherwise (for example in prometheus) return labels without it
-	if showAggregateLabel {
-		labels = append(labels, utils.LabelsFromStringList(aggregate.AggregateLabel, dataColumn.GetColumnSpec().function.String())...)
+	aggString := dataColumn.GetColumnSpec().function.String()
+	if showAggregateLabel && aggString != "" {
+		labels = append(labels, utils.LabelsFromStringList(aggregate.AggregateLabel, aggString)...)
 	}
 
 	wantedMetricName := dataColumn.GetColumnSpec().alias
