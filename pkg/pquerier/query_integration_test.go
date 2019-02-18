@@ -31,6 +31,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
+	"github.com/v3io/frames"
 	"github.com/v3io/v3io-tsdb/pkg/aggregate"
 	"github.com/v3io/v3io-tsdb/pkg/config"
 	"github.com/v3io/v3io-tsdb/pkg/pquerier"
@@ -1496,15 +1497,17 @@ func (suite *testQuerySuite) TestDataFrameRawDataMultipleMetrics() {
 	var seriesCount int
 	for iter.NextFrame() {
 		seriesCount++
-		frame := iter.GetFrame()
-		in := frame.Index()
-		cols := frame.Columns()
+		frame, err := iter.GetFrame()
+		suite.NoError(err)
+		indexCol := frame.Indices()[0] // in tsdb we have only one index
 
-		for i := 0; i < frame.Index().Len(); i++ {
-			t, _ := in.TimeAt(i)
+		for i := 0; i < indexCol.Len(); i++ {
+			t, _ := indexCol.TimeAt(i)
 			timeMillis := t.UnixNano() / int64(time.Millisecond)
 			assert.Equal(suite.T(), expectedTimeColumn[i], timeMillis, "time column does not match at index %v", i)
-			for _, column := range cols {
+			for _, columnName := range frame.Names() {
+				column, err := frame.Column(columnName)
+				suite.NoError(err)
 				v, _ := column.FloatAt(i)
 
 				expected := expectedColumns[column.Name()][i]
@@ -1625,15 +1628,17 @@ func (suite *testQuerySuite) TestVariantTypeQueryWithDataFrame() {
 	var seriesCount int
 	for iter.NextFrame() {
 		seriesCount++
-		frame := iter.GetFrame()
-		in := frame.Index()
-		cols := frame.Columns()
+		frame, err := iter.GetFrame()
+		suite.NoError(err)
+		indexCol := frame.Indices()[0] // in tsdb we have only one index
 
-		for i := 0; i < frame.Index().Len(); i++ {
-			t, _ := in.TimeAt(i)
+		for i := 0; i < indexCol.Len(); i++ {
+			t, _ := indexCol.TimeAt(i)
 			timeMillis := t.UnixNano() / int64(time.Millisecond)
 			assert.Equal(suite.T(), expectedTimeColumn[i], timeMillis, "time column does not match at index %v", i)
-			for _, column := range cols {
+			for _, columnName := range frame.Names() {
+				column, err := frame.Column(columnName)
+				suite.NoError(err)
 				v, _ := column.StringAt(i)
 
 				expected := dataToIngest[i]
@@ -2051,19 +2056,23 @@ func (suite *testQuerySuite) TestAggregatesWithZeroStepSelectDataframe() {
 	var seriesCount int
 	for set.NextFrame() {
 		seriesCount++
-		frame := set.GetFrame()
+		frame, err := set.GetFrame()
+		suite.NoError(err)
 
-		assert.Equal(suite.T(), 1, frame.Index().Len())
-		t, err := frame.Index().TimeAt(0)
+		indexCol := frame.Indices()[0]
+		assert.Equal(suite.T(), 1, indexCol.Len())
+		t, err := indexCol.TimeAt(0)
 		assert.NoError(suite.T(), err)
 		assert.Equal(suite.T(), suite.basicQueryTime, t.UnixNano()/int64(time.Millisecond))
 
-		for _, col := range frame.Columns() {
-			assert.Equal(suite.T(), 1, col.Len())
+		for _, colName := range frame.Names() {
+			col, err := frame.Column(colName)
+			suite.NoError(err)
+			suite.Require().Equal(1, col.Len())
 			currentColAggregate := strings.Split(col.Name(), "(")[0]
 			f, err := col.FloatAt(0)
 			assert.NoError(suite.T(), err)
-			assert.Equal(suite.T(), expected[currentColAggregate].Value, f)
+			suite.Require().Equal(expected[currentColAggregate].Value, f)
 		}
 	}
 
@@ -2105,11 +2114,13 @@ func (suite *testQuerySuite) TestEmptyRawDataSelectDataframe() {
 	var seriesCount int
 	for set.NextFrame() {
 		seriesCount++
-		frame := set.GetFrame()
+		frame, err := set.GetFrame()
+		suite.NoError(err)
 
-		assert.Equal(suite.T(), 0, frame.Index().Len())
+		suite.Require().Equal(0, frame.Indices()[0].Len())
 
-		for _, col := range frame.Columns() {
+		for _, colName := range frame.Names() {
+			col, _ := frame.Column(colName)
 			assert.Equal(suite.T(), 0, col.Len())
 		}
 	}
@@ -2166,16 +2177,20 @@ func (suite *testQuerySuite) Test2Series1EmptySelectDataframe() {
 	var seriesCount int
 	for set.NextFrame() {
 		seriesCount++
-		frame := set.GetFrame()
+		frame, err := set.GetFrame()
+		suite.NoError(err)
 
-		assert.Equal(suite.T(), len(ingestedData), frame.Index().Len())
-		for i := 0; i < frame.Index().Len(); i++ {
-			t, err := frame.Index().TimeAt(i)
+		indexCol := frame.Indices()[0]
+		assert.Equal(suite.T(), len(ingestedData), indexCol.Len())
+		for i := 0; i < indexCol.Len(); i++ {
+			t, err := indexCol.TimeAt(i)
 			assert.NoError(suite.T(), err)
 			assert.Equal(suite.T(), ingestedData[i].Time, t.UnixNano()/int64(time.Millisecond))
 		}
 
-		for _, col := range frame.Columns() {
+		for _, colName := range frame.Names() {
+			col, err := frame.Column(colName)
+			suite.NoError(err)
 			assert.Equal(suite.T(), len(ingestedData), col.Len())
 			for i := 0; i < col.Len(); i++ {
 				currentExpected := expected[col.Name()][i].Value
@@ -2300,23 +2315,25 @@ func (suite *testQuerySuite) TestStringAndFloatMetricsDataframe() {
 	var seriesCount int
 	for iter.NextFrame() {
 		seriesCount++
-		frame := iter.GetFrame()
-		in := frame.Index()
-		cols := frame.Columns()
+		frame, err := iter.GetFrame()
+		suite.NoError(err)
+		indexCol := frame.Indices()[0]
 
-		for i := 0; i < frame.Index().Len(); i++ {
-			t, _ := in.TimeAt(i)
+		for i := 0; i < indexCol.Len(); i++ {
+			t, _ := indexCol.TimeAt(i)
 			timeMillis := t.UnixNano() / int64(time.Millisecond)
 			suite.Require().Equal(expectedTimeColumn[i], timeMillis, "time column does not match at index %v", i)
-			for _, column := range cols {
+			for _, columnName := range frame.Names() {
 				var v interface{}
 
-				if column.DType() == pquerier.FloatType {
+				column, err := frame.Column(columnName)
+				suite.NoError(err)
+				if column.DType() == frames.FloatType {
 					v, _ = column.FloatAt(i)
-				} else if column.DType() == pquerier.StringType {
+				} else if column.DType() == frames.StringType {
 					v, _ = column.StringAt(i)
 				} else {
-					suite.Failf("column type is not as expected: %v", column.DType().String())
+					suite.Fail(fmt.Sprintf("column type is not as expected: %v", column.DType()))
 				}
 
 				suite.Require().Equal(expectedColumns[column.Name()][i], v, "column %v does not match at index %v", column.Name(), i)

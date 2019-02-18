@@ -4,6 +4,7 @@ import (
 	"math"
 	"time"
 
+	"github.com/v3io/frames"
 	"github.com/v3io/v3io-tsdb/pkg/aggregate"
 	"github.com/v3io/v3io-tsdb/pkg/chunkenc"
 	"github.com/v3io/v3io-tsdb/pkg/config"
@@ -108,7 +109,7 @@ func (it *dataFrameColumnSeriesIterator) Err() error { return it.err }
 
 func (it *dataFrameColumnSeriesIterator) Encoding() chunkenc.Encoding {
 	enc := chunkenc.EncXOR
-	if it.dataColumn.DType() == StringType {
+	if it.dataColumn.DType() == frames.StringType {
 		enc = chunkenc.EncVariant
 	}
 	return enc
