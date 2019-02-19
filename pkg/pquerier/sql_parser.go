@@ -46,7 +46,7 @@ func ParseQuery(sql string) (*SelectParams, string, error) {
 			case *sqlparser.FuncExpr:
 				parseFuncExpr(expr, &currCol)
 			case *sqlparser.ColName:
-				currCol.Metric = sqlparser.String(expr.Name)
+				currCol.Metric = removeBackticks(sqlparser.String(expr.Name))
 			default:
 				return nil, "", fmt.Errorf("unknown columns type - %T", col.Expr)
 			}

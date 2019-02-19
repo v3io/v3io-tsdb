@@ -1,0 +1,120 @@
+# github.com/cespare/xxhash v1.1.0
+github.com/cespare/xxhash
+# github.com/ghodss/yaml v1.0.0
+github.com/ghodss/yaml
+# github.com/golang/protobuf v1.2.0
+github.com/golang/protobuf/proto
+github.com/golang/protobuf/protoc-gen-go/descriptor
+github.com/golang/protobuf/ptypes
+github.com/golang/protobuf/ptypes/any
+github.com/golang/protobuf/ptypes/duration
+github.com/golang/protobuf/ptypes/timestamp
+# github.com/imdario/mergo v0.3.6
+github.com/imdario/mergo
+# github.com/klauspost/compress v1.4.0
+github.com/klauspost/compress/flate
+github.com/klauspost/compress/gzip
+github.com/klauspost/compress/zlib
+# github.com/klauspost/cpuid v0.0.0-20180405133222-e7e905edc00e
+github.com/klauspost/cpuid
+# github.com/mattn/go-colorable v0.0.9
+github.com/mattn/go-colorable
+# github.com/mattn/go-isatty v0.0.4
+github.com/mattn/go-isatty
+# github.com/mgutz/ansi v0.0.0-20170206155736-9520e82c474b
+github.com/mgutz/ansi
+# github.com/nuclio/logger v0.0.0-20180410162335-ccc5ab971395
+github.com/nuclio/logger
+# github.com/nuclio/zap v0.0.0-20180228181516-4a2bd2f9ef28
+github.com/nuclio/zap
+# github.com/pavius/zap v0.0.0-20180228181622-8d52692529b8
+github.com/pavius/zap
+github.com/pavius/zap/zapcore
+github.com/pavius/zap/internal/bufferpool
+github.com/pavius/zap/buffer
+github.com/pavius/zap/internal/color
+github.com/pavius/zap/internal/exit
+# github.com/pkg/errors v0.8.0
+github.com/pkg/errors
+# github.com/prometheus/prometheus v2.5.0+incompatible
+github.com/prometheus/prometheus/pkg/labels
+# github.com/rcrowley/go-metrics v0.0.0-20181016184325-3113b8401b8a
+github.com/rcrowley/go-metrics
+# github.com/v3io/v3io-go-http v0.0.0-20181224070828-ef32781cf2de
+github.com/v3io/v3io-go-http
+# github.com/v3io/v3io-tsdb v0.0.4-0.20190130082012-c185c909df82
+github.com/v3io/v3io-tsdb/pkg/utils
+github.com/v3io/v3io-tsdb/pkg/config
+github.com/v3io/v3io-tsdb/pkg/pquerier
+github.com/v3io/v3io-tsdb/pkg/tsdb
+github.com/v3io/v3io-tsdb/pkg/tsdb/schema
+github.com/v3io/v3io-tsdb/pkg/chunkenc
+github.com/v3io/v3io-tsdb/internal/pkg/performance
+github.com/v3io/v3io-tsdb/pkg/aggregate
+github.com/v3io/v3io-tsdb/pkg/partmgr
+github.com/v3io/v3io-tsdb/pkg/appender
+github.com/v3io/v3io-tsdb/pkg/querier
+# github.com/valyala/bytebufferpool v1.0.0
+github.com/valyala/bytebufferpool
+# github.com/valyala/fasthttp v1.0.0
+github.com/valyala/fasthttp
+github.com/valyala/fasthttp/fasthttputil
+github.com/valyala/fasthttp/stackless
+# github.com/xwb1989/sqlparser v0.0.0-20180606152119-120387863bf2
+github.com/xwb1989/sqlparser
+github.com/xwb1989/sqlparser/dependency/bytes2
+github.com/xwb1989/sqlparser/dependency/querypb
+github.com/xwb1989/sqlparser/dependency/sqltypes
+github.com/xwb1989/sqlparser/dependency/hack
+# go.uber.org/atomic v1.3.2
+go.uber.org/atomic
+# go.uber.org/multierr v1.1.0
+go.uber.org/multierr
+# golang.org/x/net v0.0.0-20181023162649-9b4f9f5ad519
+golang.org/x/net/context
+golang.org/x/net/trace
+golang.org/x/net/internal/timeseries
+golang.org/x/net/http2
+golang.org/x/net/http2/hpack
+golang.org/x/net/http/httpguts
+golang.org/x/net/idna
+# golang.org/x/sys v0.0.0-20181026203630-95b1ffbd15a5
+golang.org/x/sys/unix
+# golang.org/x/text v0.3.0
+golang.org/x/text/secure/bidirule
+golang.org/x/text/unicode/bidi
+golang.org/x/text/unicode/norm
+golang.org/x/text/transform
+# google.golang.org/genproto v0.0.0-20181026194446-8b5d7a19e2d9
+google.golang.org/genproto/googleapis/rpc/status
+# google.golang.org/grpc v1.16.0
+google.golang.org/grpc
+google.golang.org/grpc/reflection
+google.golang.org/grpc/balancer
+google.golang.org/grpc/balancer/roundrobin
+google.golang.org/grpc/codes
+google.golang.org/grpc/connectivity
+google.golang.org/grpc/credentials
+google.golang.org/grpc/encoding
+google.golang.org/grpc/encoding/proto
+google.golang.org/grpc/grpclog
+google.golang.org/grpc/internal
+google.golang.org/grpc/internal/backoff
+google.golang.org/grpc/internal/channelz
+google.golang.org/grpc/internal/envconfig
+google.golang.org/grpc/internal/grpcrand
+google.golang.org/grpc/internal/transport
+google.golang.org/grpc/keepalive
+google.golang.org/grpc/metadata
+google.golang.org/grpc/naming
+google.golang.org/grpc/peer
+google.golang.org/grpc/resolver
+google.golang.org/grpc/resolver/dns
+google.golang.org/grpc/resolver/passthrough
+google.golang.org/grpc/stats
+google.golang.org/grpc/status
+google.golang.org/grpc/tap
+google.golang.org/grpc/reflection/grpc_reflection_v1alpha
+google.golang.org/grpc/balancer/base
+# gopkg.in/yaml.v2 v2.2.1
+gopkg.in/yaml.v2

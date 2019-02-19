@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/v3io/frames"
 	"github.com/v3io/v3io-tsdb/pkg/aggregate"
 	"github.com/v3io/v3io-tsdb/pkg/chunkenc"
 )
@@ -79,7 +80,7 @@ func (c columnMeta) getColumnName() string {
 // SeriesSet contains a set of series.
 type FrameSet interface {
 	NextFrame() bool
-	GetFrame() *dataFrame
+	GetFrame() (frames.Frame, error)
 	Err() error
 }
 
@@ -88,6 +89,6 @@ type nullFrameSet struct {
 	err error
 }
 
-func (s nullFrameSet) NextFrame() bool      { return false }
-func (s nullFrameSet) GetFrame() *dataFrame { return nil }
-func (s nullFrameSet) Err() error           { return s.err }
+func (s nullFrameSet) NextFrame() bool                 { return false }
+func (s nullFrameSet) GetFrame() (frames.Frame, error) { return nil, nil }
+func (s nullFrameSet) Err() error                      { return s.err }

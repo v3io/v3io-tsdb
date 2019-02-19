@@ -10,6 +10,7 @@ import (
 
 	"github.com/nuclio/logger"
 	"github.com/pkg/errors"
+	"github.com/v3io/frames"
 	"github.com/v3io/v3io-go-http"
 	"github.com/v3io/v3io-tsdb/pkg/aggregate"
 	"github.com/v3io/v3io-tsdb/pkg/chunkenc"
@@ -39,8 +40,6 @@ type selectQueryContext struct {
 	requestChannels []chan *qryResults
 	errorChannel    chan error
 	wg              sync.WaitGroup
-
-	timeColumn Column
 }
 
 func (queryCtx *selectQueryContext) start(parts []*partmgr.DBPartition, params *SelectParams) (*frameIterator, error) {
@@ -104,8 +103,7 @@ func (queryCtx *selectQueryContext) start(parts []*partmgr.DBPartition, params *
 		queryCtx.totalColumns = queryCtx.frameList[0].Len()
 	}
 
-	frameIter := NewFrameIterator(queryCtx)
-	return frameIter, nil
+	return NewFrameIterator(queryCtx)
 }
 
 func (queryCtx *selectQueryContext) metricsAggregatesToString(metric string) (string, bool) {
@@ -417,16 +415,13 @@ func (queryCtx *selectQueryContext) getOrCreateTimeColumn() Column {
 	if queryCtx.isRawQuery() {
 		return nil
 	}
-	if queryCtx.timeColumn == nil {
-		queryCtx.timeColumn = queryCtx.generateTimeColumn()
-	}
 
-	return queryCtx.timeColumn
+	return queryCtx.generateTimeColumn()
 }
 
 func (queryCtx *selectQueryContext) generateTimeColumn() Column {
 	columnMeta := columnMeta{metric: "time"}
-	timeColumn := NewDataColumn("time", columnMeta, queryCtx.getResultBucketsSize(), TimeType)
+	timeColumn := NewDataColumn("time", columnMeta, queryCtx.getResultBucketsSize(), frames.TimeType)
 	i := 0
 	for t := queryCtx.queryParams.From; t <= queryCtx.queryParams.To; t += queryCtx.queryParams.Step {
 		timeColumn.SetDataAt(i, time.Unix(t/1000, (t%1000)*1e6))
