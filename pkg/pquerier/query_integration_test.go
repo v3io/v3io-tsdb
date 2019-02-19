@@ -2824,6 +2824,158 @@ func (suite *testQuerySuite) TestCrossSeriesAggregatesWithInterpolationOverToler
 	suite.Require().Equal(len(expected), seriesCount, "series count didn't match expected")
 }
 
+func (suite *testQuerySuite) TestQueryMultipleMetricsWithMultipleLabelSets() {
+	adapter, err := tsdb.NewV3ioAdapter(suite.v3ioConfig, nil, nil)
+	if err != nil {
+		suite.T().Fatalf("failed to create v3io adapter. reason: %s", err)
+	}
+	metricName1 := "cpu"
+	metricName2 := "diskio"
+	labels1 := utils.LabelsFromStringList("os", "linux")
+	labels2 := utils.LabelsFromStringList("os", "mac")
+	numberOfEvents := 5
+	eventsInterval := int64(tsdbtest.MinuteInMillis)
+	ingestData1 := []tsdbtest.DataPoint{{suite.basicQueryTime, 10}}
+	ingestData2 := []tsdbtest.DataPoint{{suite.basicQueryTime, 20}}
+	ingestData3 := []tsdbtest.DataPoint{{suite.basicQueryTime, 30},
+		{suite.basicQueryTime + tsdbtest.MinuteInMillis, 40}}
+
+	expectedData := map[string][]tsdbtest.DataPoint{fmt.Sprintf("%v-%v", metricName1, "linux"): ingestData1,
+		fmt.Sprintf("%v-%v", metricName2, "linux"): ingestData2,
+		fmt.Sprintf("%v-%v", metricName2, "mac"):   ingestData3}
+
+	testParams := tsdbtest.NewTestParams(suite.T(),
+		tsdbtest.TestOption{
+			Key: tsdbtest.OptTimeSeries,
+			Value: tsdbtest.TimeSeries{tsdbtest.Metric{
+				Name:   metricName1,
+				Labels: labels1,
+				Data:   ingestData1},
+				tsdbtest.Metric{
+					Name:   metricName2,
+					Labels: labels1,
+					Data:   ingestData2},
+				tsdbtest.Metric{
+					Name:   metricName2,
+					Labels: labels2,
+					Data:   ingestData3},
+			}})
+
+	tsdbtest.InsertData(suite.T(), testParams)
+
+	querierV2, err := adapter.QuerierV2()
+	if err != nil {
+		suite.T().Fatalf("Failed to create querier v2, err: %v", err)
+	}
+
+	params := &pquerier.SelectParams{Filter: "1==1",
+		From: suite.basicQueryTime, To: suite.basicQueryTime + int64(numberOfEvents)*eventsInterval}
+	set, err := querierV2.Select(params)
+	if err != nil {
+		suite.T().Fatalf("Failed to exeute query, err: %v", err)
+	}
+
+	var seriesCount int
+	for set.Next() {
+		seriesCount++
+		iter := set.At().Iterator()
+		name := set.At().Labels().Get(config.PrometheusMetricNameAttribute)
+		os := set.At().Labels().Get("os")
+		data, err := tsdbtest.IteratorToSlice(iter)
+		if err != nil {
+			suite.T().Fatal(err)
+		}
+
+		assert.Equal(suite.T(), expectedData[fmt.Sprintf("%v-%v", name, os)], data, "queried data does not match expected")
+	}
+
+	assert.Equal(suite.T(), 3, seriesCount, "series count didn't match expected")
+}
+
+func (suite *testQuerySuite) TestQueryDataFrameMultipleMetricsWithMultipleLabelSets() {
+	adapter, err := tsdb.NewV3ioAdapter(suite.v3ioConfig, nil, nil)
+	if err != nil {
+		suite.T().Fatalf("failed to create v3io adapter. reason: %s", err)
+	}
+	metricName1 := "cpu"
+	metricName2 := "diskio"
+	labels1 := utils.LabelsFromStringList("os", "linux")
+	labels2 := utils.LabelsFromStringList("os", "mac")
+	numberOfEvents := 5
+	eventsInterval := int64(tsdbtest.MinuteInMillis)
+	ingestData1 := []tsdbtest.DataPoint{{suite.basicQueryTime, 10}}
+	ingestData2 := []tsdbtest.DataPoint{{suite.basicQueryTime + tsdbtest.MinuteInMillis, 20}}
+	ingestData3 := []tsdbtest.DataPoint{{suite.basicQueryTime, 30},
+		{suite.basicQueryTime + tsdbtest.MinuteInMillis, 40}}
+
+	expectedData := map[string][]tsdbtest.DataPoint{
+		fmt.Sprintf("%v-%v", metricName1, "linux"): {{suite.basicQueryTime, 10}, {suite.basicQueryTime + tsdbtest.MinuteInMillis, math.NaN()}},
+		fmt.Sprintf("%v-%v", metricName2, "linux"): {{suite.basicQueryTime, math.NaN()}, {suite.basicQueryTime + tsdbtest.MinuteInMillis, 20}},
+		fmt.Sprintf("%v-%v", metricName2, "mac"):   ingestData3}
+
+	testParams := tsdbtest.NewTestParams(suite.T(),
+		tsdbtest.TestOption{
+			Key: tsdbtest.OptTimeSeries,
+			Value: tsdbtest.TimeSeries{tsdbtest.Metric{
+				Name:   metricName1,
+				Labels: labels1,
+				Data:   ingestData1},
+				tsdbtest.Metric{
+					Name:   metricName2,
+					Labels: labels1,
+					Data:   ingestData2},
+				tsdbtest.Metric{
+					Name:   metricName2,
+					Labels: labels2,
+					Data:   ingestData3},
+			}})
+
+	tsdbtest.InsertData(suite.T(), testParams)
+
+	querierV2, err := adapter.QuerierV2()
+	if err != nil {
+		suite.T().Fatalf("Failed to create querier v2, err: %v", err)
+	}
+
+	params := &pquerier.SelectParams{Filter: "1==1",
+		From: suite.basicQueryTime, To: suite.basicQueryTime + int64(numberOfEvents)*eventsInterval}
+	set, err := querierV2.SelectDataFrame(params)
+	if err != nil {
+		suite.T().Fatalf("Failed to exeute query, err: %v", err)
+	}
+
+	var seriesCount int
+	for set.NextFrame() {
+		seriesCount++
+		frame, err := set.GetFrame()
+		suite.NoError(err)
+
+		indexCol := frame.Indices()[0]
+		assert.Equal(suite.T(), 2, indexCol.Len())
+		for i := 0; i < indexCol.Len(); i++ {
+			t, err := indexCol.TimeAt(i)
+			assert.NoError(suite.T(), err)
+			assert.Equal(suite.T(), expectedData[fmt.Sprintf("%v-%v", metricName1, "linux")][i].Time, t.UnixNano()/int64(time.Millisecond))
+
+			for _, colName := range frame.Names() {
+				col, err := frame.Column(colName)
+				suite.NoError(err)
+				currentExpectedData := expectedData[fmt.Sprintf("%v-%v", col.Name(), frame.Labels()["os"])]
+				assert.Equal(suite.T(), len(currentExpectedData), col.Len())
+				currentExpected := currentExpectedData[i].Value
+				f, err := col.FloatAt(i)
+				assert.NoError(suite.T(), err)
+
+				if !(math.IsNaN(currentExpected) && math.IsNaN(f)) {
+					assert.Equal(suite.T(), currentExpected, f)
+				}
+			}
+		}
+	}
+
+	assert.Equal(suite.T(), 2, seriesCount, "series count didn't match expected")
+}
+
 func (suite *testQuerySuite) toMillis(date string) int64 {
 	time, err := tsdbtest.DateStringToMillis(date)
 	suite.NoError(err)
