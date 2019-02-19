@@ -48,8 +48,13 @@ func (fi *frameIterator) GetFrame() (frames.Frame, error) {
 // advance to the next time series (for Prometheus mode)
 func (fi *frameIterator) Next() bool {
 
+	var numberOfColumnsInCurrentSeries int
+	if len(fi.ctx.frameList) > 0 {
+		numberOfColumnsInCurrentSeries = len(fi.ctx.frameList[fi.setIndex].columnByName)
+	}
+
 	// can advance series within a frame
-	if fi.seriesIndex < fi.columnNum-1 {
+	if fi.seriesIndex < numberOfColumnsInCurrentSeries-1 {
 		fi.seriesIndex++
 		if fi.isCurrentSeriesHidden() {
 			return fi.Next()
@@ -462,18 +467,20 @@ func (d *dataFrame) rawSeriesToColumns() {
 				t, v = iter.At()
 			}
 
+			hasMoreData := true
 			if t == currentTime {
 				columns[seriesIndex].Append(v)
 				if iter.Next() {
 					t, _ = iter.At()
 				} else {
 					nonExhaustedIterators--
+					hasMoreData = false
 				}
-			} else if t > currentTime {
+			} else {
 				columns[seriesIndex].Append(seriesTodefaultValue[seriesIndex])
 			}
 
-			if t < nextTime {
+			if hasMoreData && t < nextTime {
 				nextTime = t
 			}
 		}
