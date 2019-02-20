@@ -314,7 +314,7 @@ func (cs *chunkStore) writeChunks(mc *MetricsCache, metric *MetricState) (hasPen
 		for pendingSampleIndex < len(cs.pending) && pendingSamplesCount < mc.cfg.BatchSize && partition.InRange(cs.pending[pendingSampleIndex].t) {
 			sampleTime := cs.pending[pendingSampleIndex].t
 
-			if sampleTime <= cs.initMaxTime && !mc.cfg.OverrideOld {
+			if sampleTime <= cs.maxTime && !mc.cfg.OverrideOld {
 				mc.logger.WarnWith("Omitting the sample - time is earlier than the last sample time for this metric", "metric", metric.Lset, "T", sampleTime, "InitMaxTime", cs.initMaxTime)
 				pendingSampleIndex++
 				continue
