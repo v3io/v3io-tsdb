@@ -21,6 +21,7 @@ such restriction.
 package config
 
 import (
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -42,10 +43,10 @@ const (
 	defaultBatchSize             = 64
 	defaultTimeoutInSeconds      = 24 * 60 * 60 // 24 hours
 
-	defaultMaximumSampleSize    = 8           // bytes
-	defaultMaximumPartitionSize = 1024 * 1024 // 1 MB
-	defaultMinimumChunkSize     = 200         // bytes
-	defaultMaximumChunkSize     = 32000       // bytes
+	defaultMaximumSampleSize    = 8       // bytes
+	defaultMaximumPartitionSize = 1700000 // 1.7MB
+	defaultMinimumChunkSize     = 200     // bytes
+	defaultMaximumChunkSize     = 32000   // bytes
 
 	DefaultShardingBucketsCount   = 8
 	DefaultStorageClass           = "local"
@@ -161,6 +162,8 @@ type V3ioConfig struct {
 	DisableClientAggr bool `json:"disableClientAggr,omitempty"`
 	// Build Info
 	BuildInfo *BuildInfo `json:"buildInfo,omitempty"`
+	// Override nginx bug
+	DisableNginxMitigation bool `json:"disableNginxMitigation,omitempty"`
 }
 
 type MetricsReporterConfig struct {
@@ -281,13 +284,29 @@ func WithDefaults(cfg *V3ioConfig) *V3ioConfig {
 
 // Create new configuration structure instance based on given instance.
 // All matching attributes within result structure will be overwritten with values of newCfg
-func (currentCfg *V3ioConfig) Merge(newCfg *V3ioConfig) (*V3ioConfig, error) {
-	resultCfg, err := currentCfg.merge(newCfg)
+func (config *V3ioConfig) Merge(newCfg *V3ioConfig) (*V3ioConfig, error) {
+	resultCfg, err := config.merge(newCfg)
 	if err != nil {
 		return nil, err
 	}
 
 	return resultCfg, nil
+}
+
+func (config V3ioConfig) String() string {
+	if config.Password != "" {
+		config.Password = "SANITIZED"
+	}
+	if config.AccessKey != "" {
+		config.AccessKey = "SANITIZED"
+	}
+
+	sanitizedConfigJson, err := json.Marshal(&config)
+	if err == nil {
+		return string(sanitizedConfigJson)
+	} else {
+		return fmt.Sprintf("Unable to read config: %v", err)
+	}
 }
 
 func (*V3ioConfig) merge(cfg *V3ioConfig) (*V3ioConfig, error) {

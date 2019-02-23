@@ -3,23 +3,14 @@ package pquerier
 import (
 	"fmt"
 	"math"
-	"reflect"
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/v3io/frames"
 	"github.com/v3io/v3io-tsdb/pkg/aggregate"
 	"github.com/v3io/v3io-tsdb/pkg/chunkenc"
 	"github.com/v3io/v3io-tsdb/pkg/config"
 	"github.com/v3io/v3io-tsdb/pkg/utils"
-)
-
-// Possible data types
-var (
-	IntType    DType = reflect.TypeOf([]int64{})
-	FloatType  DType = reflect.TypeOf([]float64{})
-	StringType DType = reflect.TypeOf([]string{})
-	TimeType   DType = reflect.TypeOf([]time.Time{})
-	BoolType   DType = reflect.TypeOf([]bool{})
 )
 
 type frameIterator struct {
@@ -31,8 +22,16 @@ type frameIterator struct {
 }
 
 // create new frame set iterator, frame iter has a SeriesSet interface (for Prometheus) plus columnar interfaces
-func NewFrameIterator(ctx *selectQueryContext) *frameIterator {
-	return &frameIterator{ctx: ctx, columnNum: ctx.totalColumns, setIndex: 0, seriesIndex: -1}
+func NewFrameIterator(ctx *selectQueryContext) (*frameIterator, error) {
+	if !ctx.isRawQuery() {
+		for _, f := range ctx.frameList {
+			if err := f.finishAllColumns(); err != nil {
+				return nil, errors.Wrapf(err, "failed to create columns for DF=%v", f.Labels())
+			}
+		}
+	}
+
+	return &frameIterator{ctx: ctx, columnNum: ctx.totalColumns, setIndex: 0, seriesIndex: -1}, nil
 }
 
 // advance to the next data frame
@@ -42,15 +41,20 @@ func (fi *frameIterator) NextFrame() bool {
 }
 
 // get current data frame
-func (fi *frameIterator) GetFrame() *dataFrame {
-	return fi.ctx.frameList[fi.setIndex-1]
+func (fi *frameIterator) GetFrame() (frames.Frame, error) {
+	return fi.ctx.frameList[fi.setIndex-1].GetFrame()
 }
 
 // advance to the next time series (for Prometheus mode)
 func (fi *frameIterator) Next() bool {
 
+	var numberOfColumnsInCurrentSeries int
+	if len(fi.ctx.frameList) > 0 {
+		numberOfColumnsInCurrentSeries = len(fi.ctx.frameList[fi.setIndex].columnByName)
+	}
+
 	// can advance series within a frame
-	if fi.seriesIndex < fi.columnNum-1 {
+	if fi.seriesIndex < numberOfColumnsInCurrentSeries-1 {
 		fi.seriesIndex++
 		if fi.isCurrentSeriesHidden() {
 			return fi.Next()
@@ -109,6 +113,7 @@ func NewDataFrame(columnsSpec []columnMeta, indexColumn Column, lset utils.Label
 		df.columns = make([]Column, 0, numOfColumns)
 		df.metricToCountColumn = map[string]Column{}
 		df.metrics = map[string]struct{}{}
+		df.nonEmptyRowsIndicators = make([]bool, columnSize)
 		// In case user wanted all metrics, save the template for every metric.
 		// Once we know what metrics we have we will create Columns out of the column Templates
 		if getAllMetrics {
@@ -156,7 +161,7 @@ func createColumn(col columnMeta, columnSize int, useServerAggregates bool) (Col
 			column = NewVirtualColumn(col.getColumnName(), col, columnSize, function)
 		}
 	} else {
-		column = NewDataColumn(col.getColumnName(), col, columnSize, FloatType)
+		column = NewDataColumn(col.getColumnName(), col, columnSize, frames.FloatType)
 	}
 
 	return column, nil
@@ -214,10 +219,11 @@ type dataFrame struct {
 	isRawColumnsGenerated bool
 	rawColumns            []utils.Series
 
-	columnsTemplates []columnMeta
-	columns          []Column
-	index            Column
-	columnByName     map[string]int // name -> index in columns
+	columnsTemplates       []columnMeta
+	columns                []Column
+	index                  Column
+	columnByName           map[string]int // name -> index in columns
+	nonEmptyRowsIndicators []bool
 
 	metrics             map[string]struct{}
 	metricToCountColumn map[string]Column
@@ -255,6 +261,20 @@ func (d *dataFrame) addMetricFromTemplate(metricName string, columnSize int, use
 	}
 	d.metrics[metricName] = struct{}{}
 	return nil
+}
+
+func (d *dataFrame) setDataAt(columnName string, index int, value interface{}) error {
+	colIndex, ok := d.columnByName[columnName]
+	if !ok {
+		return fmt.Errorf("no such column %v", columnName)
+	}
+	col := d.columns[colIndex]
+	err := col.SetDataAt(index, value)
+	if err == nil {
+		d.nonEmptyRowsIndicators[index] = true
+	}
+
+	return err
 }
 
 func (d *dataFrame) Len() int {
@@ -332,6 +352,54 @@ func (d *dataFrame) TimeSeries(i int) (utils.Series, error) {
 	}
 }
 
+// Creates Frames.columns out of tsdb columns.
+// First do all the concrete columns and then the virtual who are dependant on the concrete.
+func (d *dataFrame) finishAllColumns() error {
+
+	// Marking as deleted every index (row) that has no data.
+	for i, hasData := range d.nonEmptyRowsIndicators {
+		if !hasData {
+			for _, col := range d.columns {
+				_ = col.Delete(i)
+			}
+			_ = d.index.Delete(i)
+		}
+	}
+
+	var columnSize int
+	var err error
+	for _, col := range d.columns {
+		switch col.(type) {
+		case *dataColumn:
+			err = col.finish()
+		case *ConcreteColumn:
+			err = col.finish()
+			if columnSize == 0 {
+				columnSize = col.FramesColumn().Len()
+			} else if columnSize != col.FramesColumn().Len() {
+				return fmt.Errorf("column length mismatch %v!=%v col=%v", columnSize, col.FramesColumn().Len(), col.Name())
+			}
+		}
+		if err != nil {
+			return errors.Wrapf(err, "failed to create column '%v'", col.Name())
+		}
+	}
+	for _, col := range d.columns {
+		switch newCol := col.(type) {
+		case *virtualColumn:
+			newCol.size = columnSize
+			err = col.finish()
+		}
+		if err != nil {
+			return errors.Wrapf(err, "failed to create column '%v'", col.Name())
+		}
+	}
+
+	err = d.index.finish()
+
+	return err
+}
+
 // Normalizing the raw data of different metrics to one timeline with both metric's times.
 //
 // for example the following time series:
@@ -346,13 +414,15 @@ func (d *dataFrame) TimeSeries(i int) (utils.Series, error) {
 //
 func (d *dataFrame) rawSeriesToColumns() {
 	var timeData []time.Time
-	columns := make([][]interface{}, len(d.rawColumns))
+
+	columns := make([]frames.ColumnBuilder, len(d.rawColumns))
 	nonExhaustedIterators := len(d.rawColumns)
-	seriesToDataType := make([]DType, len(d.rawColumns))
+	seriesToDataType := make([]frames.DType, len(d.rawColumns))
+	seriesTodefaultValue := make([]interface{}, len(d.rawColumns))
 	currentTime := int64(math.MaxInt64)
 	nextTime := int64(math.MaxInt64)
 
-	for seriesIndex, rawSeries := range d.rawColumns {
+	for i, rawSeries := range d.rawColumns {
 		if rawSeries.Iterator().Next() {
 			t, _ := rawSeries.Iterator().At()
 			if t < nextTime {
@@ -363,13 +433,20 @@ func (d *dataFrame) rawSeriesToColumns() {
 		}
 
 		currentEnc := chunkenc.EncXOR
-		seriesToDataType[seriesIndex] = FloatType
 		if ser, ok := rawSeries.(*V3ioRawSeries); ok {
 			currentEnc = ser.encoding
 		}
 
 		if currentEnc == chunkenc.EncVariant {
-			seriesToDataType[seriesIndex] = StringType
+			columns[i] = frames.NewSliceColumnBuilder(rawSeries.Labels().Get(config.PrometheusMetricNameAttribute),
+				frames.StringType, 0)
+			seriesToDataType[i] = frames.StringType
+			seriesTodefaultValue[i] = ""
+		} else {
+			columns[i] = frames.NewSliceColumnBuilder(rawSeries.Labels().Get(config.PrometheusMetricNameAttribute),
+				frames.FloatType, 0)
+			seriesToDataType[i] = frames.FloatType
+			seriesTodefaultValue[i] = math.NaN()
 		}
 	}
 
@@ -384,24 +461,26 @@ func (d *dataFrame) rawSeriesToColumns() {
 			var v interface{}
 			var t int64
 
-			if seriesToDataType[seriesIndex] == StringType {
+			if seriesToDataType[seriesIndex] == frames.StringType {
 				t, v = iter.AtString()
 			} else {
 				t, v = iter.At()
 			}
 
+			hasMoreData := true
 			if t == currentTime {
-				columns[seriesIndex] = append(columns[seriesIndex], v)
+				columns[seriesIndex].Append(v)
 				if iter.Next() {
 					t, _ = iter.At()
 				} else {
 					nonExhaustedIterators--
+					hasMoreData = false
 				}
-			} else if t > currentTime {
-				columns[seriesIndex] = append(columns[seriesIndex], math.NaN())
+			} else {
+				columns[seriesIndex].Append(seriesTodefaultValue[seriesIndex])
 			}
 
-			if t < nextTime {
+			if hasMoreData && t < nextTime {
 				nextTime = t
 			}
 		}
@@ -409,7 +488,7 @@ func (d *dataFrame) rawSeriesToColumns() {
 
 	numberOfRows := len(timeData)
 	colSpec := columnMeta{metric: "time"}
-	d.index = NewDataColumn("time", colSpec, numberOfRows, TimeType)
+	d.index = NewDataColumn("time", colSpec, numberOfRows, frames.TimeType)
 	d.index.SetData(timeData, numberOfRows)
 
 	d.columns = make([]Column, len(d.rawColumns))
@@ -417,7 +496,7 @@ func (d *dataFrame) rawSeriesToColumns() {
 		name := series.Labels().Get(config.PrometheusMetricNameAttribute)
 		spec := columnMeta{metric: name}
 		col := NewDataColumn(name, spec, numberOfRows, seriesToDataType[i])
-		col.SetData(columns[i], numberOfRows)
+		col.framesCol = columns[i].Finish()
 		d.columns[i] = col
 	}
 
@@ -426,6 +505,20 @@ func (d *dataFrame) rawSeriesToColumns() {
 
 func (d *dataFrame) shouldGenerateRawColumns() bool { return d.isRawSeries && !d.isRawColumnsGenerated }
 
+func (d *dataFrame) GetFrame() (frames.Frame, error) {
+	var framesColumns []frames.Column
+	if d.shouldGenerateRawColumns() {
+		d.rawSeriesToColumns()
+	}
+	for _, col := range d.columns {
+		if !col.GetColumnSpec().isHidden {
+			framesColumns = append(framesColumns, col.FramesColumn())
+		}
+	}
+
+	return frames.NewFrame(framesColumns, []frames.Column{d.index.FramesColumn()}, d.Labels().Map())
+}
+
 // Column object, store a single value or index column/array
 // There can be data columns or calculated columns (e.g. Avg built from count & sum columns)
 
@@ -433,7 +526,7 @@ func (d *dataFrame) shouldGenerateRawColumns() bool { return d.isRawSeries && !d
 type Column interface {
 	Len() int                        // Number of elements
 	Name() string                    // Column name
-	DType() DType                    // Data type (e.g. IntType, FloatType ...)
+	DType() frames.DType             // Data type (e.g. IntType, FloatType ...)
 	FloatAt(i int) (float64, error)  // Float value at index i
 	StringAt(i int) (string, error)  // String value at index i
 	TimeAt(i int) (time.Time, error) // time value at index i
@@ -442,6 +535,9 @@ type Column interface {
 	SetData(d interface{}, size int) error
 	GetInterpolationFunction() InterpolationFunction
 	setMetricName(name string)
+	finish() error
+	FramesColumn() frames.Column
+	Delete(index int) error
 }
 
 type basicColumn struct {
@@ -449,6 +545,21 @@ type basicColumn struct {
 	size                  int
 	spec                  columnMeta
 	interpolationFunction InterpolationFunction
+	builder               frames.ColumnBuilder
+	framesCol             frames.Column
+}
+
+func (c *basicColumn) finish() error {
+	c.framesCol = c.builder.Finish()
+	return nil
+}
+
+func (c *basicColumn) Delete(index int) error {
+	return c.builder.Delete(index)
+}
+
+func (c *basicColumn) FramesColumn() frames.Column {
+	return c.framesCol
 }
 
 // Name returns the column name
@@ -458,6 +569,9 @@ func (c *basicColumn) Name() string {
 
 // Len returns the number of elements
 func (c *basicColumn) Len() int {
+	if c.framesCol != nil {
+		return c.framesCol.Len()
+	}
 	return c.size
 }
 
@@ -478,114 +592,43 @@ func (c *basicColumn) GetInterpolationFunction() InterpolationFunction {
 	return c.interpolationFunction
 }
 
-// DType is data type
-type DType reflect.Type
-
-func NewDataColumn(name string, colSpec columnMeta, size int, datatype DType) *dataColumn {
+func NewDataColumn(name string, colSpec columnMeta, size int, datatype frames.DType) *dataColumn {
 	dc := &dataColumn{basicColumn: basicColumn{name: name, spec: colSpec, size: size,
-		interpolationFunction: GetInterpolateFunc(colSpec.interpolationType, colSpec.interpolationTolerance)}, dtype: datatype}
-	dc.initializeData(datatype)
+		interpolationFunction: GetInterpolateFunc(colSpec.interpolationType, colSpec.interpolationTolerance),
+		builder:               frames.NewSliceColumnBuilder(name, datatype, size)}}
 	return dc
 
 }
 
 type dataColumn struct {
 	basicColumn
-	data  interface{}
-	dtype DType
-}
-
-func (dc *dataColumn) initializeData(dataType DType) {
-	switch dataType {
-	case IntType:
-		dc.data = make([]int64, dc.size)
-	case FloatType:
-		dc.data = make([]float64, dc.size)
-		floats := dc.data.([]float64)
-		for i := 0; i < dc.size; i++ {
-			floats[i] = math.NaN()
-		}
-	case StringType:
-		dc.data = make([]string, dc.size)
-	case TimeType:
-		dc.data = make([]time.Time, dc.size)
-	case BoolType:
-		dc.data = make([]bool, dc.size)
-	}
 }
 
 // DType returns the data type
-func (dc *dataColumn) DType() DType {
-	return dc.dtype
+func (dc *dataColumn) DType() frames.DType {
+	return dc.framesCol.DType()
 }
 
 // FloatAt returns float64 value at index i
 func (dc *dataColumn) FloatAt(i int) (float64, error) {
-	if !dc.isValidIndex(i) {
-		return 0, fmt.Errorf("index %d out of bounds [0:%d]", i, dc.size)
-	}
-
-	typedCol, ok := dc.data.([]float64)
-	if !ok {
-		genericCol, ok := dc.data.([]interface{})
-		if ok {
-			f, ok := genericCol[i].(float64)
-			if ok {
-				return f, nil
-			}
-		}
-		return 0, fmt.Errorf("wrong type (type is %s)", dc.DType())
-	}
-
-	return typedCol[i], nil
+	return dc.framesCol.FloatAt(i)
 }
 
 // StringAt returns string value at index i
 func (dc *dataColumn) StringAt(i int) (string, error) {
-	if !dc.isValidIndex(i) {
-		return "", fmt.Errorf("index %d out of bounds [0:%d]", i, dc.size)
-	}
-
-	typedCol, ok := dc.data.([]string)
-	if !ok {
-		genericCol, ok := dc.data.([]interface{})
-		if ok {
-			s, ok := genericCol[i].(string)
-			if ok {
-				return s, nil
-			}
-		}
-		return "", fmt.Errorf("wrong type (type is %s)", dc.DType())
-	}
-
-	return typedCol[i], nil
+	return dc.framesCol.StringAt(i)
 }
 
 // TimeAt returns time.Time value at index i
 func (dc *dataColumn) TimeAt(i int) (time.Time, error) {
-	if !dc.isValidIndex(i) {
-		return time.Unix(0, 0), fmt.Errorf("index %d out of bounds [0:%d]", i, dc.size)
-	}
-
-	typedCol, ok := dc.data.([]time.Time)
-	if !ok {
-		genericCol, ok := dc.data.([]interface{})
-		if ok {
-			i, ok := genericCol[i].(time.Time)
-			if ok {
-				return i, nil
-			}
-		}
-		return time.Unix(0, 0), fmt.Errorf("wrong type (type is %s)", dc.DType())
-	}
-
-	return typedCol[i], nil
+	return dc.framesCol.TimeAt(i)
 }
 
 func (dc *dataColumn) SetData(d interface{}, size int) error {
-	dc.data = d
 	dc.size = size
-	return nil
+	var err error
+	dc.framesCol, err = frames.NewSliceColumn(dc.name, d)
+	return err
 }
 
 func (dc *dataColumn) SetDataAt(i int, value interface{}) error {
@@ -593,49 +636,37 @@ func (dc *dataColumn) SetDataAt(i int, value interface{}) error {
 		return fmt.Errorf("index %d out of bounds [0:%d]", i, dc.size)
 	}
 
-	switch reflect.TypeOf(dc.data) {
-	case IntType:
-		dc.data.([]int64)[i] = value.(int64)
-	case FloatType:
+	var err error
+	switch value.(type) {
+	case float64:
 		// Update requested cell, only if not trying to override an existing value with NaN
-		if !(math.IsNaN(value.(float64)) && !math.IsNaN(dc.data.([]float64)[i])) {
-			dc.data.([]float64)[i] = value.(float64)
+		prev, _ := dc.builder.At(i)
+		if !(math.IsNaN(value.(float64)) && prev != nil && !math.IsNaN(prev.(float64))) {
+			err = dc.builder.Set(i, value)
 		}
-	case StringType:
-		dc.data.([]string)[i] = value.(string)
-	case TimeType:
-		dc.data.([]time.Time)[i] = value.(time.Time)
-	case BoolType:
-		dc.data.([]bool)[i] = value.(bool)
+	default:
+		err = dc.builder.Set(i, value)
 	}
-	return nil
+	return err
 }
 
 func NewConcreteColumn(name string, colSpec columnMeta, size int, setFunc func(old, new interface{}) interface{}) *ConcreteColumn {
 	col := &ConcreteColumn{basicColumn: basicColumn{name: name, spec: colSpec, size: size,
-		interpolationFunction: GetInterpolateFunc(colSpec.interpolationType, colSpec.interpolationTolerance)}, setFunc: setFunc}
-	col.data = make([]interface{}, size)
+		interpolationFunction: GetInterpolateFunc(colSpec.interpolationType, colSpec.interpolationTolerance),
+		builder:               frames.NewSliceColumnBuilder(name, frames.FloatType, size)}, setFunc: setFunc}
 	return col
 }
 
 type ConcreteColumn struct {
 	basicColumn
 	setFunc func(old, new interface{}) interface{}
-	data    []interface{}
 }
 
-func (c *ConcreteColumn) DType() DType {
-	var a float64
-	return reflect.TypeOf(a)
+func (c *ConcreteColumn) DType() frames.DType {
+	return c.framesCol.DType()
 }
 func (c *ConcreteColumn) FloatAt(i int) (float64, error) {
-	if !c.isValidIndex(i) {
-		return 0, fmt.Errorf("index %d out of bounds [0:%d]", i, c.size)
-	}
-	if c.data[i] == nil {
-		return math.NaN(), nil
-	}
-	return c.data[i].(float64), nil
+	return c.framesCol.FloatAt(i)
 }
 func (c *ConcreteColumn) StringAt(i int) (string, error) {
 	return "", errors.New("aggregated column does not support string type")
@@ -647,14 +678,15 @@ func (c *ConcreteColumn) SetDataAt(i int, val interface{}) error {
 	if !c.isValidIndex(i) {
 		return fmt.Errorf("index %d out of bounds [0:%d]", i, c.size)
 	}
-
-	c.data[i] = c.setFunc(c.data[i], val)
-	return nil
+	value, _ := c.builder.At(i)
+	err := c.builder.Set(i, c.setFunc(value, val))
+	return err
 }
 
 func NewVirtualColumn(name string, colSpec columnMeta, size int, function func([]Column, int) (interface{}, error)) Column {
 	col := &virtualColumn{basicColumn: basicColumn{name: name, spec: colSpec, size: size,
-		interpolationFunction: GetInterpolateFunc(colSpec.interpolationType, colSpec.interpolationTolerance)},
+		interpolationFunction: GetInterpolateFunc(colSpec.interpolationType, colSpec.interpolationTolerance),
+		builder:               frames.NewSliceColumnBuilder(name, frames.FloatType, size)},
 		function: function}
 	return col
 }
@@ -665,31 +697,32 @@ type virtualColumn struct {
 	function         func([]Column, int) (interface{}, error)
 }
 
-func (c *virtualColumn) DType() DType {
+func (c *virtualColumn) finish() error {
+	data := make([]float64, c.Len())
+	var err error
+	for i := 0; i < c.Len(); i++ {
+		value, err := c.function(c.dependantColumns, i)
+		if err != nil {
+			return err
+		}
+		data[i] = value.(float64)
+	}
+
+	c.framesCol, err = frames.NewSliceColumn(c.name, data)
+	if err != nil {
+		return err
+	}
 	return nil
 }
+
+func (c *virtualColumn) DType() frames.DType {
+	return c.framesCol.DType()
+}
 func (c *virtualColumn) FloatAt(i int) (float64, error) {
-	if !c.isValidIndex(i) {
-		return 0, fmt.Errorf("index %d out of bounds [0:%d]", i, c.size)
-	}
-
-	value, err := c.function(c.dependantColumns, i)
-
-	if err != nil {
-		return 0, err
-	}
-	return value.(float64), nil
+	return c.framesCol.FloatAt(i)
 }
 func (c *virtualColumn) StringAt(i int) (string, error) {
-	if !c.isValidIndex(i) {
-		return "", fmt.Errorf("index %d out of bounds [0:%d]", i, c.size)
-	}
-
-	value, err := c.function(c.dependantColumns, i)
-	if err != nil {
-		return "", err
-	}
-	return value.(string), nil
+	return c.framesCol.StringAt(i)
 }
 func (c *virtualColumn) TimeAt(i int) (time.Time, error) {
 	return time.Unix(0, 0), errors.New("aggregated column does not support time type")

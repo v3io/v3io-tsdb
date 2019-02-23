@@ -4,6 +4,7 @@ import (
 	"math"
 	"time"
 
+	"github.com/v3io/frames"
 	"github.com/v3io/v3io-tsdb/pkg/aggregate"
 	"github.com/v3io/v3io-tsdb/pkg/chunkenc"
 	"github.com/v3io/v3io-tsdb/pkg/config"
@@ -12,8 +13,9 @@ import (
 
 func NewDataFrameColumnSeries(indexColumn, dataColumn, countColumn Column, labels utils.Labels, hash uint64, showAggregateLabel bool) *DataFrameColumnSeries {
 	// If we need to return the Aggregate label then add it, otherwise (for example in prometheus) return labels without it
-	if showAggregateLabel {
-		labels = append(labels, utils.LabelsFromStringList(aggregate.AggregateLabel, dataColumn.GetColumnSpec().function.String())...)
+	aggString := dataColumn.GetColumnSpec().function.String()
+	if showAggregateLabel && aggString != "" {
+		labels = append(labels, utils.LabelsFromStringList(aggregate.AggregateLabel, aggString)...)
 	}
 
 	wantedMetricName := dataColumn.GetColumnSpec().alias
@@ -107,7 +109,7 @@ func (it *dataFrameColumnSeriesIterator) Err() error { return it.err }
 
 func (it *dataFrameColumnSeriesIterator) Encoding() chunkenc.Encoding {
 	enc := chunkenc.EncXOR
-	if it.dataColumn.DType() == StringType {
+	if it.dataColumn.DType() == frames.StringType {
 		enc = chunkenc.EncVariant
 	}
 	return enc

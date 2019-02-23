@@ -219,8 +219,8 @@ func Equal(ls, o Labels) bool {
 }
 
 // Map returns a string map of the labels.
-func (ls Labels) Map() map[string]string {
-	m := make(map[string]string, len(ls))
+func (ls Labels) Map() map[string]interface{} {
+	m := make(map[string]interface{}, len(ls))
 	for _, l := range ls {
 		m[l.Name] = l.Value
 	}

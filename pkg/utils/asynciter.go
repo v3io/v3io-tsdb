@@ -21,11 +21,14 @@ such restriction.
 package utils
 
 import (
+	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/nuclio/logger"
 	"github.com/pkg/errors"
 	"github.com/v3io/v3io-go-http"
+	"github.com/v3io/v3io-tsdb/pkg/config"
 )
 
 type ItemsCursor interface {
@@ -180,6 +183,23 @@ func (ic *AsyncItemsCursor) processResponse() error {
 	ic.items = getItemsResp.Items
 	ic.itemIndex = 0
 
+	conf, err := config.GetOrDefaultConfig()
+	if err != nil {
+		return err
+	}
+
+	// until IGZ-2.0 there is a bug in Nginx regarding range-scan, the following code is a mitigation for it.
+	if conf.DisableNginxMitigation {
+		ic.sendNextGetItemsOld(resp)
+	} else {
+		ic.sendNextGetItemsNew(resp)
+	}
+
+	return nil
+}
+
+func (ic *AsyncItemsCursor) sendNextGetItemsOld(resp *v3io.Response) error {
+	getItemsResp := resp.Output.(*v3io.GetItemsOutput)
 	if !getItemsResp.Last {
 
 		// if not last, make a new request to that shard
@@ -191,6 +211,53 @@ func (ic *AsyncItemsCursor) processResponse() error {
 		_, err := ic.container.GetItems(input, input, ic.responseChan)
 		if err != nil {
 			return errors.Wrap(err, "Failed to request next items")
+		}
+
+	} else {
+		// Mark one more shard as completed
+		ic.lastShards++
+	}
+
+	return nil
+}
+
+func (ic *AsyncItemsCursor) sendNextGetItemsNew(resp *v3io.Response) error {
+	getItemsResp := resp.Output.(*v3io.GetItemsOutput)
+	if len(getItemsResp.Items) > 0 {
+
+		// if not last, make a new request to that shard
+		input := resp.Context.(*v3io.GetItemsInput)
+
+		if getItemsResp.NextMarker == "" || getItemsResp.NextMarker == input.Marker {
+			lastItemObjectName, err := ic.items[len(ic.items)-1].GetFieldString(config.ObjectNameAttrName)
+
+			splittdObjectName := strings.Split(lastItemObjectName, ".")
+
+			// If we have the __name attribute and the query was a range scan query and the data is in range-scan format
+			if len(splittdObjectName) == 2 && input.ShardingKey != "" && err == nil {
+				lastSortingKey := splittdObjectName[1]
+
+				ic.logger.Debug("getting next items after calculating next marker for %v%v is %v for the object=%v", input.Path, input.ShardingKey, lastSortingKey, lastItemObjectName)
+				input.SortKeyRangeStart = lastSortingKey + "0"
+				input.Marker = ""
+			} else {
+				// In case it is names query
+				if getItemsResp.Last {
+					ic.lastShards++
+					return nil
+				} else {
+					input.Marker = getItemsResp.NextMarker
+				}
+			}
+		} else {
+			// set next marker
+			input.Marker = getItemsResp.NextMarker
+			ic.logger.Debug("getting next items for %v%v with given next marker %v", input.Path, input.ShardingKey, input.Marker)
+		}
+
+		_, err := ic.container.GetItems(input, input, ic.responseChan)
+		if err != nil {
+			return errors.Wrap(err, fmt.Sprintf("Failed to request next items for input=%v", input))
 		}
 
 	} else {
