@@ -110,61 +110,6 @@ def build_nuclio(V3IO_TSDB_VERSION) {
     }
 }
 
-def build_demo(V3IO_TSDB_VERSION) {
-    withCredentials([
-            usernamePassword(credentialsId: git_deploy_user, passwordVariable: 'GIT_PASSWORD', usernameVariable: 'GIT_USERNAME'),
-            string(credentialsId: git_deploy_user_token, variable: 'GIT_TOKEN')
-    ]) {
-        def git_project = 'demos'
-
-        stage('prepare sources') {
-            container('jnlp') {
-                sh """
-                    cd ${BUILD_FOLDER}
-                    git clone https://${GIT_USERNAME}:${GIT_PASSWORD}@github.com/${git_project_user}/${git_project}.git src/github.com/v3io/${git_project}
-                    cd ${BUILD_FOLDER}/src/github.com/v3io/${git_project}/netops/golang/src/github.com/v3io/demos
-                    rm -rf vendor/github.com/v3io/v3io-tsdb/
-                    git clone https://${GIT_USERNAME}:${GIT_PASSWORD}@github.com/${git_project_user}/v3io-tsdb.git vendor/github.com/v3io/v3io-tsdb
-                    cd vendor/github.com/v3io/v3io-tsdb
-                    git checkout ${V3IO_TSDB_VERSION}
-                    rm -rf .git vendor/github.com/v3io vendor/github.com/nuclio
-                """
-            }
-        }
-
-        stage('git push') {
-            container('jnlp') {
-                try {
-                    dir("${BUILD_FOLDER}/src/github.com/v3io/${git_project}/netops") {
-                        sh """
-                            git config --global user.email '${GIT_USERNAME}@iguazio.com'
-                            git config --global user.name '${GIT_USERNAME}'
-                            git add golang/src/github.com/v3io/demos/vendor/github.com;
-                            git commit -am 'Updated TSDB to ${V3IO_TSDB_VERSION}';
-                            git push origin master
-                        """
-                    }
-                } catch (err) {
-                    echo "Can not push code to master"
-                }
-            }
-
-            container('jnlp') {
-                try {
-                    dir("${BUILD_FOLDER}/src/github.com/v3io/${git_project}/netops") {
-                        sh """
-                            git checkout development
-                            git merge origin/master
-                            git push origin development
-                        """
-                    }
-                } catch (err) {
-                    echo "Can not push code to development"
-                }
-            }
-        }
-    }
-}
 
 def build_prometheus(V3IO_TSDB_VERSION) {
     withCredentials([
@@ -260,7 +205,7 @@ spec:
 ) {
     def MAIN_TAG_VERSION
     def PUBLISHED_BEFORE
-    def next_versions = ['demos':null, 'prometheus':null, 'tsdb-nuclio':null]
+    def next_versions = ['prometheus':null, 'tsdb-nuclio':null]
 
     pipelinex = library(identifier: 'pipelinex@DEVOPS-204-pipelinex', retriever: modernSCM(
             [$class: 'GitSCMSource',
@@ -299,7 +244,6 @@ spec:
                             }
                         }
                     },
-
                     'tsdb-nuclio': {
                         podTemplate(label: "v3io-tsdb-nuclio-${label}", inheritFrom: "${git_project}-${label}") {
                             node("v3io-tsdb-nuclio-${label}") {
@@ -322,34 +266,6 @@ spec:
                                     stage('create tsdb-nuclio prerelease') {
                                         container('jnlp') {
                                             github.create_prerelease("tsdb-nuclio", git_project_user, NEXT_VERSION, GIT_TOKEN)
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    },
-                    'demos': {
-                        podTemplate(label: "demos-${label}", inheritFrom: "${git_project}-${label}") {
-                            node("demos-${label}") {
-                                withCredentials([
-                                        string(credentialsId: git_deploy_user_token, variable: 'GIT_TOKEN')
-                                ]) {
-                                    def NEXT_VERSION
-
-                                    stage('get previous release version') {
-                                        container('jnlp') {
-                                            NEXT_VERSION = github.get_next_tag_version("demos", git_project_user, GIT_TOKEN)
-
-                                            echo "$NEXT_VERSION"
-                                            next_versions.putAt('demos', NEXT_VERSION)
-                                        }
-                                    }
-
-                                    build_demo(TAG_NAME)
-
-                                    stage('create demos prerelease') {
-                                        container('jnlp') {
-                                            github.create_prerelease("demos", git_project_user, NEXT_VERSION, GIT_TOKEN)
                                         }
                                     }
                                 }
@@ -420,7 +336,7 @@ spec:
                 stage('waiting for prereleases moved to releases') {
                     container('jnlp') {
                         i = 0
-                        def tasks_list = ['demos': null, 'prometheus': null, 'tsdb-nuclio': null]
+                        def tasks_list = ['prometheus': null, 'tsdb-nuclio': null]
                         def success_count = 0
 
                         while (true) {
