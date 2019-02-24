@@ -250,7 +250,11 @@ spec:
 
                                     stage('get previous release version') {
                                         container('jnlp') {
-                                            NEXT_VERSION = github.get_next_tag_version("tsdb-nuclio", git_project_user, GIT_TOKEN)
+                                            if (MAIN_TAG_VERSION != "unstable") {
+                                                NEXT_VERSION = github.get_next_tag_version("tsdb-nuclio", git_project_user, GIT_TOKEN)
+                                            } else {
+                                                NEXT_VERSION = "unstable"
+                                            }
 
                                             echo "$NEXT_VERSION"
                                             next_versions.putAt("tsdb-nuclio", NEXT_VERSION)
@@ -300,7 +304,11 @@ spec:
                                     if (TAG_VERSION) {
                                         stage('get previous release version') {
                                             container('jnlp') {
-                                                NEXT_VERSION = "v${TAG_VERSION}-${MAIN_TAG_VERSION}"
+                                                if (MAIN_TAG_VERSION != "unstable") {
+                                                    NEXT_VERSION = "v${TAG_VERSION}-${MAIN_TAG_VERSION}"
+                                                } else {
+                                                    NEXT_VERSION = "unstable"
+                                                }
 
                                                 echo "$NEXT_VERSION"
                                                 next_versions.putAt('prometheus', NEXT_VERSION)
