@@ -265,6 +265,10 @@ spec:
 
                                     stage('create tsdb-nuclio prerelease') {
                                         container('jnlp') {
+                                            if (NEXT_VERSION == "unstable") {
+                                                github.delete_release("tsdb-nuclio", git_project_user, NEXT_VERSION, GIT_TOKEN)
+                                            }
+
                                             github.create_prerelease("tsdb-nuclio", git_project_user, NEXT_VERSION, GIT_TOKEN)
                                         }
                                     }
@@ -285,9 +289,9 @@ spec:
                                     stage('trigger') {
                                         container('jnlp') {
                                             sh """
-                                        cd ${BUILD_FOLDER}
-                                        git clone https://${GIT_USERNAME}:${GIT_PASSWORD}@github.com/${git_project_user}/prometheus.git src/github.com/prometheus/prometheus
-                                    """
+                                                cd ${BUILD_FOLDER}
+                                                git clone https://${GIT_USERNAME}:${GIT_PASSWORD}@github.com/${git_project_user}/prometheus.git src/github.com/prometheus/prometheus
+                                            """
 
                                             TAG_VERSION = sh(
                                                     script: "cat ${BUILD_FOLDER}/src/github.com/prometheus/prometheus/VERSION",
@@ -310,6 +314,10 @@ spec:
 
                                         stage('create prometheus prerelease') {
                                             container('jnlp') {
+                                                if (NEXT_VERSION == "unstable") {
+                                                    github.delete_release("prometheus", git_project_user, NEXT_VERSION, GIT_TOKEN)
+                                                }
+
                                                 github.create_prerelease("prometheus", git_project_user, NEXT_VERSION, GIT_TOKEN)
                                             }
                                         }
