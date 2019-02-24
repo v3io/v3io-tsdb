@@ -261,7 +261,7 @@ spec:
                                         }
                                     }
 
-                                    build_nuclio(TAG_NAME)
+                                    build_nuclio(MAIN_TAG_VERSION)
 
                                     stage('create tsdb-nuclio prerelease') {
                                         container('jnlp') {
@@ -305,14 +305,14 @@ spec:
                                     if (TAG_VERSION) {
                                         stage('get previous release version') {
                                             container('jnlp') {
-                                                NEXT_VERSION = "v${TAG_VERSION}-${TAG_NAME}"
+                                                NEXT_VERSION = "v${TAG_VERSION}-${MAIN_TAG_VERSION}"
 
                                                 echo "$NEXT_VERSION"
                                                 next_versions.putAt('prometheus', NEXT_VERSION)
                                             }
                                         }
 
-                                        build_prometheus(TAG_NAME)
+                                        build_prometheus(MAIN_TAG_VERSION)
 
                                         stage('create prometheus prerelease') {
                                             container('jnlp') {
