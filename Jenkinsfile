@@ -51,7 +51,7 @@ def build_v3io_tsdb(TAG_VERSION) {
     }
 }
 
-def build_nuclio(V3IO_TSDB_VERSION) {
+def build_nuclio(V3IO_TSDB_VERSION, internal_status="stable") {
     withCredentials([
             string(credentialsId: git_deploy_user_token, variable: 'GIT_TOKEN')
     ]) {
@@ -60,9 +60,12 @@ def build_nuclio(V3IO_TSDB_VERSION) {
             container('jnlp') {
                 sh """
                     cd ${BUILD_FOLDER}
+                    if [[ -d "src/github.com/v3io/${git_project}" ]]; then
+                        rm -rf "src/github.com/v3io/${git_project}";
+                    fi
                     git clone https://${GIT_TOKEN}@github.com/${git_project_user}/${git_project}.git src/github.com/v3io/${git_project}
                     cd ${BUILD_FOLDER}/src/github.com/v3io/${git_project}
-                    if [[ "${V3IO_TSDB_VERSION}" == "unstable" ]]; then
+                    if [[ "${internal_status}" == "unstable" ]]; then
                         git checkout development
                     fi
                     rm -rf functions/ingest/vendor/github.com/v3io/v3io-tsdb functions/query/vendor/github.com/v3io/v3io-tsdb
@@ -85,7 +88,11 @@ def build_nuclio(V3IO_TSDB_VERSION) {
                             git config --global user.name '${GIT_USERNAME}'
                             git add functions/ingest/vendor/github.com functions/query/vendor/github.com;
                             git commit -am 'Updated TSDB to ${V3IO_TSDB_VERSION}';
-                            git push origin master
+                            if [[ "${internal_status}" == "unstable" ]]; then
+                                git push origin development
+                            else
+                                git push origin master
+                            fi
                         """
                     }
                 } catch (err) {
@@ -111,7 +118,7 @@ def build_nuclio(V3IO_TSDB_VERSION) {
 }
 
 
-def build_prometheus(V3IO_TSDB_VERSION) {
+def build_prometheus(V3IO_TSDB_VERSION, internal_status="stable") {
     withCredentials([
             string(credentialsId: git_deploy_user_token, variable: 'GIT_TOKEN')
     ]) {
@@ -121,9 +128,12 @@ def build_prometheus(V3IO_TSDB_VERSION) {
             container('jnlp') {
                 sh """ 
                     cd ${BUILD_FOLDER}
+                    if [[ -d "src/github.com/${git_project}/${git_project}" ]]; then
+                        rm -rf "src/github.com/${git_project}/${git_project}";
+                    fi
                     git clone https://${GIT_TOKEN}@github.com/${git_project_user}/${git_project}.git src/github.com/${git_project}/${git_project}
                     cd ${BUILD_FOLDER}/src/github.com/${git_project}/${git_project}
-                    if [[ "${V3IO_TSDB_VERSION}" == "unstable" ]]; then
+                    if [[ "${internal_status}" == "unstable" ]]; then
                         git checkout development
                     fi
                     rm -rf vendor/github.com/v3io/v3io-tsdb/
@@ -144,7 +154,11 @@ def build_prometheus(V3IO_TSDB_VERSION) {
                             git config --global user.name '${GIT_USERNAME}'
                             git add vendor/github.com;
                             git commit -am 'Updated TSDB to ${V3IO_TSDB_VERSION}';
-                            git push origin master
+                            if [[ "${internal_status}" == "unstable" ]]; then
+                                git push origin development
+                            else
+                                git push origin master
+                            fi
                         """
                     }
                 } catch (err) {
@@ -252,30 +266,32 @@ spec:
                                 ]) {
                                     def NEXT_VERSION
 
-                                    stage('get previous release version') {
-                                        container('jnlp') {
-                                            if (MAIN_TAG_VERSION != "unstable") {
+                                    if (MAIN_TAG_VERSION != "unstable") {
+                                        stage('get previous release version') {
+                                            container('jnlp') {
                                                 NEXT_VERSION = github.get_next_tag_version("tsdb-nuclio", git_project_user, GIT_TOKEN)
-                                            } else {
-                                                NEXT_VERSION = "unstable"
+
+                                                echo "$NEXT_VERSION"
+                                                next_versions.putAt("tsdb-nuclio", NEXT_VERSION)
                                             }
-
-                                            echo "$NEXT_VERSION"
-                                            next_versions.putAt("tsdb-nuclio", NEXT_VERSION)
                                         }
-                                    }
 
-                                    build_nuclio(MAIN_TAG_VERSION)
+                                        build_nuclio(MAIN_TAG_VERSION, "unstable")
+                                        build_nuclio(MAIN_TAG_VERSION)
 
-                                    stage('create tsdb-nuclio prerelease') {
-                                        container('jnlp') {
-                                            echo "Triggered tsdb-nuclio development will be builded with last tsdb stable version"
-                                            github.delete_release("tsdb-nuclio", git_project_user, "unstable", GIT_TOKEN)
-                                            github.create_prerelease("tsdb-nuclio", git_project_user, "unstable", GIT_TOKEN, "development")
+                                        stage('create tsdb-nuclio prerelease') {
+                                            container('jnlp') {
+                                                echo "Triggered tsdb-nuclio development will be builded with last tsdb stable version"
+                                                github.delete_release("tsdb-nuclio", git_project_user, "unstable", GIT_TOKEN)
+                                                github.create_prerelease("tsdb-nuclio", git_project_user, "unstable", GIT_TOKEN, "development")
 
-                                            if (MAIN_TAG_VERSION != "unstable") {
+                                                echo "Trigger tsdb-nuclio ${NEXT_VERSION} with tsdb ${MAIN_TAG_VERSION}"
                                                 github.create_prerelease("tsdb-nuclio", git_project_user, NEXT_VERSION, GIT_TOKEN)
                                             }
+                                        }
+                                    } else {
+                                        stage('info') {
+                                            echo("Unstable tsdb doesn't trigger tsdb-nuclio")
                                         }
                                     }
                                 }
@@ -291,46 +307,48 @@ spec:
                                     def TAG_VERSION
                                     def NEXT_VERSION
 
-                                    stage('trigger') {
-                                        container('jnlp') {
-                                            sh """
-                                                cd ${BUILD_FOLDER}
-                                                git clone https://${GIT_TOKEN}@github.com/${git_project_user}/prometheus.git src/github.com/prometheus/prometheus
-                                            """
-
-                                            TAG_VERSION = sh(
-                                                    script: "cat ${BUILD_FOLDER}/src/github.com/prometheus/prometheus/VERSION",
-                                                    returnStdout: true
-                                            ).trim()
-                                        }
-                                    }
-
-                                    if (TAG_VERSION) {
-                                        stage('get previous release version') {
+                                    if (MAIN_TAG_VERSION != "unstable") {
+                                        stage('get current version') {
                                             container('jnlp') {
-                                                if (MAIN_TAG_VERSION != "unstable") {
-                                                    NEXT_VERSION = "v${TAG_VERSION}-${MAIN_TAG_VERSION}"
-                                                } else {
-                                                    NEXT_VERSION = "unstable"
-                                                }
+                                                sh """
+                                                    cd ${BUILD_FOLDER}
+                                                    git clone https://${GIT_TOKEN}@github.com/${git_project_user}/prometheus.git src/github.com/prometheus/prometheus
+                                                """
 
-                                                echo "$NEXT_VERSION"
-                                                next_versions.putAt('prometheus', NEXT_VERSION)
+                                                TAG_VERSION = sh(
+                                                        script: "cat ${BUILD_FOLDER}/src/github.com/prometheus/prometheus/VERSION",
+                                                        returnStdout: true
+                                                ).trim()
                                             }
                                         }
 
-                                        build_prometheus(MAIN_TAG_VERSION)
+                                        if (TAG_VERSION) {
+                                            stage('get previous release version') {
+                                                container('jnlp') {
+                                                    NEXT_VERSION = "v${TAG_VERSION}-${MAIN_TAG_VERSION}"
 
-                                        stage('create prometheus prerelease') {
-                                            container('jnlp') {
-                                                echo "Triggered prometheus development will be builded with last tsdb stable version"
-                                                github.delete_release("prometheus", git_project_user, "unstable", GIT_TOKEN)
-                                                github.create_prerelease("prometheus", git_project_user, "unstable", GIT_TOKEN, "development")
+                                                    echo "$NEXT_VERSION"
+                                                    next_versions.putAt('prometheus', NEXT_VERSION)
+                                                }
+                                            }
 
-                                                if (MAIN_TAG_VERSION != "unstable") {
+                                            build_prometheus(MAIN_TAG_VERSION, "unstable")
+                                            build_prometheus(MAIN_TAG_VERSION)
+
+                                            stage('create prometheus prerelease') {
+                                                container('jnlp') {
+                                                    echo "Triggered prometheus development will be builded with last tsdb stable version"
+                                                    github.delete_release("prometheus", git_project_user, "unstable", GIT_TOKEN)
+                                                    github.create_prerelease("prometheus", git_project_user, "unstable", GIT_TOKEN, "development")
+
+                                                    echo "Trigger prometheus ${NEXT_VERSION} with tsdb ${MAIN_TAG_VERSION}"
                                                     github.create_prerelease("prometheus", git_project_user, NEXT_VERSION, GIT_TOKEN)
                                                 }
                                             }
+                                        }
+                                    } else {
+                                        stage('info') {
+                                            echo("Unstable tsdb doesn't trigger prometheus")
                                         }
                                     }
                                 }
