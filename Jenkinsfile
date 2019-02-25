@@ -60,27 +60,19 @@ def build_nuclio(V3IO_TSDB_VERSION, internal_status="stable") {
         def git_project = 'tsdb-nuclio'
         stage('prepare sources') {
             container('jnlp') {
-                echo "a1"
                 if(!fileExists("${BUILD_FOLDER}/src/github.com/v3io/${git_project}")) {
                     sh("cd ${BUILD_FOLDER}; git clone https://${GIT_TOKEN}@github.com/${git_project_user}/${git_project}.git src/github.com/v3io/${git_project}")
                 }
-                echo "a2"
                 if ( "${internal_status}" == "unstable" ) {
-                    echo "a3"
                     dir("${BUILD_FOLDER}/src/github.com/v3io/${git_project}") {
-                        echo "a4"
                         sh("git checkout development")
                     }
                 } else {
-                    echo "b3"
                     dir("${BUILD_FOLDER}/src/github.com/v3io/${git_project}") {
-                        echo "b4"
                         sh("git checkout master")
                     }
                 }
-                echo "a5"
                 dir("${BUILD_FOLDER}/src/github.com/v3io/${git_project}") {
-                    echo "a6"
                     sh """
                         rm -rf functions/ingest/vendor/github.com/v3io/v3io-tsdb functions/query/vendor/github.com/v3io/v3io-tsdb
                         git clone https://${GIT_TOKEN}@github.com/${git_project_user}/v3io-tsdb.git functions/ingest/vendor/github.com/v3io/v3io-tsdb
@@ -182,54 +174,7 @@ def build_prometheus(V3IO_TSDB_VERSION, internal_status="stable") {
     }
 }
 
-podTemplate(label: "${git_project}-${label}", yaml: """
-apiVersion: v1
-kind: Pod
-metadata:
-  name: "${git_project}-${label}"
-  labels:
-    jenkins/kube-default: "true"
-    app: "jenkins"
-    component: "agent"
-spec:
-  shareProcessNamespace: true
-  containers:
-    - name: jnlp
-      image: jenkins/jnlp-slave
-      resources:
-        limits:
-          cpu: 1
-          memory: 2Gi
-        requests:
-          cpu: 1
-          memory: 2Gi
-      volumeMounts:
-        - name: go-shared
-          mountPath: /go
-    - name: docker-cmd
-      image: docker
-      command: [ "/bin/sh", "-c", "--" ]
-      args: [ "while true; do sleep 30; done;" ]
-      volumeMounts:
-        - name: docker-sock
-          mountPath: /var/run
-        - name: go-shared
-          mountPath: /go
-    - name: golang
-      image: golang:1.11
-      command: [ "/bin/sh", "-c", "--" ]
-      args: [ "while true; do sleep 30; done;" ]
-      volumeMounts:
-        - name: go-shared
-          mountPath: /go
-  volumes:
-    - name: docker-sock
-      hostPath:
-          path: /var/run
-    - name: go-shared
-      emptyDir: {}
-"""
-) {
+podTemplate(label: "${git_project}-${label}", inheritFrom: "jnlp-docker-golang") {
     def MAIN_TAG_VERSION
     def PUBLISHED_BEFORE
     def next_versions = ['prometheus':null, 'tsdb-nuclio':null]
