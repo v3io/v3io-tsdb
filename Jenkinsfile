@@ -4,6 +4,7 @@ expired=240
 attempts=15
 git_project = "v3io-tsdb"
 git_project_user = "gkirok"
+git_deploy_user = "iguazio-dev-git-user"
 git_deploy_user_token = "iguazio-dev-git-user-token"
 git_deploy_user_private_key = "iguazio-dev-git-user-private-key"
 
@@ -53,6 +54,7 @@ def build_v3io_tsdb(TAG_VERSION) {
 
 def build_nuclio(V3IO_TSDB_VERSION, internal_status="stable") {
     withCredentials([
+            usernamePassword(credentialsId: git_deploy_user, passwordVariable: 'GIT_PASSWORD', usernameVariable: 'GIT_USERNAME'),
             string(credentialsId: git_deploy_user_token, variable: 'GIT_TOKEN')
     ]) {
         def git_project = 'tsdb-nuclio'
@@ -99,6 +101,8 @@ def build_nuclio(V3IO_TSDB_VERSION, internal_status="stable") {
                         sh """
                             git config --global user.email '${GIT_USERNAME}@iguazio.com'
                             git config --global user.name '${GIT_USERNAME}'
+                            git remote rm origin
+                            git remote add origin https://${GIT_USERNAME}:${GIT_TOKEN}@github.com/${git_project_user}/${git_project}.git
                             git add functions/ingest/vendor/github.com functions/query/vendor/github.com;
                             git commit -am 'Updated TSDB to ${V3IO_TSDB_VERSION}';
                         """
@@ -113,20 +117,6 @@ def build_nuclio(V3IO_TSDB_VERSION, internal_status="stable") {
                     echo err
                 }
             }
-
-            container('jnlp') {
-                try {
-                    dir("${BUILD_FOLDER}/src/github.com/v3io/${git_project}") {
-                        sh """
-                            git checkout development
-                            git merge origin/master
-                            git push origin development
-                        """
-                    }
-                } catch (err) {
-                    echo "Can not push code to development"
-                }
-            }
         }
     }
 }
@@ -134,6 +124,7 @@ def build_nuclio(V3IO_TSDB_VERSION, internal_status="stable") {
 
 def build_prometheus(V3IO_TSDB_VERSION, internal_status="stable") {
     withCredentials([
+            usernamePassword(credentialsId: git_deploy_user, passwordVariable: 'GIT_PASSWORD', usernameVariable: 'GIT_USERNAME'),
             string(credentialsId: git_deploy_user_token, variable: 'GIT_TOKEN')
     ]) {
         def git_project = 'prometheus'
@@ -171,6 +162,8 @@ def build_prometheus(V3IO_TSDB_VERSION, internal_status="stable") {
                         sh """
                             git config --global user.email '${GIT_USERNAME}@iguazio.com'
                             git config --global user.name '${GIT_USERNAME}'
+                            git remote rm origin
+                            git remote add origin https://${GIT_USERNAME}:${GIT_TOKEN}@github.com/${git_project_user}/${git_project}.git
                             git add vendor/github.com;
                             git commit -am 'Updated TSDB to ${V3IO_TSDB_VERSION}';
                         """
