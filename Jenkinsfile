@@ -58,24 +58,28 @@ def build_nuclio(V3IO_TSDB_VERSION, internal_status="stable") {
         def git_project = 'tsdb-nuclio'
         stage('prepare sources') {
             container('jnlp') {
-                sh """
-                    cd ${BUILD_FOLDER}
-                    rm -rf "src/github.com/v3io/${git_project}";
-                    git clone https://${GIT_TOKEN}@github.com/${git_project_user}/${git_project}.git src/github.com/v3io/${git_project}
-                    cd ${BUILD_FOLDER}/src/github.com/v3io/${git_project}
-                """
-                if ( "${internal_status}" == "unstable" ) {
-                    sh("git checkout development")
+                dir("${BUILD_FOLDER}") {
+                    sh """
+                        rm -rf "src/github.com/v3io/${git_project}";
+                        git clone https://${GIT_TOKEN}@github.com/${git_project_user}/${git_project}.git src/github.com/v3io/${git_project}
+                    """
                 }
-                sh """
-                    rm -rf functions/ingest/vendor/github.com/v3io/v3io-tsdb functions/query/vendor/github.com/v3io/v3io-tsdb
-                    git clone https://${GIT_TOKEN}@github.com/${git_project_user}/v3io-tsdb.git functions/ingest/vendor/github.com/v3io/v3io-tsdb
-                    cd functions/ingest/vendor/github.com/v3io/v3io-tsdb
-                    git checkout ${V3IO_TSDB_VERSION}
-                    rm -rf .git vendor/github.com/nuclio vendor/github.com/v3io/frames/vendor/golang.org/x/net
-                    cd ${BUILD_FOLDER}/src/github.com/v3io/${git_project}
-                    cp -R functions/ingest/vendor/github.com/v3io/v3io-tsdb functions/query/vendor/github.com/v3io/v3io-tsdb
-                """
+                if ( "${internal_status}" == "unstable" ) {
+                    dir("${BUILD_FOLDER}/src/github.com/v3io/${git_project}") {
+                        sh("git checkout development")
+                    }
+                }
+                dir("${BUILD_FOLDER}/src/github.com/v3io/${git_project}") {
+                    sh """
+                        rm -rf functions/ingest/vendor/github.com/v3io/v3io-tsdb functions/query/vendor/github.com/v3io/v3io-tsdb
+                        git clone https://${GIT_TOKEN}@github.com/${git_project_user}/v3io-tsdb.git functions/ingest/vendor/github.com/v3io/v3io-tsdb
+                        cd functions/ingest/vendor/github.com/v3io/v3io-tsdb
+                        git checkout ${V3IO_TSDB_VERSION}
+                        rm -rf .git vendor/github.com/nuclio vendor/github.com/v3io/frames/vendor/golang.org/x/net
+                        cd ${BUILD_FOLDER}/src/github.com/v3io/${git_project}
+                        cp -R functions/ingest/vendor/github.com/v3io/v3io-tsdb functions/query/vendor/github.com/v3io/v3io-tsdb
+                    """
+                }
             }
         }
 
@@ -126,22 +130,26 @@ def build_prometheus(V3IO_TSDB_VERSION, internal_status="stable") {
 
         stage('prepare sources') {
             container('jnlp') {
-                sh """ 
-                    cd ${BUILD_FOLDER}
-                    rm -rf "src/github.com/${git_project}/${git_project}";
-                    git clone https://${GIT_TOKEN}@github.com/${git_project_user}/${git_project}.git src/github.com/${git_project}/${git_project}
-                    cd ${BUILD_FOLDER}/src/github.com/${git_project}/${git_project}
-                """
-                    if ( "${internal_status}" == "unstable" ) {
+                dir("${BUILD_FOLDER}") {
+                    sh """ 
+                        rm -rf "src/github.com/${git_project}/${git_project}";
+                        git clone https://${GIT_TOKEN}@github.com/${git_project_user}/${git_project}.git src/github.com/${git_project}/${git_project}
+                    """
+                }
+                if ( "${internal_status}" == "unstable" ) {
+                    dir("${BUILD_FOLDER}/src/github.com/${git_project}/${git_project}") {
                         sh("git checkout development")
                     }
-                sh """
-                    rm -rf vendor/github.com/v3io/v3io-tsdb/
-                    git clone https://${GIT_TOKEN}@github.com/${git_project_user}/v3io-tsdb.git vendor/github.com/v3io/v3io-tsdb
-                    cd vendor/github.com/v3io/v3io-tsdb
-                    git checkout ${V3IO_TSDB_VERSION}
-                    rm -rf .git vendor/github.com/${git_project} vendor/github.com/v3io/frames/vendor/golang.org/x/net
-                """
+                }
+                dir("${BUILD_FOLDER}/src/github.com/${git_project}/${git_project}") {
+                    sh """
+                        rm -rf vendor/github.com/v3io/v3io-tsdb/
+                        git clone https://${GIT_TOKEN}@github.com/${git_project_user}/v3io-tsdb.git vendor/github.com/v3io/v3io-tsdb
+                        cd vendor/github.com/v3io/v3io-tsdb
+                        git checkout ${V3IO_TSDB_VERSION}
+                        rm -rf .git vendor/github.com/${git_project} vendor/github.com/v3io/frames/vendor/golang.org/x/net
+                    """
+                }
             }
         }
 
