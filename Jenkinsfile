@@ -63,9 +63,11 @@ def build_nuclio(V3IO_TSDB_VERSION, internal_status="stable") {
                     rm -rf "src/github.com/v3io/${git_project}";
                     git clone https://${GIT_TOKEN}@github.com/${git_project_user}/${git_project}.git src/github.com/v3io/${git_project}
                     cd ${BUILD_FOLDER}/src/github.com/v3io/${git_project}
-                    if [ "${internal_status}" == "unstable" ]; then
-                        git checkout development
-                    fi
+                """
+                if ( "${internal_status}" == "unstable" ) {
+                    sh("git checkout development")
+                }
+                sh """
                     rm -rf functions/ingest/vendor/github.com/v3io/v3io-tsdb functions/query/vendor/github.com/v3io/v3io-tsdb
                     git clone https://${GIT_TOKEN}@github.com/${git_project_user}/v3io-tsdb.git functions/ingest/vendor/github.com/v3io/v3io-tsdb
                     cd functions/ingest/vendor/github.com/v3io/v3io-tsdb
@@ -129,9 +131,11 @@ def build_prometheus(V3IO_TSDB_VERSION, internal_status="stable") {
                     rm -rf "src/github.com/${git_project}/${git_project}";
                     git clone https://${GIT_TOKEN}@github.com/${git_project_user}/${git_project}.git src/github.com/${git_project}/${git_project}
                     cd ${BUILD_FOLDER}/src/github.com/${git_project}/${git_project}
-                    if [ "${internal_status}" == "unstable" ]; then
-                        git checkout development
-                    fi
+                """
+                    if ( "${internal_status}" == "unstable" ) {
+                        sh("git checkout development")
+                    }
+                sh """
                     rm -rf vendor/github.com/v3io/v3io-tsdb/
                     git clone https://${GIT_TOKEN}@github.com/${git_project_user}/v3io-tsdb.git vendor/github.com/v3io/v3io-tsdb
                     cd vendor/github.com/v3io/v3io-tsdb
