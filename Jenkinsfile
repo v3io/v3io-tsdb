@@ -4,8 +4,8 @@ expired=240
 attempts=15
 git_project = "v3io-tsdb"
 git_project_user = "gkirok"
-git_deploy_user_token = "iguazio-prod-git-user-token"
-git_deploy_user_private_key = "iguazio-prod-git-user-private-key"
+git_deploy_user_token = "iguazio-dev-git-user-token"
+git_deploy_user_private_key = "iguazio-dev-git-user-private-key"
 
 def build_v3io_tsdb(TAG_VERSION) {
     withCredentials([
@@ -337,9 +337,11 @@ spec:
         } else {
             stage('warning') {
                 if (PUBLISHED_BEFORE >= expired) {
-                    echo "Tag too old, published before $PUBLISHED_BEFORE minutes."
+                    currentBuild.result = 'ABORTED'
+                    error("Tag too old, published before $PUBLISHED_BEFORE minutes.")
                 } else {
-                    echo "${MAIN_TAG_VERSION} is not release tag."
+                    currentBuild.result = 'ABORTED'
+                    error("${TAG_VERSION} is not release tag.")
                 }
             }
         }
