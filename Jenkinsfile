@@ -88,25 +88,29 @@ def build_nuclio(V3IO_TSDB_VERSION, internal_status="stable") {
 
         stage('git push') {
             container('jnlp') {
-                try {
-                    dir("${BUILD_FOLDER}/src/github.com/v3io/${git_project}") {
-                        sh """
-                            git config --global user.email '${GIT_USERNAME}@iguazio.com'
-                            git config --global user.name '${GIT_USERNAME}'
-                            git remote rm origin
-                            git remote add origin https://${GIT_USERNAME}:${GIT_TOKEN}@github.com/${git_project_user}/${git_project}.git
-                            git add functions/ingest/vendor/github.com functions/query/vendor/github.com;
-                            git commit -am 'Updated TSDB to ${V3IO_TSDB_VERSION}';
-                        """
+                dir("${BUILD_FOLDER}/src/github.com/v3io/${git_project}") {
+                    sh """
+                        git config --global user.email '${GIT_USERNAME}@iguazio.com'
+                        git config --global user.name '${GIT_USERNAME}'
+                        git remote rm origin
+                        git remote add origin https://${GIT_USERNAME}:${GIT_TOKEN}@github.com/${git_project_user}/${git_project}.git
+                        git add functions/ingest/vendor/github.com functions/query/vendor/github.com;
+                    """
+                    try {
+                        sh("git commit -am 'Updated TSDB to ${V3IO_TSDB_VERSION}'")
+                    } catch (err) {
+                        echo "Can not commit"
+                    }
+                    try {
                         if ( "${internal_status}" == "unstable" ) {
                             sh("git push origin development")
                         } else {
                             sh("git push origin master")
                         }
+                    } catch (err) {
+                        echo "Can not push code"
+                        echo err
                     }
-                } catch (err) {
-                    echo "Can not push code"
-                    echo err
                 }
             }
         }
@@ -149,25 +153,29 @@ def build_prometheus(V3IO_TSDB_VERSION, internal_status="stable") {
 
         stage('git push') {
             container('jnlp') {
-                try {
-                    dir("${BUILD_FOLDER}/src/github.com/${git_project}/${git_project}") {
-                        sh """
-                            git config --global user.email '${GIT_USERNAME}@iguazio.com'
-                            git config --global user.name '${GIT_USERNAME}'
-                            git remote rm origin
-                            git remote add origin https://${GIT_USERNAME}:${GIT_TOKEN}@github.com/${git_project_user}/${git_project}.git
-                            git add vendor/github.com;
-                            git commit -am 'Updated TSDB to ${V3IO_TSDB_VERSION}';
-                        """
+                dir("${BUILD_FOLDER}/src/github.com/${git_project}/${git_project}") {
+                    sh """
+                        git config --global user.email '${GIT_USERNAME}@iguazio.com'
+                        git config --global user.name '${GIT_USERNAME}'
+                        git remote rm origin
+                        git remote add origin https://${GIT_USERNAME}:${GIT_TOKEN}@github.com/${git_project_user}/${git_project}.git
+                        git add vendor/github.com;
+                    """
+                    try {
+                        sh("git commit -am 'Updated TSDB to ${V3IO_TSDB_VERSION}'")
+                    } catch (err) {
+                        echo "Can not commit"
+                    }
+                    try {
                         if ( "${internal_status}" == "unstable" ) {
                             sh("git push origin development")
                         } else {
                             sh("git push origin master")
                         }
+                    } catch (err) {
+                        echo "Can not push code"
+                        echo err
                     }
-                } catch (err) {
-                    echo "Can not push code"
-                    echo err
                 }
             }
         }
