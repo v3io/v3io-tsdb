@@ -449,9 +449,6 @@ func (queryCtx *selectQueryContext) getResultBucketsSize() int {
 	if queryCtx.isRawQuery() {
 		return 0
 	}
-	if queryCtx.queryParams.To-queryCtx.queryParams.From == queryCtx.queryParams.Step {
-		return 1
-	}
 	return int((queryCtx.queryParams.To-queryCtx.queryParams.From)/queryCtx.queryParams.Step + 1)
 }
 
