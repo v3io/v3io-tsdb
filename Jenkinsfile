@@ -2,10 +2,10 @@ label = "${UUID.randomUUID().toString()}"
 BUILD_FOLDER = "/go"
 attempts=15
 git_project = "v3io-tsdb"
-git_project_user = "gkirok"
-git_deploy_user = "iguazio-dev-git-user"
-git_deploy_user_token = "iguazio-dev-git-user-token"
-git_deploy_user_private_key = "iguazio-dev-git-user-private-key"
+git_project_user = "v3io"
+git_deploy_user = "iguazio-prod-git-user"
+git_deploy_user_token = "iguazio-prod-git-user-token"
+git_deploy_user_private_key = "iguazio-prod-git-user-private-key"
 
 def build_v3io_tsdb(TAG_VERSION) {
     withCredentials([
