@@ -65,8 +65,7 @@ type chunkStore struct {
 	aggrList      *aggregate.AggregatesList
 	pending       pendingList
 	maxTime       int64
-	initMaxTime   int64 // Max time read from DB metric before first append
-	delRawSamples bool  // TODO: for metrics w aggregates only
+	delRawSamples bool // TODO: for metrics w aggregates only
 }
 
 func (cs *chunkStore) isAggr() bool {
@@ -209,7 +208,6 @@ func (cs *chunkStore) processGetResp(mc *MetricsCache, metric *MetricState, resp
 
 	if !mc.cfg.OverrideOld {
 		cs.maxTime = maxTime
-		cs.initMaxTime = maxTime
 	}
 
 	if !cs.isAggr() {
@@ -314,8 +312,8 @@ func (cs *chunkStore) writeChunks(mc *MetricsCache, metric *MetricState) (hasPen
 		for pendingSampleIndex < len(cs.pending) && pendingSamplesCount < mc.cfg.BatchSize && partition.InRange(cs.pending[pendingSampleIndex].t) {
 			sampleTime := cs.pending[pendingSampleIndex].t
 
-			if sampleTime <= cs.initMaxTime && !mc.cfg.OverrideOld {
-				mc.logger.WarnWith("Omitting the sample - time is earlier than the last sample time for this metric", "metric", metric.Lset, "T", sampleTime, "InitMaxTime", cs.initMaxTime)
+			if sampleTime <= cs.maxTime && !mc.cfg.OverrideOld {
+				mc.logger.WarnWith("Omitting the sample - time is earlier than the last sample time for this metric", "metric", metric.Lset, "T", sampleTime)
 				pendingSampleIndex++
 				continue
 			}
