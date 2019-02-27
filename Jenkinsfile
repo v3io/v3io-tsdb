@@ -1,6 +1,5 @@
 label = "${UUID.randomUUID().toString()}"
 BUILD_FOLDER = "/go"
-expired=240
 attempts=15
 git_project = "v3io-tsdb"
 git_project_user = "gkirok"
@@ -187,10 +186,10 @@ podTemplate(label: "${git_project}-${label}", inheritFrom: "jnlp-docker-golang")
     def PUBLISHED_BEFORE
     def next_versions = ['prometheus':null, 'tsdb-nuclio':null]
 
-    pipelinex = library(identifier: 'pipelinex@DEVOPS-204-pipelinex', retriever: modernSCM(
-            [$class: 'GitSCMSource',
+    pipelinex = library(identifier: 'pipelinex@shellc', retriever: modernSCM(
+            [$class:        'GitSCMSource',
              credentialsId: git_deploy_user_private_key,
-             remote: "git@github.com:iguazio/pipelinex.git"])).com.iguazio.pipelinex
+             remote:        "git@github.com:iguazio/pipelinex.git"])).com.iguazio.pipelinex
 
     common.notify_slack {
         node("${git_project}-${label}") {
@@ -200,16 +199,14 @@ podTemplate(label: "${git_project}-${label}", inheritFrom: "jnlp-docker-golang")
                 stage('get tag data') {
                     container('jnlp') {
                         MAIN_TAG_VERSION = github.get_tag_version(TAG_NAME)
-                        PUBLISHED_BEFORE = github.get_tag_published_before(git_project, git_project_user, "${MAIN_TAG_VERSION}", GIT_TOKEN)
 
                         echo "$MAIN_TAG_VERSION"
-                        echo "$PUBLISHED_BEFORE"
                     }
                 }
             }
         }
 
-        if (MAIN_TAG_VERSION != null && MAIN_TAG_VERSION.length() > 0 && PUBLISHED_BEFORE < expired) {
+        if (github.check_tag_expiration(git_project, git_project_user, MAIN_TAG_VERSION, GIT_TOKEN)) {
             parallel(
                     'v3io-tsdb': {
                         podTemplate(label: "v3io-tsdb-${label}", inheritFrom: "${git_project}-${label}", containers: [
@@ -322,16 +319,6 @@ podTemplate(label: "${git_project}-${label}", inheritFrom: "jnlp-docker-golang")
                         }
                     }
             )
-        } else {
-            stage('warning') {
-                if (PUBLISHED_BEFORE >= expired) {
-                    currentBuild.result = 'ABORTED'
-                    error("Tag too old, published before $PUBLISHED_BEFORE minutes.")
-                } else {
-                    currentBuild.result = 'ABORTED'
-                    error("${TAG_VERSION} is not release tag.")
-                }
-            }
         }
 
         node("${git_project}-${label}") {
