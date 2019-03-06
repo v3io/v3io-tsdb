@@ -1,5 +1,3 @@
-# sqlparser [![Build Status](https://img.shields.io/travis/xwb1989/sqlparser.svg)](https://travis-ci.org/xwb1989/sqlparser) [![Coverage](https://img.shields.io/coveralls/xwb1989/sqlparser.svg)](https://coveralls.io/github/xwb1989/sqlparser) [![Report card](https://goreportcard.com/badge/github.com/xwb1989/sqlparser)](https://goreportcard.com/report/github.com/xwb1989/sqlparser) [![GoDoc](https://godoc.org/github.com/xwb1989/sqlparser?status.svg)](https://godoc.org/github.com/xwb1989/sqlparser)
-
 Go package for parsing MySQL SQL queries.
 
 ## Notice
@@ -13,7 +11,7 @@ It applies the same LICENSE as vitessio/vitess.
 
 ```go
 import (
-    "github.com/xwb1989/sqlparser"
+    "github.com/v3io/sqlparser"
 )
 ```
 
@@ -49,7 +47,7 @@ for {
 }
 ```
 
-See [parse_test.go](https://github.com/xwb1989/sqlparser/blob/master/parse_test.go) for more examples, or read the [godoc](https://godoc.org/github.com/xwb1989/sqlparser).
+See [parse_test.go](https://github.com/v3io/sqlparser/blob/master/parse_test.go) for more examples, or read the [godoc](https://godoc.org/github.com/v3io/sqlparser).
 
 
 ## Porting Instructions
@@ -61,7 +59,7 @@ You only need the below if you plan to try and keep this library up to date with
 ```bash
 shopt -s nullglob
 VITESS=${GOPATH?}/src/vitess.io/vitess/go/
-XWB1989=${GOPATH?}/src/github.com/xwb1989/sqlparser/
+XWB1989=${GOPATH?}/src/github.com/v3io/sqlparser/
 
 # Create patches for everything that changed
 LASTIMPORT=1b7879cb91f1dfe1a2dfa06fea96e951e3a7aec5
@@ -96,7 +94,7 @@ TODO: Change these instructions to use git to copy the files, that'll make later
 
 ```bash
 VITESS=${GOPATH?}/src/vitess.io/vitess/go/
-XWB1989=${GOPATH?}/src/github.com/xwb1989/sqlparser/
+XWB1989=${GOPATH?}/src/github.com/v3io/sqlparser/
 
 cd ${XWB1989?}
 
@@ -112,8 +110,8 @@ rm dependency/sqltypes/arithmetic.go dependency/sqltypes/arithmetic_test.go depe
 # Some automated fixes
 
 # Fix imports
-sed -i '.bak' 's_vitess.io/vitess/go/vt/proto/query_github.com/xwb1989/sqlparser/dependency/querypb_g' *.go dependency/sqltypes/*.go
-sed -i '.bak' 's_vitess.io/vitess/go/_github.com/xwb1989/sqlparser/dependency/_g' *.go dependency/sqltypes/*.go
+sed -i '.bak' 's_vitess.io/vitess/go/vt/proto/query_github.com/v3io/sqlparser/dependency/querypb_g' *.go dependency/sqltypes/*.go
+sed -i '.bak' 's_vitess.io/vitess/go/_github.com/v3io/sqlparser/dependency/_g' *.go dependency/sqltypes/*.go
 
 # Copy the proto, but basically drop everything we don't want
 cp -pr ${VITESS?}/vt/proto/query dependency/querypb
@@ -135,7 +133,7 @@ sed -i '.bak' 's/vterrors.New([^,]*, /errors.New(/g' *.go dependency/sqltypes/*.
 
 ```bash
 VITESS=${GOPATH?}/src/vitess.io/vitess/go/
-XWB1989=${GOPATH?}/src/github.com/xwb1989/sqlparser/
+XWB1989=${GOPATH?}/src/github.com/v3io/sqlparser/
 
 cd ${XWB1989?}
 

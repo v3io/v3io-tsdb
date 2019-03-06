@@ -2907,6 +2907,10 @@ table_id:
   {
     $$ = NewTableIdent(string($1))
   }
+| STRING
+  {
+    $$ = NewTableIdent(string($1))
+  }
 
 reserved_table_id:
   table_id

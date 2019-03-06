@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/v3io/sqlparser"
 	"github.com/v3io/v3io-tsdb/pkg/utils"
-	"github.com/xwb1989/sqlparser"
 )
 
 const emptyTableName = "dual"
@@ -127,7 +127,7 @@ func getTableName(slct *sqlparser.Select) (string, error) {
 		return "", fmt.Errorf("not a table in FROM field")
 	}
 
-	tableStr := sqlparser.String(table)
+	tableStr := table.Name.String()
 	if tableStr == emptyTableName {
 		return "", nil
 	}

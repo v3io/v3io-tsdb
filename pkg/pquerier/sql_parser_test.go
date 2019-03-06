@@ -30,9 +30,9 @@ func TestParseQuery(t *testing.T) {
 
 		{input: "select max(prev(columnA, '1h')) as ahsheli, avg(columnB)",
 			output: &pquerier.SelectParams{RequestedColumns: []pquerier.RequestedColumn{{Metric: "columnA",
-				Interpolator: "prev",
-				Function:     "max",
-				Alias:        "ahsheli",
+				Interpolator:           "prev",
+				Function:               "max",
+				Alias:                  "ahsheli",
 				InterpolationTolerance: tsdbtest.HoursInMillis},
 				{Metric: "columnB", Function: "avg"}}}},
 
@@ -55,6 +55,10 @@ func TestParseQuery(t *testing.T) {
 		{input: "select * from my_table",
 			output:      &pquerier.SelectParams{RequestedColumns: []pquerier.RequestedColumn{{Metric: ""}}},
 			outputTable: "my_table"},
+
+		{input: `select * from 'my/table'`,
+			output:      &pquerier.SelectParams{RequestedColumns: []pquerier.RequestedColumn{{Metric: ""}}},
+			outputTable: "my/table"},
 
 		{input: "select max(*), avg(*) from my_table",
 			output:      &pquerier.SelectParams{RequestedColumns: []pquerier.RequestedColumn{{Metric: "", Function: "max"}, {Metric: "", Function: "avg"}}},
