@@ -19,7 +19,7 @@ package sqlparser
 import (
 	"bytes"
 
-	"github.com/v3io/sqlparser/dependency/sqltypes"
+	"github.com/xwb1989/sqlparser/dependency/sqltypes"
 )
 
 // This file contains types that are 'Encodable'.
