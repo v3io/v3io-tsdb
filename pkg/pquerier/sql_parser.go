@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/v3io/sqlparser"
 	"github.com/v3io/v3io-tsdb/pkg/utils"
+	"github.com/xwb1989/sqlparser"
 )
 
 const emptyTableName = "dual"
