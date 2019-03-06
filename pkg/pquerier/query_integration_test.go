@@ -3075,6 +3075,83 @@ func (suite *testQuerySuite) TestDifferentMetricsInDifferentPartitions() {
 	assert.Equal(suite.T(), 1, seriesCount, "series count didn't match expected")
 }
 
+func (suite *testQuerySuite) TestSelectDataframeAggregationsMetricsHaveBigGaps() {
+	adapter, err := tsdb.NewV3ioAdapter(suite.v3ioConfig, nil, nil)
+	if err != nil {
+		suite.T().Fatalf("failed to create v3io adapter. reason: %s", err)
+	}
+
+	labels1 := utils.LabelsFromStringList("os", "linux")
+	ingestedData1 := []tsdbtest.DataPoint{{suite.basicQueryTime - 7*tsdbtest.DaysInMillis, 10},
+		{int64(suite.basicQueryTime - 4*tsdbtest.DaysInMillis), 20}}
+
+	ingestedData2 := []tsdbtest.DataPoint{{suite.basicQueryTime - 1*tsdbtest.DaysInMillis, 30}}
+
+	testParams := tsdbtest.NewTestParams(suite.T(),
+		tsdbtest.TestOption{
+			Key: tsdbtest.OptTimeSeries,
+			Value: tsdbtest.TimeSeries{tsdbtest.Metric{
+				Name:   "cpu1",
+				Labels: labels1,
+				Data:   ingestedData1},
+				tsdbtest.Metric{
+					Name:   "cpu2",
+					Labels: labels1,
+					Data:   ingestedData2},
+			}})
+	tsdbtest.InsertData(suite.T(), testParams)
+
+	expectedTime := []int64{suite.basicQueryTime - 7*tsdbtest.DaysInMillis, suite.basicQueryTime - 4*tsdbtest.DaysInMillis, suite.basicQueryTime - 1*tsdbtest.DaysInMillis}
+	expected := map[string][]float64{"count(cpu1)": {1, 1, math.NaN()},
+		"count(cpu2)": {math.NaN(), math.NaN(), 1}}
+
+	querierV2, err := adapter.QuerierV2()
+	if err != nil {
+		suite.T().Fatalf("Failed to create querier v2, err: %v", err)
+	}
+
+	params := &pquerier.SelectParams{
+		Functions: "count",
+		Step:      int64(tsdbtest.MinuteInMillis),
+		From:      suite.basicQueryTime - 7*tsdbtest.DaysInMillis,
+		To:        suite.basicQueryTime}
+	set, err := querierV2.SelectDataFrame(params)
+	if err != nil {
+		suite.T().Fatalf("Failed to exeute query, err: %v", err)
+	}
+
+	var dataFrameCount int
+	for set.NextFrame() {
+		dataFrameCount++
+		frame, err := set.GetFrame()
+		suite.Require().NoError(err)
+		suite.Require().Equal(len(expected), len(frame.Names()), "number of columns in frame does not match")
+		suite.Require().Equal(len(expectedTime), frame.Indices()[0].Len(), "columns size is not as expected")
+
+		indexCol := frame.Indices()[0]
+
+		for i := 0; i < len(expected); i++ {
+			t, err := indexCol.TimeAt(i)
+			timeMillis := t.UnixNano() / int64(time.Millisecond)
+			suite.Require().NoError(err)
+			suite.Require().Equal(expectedTime[i], timeMillis)
+
+			for _, currName := range frame.Names() {
+				currCol, err := frame.Column(currName)
+				suite.Require().NoError(err)
+				currVal, err := currCol.FloatAt(i)
+
+				suite.Require().NoError(err)
+				if !(math.IsNaN(currVal) && math.IsNaN(expected[currName][i])) {
+					suite.Require().Equal(expected[currName][i], currVal)
+				}
+			}
+		}
+	}
+
+	assert.Equal(suite.T(), 1, dataFrameCount, "series count didn't match expected")
+}
+
 func (suite *testQuerySuite) toMillis(date string) int64 {
 	time, err := tsdbtest.DateStringToMillis(date)
 	suite.NoError(err)

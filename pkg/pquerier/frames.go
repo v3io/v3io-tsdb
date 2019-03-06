@@ -357,12 +357,25 @@ func (d *dataFrame) TimeSeries(i int) (utils.Series, error) {
 func (d *dataFrame) finishAllColumns() error {
 
 	// Marking as deleted every index (row) that has no data.
-	for i, hasData := range d.nonEmptyRowsIndicators {
+	// Also, adding "blank" rows when needed to align all columns to the same time.
+	// Iterating backwards to not miss any deleted cell.
+	for i := len(d.nonEmptyRowsIndicators) - 1; i >= 0; i-- {
+		hasData := d.nonEmptyRowsIndicators[i]
 		if !hasData {
 			for _, col := range d.columns {
 				_ = col.Delete(i)
 			}
 			_ = d.index.Delete(i)
+		} else {
+			for _, col := range d.columns {
+				switch currCol := col.(type) {
+				case *ConcreteColumn:
+					value, err := currCol.builder.At(i)
+					if err != nil || value == nil {
+						currCol.builder.Set(i, math.NaN())
+					}
+				}
+			}
 		}
 	}
 
