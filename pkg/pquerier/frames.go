@@ -355,7 +355,6 @@ func (d *dataFrame) TimeSeries(i int) (utils.Series, error) {
 // Creates Frames.columns out of tsdb columns.
 // First do all the concrete columns and then the virtual who are dependant on the concrete.
 func (d *dataFrame) finishAllColumns() error {
-
 	// Marking as deleted every index (row) that has no data.
 	// Also, adding "blank" rows when needed to align all columns to the same time.
 	// Iterating backwards to not miss any deleted cell.
@@ -369,6 +368,11 @@ func (d *dataFrame) finishAllColumns() error {
 		} else {
 			for _, col := range d.columns {
 				switch currCol := col.(type) {
+				case *dataColumn:
+					value, err := currCol.builder.At(i)
+					if err != nil || value == nil {
+						currCol.builder.Set(i, math.NaN())
+					}
 				case *ConcreteColumn:
 					value, err := currCol.builder.At(i)
 					if err != nil || value == nil {
