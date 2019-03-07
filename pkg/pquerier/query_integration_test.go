@@ -3149,7 +3149,7 @@ func (suite *testQuerySuite) TestSelectDataframeAggregationsMetricsHaveBigGaps()
 		}
 	}
 
-	assert.Equal(suite.T(), 1, dataFrameCount, "series count didn't match expected")
+	suite.Require().Equal(1, dataFrameCount, "series count didn't match expected")
 }
 
 func (suite *testQuerySuite) TestSelectDataframeDaownsampleMetricsHaveBigGaps() {
@@ -3225,7 +3225,7 @@ func (suite *testQuerySuite) TestSelectDataframeDaownsampleMetricsHaveBigGaps() 
 		}
 	}
 
-	assert.Equal(suite.T(), 1, dataFrameCount, "series count didn't match expected")
+	suite.Require().Equal(1, dataFrameCount, "series count didn't match expected")
 }
 
 func (suite *testQuerySuite) toMillis(date string) int64 {

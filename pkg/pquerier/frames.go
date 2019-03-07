@@ -367,16 +367,11 @@ func (d *dataFrame) finishAllColumns() error {
 			_ = d.index.Delete(i)
 		} else {
 			for _, col := range d.columns {
-				switch currCol := col.(type) {
-				case *dataColumn:
-					value, err := currCol.builder.At(i)
+				switch col.(type) {
+				case *ConcreteColumn, *dataColumn:
+					value, err := col.getBuilder().At(i)
 					if err != nil || value == nil {
-						currCol.builder.Set(i, math.NaN())
-					}
-				case *ConcreteColumn:
-					value, err := currCol.builder.At(i)
-					if err != nil || value == nil {
-						currCol.builder.Set(i, math.NaN())
+						col.getBuilder().Set(i, math.NaN())
 					}
 				}
 			}
@@ -551,10 +546,12 @@ type Column interface {
 	SetDataAt(i int, value interface{}) error
 	SetData(d interface{}, size int) error
 	GetInterpolationFunction() InterpolationFunction
-	setMetricName(name string)
-	finish() error
 	FramesColumn() frames.Column
 	Delete(index int) error
+
+	setMetricName(name string)
+	getBuilder() frames.ColumnBuilder
+	finish() error
 }
 
 type basicColumn struct {
@@ -564,6 +561,10 @@ type basicColumn struct {
 	interpolationFunction InterpolationFunction
 	builder               frames.ColumnBuilder
 	framesCol             frames.Column
+}
+
+func (c *basicColumn) getBuilder() frames.ColumnBuilder {
+	return c.builder
 }
 
 func (c *basicColumn) finish() error {
