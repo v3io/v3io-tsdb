@@ -228,7 +228,7 @@ func (s *V3ioRawSeries) AddChunks(results *qryResults) {
 	switch iter := s.iter.(type) {
 	case *RawChunkIterator:
 		iter.AddChunks(results)
-	case utils.NullSeriesIterator:
+	case *utils.NullSeriesIterator:
 		s.iter = newRawChunkIterator(results, s.logger)
 	}
 }

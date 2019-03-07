@@ -355,14 +355,26 @@ func (d *dataFrame) TimeSeries(i int) (utils.Series, error) {
 // Creates Frames.columns out of tsdb columns.
 // First do all the concrete columns and then the virtual who are dependant on the concrete.
 func (d *dataFrame) finishAllColumns() error {
-
 	// Marking as deleted every index (row) that has no data.
-	for i, hasData := range d.nonEmptyRowsIndicators {
+	// Also, adding "blank" rows when needed to align all columns to the same time.
+	// Iterating backwards to not miss any deleted cell.
+	for i := len(d.nonEmptyRowsIndicators) - 1; i >= 0; i-- {
+		hasData := d.nonEmptyRowsIndicators[i]
 		if !hasData {
 			for _, col := range d.columns {
 				_ = col.Delete(i)
 			}
 			_ = d.index.Delete(i)
+		} else {
+			for _, col := range d.columns {
+				switch col.(type) {
+				case *ConcreteColumn, *dataColumn:
+					value, err := col.getBuilder().At(i)
+					if err != nil || value == nil {
+						col.getBuilder().Set(i, math.NaN())
+					}
+				}
+			}
 		}
 	}
 
@@ -534,10 +546,12 @@ type Column interface {
 	SetDataAt(i int, value interface{}) error
 	SetData(d interface{}, size int) error
 	GetInterpolationFunction() InterpolationFunction
-	setMetricName(name string)
-	finish() error
 	FramesColumn() frames.Column
 	Delete(index int) error
+
+	setMetricName(name string)
+	getBuilder() frames.ColumnBuilder
+	finish() error
 }
 
 type basicColumn struct {
@@ -547,6 +561,10 @@ type basicColumn struct {
 	interpolationFunction InterpolationFunction
 	builder               frames.ColumnBuilder
 	framesCol             frames.Column
+}
+
+func (c *basicColumn) getBuilder() frames.ColumnBuilder {
+	return c.builder
 }
 
 func (c *basicColumn) finish() error {

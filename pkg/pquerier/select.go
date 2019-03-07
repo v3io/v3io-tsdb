@@ -134,7 +134,6 @@ func (queryCtx *selectQueryContext) queryPartition(partition *partmgr.DBPartitio
 	var err error
 
 	mint, maxt := partition.GetPartitionRange()
-	step := queryCtx.queryParams.Step
 
 	if queryCtx.queryParams.To < maxt {
 		maxt = queryCtx.queryParams.To
@@ -151,14 +150,14 @@ func (queryCtx *selectQueryContext) queryPartition(partition *partmgr.DBPartitio
 		// Check whether there are aggregations to add and aggregates aren't disabled
 		if functions != "" && !queryCtx.queryParams.disableAllAggr {
 
-			if step > partition.RollupTime() && queryCtx.queryParams.disableClientAggr {
-				step = partition.RollupTime()
+			if queryCtx.queryParams.Step > partition.RollupTime() && queryCtx.queryParams.disableClientAggr {
+				queryCtx.queryParams.Step = partition.RollupTime()
 			}
 
 			params, err := aggregate.NewAggregationParams(functions,
 				"v",
 				partition.AggrBuckets(),
-				step,
+				queryCtx.queryParams.Step,
 				partition.RollupTime(),
 				queryCtx.queryParams.Windows)
 
@@ -169,7 +168,7 @@ func (queryCtx *selectQueryContext) queryPartition(partition *partmgr.DBPartitio
 
 		}
 
-		newQuery := &partQuery{mint: mint, maxt: maxt, partition: partition, step: step}
+		newQuery := &partQuery{mint: mint, maxt: maxt, partition: partition, step: queryCtx.queryParams.Step}
 		if aggregationParams != nil {
 			// Cross series aggregations cannot use server side aggregates.
 			newQuery.useServerSideAggregates = aggregationParams.CanAggregate(partition.AggrType()) && !queryCtx.isCrossSeriesAggregate
@@ -431,7 +430,7 @@ func (queryCtx *selectQueryContext) generateTimeColumn() Column {
 }
 
 func (queryCtx *selectQueryContext) isRawQuery() bool {
-	return (!queryCtx.hasAtLeastOneFunction() && queryCtx.queryParams.Step == 0) || queryCtx.queryParams.disableClientAggr
+	return (!queryCtx.hasAtLeastOneFunction() && queryCtx.queryParams.Step == 0) || queryCtx.queryParams.disableAllAggr
 }
 
 func (queryCtx *selectQueryContext) hasAtLeastOneFunction() bool {
