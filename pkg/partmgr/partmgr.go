@@ -262,7 +262,7 @@ func (p *PartitionManager) ReadAndUpdateSchema() (err error) {
 			p.schemaConfig = schema
 			err = p.updatePartitionsFromSchema(schema)
 			if err != nil {
-				err = errors.Wrapf(err, "Failed to update partitions from schema.", fullPath)
+				err = errors.Wrapf(err, "Failed to update partitions from schema at path '%s'.", fullPath)
 			}
 		})
 	}
