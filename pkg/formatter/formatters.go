@@ -4,6 +4,8 @@ import (
 	"encoding/csv"
 	"fmt"
 	"io"
+	"strconv"
+	"time"
 
 	"github.com/pkg/errors"
 	"github.com/v3io/v3io-tsdb/pkg/chunkenc"
@@ -45,6 +47,13 @@ func (f textFormatter) Write(out io.Writer, set utils.SeriesSet) error {
 	return nil
 }
 
+func (f textFormatter) timeString(t int64) string {
+	if f.cfg.TimeFormat == "" {
+		return strconv.Itoa(int(t))
+	}
+	return time.Unix(t/1000, 0).Format(f.cfg.TimeFormat)
+}
+
 type csvFormatter struct {
 	baseFormatter
 }
@@ -61,7 +70,7 @@ func (f csvFormatter) Write(out io.Writer, set utils.SeriesSet) error {
 		for iter.Next() {
 
 			t, v := iter.At()
-			writer.Write([]string{name, labelStr, fmt.Sprintf("%.6f", v), f.timeString(t)})
+			_ = writer.Write([]string{name, labelStr, fmt.Sprintf("%.6f", v), strconv.FormatInt(t, 10)})
 		}
 
 		if iter.Err() != nil {
