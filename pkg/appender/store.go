@@ -58,6 +58,7 @@ type chunkStore struct {
 	performanceReporter *performance.MetricReporter
 
 	curChunk int
+	nextTid  int64
 	lastTid  int64
 	chunks   [2]*attrAppender
 
@@ -142,6 +143,7 @@ func (cs *chunkStore) getChunksState(mc *MetricsCache, metric *MetricState) (boo
 	if !cs.isAggr() {
 		cs.chunks[0].initialize(part, t)
 	}
+	cs.nextTid = t
 	cs.aggrList = aggregate.NewAggregatesList(part.AggrType())
 
 	// TODO: if policy to merge w old chunks needs to get prev chunk, vs restart appender
@@ -214,10 +216,9 @@ func (cs *chunkStore) processGetResp(mc *MetricsCache, metric *MetricState, resp
 		if cs.chunks[0].inRange(maxTime) && !mc.cfg.OverrideOld {
 			cs.chunks[0].state |= chunkStateMerge
 		}
-
-		// Set Last TableId - indicate that there is no need to create metric object
-		cs.lastTid = cs.chunks[0].partition.GetStartTime()
 	}
+	// Set Last TableId - indicate that there is no need to create metric object
+	cs.lastTid = cs.nextTid
 }
 
 // Append data to the right chunk and table based on the time and state
@@ -255,6 +256,7 @@ func (cs *chunkStore) chunkByTime(t int64, isVariantEncoding bool) *attrAppender
 		}
 		nextPart, _ := part.NextPart(t)
 		cur.initialize(nextPart, t)
+		cs.nextTid = t
 		cur.appender = app
 		cs.curChunk = cs.curChunk ^ 1
 
