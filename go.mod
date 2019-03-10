@@ -27,4 +27,7 @@ require (
 	gopkg.in/yaml.v2 v2.2.2 // indirect
 )
 
-replace github.com/xwb1989/sqlparser => github.com/v3io/sqlparser v0.0.0-20190306105200-4d7273501871
+replace (
+	github.com/prometheus/prometheus => github.com/v3io/prometheus v0.0.0-20190307105200-b8a3945c83b6
+	github.com/xwb1989/sqlparser => github.com/v3io/sqlparser v0.0.0-20190306105200-4d7273501871
+)
