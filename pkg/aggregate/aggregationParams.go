@@ -12,7 +12,7 @@ type AggregationParams struct {
 	Interval          int64    // requested (query) aggregation step
 	buckets           int      // number of buckets in the array
 	overlapWindows    []int    // a list of overlapping windows (* interval), e.g. last 1hr, 6hr, 12hr, 24hr
-	aggregationWindow int64	   // a time window on which to calculate the aggregation per Interval
+	aggregationWindow int64    // a time window on which to calculate the aggregation per Interval
 }
 
 func NewAggregationParams(functions, col string, buckets int, interval, aggregationWindow, rollupTime int64, windows []int) (*AggregationParams, error) {
