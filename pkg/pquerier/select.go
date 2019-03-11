@@ -158,6 +158,7 @@ func (queryCtx *selectQueryContext) queryPartition(partition *partmgr.DBPartitio
 				"v",
 				partition.AggrBuckets(),
 				queryCtx.queryParams.Step,
+				queryCtx.queryParams.AggregationWindow,
 				partition.RollupTime(),
 				queryCtx.queryParams.Windows)
 

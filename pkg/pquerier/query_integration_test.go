@@ -3286,6 +3286,395 @@ func (suite *testQuerySuite) TestSelectDataframeDaownsampleMetricsHaveBigGaps() 
 	suite.Require().Equal(1, dataFrameCount, "series count didn't match expected")
 }
 
+func (suite *testQuerySuite) TestClientWindowedAggregationWindowBiggerThanStep() {
+	adapter, err := tsdb.NewV3ioAdapter(suite.v3ioConfig, nil, nil)
+	if err != nil {
+		suite.T().Fatalf("failed to create v3io adapter. reason: %s", err)
+	}
+
+	labels1 := utils.LabelsFromStringList("os", "linux")
+	numberOfEvents := 10
+
+	var ingestedData []tsdbtest.DataPoint
+
+	for i := 0; i < numberOfEvents; i++ {
+		ingestedData = append(ingestedData, tsdbtest.DataPoint{Time: suite.basicQueryTime + int64(i)*tsdbtest.MinuteInMillis, Value: 10 * float64(i)})
+	}
+
+	testParams := tsdbtest.NewTestParams(suite.T(),
+		tsdbtest.TestOption{
+			Key: tsdbtest.OptTimeSeries,
+			Value: tsdbtest.TimeSeries{tsdbtest.Metric{
+				Name:   "cpu",
+				Labels: labels1,
+				Data:   ingestedData},
+			}})
+	tsdbtest.InsertData(suite.T(), testParams)
+
+	expected := map[string][]tsdbtest.DataPoint{"sum": {
+		{Time: suite.basicQueryTime, Value: 0},
+		{Time: suite.basicQueryTime + 5*tsdbtest.MinuteInMillis, Value: 150},
+		{Time: suite.basicQueryTime + 10*tsdbtest.MinuteInMillis, Value: 390},
+	}}
+
+	querierV2, err := adapter.QuerierV2()
+	if err != nil {
+		suite.T().Fatalf("Failed to create querier v2, err: %v", err)
+	}
+
+	params := &pquerier.SelectParams{Name: "cpu",
+		Functions:         "sum",
+		Step:              5 * tsdbtest.MinuteInMillis,
+		AggregationWindow: 6 * tsdbtest.MinuteInMillis,
+		From:              suite.basicQueryTime,
+		To:                suite.basicQueryTime + 10*tsdbtest.MinuteInMillis}
+	set, err := querierV2.Select(params)
+	if err != nil {
+		suite.T().Fatalf("Failed to exeute query, err: %v", err)
+	}
+
+	var seriesCount int
+	for set.Next() {
+		seriesCount++
+		iter := set.At().Iterator()
+
+		data, err := tsdbtest.IteratorToSlice(iter)
+		agg := set.At().Labels().Get(aggregate.AggregateLabel)
+		if err != nil {
+			suite.T().Fatal(err)
+		}
+
+		assert.Equal(suite.T(), expected[agg], data, "queried data does not match expected")
+	}
+
+	assert.Equal(suite.T(), 1, seriesCount, "series count didn't match expected")
+}
+
+func (suite *testQuerySuite) TestClientWindowedAggregationWindowSmallerThanStep() {
+	adapter, err := tsdb.NewV3ioAdapter(suite.v3ioConfig, nil, nil)
+	if err != nil {
+		suite.T().Fatalf("failed to create v3io adapter. reason: %s", err)
+	}
+
+	labels1 := utils.LabelsFromStringList("os", "linux")
+	numberOfEvents := 10
+
+	var ingestedData []tsdbtest.DataPoint
+
+	for i := 0; i < numberOfEvents; i++ {
+		ingestedData = append(ingestedData, tsdbtest.DataPoint{Time: suite.basicQueryTime + int64(i)*tsdbtest.MinuteInMillis, Value: 10 * float64(i)})
+	}
+
+	testParams := tsdbtest.NewTestParams(suite.T(),
+		tsdbtest.TestOption{
+			Key: tsdbtest.OptTimeSeries,
+			Value: tsdbtest.TimeSeries{tsdbtest.Metric{
+				Name:   "cpu",
+				Labels: labels1,
+				Data:   ingestedData},
+			}})
+	tsdbtest.InsertData(suite.T(), testParams)
+
+	expected := map[string][]tsdbtest.DataPoint{"sum": {
+		{Time: suite.basicQueryTime, Value: 0},
+		{Time: suite.basicQueryTime + 5*tsdbtest.MinuteInMillis, Value: 120},
+		{Time: suite.basicQueryTime + 10*tsdbtest.MinuteInMillis, Value: 170},
+	}}
+
+	querierV2, err := adapter.QuerierV2()
+	if err != nil {
+		suite.T().Fatalf("Failed to create querier v2, err: %v", err)
+	}
+
+	params := &pquerier.SelectParams{Name: "cpu",
+		Functions:         "sum",
+		Step:              5 * tsdbtest.MinuteInMillis,
+		AggregationWindow: 2 * tsdbtest.MinuteInMillis,
+		From:              suite.basicQueryTime,
+		To:                suite.basicQueryTime + 10*tsdbtest.MinuteInMillis}
+	set, err := querierV2.Select(params)
+	if err != nil {
+		suite.T().Fatalf("Failed to exeute query, err: %v", err)
+	}
+
+	var seriesCount int
+	for set.Next() {
+		seriesCount++
+		iter := set.At().Iterator()
+
+		data, err := tsdbtest.IteratorToSlice(iter)
+		agg := set.At().Labels().Get(aggregate.AggregateLabel)
+		if err != nil {
+			suite.T().Fatal(err)
+		}
+
+		assert.Equal(suite.T(), expected[agg], data, "queried data does not match expected")
+	}
+
+	assert.Equal(suite.T(), 1, seriesCount, "series count didn't match expected")
+}
+
+func (suite *testQuerySuite) TestClientWindowedAggregationWindowEqualToStep() {
+	adapter, err := tsdb.NewV3ioAdapter(suite.v3ioConfig, nil, nil)
+	if err != nil {
+		suite.T().Fatalf("failed to create v3io adapter. reason: %s", err)
+	}
+
+	labels1 := utils.LabelsFromStringList("os", "linux")
+	numberOfEvents := 10
+
+	var ingestedData []tsdbtest.DataPoint
+
+	for i := 0; i < numberOfEvents; i++ {
+		ingestedData = append(ingestedData, tsdbtest.DataPoint{Time: suite.basicQueryTime + int64(i)*tsdbtest.MinuteInMillis, Value: 10 * float64(i)})
+	}
+
+	testParams := tsdbtest.NewTestParams(suite.T(),
+		tsdbtest.TestOption{
+			Key: tsdbtest.OptTimeSeries,
+			Value: tsdbtest.TimeSeries{tsdbtest.Metric{
+				Name:   "cpu",
+				Labels: labels1,
+				Data:   ingestedData},
+			}})
+	tsdbtest.InsertData(suite.T(), testParams)
+
+	expected := map[string][]tsdbtest.DataPoint{"sum": {
+		{Time: suite.basicQueryTime, Value: 0},
+		{Time: suite.basicQueryTime + 5*tsdbtest.MinuteInMillis, Value: 150},
+		{Time: suite.basicQueryTime + 10*tsdbtest.MinuteInMillis, Value: 300},
+	}}
+
+	querierV2, err := adapter.QuerierV2()
+	if err != nil {
+		suite.T().Fatalf("Failed to create querier v2, err: %v", err)
+	}
+
+	params := &pquerier.SelectParams{Name: "cpu",
+		Functions:         "sum",
+		Step:              5 * tsdbtest.MinuteInMillis,
+		AggregationWindow: 5 * tsdbtest.MinuteInMillis,
+		From:              suite.basicQueryTime,
+		To:                suite.basicQueryTime + 10*tsdbtest.MinuteInMillis}
+	set, err := querierV2.Select(params)
+	if err != nil {
+		suite.T().Fatalf("Failed to exeute query, err: %v", err)
+	}
+
+	var seriesCount int
+	for set.Next() {
+		seriesCount++
+		iter := set.At().Iterator()
+
+		data, err := tsdbtest.IteratorToSlice(iter)
+		agg := set.At().Labels().Get(aggregate.AggregateLabel)
+		if err != nil {
+			suite.T().Fatal(err)
+		}
+
+		assert.Equal(suite.T(), expected[agg], data, "queried data does not match expected")
+	}
+
+	assert.Equal(suite.T(), 1, seriesCount, "series count didn't match expected")
+}
+
+func (suite *testQuerySuite) TestServerWindowedAggregationWindowBiggerThanStep() {
+	adapter, err := tsdb.NewV3ioAdapter(suite.v3ioConfig, nil, nil)
+	if err != nil {
+		suite.T().Fatalf("failed to create v3io adapter. reason: %s", err)
+	}
+
+	labels1 := utils.LabelsFromStringList("os", "linux")
+	numberOfEvents := 10
+
+	var ingestedData []tsdbtest.DataPoint
+
+	for i := 0; i < numberOfEvents; i++ {
+		ingestedData = append(ingestedData, tsdbtest.DataPoint{Time: suite.basicQueryTime + int64(i)*tsdbtest.HoursInMillis, Value: 10 * float64(i)})
+	}
+
+	testParams := tsdbtest.NewTestParams(suite.T(),
+		tsdbtest.TestOption{
+			Key: tsdbtest.OptTimeSeries,
+			Value: tsdbtest.TimeSeries{tsdbtest.Metric{
+				Name:   "cpu",
+				Labels: labels1,
+				Data:   ingestedData},
+			}})
+	tsdbtest.InsertData(suite.T(), testParams)
+
+	expected := map[string][]tsdbtest.DataPoint{"sum": {
+		{Time: suite.basicQueryTime + 5*tsdbtest.HoursInMillis, Value: 100},
+		{Time: suite.basicQueryTime + 10*tsdbtest.HoursInMillis, Value: 390},
+	}}
+
+	querierV2, err := adapter.QuerierV2()
+	if err != nil {
+		suite.T().Fatalf("Failed to create querier v2, err: %v", err)
+	}
+
+	params := &pquerier.SelectParams{Name: "cpu",
+		Functions:         "sum",
+		Step:              5 * tsdbtest.HoursInMillis,
+		AggregationWindow: 6 * tsdbtest.HoursInMillis,
+		From:              suite.basicQueryTime,
+		To:                suite.basicQueryTime + 10*tsdbtest.HoursInMillis}
+	set, err := querierV2.Select(params)
+	if err != nil {
+		suite.T().Fatalf("Failed to exeute query, err: %v", err)
+	}
+
+	var seriesCount int
+	for set.Next() {
+		seriesCount++
+		iter := set.At().Iterator()
+
+		data, err := tsdbtest.IteratorToSlice(iter)
+		agg := set.At().Labels().Get(aggregate.AggregateLabel)
+		if err != nil {
+			suite.T().Fatal(err)
+		}
+
+		assert.Equal(suite.T(), expected[agg], data, "queried data does not match expected")
+	}
+
+	assert.Equal(suite.T(), 1, seriesCount, "series count didn't match expected")
+}
+
+func (suite *testQuerySuite) TestServerWindowedAggregationWindowEqualToStep() {
+	adapter, err := tsdb.NewV3ioAdapter(suite.v3ioConfig, nil, nil)
+	if err != nil {
+		suite.T().Fatalf("failed to create v3io adapter. reason: %s", err)
+	}
+
+	labels1 := utils.LabelsFromStringList("os", "linux")
+	numberOfEvents := 10
+
+	var ingestedData []tsdbtest.DataPoint
+
+	for i := 0; i < numberOfEvents; i++ {
+		ingestedData = append(ingestedData, tsdbtest.DataPoint{Time: suite.basicQueryTime + int64(i)*tsdbtest.HoursInMillis, Value: 10 * float64(i)})
+	}
+
+	testParams := tsdbtest.NewTestParams(suite.T(),
+		tsdbtest.TestOption{
+			Key: tsdbtest.OptTimeSeries,
+			Value: tsdbtest.TimeSeries{tsdbtest.Metric{
+				Name:   "cpu",
+				Labels: labels1,
+				Data:   ingestedData},
+			}})
+	tsdbtest.InsertData(suite.T(), testParams)
+
+	expected := map[string][]tsdbtest.DataPoint{"sum": {
+		{Time: suite.basicQueryTime + 5*tsdbtest.HoursInMillis, Value: 100},
+		{Time: suite.basicQueryTime + 10*tsdbtest.HoursInMillis, Value: 350},
+	}}
+
+	querierV2, err := adapter.QuerierV2()
+	if err != nil {
+		suite.T().Fatalf("Failed to create querier v2, err: %v", err)
+	}
+
+	params := &pquerier.SelectParams{Name: "cpu",
+		Functions:         "sum",
+		Step:              5 * tsdbtest.HoursInMillis,
+		AggregationWindow: 5 * tsdbtest.HoursInMillis,
+		From:              suite.basicQueryTime,
+		To:                suite.basicQueryTime + 10*tsdbtest.HoursInMillis}
+	set, err := querierV2.Select(params)
+	if err != nil {
+		suite.T().Fatalf("Failed to exeute query, err: %v", err)
+	}
+
+	var seriesCount int
+	for set.Next() {
+		seriesCount++
+		iter := set.At().Iterator()
+
+		data, err := tsdbtest.IteratorToSlice(iter)
+		agg := set.At().Labels().Get(aggregate.AggregateLabel)
+		if err != nil {
+			suite.T().Fatal(err)
+		}
+
+		assert.Equal(suite.T(), expected[agg], data, "queried data does not match expected")
+	}
+
+	assert.Equal(suite.T(), 1, seriesCount, "series count didn't match expected")
+}
+
+func (suite *testQuerySuite) TestServerWindowedAggregationWindowEqualToRollupInterval() {
+	adapter, err := tsdb.NewV3ioAdapter(suite.v3ioConfig, nil, nil)
+	if err != nil {
+		suite.T().Fatalf("failed to create v3io adapter. reason: %s", err)
+	}
+
+	labels1 := utils.LabelsFromStringList("os", "linux")
+	numberOfEvents := 10
+
+	var ingestedData []tsdbtest.DataPoint
+
+	for i := 0; i < numberOfEvents; i++ {
+		ingestedData = append(ingestedData, tsdbtest.DataPoint{Time: suite.basicQueryTime + int64(i)*tsdbtest.HoursInMillis, Value: 10 * float64(i)})
+	}
+
+	testParams := tsdbtest.NewTestParams(suite.T(),
+		tsdbtest.TestOption{
+			Key: tsdbtest.OptTimeSeries,
+			Value: tsdbtest.TimeSeries{tsdbtest.Metric{
+				Name:   "cpu",
+				Labels: labels1,
+				Data:   ingestedData},
+			}})
+	tsdbtest.InsertData(suite.T(), testParams)
+
+	expected := map[string][]tsdbtest.DataPoint{"sum": {
+		{Time: suite.basicQueryTime + 1*tsdbtest.HoursInMillis, Value: 0},
+		{Time: suite.basicQueryTime + 2*tsdbtest.HoursInMillis, Value: 10},
+		{Time: suite.basicQueryTime + 3*tsdbtest.HoursInMillis, Value: 20},
+		{Time: suite.basicQueryTime + 4*tsdbtest.HoursInMillis, Value: 30},
+		{Time: suite.basicQueryTime + 5*tsdbtest.HoursInMillis, Value: 40},
+		{Time: suite.basicQueryTime + 6*tsdbtest.HoursInMillis, Value: 50},
+		{Time: suite.basicQueryTime + 7*tsdbtest.HoursInMillis, Value: 60},
+		{Time: suite.basicQueryTime + 8*tsdbtest.HoursInMillis, Value: 70},
+		{Time: suite.basicQueryTime + 9*tsdbtest.HoursInMillis, Value: 80},
+		{Time: suite.basicQueryTime + 10*tsdbtest.HoursInMillis, Value: 90},
+	}}
+
+	querierV2, err := adapter.QuerierV2()
+	if err != nil {
+		suite.T().Fatalf("Failed to create querier v2, err: %v", err)
+	}
+
+	params := &pquerier.SelectParams{Name: "cpu",
+		Functions:         "sum",
+		Step:              1 * tsdbtest.HoursInMillis,
+		AggregationWindow: 1 * tsdbtest.HoursInMillis,
+		From:              suite.basicQueryTime,
+		To:                suite.basicQueryTime + 10*tsdbtest.HoursInMillis}
+	set, err := querierV2.Select(params)
+	if err != nil {
+		suite.T().Fatalf("Failed to exeute query, err: %v", err)
+	}
+
+	var seriesCount int
+	for set.Next() {
+		seriesCount++
+		iter := set.At().Iterator()
+
+		data, err := tsdbtest.IteratorToSlice(iter)
+		agg := set.At().Labels().Get(aggregate.AggregateLabel)
+		if err != nil {
+			suite.T().Fatal(err)
+		}
+
+		assert.Equal(suite.T(), expected[agg], data, "queried data does not match expected")
+	}
+
+	assert.Equal(suite.T(), 1, seriesCount, "series count didn't match expected")
+}
+
 func (suite *testQuerySuite) toMillis(date string) int64 {
 	time, err := tsdbtest.DateStringToMillis(date)
 	suite.NoError(err)

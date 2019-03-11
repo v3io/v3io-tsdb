@@ -39,13 +39,14 @@ type V3ioQuerier struct {
 }
 
 type SelectParams struct {
-	Name             string
-	Functions        string
-	From, To, Step   int64
-	Windows          []int
-	Filter           string
-	RequestedColumns []RequestedColumn
-	GroupBy          string
+	Name              string
+	Functions         string
+	From, To, Step    int64
+	Windows           []int
+	Filter            string
+	RequestedColumns  []RequestedColumn
+	GroupBy           string
+	AggregationWindow int64
 
 	disableAllAggr    bool
 	disableClientAggr bool

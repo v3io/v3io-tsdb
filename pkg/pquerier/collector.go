@@ -124,12 +124,11 @@ func aggregateClientAggregates(ctx *selectQueryContext, res *qryResults) {
 	it := newRawChunkIterator(res, ctx.logger)
 	for it.Next() {
 		t, v := it.At()
-		currentCell := (t - ctx.queryParams.From) / res.query.aggregationParams.Interval
 
-		for _, col := range res.frame.columns {
-			if col.GetColumnSpec().metric == res.name {
-				_ = res.frame.setDataAt(col.Name(), int(currentCell), v)
-			}
+		if res.query.aggregationParams.GetAggregationWindow() != 0 {
+			windowAggregation(ctx, res, t, v)
+		} else {
+			intervalAggregation(ctx, res, t, v)
 		}
 	}
 }
@@ -165,7 +164,14 @@ func aggregateServerAggregates(ctx *selectQueryContext, res *qryResults) {
 					} else {
 						floatVal = math.Float64frombits(val)
 					}
-					_ = res.frame.setDataAt(col.Name(), int(currentCell), floatVal)
+
+					if currentValueTime >= ctx.queryParams.From-res.query.aggregationParams.GetAggregationWindow() && currentValueTime <= ctx.queryParams.To {
+						if res.query.aggregationParams.GetAggregationWindow() == 0 {
+							_ = res.frame.setDataAt(col.Name(), int(currentCell), floatVal)
+						} else {
+							windowAggregationWithServerAggregates(ctx, res, col, currentValueTime, floatVal)
+						}
+					}
 				}
 			}
 		}
@@ -262,4 +268,70 @@ func aggregateClientAggregatesCrossSeries(ctx *selectQueryContext, res *qryResul
 
 	lastT, lastV := it.At()
 	return lastT, lastV, nil
+}
+
+func intervalAggregation(ctx *selectQueryContext, res *qryResults, t int64, v float64) {
+	currentCell := (t - ctx.queryParams.From) / res.query.aggregationParams.Interval
+
+	for _, col := range res.frame.columns {
+		if col.GetColumnSpec().metric == res.name {
+			_ = res.frame.setDataAt(col.Name(), int(currentCell), v)
+		}
+	}
+}
+
+func windowAggregation(ctx *selectQueryContext, res *qryResults, t int64, v float64) {
+	currentCell := (t - ctx.queryParams.From) / res.query.aggregationParams.Interval
+	if (t-ctx.queryParams.From)%res.query.aggregationParams.Interval > 0 {
+		currentCell++
+	}
+
+	if res.query.aggregationParams.GetAggregationWindow() > res.query.aggregationParams.Interval {
+		numEffectedCells := (t + res.query.aggregationParams.GetAggregationWindow() - ctx.queryParams.From - currentCell*res.query.aggregationParams.Interval) / res.query.aggregationParams.Interval
+		if res.query.aggregationParams.GetAggregationWindow()%res.query.aggregationParams.Interval > 0 {
+			numEffectedCells++
+		}
+
+		for i := int64(0); i < numEffectedCells; i++ {
+			for _, col := range res.frame.columns {
+				if col.GetColumnSpec().metric == res.name {
+					_ = res.frame.setDataAt(col.Name(), int(currentCell+i), v)
+				}
+			}
+		}
+	} else if res.query.aggregationParams.GetAggregationWindow() < res.query.aggregationParams.Interval {
+		if t+res.query.aggregationParams.GetAggregationWindow() >= ctx.queryParams.From+currentCell*res.query.aggregationParams.Interval {
+			for _, col := range res.frame.columns {
+				if col.GetColumnSpec().metric == res.name {
+					_ = res.frame.setDataAt(col.Name(), int(currentCell), v)
+				}
+			}
+		}
+	} else {
+		for _, col := range res.frame.columns {
+			if col.GetColumnSpec().metric == res.name {
+				_ = res.frame.setDataAt(col.Name(), int(currentCell), v)
+			}
+		}
+	}
+}
+
+func windowAggregationWithServerAggregates(ctx *selectQueryContext, res *qryResults, column Column, t int64, v float64) {
+	currentCell := (t - ctx.queryParams.From) / res.query.aggregationParams.Interval
+	if (t-ctx.queryParams.From)%res.query.aggregationParams.Interval > 0 {
+		currentCell++
+	}
+
+	if res.query.aggregationParams.GetAggregationWindow() > res.query.aggregationParams.Interval {
+		numEffectedCells := (t + res.query.aggregationParams.GetAggregationWindow() - ctx.queryParams.From - currentCell*res.query.aggregationParams.Interval) / res.query.aggregationParams.Interval
+		if res.query.aggregationParams.GetAggregationWindow()%res.query.aggregationParams.Interval > 0 {
+			numEffectedCells++
+		}
+
+		for i := int64(0); i < numEffectedCells; i++ {
+			_ = res.frame.setDataAt(column.Name(), int(currentCell+i), v)
+		}
+	} else {
+		_ = res.frame.setDataAt(column.Name(), int(currentCell), v)
+	}
 }
