@@ -165,7 +165,11 @@ func aggregateServerAggregates(ctx *selectQueryContext, res *qryResults) {
 						floatVal = math.Float64frombits(val)
 					}
 
-					if currentValueTime >= ctx.queryParams.From-res.query.aggregationParams.GetAggregationWindow() && currentValueTime <= ctx.queryParams.To {
+					bottomMargin := res.query.aggregationParams.Interval
+					if res.query.aggregationParams.GetAggregationWindow() != 0 {
+						bottomMargin = res.query.aggregationParams.GetAggregationWindow()
+					}
+					if currentValueTime >= ctx.queryParams.From-bottomMargin && currentValueTime <= ctx.queryParams.To+res.query.aggregationParams.Interval {
 						if res.query.aggregationParams.GetAggregationWindow() == 0 {
 							_ = res.frame.setDataAt(col.Name(), int(currentCell), floatVal)
 						} else {
