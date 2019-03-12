@@ -2,7 +2,7 @@ label = "${UUID.randomUUID().toString()}"
 BUILD_FOLDER = "/go"
 attempts=15
 git_project = "v3io-tsdb"
-git_project_user = "v3io"
+git_project_user = "gkirok"
 git_deploy_user = "iguazio-prod-git-user"
 git_deploy_user_token = "iguazio-prod-git-user-token"
 git_deploy_user_private_key = "iguazio-prod-git-user-private-key"
@@ -44,7 +44,7 @@ def build_v3io_tsdb(TAG_VERSION) {
                 withCredentials([
                         string(credentialsId: pipelinex.PackagesRepo.ARTIFACTORY_IGUAZIO[2], variable: 'PACKAGES_ARTIFACTORY_PASSWORD')
                 ]) {
-                    common.upload_file_to_artifactory(pipelinex.PackagesRepo.ARTIFACTORY_IGUAZIO[0], pipelinex.PackagesRepo.ARTIFACTORY_IGUAZIO[1], PACKAGES_ARTIFACTORY_PASSWORD, "iguazio-devops/k8s", "tsdbctl-${TAG_VERSION}-linux-amd64")
+                    common.upload_file_to_artifactory(pipelinex.PackagesRepo.ARTIFACTORY_IGUAZIO[0], pipelinex.PackagesRepo.ARTIFACTORY_IGUAZIO[1], PACKAGES_ARTIFACTORY_PASSWORD, "gallz/k8s", "tsdbctl-${TAG_VERSION}-linux-amd64")
                 }
             }
         }
