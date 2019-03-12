@@ -25,9 +25,9 @@ def build_v3io_tsdb(TAG_VERSION) {
             container('golang') {
                 dir("${BUILD_FOLDER}/src/github.com/v3io/${git_project}") {
                     sh """
-                        GOOS=linux GOARCH=amd64 TRAVIS_TAG=${TAG_VERSION} make bin
-                        GOOS=darwin GOARCH=amd64 TRAVIS_TAG=${TAG_VERSION} make bin
-                        GOOS=windows GOARCH=amd64 TRAVIS_TAG=${TAG_VERSION} make bin
+                        GO111MODULE=on GOOS=linux GOARCH=amd64 TRAVIS_TAG=${TAG_VERSION} make bin
+                        GO111MODULE=on GOOS=darwin GOARCH=amd64 TRAVIS_TAG=${TAG_VERSION} make bin
+                        GO111MODULE=on GOOS=windows GOARCH=amd64 TRAVIS_TAG=${TAG_VERSION} make bin
                         ls -la /go/bin
                     """
                 }
@@ -206,9 +206,7 @@ podTemplate(label: "${git_project}-${label}", inheritFrom: "jnlp-docker-golang")
                 if (github.check_tag_expiration(git_project, git_project_user, MAIN_TAG_VERSION, GIT_TOKEN)) {
                     parallel(
                             'v3io-tsdb': {
-                                podTemplate(label: "v3io-tsdb-${label}", inheritFrom: "${git_project}-${label}", containers: [
-                                        containerTemplate(name: 'golang', image: 'golang:1.11')
-                                ]) {
+                                podTemplate(label: "v3io-tsdb-${label}", inheritFrom: "jnlp-docker-golang") {
                                     node("v3io-tsdb-${label}") {
                                         withCredentials([
                                                 string(credentialsId: git_deploy_user_token, variable: 'GIT_TOKEN')
@@ -219,7 +217,7 @@ podTemplate(label: "${git_project}-${label}", inheritFrom: "jnlp-docker-golang")
                                 }
                             },
                             'tsdb-nuclio': {
-                                podTemplate(label: "v3io-tsdb-nuclio-${label}", inheritFrom: "${git_project}-${label}") {
+                                podTemplate(label: "v3io-tsdb-nuclio-${label}", inheritFrom: "jnlp-docker") {
                                     node("v3io-tsdb-nuclio-${label}") {
                                         withCredentials([
                                                 string(credentialsId: git_deploy_user_token, variable: 'GIT_TOKEN')
@@ -259,7 +257,7 @@ podTemplate(label: "${git_project}-${label}", inheritFrom: "jnlp-docker-golang")
                                 }
                             },
                             'prometheus': {
-                                podTemplate(label: "v3io-tsdb-prometheus-${label}", inheritFrom: "${git_project}-${label}") {
+                                podTemplate(label: "v3io-tsdb-prometheus-${label}", inheritFrom: "jnlp-docker") {
                                     node("v3io-tsdb-prometheus-${label}") {
                                         withCredentials([
                                                 string(credentialsId: git_deploy_user_token, variable: 'GIT_TOKEN')
