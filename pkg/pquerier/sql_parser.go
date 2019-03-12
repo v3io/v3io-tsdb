@@ -127,7 +127,7 @@ func getTableName(slct *sqlparser.Select) (string, error) {
 		return "", fmt.Errorf("not a table in FROM field")
 	}
 
-	tableStr := sqlparser.String(table)
+	tableStr := table.Name.String()
 	if tableStr == emptyTableName {
 		return "", nil
 	}

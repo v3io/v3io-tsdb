@@ -181,7 +181,7 @@ def build_prometheus(V3IO_TSDB_VERSION, internal_status="stable") {
     }
 }
 
-podTemplate(label: "${git_project}-${label}", inheritFrom: "jnlp-docker") {
+podTemplate(label: "${git_project}-${label}", inheritFrom: "jnlp-docker-golang") {
     def MAIN_TAG_VERSION
     def next_versions = ['prometheus':null, 'tsdb-nuclio':null]
 

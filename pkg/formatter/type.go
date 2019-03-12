@@ -3,7 +3,6 @@ package formatter
 import (
 	"fmt"
 	"io"
-	"strconv"
 	"strings"
 	"time"
 
@@ -43,16 +42,9 @@ type baseFormatter struct {
 	cfg *FormatterConfig
 }
 
-func (f baseFormatter) timeString(t int64) string {
-	if f.cfg.TimeFormat == "" {
-		return strconv.Itoa(int(t))
-	}
-	return time.Unix(t/1000, 0).UTC().Format(f.cfg.TimeFormat)
-}
-
 func labelsToStr(labels utils.Labels) (string, string) {
 	name := ""
-	lbls := []string{}
+	var lbls []string
 	for _, lbl := range labels {
 		if lbl.Name == "__name__" {
 			name = lbl.Value

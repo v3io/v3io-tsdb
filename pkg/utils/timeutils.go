@@ -89,7 +89,7 @@ func Str2unixTime(timeString string) (int64, error) {
 			} else if sign == "+" {
 				return CurrentTimeInMillis() + int64(t), nil
 			} else {
-				return 0, errors.Wrapf(err, "Unsupported time format:", timeString)
+				return 0, errors.Wrapf(err, "Unsupported time format: %s", timeString)
 			}
 		} else {
 			return CurrentTimeInMillis(), nil
