@@ -25,9 +25,9 @@ def build_v3io_tsdb(TAG_VERSION) {
             container('golang') {
                 dir("${BUILD_FOLDER}/src/github.com/v3io/${git_project}") {
                     sh """
-                        GOOS=linux GOARCH=amd64 TRAVIS_TAG=${TAG_VERSION} make bin
-                        GOOS=darwin GOARCH=amd64 TRAVIS_TAG=${TAG_VERSION} make bin
-                        GOOS=windows GOARCH=amd64 TRAVIS_TAG=${TAG_VERSION} make bin
+                        GO111MODULE=on GOOS=linux GOARCH=amd64 TRAVIS_TAG=${TAG_VERSION} make bin
+                        GO111MODULE=on GOOS=darwin GOARCH=amd64 TRAVIS_TAG=${TAG_VERSION} make bin
+                        GO111MODULE=on GOOS=windows GOARCH=amd64 TRAVIS_TAG=${TAG_VERSION} make bin
                         ls -la /go/bin
                     """
                 }
