@@ -3478,6 +3478,71 @@ func (suite *testQuerySuite) TestClientWindowedAggregationWindowEqualToStep() {
 	assert.Equal(suite.T(), 1, seriesCount, "series count didn't match expected")
 }
 
+func (suite *testQuerySuite) TestClientWindowedAggregationWindowExceedsPartition() {
+	adapter, err := tsdb.NewV3ioAdapter(suite.v3ioConfig, nil, nil)
+	if err != nil {
+		suite.T().Fatalf("failed to create v3io adapter. reason: %s", err)
+	}
+
+	labels1 := utils.LabelsFromStringList("os", "linux")
+
+	ingestedData := []tsdbtest.DataPoint{{Time: suite.toMillis("2018-07-19T23:50:00Z"), Value: 1},
+		{Time: suite.toMillis("2018-07-19T23:55:00Z"), Value: 2},
+		{Time: suite.toMillis("2018-07-19T23:57:00Z"), Value: 3},
+		{Time: suite.toMillis("2018-07-20T00:10:00Z"), Value: 4},
+		{Time: suite.toMillis("2018-07-20T00:20:00Z"), Value: 5},
+		{Time: suite.toMillis("2018-07-20T00:30:00Z"), Value: 6},
+	}
+
+	testParams := tsdbtest.NewTestParams(suite.T(),
+		tsdbtest.TestOption{
+			Key: tsdbtest.OptTimeSeries,
+			Value: tsdbtest.TimeSeries{tsdbtest.Metric{
+				Name:   "cpu",
+				Labels: labels1,
+				Data:   ingestedData},
+			}})
+	tsdbtest.InsertData(suite.T(), testParams)
+
+	expected := map[string][]tsdbtest.DataPoint{"sum": {
+		{Time: suite.toMillis("2018-07-20T00:10:00Z"), Value: 10},
+		{Time: suite.toMillis("2018-07-20T00:20:00Z"), Value: 15},
+		{Time: suite.toMillis("2018-07-20T00:30:00Z"), Value: 15},
+	}}
+
+	querierV2, err := adapter.QuerierV2()
+	if err != nil {
+		suite.T().Fatalf("Failed to create querier v2, err: %v", err)
+	}
+
+	params := &pquerier.SelectParams{Name: "cpu",
+		Functions:         "sum",
+		Step:              10 * tsdbtest.MinuteInMillis,
+		AggregationWindow: 30 * tsdbtest.MinuteInMillis,
+		From:              suite.toMillis("2018-07-20T00:10:00Z"),
+		To:                suite.toMillis("2018-07-20T00:30:00Z")}
+	set, err := querierV2.Select(params)
+	if err != nil {
+		suite.T().Fatalf("Failed to exeute query, err: %v", err)
+	}
+
+	var seriesCount int
+	for set.Next() {
+		seriesCount++
+		iter := set.At().Iterator()
+
+		data, err := tsdbtest.IteratorToSlice(iter)
+		agg := set.At().Labels().Get(aggregate.AggregateLabel)
+		if err != nil {
+			suite.T().Fatal(err)
+		}
+
+		assert.Equal(suite.T(), expected[agg], data, "queried data does not match expected")
+	}
+
+	assert.Equal(suite.T(), 1, seriesCount, "series count didn't match expected")
+}
+
 func (suite *testQuerySuite) TestServerWindowedAggregationWindowBiggerThanStep() {
 	adapter, err := tsdb.NewV3ioAdapter(suite.v3ioConfig, nil, nil)
 	if err != nil {

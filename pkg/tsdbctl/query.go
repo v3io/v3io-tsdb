@@ -100,7 +100,7 @@ Arguments:
 	cmd.Flags().StringVarP(&commandeer.last, "last", "l", "",
 		"Return data for the specified time period before the\ncurrent time, of the format \"[0-9]+[mhd]\" (where\n'm' = minutes, 'h' = hours, and 'd' = days>). When setting\nthis flag, don't set the -b|--begin or -e|--end flags.\nExamples: \"1h\"; \"15m\"; \"30d\" to return data for the last\n1 hour, 15 minutes, or 30 days.")
 	cmd.Flags().StringVarP(&commandeer.aggregationWindow, "aggregation-window", "w", "",
-		"Sliding window to calculate the aggregation for every step. Examples: \"1h\"; \"150m\". (default = 0)")
+		"Sliding time window for aggregation. Must be used in conjunction with `-a <aggr>`. Examples: \"1h\"; \"150m\".")
 	cmd.Flags().StringVarP(&commandeer.functions, "aggregates", "a", "",
 		"Aggregation information to return, as a comma-separated\nlist of supported aggregation functions - count | avg |\nsum | min | max | stddev | stdvar | last | rate.\nFor cross series aggregations add an \"_all\" suffix for the wanted aggregate.\nNote: you can query either over time aggregates or cross series aggregate but not both in the same query.\nExample: \"sum,min,max,count\", \"sum_all,avg_all\".")
 	cmd.Flags().StringVarP(&commandeer.step, "aggregation-interval", "i", "",
@@ -181,7 +181,7 @@ func (qc *queryCommandeer) newQuery(from, to, step int64) error {
 	}
 	aggregationWindow, err := utils.Str2duration(qc.aggregationWindow)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "Failed to parse aggregation window")
 	}
 
 	var selectParams *pquerier.SelectParams
