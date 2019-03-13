@@ -33,10 +33,14 @@ func newRawChunkIterator(queryResult *qryResults, log logger.Logger) utils.Serie
 		maxt = int64(maxTime.(int))
 	}
 
+	var window int64
+	if queryResult.query.aggregationParams != nil {
+		window = queryResult.query.aggregationParams.GetAggregationWindow()
+	}
 	newIterator := RawChunkIterator{
 		mint:     queryResult.query.mint,
 		maxt:     maxt,
-		window:   queryResult.query.aggregationParams.GetAggregationWindow(),
+		window:   window,
 		log:      log.GetChild("rawChunkIterator"),
 		encoding: queryResult.encoding}
 
