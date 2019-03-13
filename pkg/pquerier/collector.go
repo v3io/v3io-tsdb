@@ -291,10 +291,9 @@ func windowAggregation(ctx *selectQueryContext, res *qryResults, t int64, v floa
 	}
 
 	if res.query.aggregationParams.GetAggregationWindow() > res.query.aggregationParams.Interval {
-		numAffectedCells := (t + res.query.aggregationParams.GetAggregationWindow() - ctx.queryParams.From - currentCell*res.query.aggregationParams.Interval) / res.query.aggregationParams.Interval
-		if res.query.aggregationParams.GetAggregationWindow()%res.query.aggregationParams.Interval >= 0 {
-			numAffectedCells++
-		}
+		currentCellTime := ctx.queryParams.From + currentCell*res.query.aggregationParams.Interval
+		maximumAffectedTime := t + res.query.aggregationParams.GetAggregationWindow()
+		numAffectedCells := (maximumAffectedTime-currentCellTime)/res.query.aggregationParams.Interval + 1 // +1 to include the current cell
 
 		for i := int64(0); i < numAffectedCells; i++ {
 			for _, col := range res.frame.columns {
@@ -327,10 +326,9 @@ func windowAggregationWithServerAggregates(ctx *selectQueryContext, res *qryResu
 	}
 
 	if res.query.aggregationParams.GetAggregationWindow() > res.query.aggregationParams.Interval {
-		numAffectedCells := (t + res.query.aggregationParams.GetAggregationWindow() - ctx.queryParams.From - currentCell*res.query.aggregationParams.Interval) / res.query.aggregationParams.Interval
-		if res.query.aggregationParams.GetAggregationWindow()%res.query.aggregationParams.Interval >= 0 {
-			numAffectedCells++
-		}
+		currentCellTime := ctx.queryParams.From + currentCell*res.query.aggregationParams.Interval
+		maxAffectedTime := t + res.query.aggregationParams.GetAggregationWindow()
+		numAffectedCells := (maxAffectedTime-currentCellTime)/res.query.aggregationParams.Interval + 1 // +1 to include the current cell
 
 		for i := int64(0); i < numAffectedCells; i++ {
 			_ = res.frame.setDataAt(column.Name(), int(currentCell+i), v)
