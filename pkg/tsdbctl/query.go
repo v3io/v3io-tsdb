@@ -34,19 +34,20 @@ import (
 )
 
 type queryCommandeer struct {
-	cmd            *cobra.Command
-	rootCommandeer *RootCommandeer
-	name           string
-	filter         string
-	to             string
-	from           string
-	last           string
-	windows        string
-	functions      string
-	step           string
-	output         string
-	oldQuerier     bool
-	groupBy        string
+	cmd                    *cobra.Command
+	rootCommandeer         *RootCommandeer
+	name                   string
+	filter                 string
+	to                     string
+	from                   string
+	last                   string
+	windows                string
+	functions              string
+	step                   string
+	output                 string
+	oldQuerier             bool
+	groupBy                string
+	usePreciseAggregations bool
 }
 
 func newQueryCommandeer(rootCommandeer *RootCommandeer) *queryCommandeer {
@@ -113,6 +114,8 @@ Arguments:
 		"Aggregation interval for applying the aggregation functions\n(if set - see the -a|--aggregates flag), of the format\n\"[0-9]+[mhd]\" (where 'm' = minutes, 'h' = hours, and\n'd' = days). Examples: \"1h\"; \"150m\". (default =\n<end time> - <start time>)")
 	cmd.Flags().StringVar(&commandeer.groupBy, "groupBy", "",
 		"Comma separated list of labels to group the result by")
+	cmd.Flags().BoolVar(&commandeer.usePreciseAggregations, "use-precise-aggregations", false,
+		"Ignore server aggregations optimizations for more accurate results.")
 
 	cmd.Flags().BoolVarP(&commandeer.oldQuerier, "oldQuerier", "q", false, "use old querier")
 	cmd.Flags().Lookup("oldQuerier").Hidden = true
@@ -197,9 +200,11 @@ func (qc *queryCommandeer) newQuery(from, to, step int64) error {
 		selectParams.Step = step
 		selectParams.From = from
 		selectParams.To = to
+		selectParams.UseOnlyClientAggr = qc.usePreciseAggregations
 	} else {
 		selectParams = &pquerier.SelectParams{Name: qc.name, Functions: qc.functions,
-			Step: step, Filter: qc.filter, From: from, To: to, GroupBy: qc.groupBy}
+			Step: step, Filter: qc.filter, From: from, To: to, GroupBy: qc.groupBy,
+			UseOnlyClientAggr: qc.usePreciseAggregations}
 	}
 	set, err := qry.Select(selectParams)
 

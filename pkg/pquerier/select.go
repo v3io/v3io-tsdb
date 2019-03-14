@@ -173,7 +173,7 @@ func (queryCtx *selectQueryContext) queryPartition(partition *partmgr.DBPartitio
 			// Cross series aggregations cannot use server side aggregates.
 			newQuery.useServerSideAggregates = aggregationParams.CanAggregate(partition.AggrType()) &&
 				!queryCtx.isCrossSeriesAggregate &&
-				!queryCtx.queryParams.useOnlyClientAggr
+				!queryCtx.queryParams.UseOnlyClientAggr
 			if newQuery.useServerSideAggregates || !queryCtx.queryParams.disableClientAggr {
 				newQuery.aggregationParams = aggregationParams
 			}
