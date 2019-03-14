@@ -49,6 +49,7 @@ type SelectParams struct {
 
 	disableAllAggr    bool
 	disableClientAggr bool
+	useOnlyClientAggr bool
 }
 
 func (s *SelectParams) getRequestedColumns() []RequestedColumn {
@@ -75,7 +76,7 @@ func (q *V3ioQuerier) SelectProm(params *SelectParams, noAggr bool) (utils.Serie
 
 	params.disableClientAggr = true
 	params.disableAllAggr = noAggr
-
+	params.useOnlyClientAggr = q.cfg.UsePreciseAggregations
 	iter, err := q.baseSelectQry(params, false)
 	if err != nil || iter == nil {
 		return utils.NullSeriesSet{}, err
@@ -88,6 +89,7 @@ func (q *V3ioQuerier) SelectProm(params *SelectParams, noAggr bool) (utils.Serie
 func (q *V3ioQuerier) Select(params *SelectParams) (utils.SeriesSet, error) {
 	params.disableAllAggr = false
 	params.disableClientAggr = q.cfg.DisableClientAggr
+	params.useOnlyClientAggr = q.cfg.UsePreciseAggregations
 	iter, err := q.baseSelectQry(params, true)
 	if err != nil || iter == nil {
 		return utils.NullSeriesSet{}, err
@@ -99,6 +101,7 @@ func (q *V3ioQuerier) Select(params *SelectParams) (utils.SeriesSet, error) {
 func (q *V3ioQuerier) SelectDataFrame(params *SelectParams) (FrameSet, error) {
 	params.disableAllAggr = false
 	params.disableClientAggr = q.cfg.DisableClientAggr
+	params.useOnlyClientAggr = q.cfg.UsePreciseAggregations
 	iter, err := q.baseSelectQry(params, true)
 	if err != nil || iter == nil {
 		return nullFrameSet{}, err

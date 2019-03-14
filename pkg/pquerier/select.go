@@ -171,7 +171,9 @@ func (queryCtx *selectQueryContext) queryPartition(partition *partmgr.DBPartitio
 		newQuery := &partQuery{mint: mint, maxt: maxt, partition: partition, step: queryCtx.queryParams.Step}
 		if aggregationParams != nil {
 			// Cross series aggregations cannot use server side aggregates.
-			newQuery.useServerSideAggregates = aggregationParams.CanAggregate(partition.AggrType()) && !queryCtx.isCrossSeriesAggregate
+			newQuery.useServerSideAggregates = aggregationParams.CanAggregate(partition.AggrType()) &&
+				!queryCtx.isCrossSeriesAggregate &&
+				!queryCtx.queryParams.useOnlyClientAggr
 			if newQuery.useServerSideAggregates || !queryCtx.queryParams.disableClientAggr {
 				newQuery.aggregationParams = aggregationParams
 			}

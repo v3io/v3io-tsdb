@@ -164,6 +164,8 @@ type V3ioConfig struct {
 	BuildInfo *BuildInfo `json:"buildInfo,omitempty"`
 	// Override nginx bug
 	DisableNginxMitigation bool `json:"disableNginxMitigation,omitempty"`
+	// explicitly always use client aggregation
+	UsePreciseAggregations bool `json:"usePreciseAggregations,omitempty"`
 }
 
 type MetricsReporterConfig struct {
