@@ -24,7 +24,6 @@ package pquerier_test
 
 import (
 	"fmt"
-	"github.com/v3io/frames"
 	"math"
 	"strings"
 	"testing"
@@ -32,6 +31,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
+	"github.com/v3io/frames"
 	"github.com/v3io/v3io-tsdb/pkg/aggregate"
 	"github.com/v3io/v3io-tsdb/pkg/config"
 	"github.com/v3io/v3io-tsdb/pkg/pquerier"
