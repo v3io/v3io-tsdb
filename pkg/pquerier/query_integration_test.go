@@ -3290,9 +3290,8 @@ func (suite *testQuerySuite) TestUsePreciseAggregationsConfig() {
 	suite.v3ioConfig.UsePreciseAggregations = true
 	defer func() { suite.v3ioConfig.UsePreciseAggregations = false }()
 	adapter, err := tsdb.NewV3ioAdapter(suite.v3ioConfig, nil, nil)
-	if err != nil {
-		suite.T().Fatalf("failed to create v3io adapter. reason: %s", err)
-	}
+	suite.NoError(err, "failed to create v3io adapter.")
+
 	labels1 := utils.LabelsFromStringList("os", "linux")
 	numberOfEvents := 10
 	eventsInterval := 60 * 1000
@@ -3316,15 +3315,11 @@ func (suite *testQuerySuite) TestUsePreciseAggregationsConfig() {
 		"max": {{Time: suite.basicQueryTime, Value: 40}}}
 
 	querierV2, err := adapter.QuerierV2()
-	if err != nil {
-		suite.T().Fatalf("Failed to create querier v2, err: %v", err)
-	}
+	suite.NoError(err, "failed to create querier v2.")
 
 	params := &pquerier.SelectParams{Name: "cpu", Functions: "sum,max,min", Step: 1 * 60 * 60 * 1000, From: suite.basicQueryTime, To: suite.basicQueryTime + int64(numberOfEvents*eventsInterval)}
 	set, err := querierV2.Select(params)
-	if err != nil {
-		suite.T().Fatalf("Failed to exeute query, err: %v", err)
-	}
+	suite.NoError(err, "failed to exeute query,")
 
 	var seriesCount int
 	for set.Next() {
@@ -3337,10 +3332,10 @@ func (suite *testQuerySuite) TestUsePreciseAggregationsConfig() {
 			suite.T().Fatal(err)
 		}
 
-		assert.Equal(suite.T(), expected[agg], data, "queried data does not match expected")
+		suite.Require().Equal(expected[agg], data, "queried data does not match expected")
 	}
 
-	assert.Equal(suite.T(), 3, seriesCount, "series count didn't match expected")
+	suite.Require().Equal(3, seriesCount, "series count didn't match expected")
 }
 
 func (suite *testQuerySuite) toMillis(date string) int64 {

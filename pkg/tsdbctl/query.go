@@ -115,7 +115,7 @@ Arguments:
 	cmd.Flags().StringVar(&commandeer.groupBy, "groupBy", "",
 		"Comma separated list of labels to group the result by")
 	cmd.Flags().BoolVar(&commandeer.usePreciseAggregations, "use-precise-aggregations", false,
-		"Ignore server aggregations optimizations for more accurate results.")
+		"Disable server aggregation optimizations for more accurate results.")
 
 	cmd.Flags().BoolVarP(&commandeer.oldQuerier, "oldQuerier", "q", false, "use old querier")
 	cmd.Flags().Lookup("oldQuerier").Hidden = true
