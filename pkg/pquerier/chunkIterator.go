@@ -12,7 +12,7 @@ import (
 
 // Chunk-list series iterator
 type RawChunkIterator struct {
-	mint, maxt, window int64
+	mint, maxt, aggregationWindow int64
 
 	chunks   []chunkenc.Chunk
 	encoding chunkenc.Encoding
@@ -33,16 +33,16 @@ func newRawChunkIterator(queryResult *qryResults, log logger.Logger) utils.Serie
 		maxt = int64(maxTime.(int))
 	}
 
-	var window int64
+	var aggregationWindow int64
 	if queryResult.query.aggregationParams != nil {
-		window = queryResult.query.aggregationParams.GetAggregationWindow()
+		aggregationWindow = queryResult.query.aggregationParams.GetAggregationWindow()
 	}
 	newIterator := RawChunkIterator{
-		mint:     queryResult.query.mint,
-		maxt:     maxt,
-		window:   window,
-		log:      log.GetChild("rawChunkIterator"),
-		encoding: queryResult.encoding}
+		mint:              queryResult.query.mint,
+		maxt:              maxt,
+		aggregationWindow: aggregationWindow,
+		log:               log.GetChild("rawChunkIterator"),
+		encoding:          queryResult.encoding}
 
 	newIterator.AddChunks(queryResult)
 
@@ -64,8 +64,8 @@ func (it *RawChunkIterator) Seek(t int64) bool {
 	}
 
 	// Seek to the first valid value after t
-	if t < it.mint-it.window {
-		t = it.mint - it.window
+	if t < it.mint-it.aggregationWindow {
+		t = it.mint - it.aggregationWindow
 	}
 
 	// Check the first element
@@ -123,7 +123,7 @@ func (it *RawChunkIterator) Next() bool {
 	it.updatePrevPoint()
 	if it.iter.Next() {
 		t, _ := it.iter.At()
-		if t < it.mint-it.window {
+		if t < it.mint-it.aggregationWindow {
 			if !it.Seek(it.mint) {
 				return false
 			}

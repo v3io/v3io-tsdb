@@ -61,6 +61,10 @@ func (as *AggregationParams) GetAggregationWindow() int64 {
 	return as.aggregationWindow
 }
 
+func (as *AggregationParams) HasAggregationWindow() bool {
+	return as.aggregationWindow > 0
+}
+
 func (as *AggregationParams) toAttrName(aggr AggrType) string {
 	return fmt.Sprintf("_%v_%v", as.colName, aggr.String())
 }
