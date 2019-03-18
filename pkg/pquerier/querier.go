@@ -39,13 +39,14 @@ type V3ioQuerier struct {
 }
 
 type SelectParams struct {
-	Name             string
-	Functions        string
-	From, To, Step   int64
-	Windows          []int
-	Filter           string
-	RequestedColumns []RequestedColumn
-	GroupBy          string
+	Name              string
+	Functions         string
+	From, To, Step    int64
+	Windows           []int
+	Filter            string
+	RequestedColumns  []RequestedColumn
+	GroupBy           string
+	AggregationWindow int64
 
 	disableAllAggr    bool
 	disableClientAggr bool
@@ -138,7 +139,8 @@ func (q *V3ioQuerier) baseSelectQry(params *SelectParams, showAggregateLabel boo
 	q.performanceReporter.WithTimer("QueryTimer", func() {
 		params.Filter = strings.Replace(params.Filter, config.PrometheusMetricNameAttribute, config.MetricNameAttrName, -1)
 
-		parts := q.partitionMngr.PartsForRange(params.From, params.To, true)
+		// Get all partitions containing data relevant to the query. If the Aggregation Window parameter is specified take it in account.
+		parts := q.partitionMngr.PartsForRange(params.From-params.AggregationWindow, params.To, true)
 		if len(parts) == 0 {
 			return
 		}

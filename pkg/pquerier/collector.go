@@ -124,12 +124,11 @@ func aggregateClientAggregates(ctx *selectQueryContext, res *qryResults) {
 	it := newRawChunkIterator(res, ctx.logger)
 	for it.Next() {
 		t, v := it.At()
-		currentCell := (t - ctx.queryParams.From) / res.query.aggregationParams.Interval
 
-		for _, col := range res.frame.columns {
-			if col.GetColumnSpec().metric == res.name {
-				_ = res.frame.setDataAt(col.Name(), int(currentCell), v)
-			}
+		if res.query.aggregationParams.HasAggregationWindow() {
+			windowAggregation(ctx, res, t, v)
+		} else {
+			intervalAggregation(ctx, res, t, v)
 		}
 	}
 }
@@ -165,7 +164,18 @@ func aggregateServerAggregates(ctx *selectQueryContext, res *qryResults) {
 					} else {
 						floatVal = math.Float64frombits(val)
 					}
-					_ = res.frame.setDataAt(col.Name(), int(currentCell), floatVal)
+
+					bottomMargin := res.query.aggregationParams.Interval
+					if res.query.aggregationParams.HasAggregationWindow() {
+						bottomMargin = res.query.aggregationParams.GetAggregationWindow()
+					}
+					if currentValueTime >= ctx.queryParams.From-bottomMargin && currentValueTime <= ctx.queryParams.To+res.query.aggregationParams.Interval {
+						if !res.query.aggregationParams.HasAggregationWindow() {
+							_ = res.frame.setDataAt(col.Name(), int(currentCell), floatVal)
+						} else {
+							windowAggregationWithServerAggregates(ctx, res, col, currentValueTime, floatVal)
+						}
+					}
 				}
 			}
 		}
@@ -262,4 +272,65 @@ func aggregateClientAggregatesCrossSeries(ctx *selectQueryContext, res *qryResul
 
 	lastT, lastV := it.At()
 	return lastT, lastV, nil
+}
+
+func intervalAggregation(ctx *selectQueryContext, res *qryResults, t int64, v float64) {
+	currentCell := getRelativeCell(t, ctx.queryParams.From, res.query.aggregationParams.Interval, false)
+	aggregateAllColumns(res, currentCell, v)
+}
+
+func windowAggregation(ctx *selectQueryContext, res *qryResults, t int64, v float64) {
+	currentCell := getRelativeCell(t, ctx.queryParams.From, res.query.aggregationParams.Interval, true)
+	aggregationWindow := res.query.aggregationParams.GetAggregationWindow()
+
+	if aggregationWindow > res.query.aggregationParams.Interval {
+		currentCellTime := ctx.queryParams.From + currentCell*res.query.aggregationParams.Interval
+		maximumAffectedTime := t + aggregationWindow
+		numAffectedCells := (maximumAffectedTime-currentCellTime)/res.query.aggregationParams.Interval + 1 // +1 to include the current cell
+
+		for i := int64(0); i < numAffectedCells; i++ {
+			aggregateAllColumns(res, currentCell+i, v)
+		}
+	} else if aggregationWindow < res.query.aggregationParams.Interval {
+		if t+aggregationWindow >= ctx.queryParams.From+currentCell*res.query.aggregationParams.Interval {
+			aggregateAllColumns(res, currentCell, v)
+		}
+	} else {
+		aggregateAllColumns(res, currentCell, v)
+	}
+}
+
+func windowAggregationWithServerAggregates(ctx *selectQueryContext, res *qryResults, column Column, t int64, v float64) {
+	currentCell := getRelativeCell(t, ctx.queryParams.From, res.query.aggregationParams.Interval, true)
+
+	aggregationWindow := res.query.aggregationParams.GetAggregationWindow()
+	if aggregationWindow > res.query.aggregationParams.Interval {
+		currentCellTime := ctx.queryParams.From + currentCell*res.query.aggregationParams.Interval
+		maxAffectedTime := t + aggregationWindow
+		numAffectedCells := (maxAffectedTime-currentCellTime)/res.query.aggregationParams.Interval + 1 // +1 to include the current cell
+
+		for i := int64(0); i < numAffectedCells; i++ {
+			_ = res.frame.setDataAt(column.Name(), int(currentCell+i), v)
+		}
+	} else {
+		_ = res.frame.setDataAt(column.Name(), int(currentCell), v)
+	}
+}
+
+func getRelativeCell(time, beginning, interval int64, roundUp bool) int64 {
+	cell := (time - beginning) / interval
+
+	if roundUp && (time-beginning)%interval > 0 {
+		cell++
+	}
+
+	return cell
+}
+
+func aggregateAllColumns(res *qryResults, cell int64, value float64) {
+	for _, col := range res.frame.columns {
+		if col.GetColumnSpec().metric == res.name {
+			_ = res.frame.setDataAt(col.Name(), int(cell), value)
+		}
+	}
 }

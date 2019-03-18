@@ -158,6 +158,7 @@ func (queryCtx *selectQueryContext) queryPartition(partition *partmgr.DBPartitio
 				"v",
 				partition.AggrBuckets(),
 				queryCtx.queryParams.Step,
+				queryCtx.queryParams.AggregationWindow,
 				partition.RollupTime(),
 				queryCtx.queryParams.Windows)
 
@@ -488,7 +489,7 @@ func (query *partQuery) getItems(ctx *selectQueryContext, name string, preAggreg
 	// It is possible to request both server aggregates and raw chunk data (to downsample) for the same metric
 	// example: `select max(cpu), avg(cpu), cpu` with step = 1h
 	if !query.useServerSideAggregates || aggregatesAndChunk {
-		chunkAttr, chunk0Time := query.partition.Range2Attrs("v", query.mint, query.maxt)
+		chunkAttr, chunk0Time := query.partition.Range2Attrs("v", query.mint-ctx.queryParams.AggregationWindow, query.maxt)
 		query.chunk0Time = chunk0Time
 		query.attrs = append(query.attrs, chunkAttr...)
 	}
