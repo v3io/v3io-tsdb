@@ -76,8 +76,9 @@ def build_nuclio(V3IO_TSDB_VERSION, internal_status="stable") {
                         rm -rf functions/ingest/vendor/github.com/v3io/v3io-tsdb functions/query/vendor/github.com/v3io/v3io-tsdb
                         git clone https://${GIT_TOKEN}@github.com/${git_project_user}/v3io-tsdb.git functions/ingest/vendor/github.com/v3io/v3io-tsdb
                         cd functions/ingest/vendor/github.com/v3io/v3io-tsdb
+                        GO111MODULE=on go mod vendor
                         git checkout ${V3IO_TSDB_VERSION}
-                        rm -rf .git vendor/github.com/nuclio vendor/github.com/v3io/frames/vendor/golang.org/x/net
+                        rm -rf .git vendor/github.com/nuclio vendor/github.com/v3io/frames/vendor/golang.org/x/net vendor/golang.org/x/net
                         cd ${BUILD_FOLDER}/src/github.com/v3io/${git_project}
                         cp -R functions/ingest/vendor/github.com/v3io/v3io-tsdb functions/query/vendor/github.com/v3io/v3io-tsdb
                     """
@@ -143,8 +144,9 @@ def build_prometheus(V3IO_TSDB_VERSION, internal_status="stable") {
                         rm -rf vendor/github.com/v3io/v3io-tsdb/
                         git clone https://${GIT_TOKEN}@github.com/${git_project_user}/v3io-tsdb.git vendor/github.com/v3io/v3io-tsdb
                         cd vendor/github.com/v3io/v3io-tsdb
+                        GO111MODULE=on go mod vendor
                         git checkout ${V3IO_TSDB_VERSION}
-                        rm -rf .git vendor/github.com/${git_project} vendor/github.com/v3io/frames/vendor/golang.org/x/net
+                        rm -rf .git vendor/github.com/${git_project} vendor/github.com/v3io/frames/vendor/golang.org/x/net vendor/golang.org/x/net
                     """
                 }
             }
