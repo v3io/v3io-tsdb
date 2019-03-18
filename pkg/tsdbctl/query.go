@@ -21,7 +21,6 @@ such restriction.
 package tsdbctl
 
 import (
-	"strconv"
 	"strings"
 	"time"
 
@@ -41,13 +40,13 @@ type queryCommandeer struct {
 	to                     string
 	from                   string
 	last                   string
-	windows                string
 	functions              string
 	step                   string
 	output                 string
 	oldQuerier             bool
 	groupBy                string
 	usePreciseAggregations bool
+	aggregationWindow      string
 }
 
 func newQueryCommandeer(rootCommandeer *RootCommandeer) *queryCommandeer {
@@ -101,13 +100,8 @@ Arguments:
 		"Query filter, as an Iguazio Continuous Data Platform\nfilter expression. To reference a metric name from within\nthe query filter, use the \"__name__\" attribute.\nExamples: \"method=='get'\"; \"__name__='cpu' AND os=='win'\".")
 	cmd.Flags().StringVarP(&commandeer.last, "last", "l", "",
 		"Return data for the specified time period before the\ncurrent time, of the format \"[0-9]+[mhd]\" (where\n'm' = minutes, 'h' = hours, and 'd' = days>). When setting\nthis flag, don't set the -b|--begin or -e|--end flags.\nExamples: \"1h\"; \"15m\"; \"30d\" to return data for the last\n1 hour, 15 minutes, or 30 days.")
-	cmd.Flags().StringVarP(&commandeer.windows, "windows", "w", "",
-		"Overlapping windows of time to which to apply the aggregation\nfunctions (if defined - see the -a|--aggregates flag), as a\ncomma separated list of integer values (\"[0-9]+\").\nThe duration of each window is calculated by multiplying the\nvalue from the windows flag with the aggregation interval\n(see -i|--aggregation-interval). The windows' end time is\nthe query's end time (see -e|--end and -l|--last). If the\nwindow's duration extends beyond the query's start time (see\n-b|--begin and -l|--last), it will be shortened to fit the\nstart time. Example: -w \"1,2\" with -i \"2h\", -b 0, and the\ndefault end time (\"now\") defines overlapping aggregation\nwindows for the last 2 hours and 4 hours.")
-	// The default aggregates list for an overlapping-windows query is "avg",
-	// provided the TSDB instance has the "count" and "sum" aggregates, which
-	// make up the "avg" aggregate; ("count" is added automatically when adding
-	// any other aggregate). However, it was decided that documenting this
-	// would over complicate the documentation.
+	cmd.Flags().StringVarP(&commandeer.aggregationWindow, "aggregation-window", "w", "",
+		"Sliding time window for aggregation. Must be used in conjunction with `-a <aggr>`. Examples: \"1h\"; \"150m\".")
 	cmd.Flags().StringVarP(&commandeer.functions, "aggregates", "a", "",
 		"Aggregation information to return, as a comma-separated\nlist of supported aggregation functions - count | avg |\nsum | min | max | stddev | stdvar | last | rate.\nFor cross series aggregations add an \"_all\" suffix for the wanted aggregate.\nNote: you can query either over time aggregates or cross series aggregate but not both in the same query.\nExample: \"sum,min,max,count\", \"sum_all,avg_all\".")
 	cmd.Flags().StringVarP(&commandeer.step, "aggregation-interval", "i", "",
@@ -119,7 +113,6 @@ Arguments:
 
 	cmd.Flags().BoolVarP(&commandeer.oldQuerier, "oldQuerier", "q", false, "use old querier")
 	cmd.Flags().Lookup("oldQuerier").Hidden = true
-	cmd.Flags().Lookup("windows").Hidden = true // hidden, because only supported in old querier.
 	commandeer.cmd = cmd
 
 	return commandeer
@@ -189,6 +182,10 @@ func (qc *queryCommandeer) newQuery(from, to, step int64) error {
 	if err != nil {
 		return errors.Wrap(err, "Failed to initialize the Querier object.")
 	}
+	aggregationWindow, err := utils.Str2duration(qc.aggregationWindow)
+	if err != nil {
+		return errors.Wrap(err, "Failed to parse aggregation window")
+	}
 
 	var selectParams *pquerier.SelectParams
 
@@ -201,10 +198,12 @@ func (qc *queryCommandeer) newQuery(from, to, step int64) error {
 		selectParams.From = from
 		selectParams.To = to
 		selectParams.UseOnlyClientAggr = qc.usePreciseAggregations
+		selectParams.AggregationWindow = aggregationWindow
 	} else {
 		selectParams = &pquerier.SelectParams{Name: qc.name, Functions: qc.functions,
 			Step: step, Filter: qc.filter, From: from, To: to, GroupBy: qc.groupBy,
-			UseOnlyClientAggr: qc.usePreciseAggregations}
+			UseOnlyClientAggr: qc.usePreciseAggregations,
+			AggregationWindow: aggregationWindow}
 	}
 	set, err := qry.Select(selectParams)
 
@@ -230,22 +229,7 @@ func (qc *queryCommandeer) oldQuery(from, to, step int64) error {
 	}
 
 	var set utils.SeriesSet
-	if qc.windows == "" {
-		set, err = qry.Select(qc.name, qc.functions, step, qc.filter)
-	} else {
-		list := strings.Split(qc.windows, ",")
-		win := []int{}
-		for _, val := range list {
-			i, err := strconv.Atoi(val)
-			if err != nil {
-				return errors.Wrap(err, "Invalid window.")
-			}
-			win = append(win, i)
-
-		}
-
-		set, err = qry.SelectOverlap(qc.name, qc.functions, step, win, qc.filter)
-	}
+	set, err = qry.Select(qc.name, qc.functions, step, qc.filter)
 
 	if err != nil {
 		return errors.Wrap(err, "The query selection failed.")
