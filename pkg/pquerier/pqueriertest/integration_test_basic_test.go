@@ -20,7 +20,7 @@ under the Apache 2.0 license is conditioned upon your compliance with
 such restriction.
 */
 
-package pquerier_test
+package pqueriertest
 
 import (
 	"fmt"

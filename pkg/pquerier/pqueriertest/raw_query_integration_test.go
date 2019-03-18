@@ -1,6 +1,6 @@
 // +build integration
 
-package pquerier_test
+package pqueriertest
 
 import (
 	"fmt"

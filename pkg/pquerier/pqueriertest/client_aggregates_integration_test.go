@@ -1,6 +1,6 @@
 // +build integration
 
-package pquerier_test
+package pqueriertest
 
 import (
 	"math"
@@ -661,4 +661,3 @@ func (suite *testClientAggregatesSuite) TestAggregatesWithZeroStep() {
 
 	assert.Equal(suite.T(), 4, seriesCount, "series count didn't match expected")
 }
-
