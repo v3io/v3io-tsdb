@@ -275,20 +275,12 @@ func aggregateClientAggregatesCrossSeries(ctx *selectQueryContext, res *qryResul
 }
 
 func intervalAggregation(ctx *selectQueryContext, res *qryResults, t int64, v float64) {
-	currentCell := (t - ctx.queryParams.From) / res.query.aggregationParams.Interval
-
-	for _, col := range res.frame.columns {
-		if col.GetColumnSpec().metric == res.name {
-			_ = res.frame.setDataAt(col.Name(), int(currentCell), v)
-		}
-	}
+	currentCell := getRelativeCell(t, ctx.queryParams.From, res.query.aggregationParams.Interval, false)
+	aggregateAllColumns(res, currentCell, v)
 }
 
 func windowAggregation(ctx *selectQueryContext, res *qryResults, t int64, v float64) {
-	currentCell := (t - ctx.queryParams.From) / res.query.aggregationParams.Interval
-	if (t-ctx.queryParams.From)%res.query.aggregationParams.Interval > 0 {
-		currentCell++
-	}
+	currentCell := getRelativeCell(t, ctx.queryParams.From, res.query.aggregationParams.Interval, true)
 	aggregationWindow := res.query.aggregationParams.GetAggregationWindow()
 
 	if aggregationWindow > res.query.aggregationParams.Interval {
@@ -297,34 +289,19 @@ func windowAggregation(ctx *selectQueryContext, res *qryResults, t int64, v floa
 		numAffectedCells := (maximumAffectedTime-currentCellTime)/res.query.aggregationParams.Interval + 1 // +1 to include the current cell
 
 		for i := int64(0); i < numAffectedCells; i++ {
-			for _, col := range res.frame.columns {
-				if col.GetColumnSpec().metric == res.name {
-					_ = res.frame.setDataAt(col.Name(), int(currentCell+i), v)
-				}
-			}
+			aggregateAllColumns(res, currentCell+i, v)
 		}
 	} else if aggregationWindow < res.query.aggregationParams.Interval {
 		if t+aggregationWindow >= ctx.queryParams.From+currentCell*res.query.aggregationParams.Interval {
-			for _, col := range res.frame.columns {
-				if col.GetColumnSpec().metric == res.name {
-					_ = res.frame.setDataAt(col.Name(), int(currentCell), v)
-				}
-			}
+			aggregateAllColumns(res, currentCell, v)
 		}
 	} else {
-		for _, col := range res.frame.columns {
-			if col.GetColumnSpec().metric == res.name {
-				_ = res.frame.setDataAt(col.Name(), int(currentCell), v)
-			}
-		}
+		aggregateAllColumns(res, currentCell, v)
 	}
 }
 
 func windowAggregationWithServerAggregates(ctx *selectQueryContext, res *qryResults, column Column, t int64, v float64) {
-	currentCell := (t - ctx.queryParams.From) / res.query.aggregationParams.Interval
-	if (t-ctx.queryParams.From)%res.query.aggregationParams.Interval > 0 {
-		currentCell++
-	}
+	currentCell := getRelativeCell(t, ctx.queryParams.From, res.query.aggregationParams.Interval, true)
 
 	aggregationWindow := res.query.aggregationParams.GetAggregationWindow()
 	if aggregationWindow > res.query.aggregationParams.Interval {
@@ -337,5 +314,23 @@ func windowAggregationWithServerAggregates(ctx *selectQueryContext, res *qryResu
 		}
 	} else {
 		_ = res.frame.setDataAt(column.Name(), int(currentCell), v)
+	}
+}
+
+func getRelativeCell(time, beginning, interval int64, roundUp bool) int64 {
+	cell := (time - beginning) / interval
+
+	if roundUp && (time-beginning)%interval > 0 {
+		cell++
+	}
+
+	return cell
+}
+
+func aggregateAllColumns(res *qryResults, cell int64, value float64) {
+	for _, col := range res.frame.columns {
+		if col.GetColumnSpec().metric == res.name {
+			_ = res.frame.setDataAt(col.Name(), int(cell), value)
+		}
 	}
 }
