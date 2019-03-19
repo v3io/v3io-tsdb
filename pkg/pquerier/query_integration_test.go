@@ -782,10 +782,14 @@ func (suite *testQuerySuite) TestRawAggregatesMultiPartition() {
 			}})
 	tsdbtest.InsertData(suite.T(), testParams)
 
-	expected := map[string][]tsdbtest.DataPoint{"sum": {{Time: suite.basicQueryTime - 7*tsdbtest.DaysInMillis, Value: 10}, {Time: suite.basicQueryTime - tsdbtest.HoursInMillis, Value: 90}},
-		"min": {{Time: suite.basicQueryTime - 7*tsdbtest.DaysInMillis, Value: 10}, {Time: suite.basicQueryTime - tsdbtest.HoursInMillis, Value: 20}},
-		"max": {{Time: suite.basicQueryTime - 7*tsdbtest.DaysInMillis, Value: 10}, {Time: suite.basicQueryTime - tsdbtest.HoursInMillis, Value: 40}},
-		"sqr": {{Time: suite.basicQueryTime - 7*tsdbtest.DaysInMillis, Value: 100}, {Time: suite.basicQueryTime - tsdbtest.HoursInMillis, Value: 2900}}}
+	firstStepTime := suite.basicQueryTime - 7*tsdbtest.DaysInMillis
+	secondStepTime := suite.basicQueryTime - tsdbtest.HoursInMillis
+
+	expected := map[string][]tsdbtest.DataPoint{
+		"sum": {{Time: firstStepTime, Value: 10}, {Time: secondStepTime, Value: 90}},
+		"min": {{Time: firstStepTime, Value: 10}, {Time: secondStepTime, Value: 20}},
+		"max": {{Time: firstStepTime, Value: 10}, {Time: secondStepTime, Value: 40}},
+		"sqr": {{Time: firstStepTime, Value: 100}, {Time: secondStepTime, Value: 2900}}}
 
 	querierV2, err := adapter.QuerierV2()
 	if err != nil {
