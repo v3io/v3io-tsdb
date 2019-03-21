@@ -146,14 +146,16 @@ func (rc *RootCommandeer) populateConfig(cfg *config.V3ioConfig) error {
 
 	if rc.accessKey != "" {
 		cfg.AccessKey = rc.accessKey
+	} else if rc.password == "" {
+		envAccessKey := os.Getenv("V3IO_ACCESS_KEY")
+		if envAccessKey != "" {
+			cfg.AccessKey = envAccessKey
+		}
 	}
 
-	if cfg.AccessKey == "" && cfg.Password == "" {
-		cfg.AccessKey = os.Getenv("V3IO_ACCESS_KEY")
-	}
-
-	if cfg.WebApiEndpoint == "" {
-		cfg.WebApiEndpoint = os.Getenv("V3IO_API")
+	envV3ioApi := os.Getenv("V3IO_API")
+	if envV3ioApi != "" {
+		cfg.WebApiEndpoint = envV3ioApi
 	}
 
 	if rc.v3ioPath != "" {
