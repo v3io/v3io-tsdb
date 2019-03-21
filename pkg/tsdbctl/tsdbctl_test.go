@@ -23,6 +23,7 @@ such restriction.
 package tsdbctl
 
 import (
+	"os"
 	"testing"
 
 	"github.com/pkg/errors"
@@ -82,6 +83,35 @@ func (suite *testTsdbctlSuite) TestContainerConfig() {
 		Username:       "Vel@Odar",
 		Password:       "p455w0rd",
 		AccessKey:      "acce55-key",
+	})
+
+	suite.Require().Nil(err)
+	suite.Require().Equal(expectedCfg, rc.v3iocfg)
+}
+
+func (suite *testTsdbctlSuite) TestConfigFromEnvVars() {
+	oldV3ioApi := os.Getenv("V3IO_API")
+	err := os.Setenv("V3IO_API", "some-host:123")
+	suite.Require().NoError(err)
+	defer os.Setenv("V3IO_API", oldV3ioApi)
+
+	oldAccessKey := os.Getenv("V3IO_ACCESS_KEY")
+	err = os.Setenv("V3IO_ACCESS_KEY", "abcd")
+	suite.Require().NoError(err)
+	defer os.Setenv("V3IO_ACCESS_KEY", oldAccessKey)
+
+	rc := RootCommandeer{v3ioPath: "Vel@Odar:p455w0rd@localhost:80123/123", container: "test"}
+	cfg, err := config.GetOrLoadFromStruct(&config.V3ioConfig{TablePath: "/x/y/z"})
+	suite.Require().Nil(err)
+
+	err = rc.populateConfig(cfg)
+	expectedCfg, _ := config.GetOrLoadFromStruct(&config.V3ioConfig{
+		WebApiEndpoint: "some-host:123",
+		Container:      "test",
+		TablePath:      "/x/y/z",
+		Username:       "Vel@Odar",
+		Password:       "p455w0rd",
+		AccessKey:      "abcd",
 	})
 
 	suite.Require().Nil(err)

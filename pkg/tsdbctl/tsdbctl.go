@@ -148,6 +148,14 @@ func (rc *RootCommandeer) populateConfig(cfg *config.V3ioConfig) error {
 		cfg.AccessKey = rc.accessKey
 	}
 
+	if cfg.AccessKey == "" && cfg.Password == "" {
+		cfg.AccessKey = os.Getenv("V3IO_ACCESS_KEY")
+	}
+
+	if cfg.WebApiEndpoint == "" {
+		cfg.WebApiEndpoint = os.Getenv("V3IO_API")
+	}
+
 	if rc.v3ioPath != "" {
 		// Check for username and password in the web-gateway service endpoint
 		// (supported for backwards compatibility)
