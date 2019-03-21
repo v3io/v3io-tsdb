@@ -47,6 +47,7 @@ type SelectParams struct {
 	RequestedColumns  []RequestedColumn
 	GroupBy           string
 	AggregationWindow int64
+	UseOnlyClientAggr bool
 
 	disableAllAggr    bool
 	disableClientAggr bool
@@ -76,7 +77,6 @@ func (q *V3ioQuerier) SelectProm(params *SelectParams, noAggr bool) (utils.Serie
 
 	params.disableClientAggr = true
 	params.disableAllAggr = noAggr
-
 	iter, err := q.baseSelectQry(params, false)
 	if err != nil || iter == nil {
 		return utils.NullSeriesSet{}, err
@@ -121,6 +121,11 @@ func (q *V3ioQuerier) baseSelectQry(params *SelectParams, showAggregateLabel boo
 	// TODO: should be checked in config
 	if !isPowerOfTwo(q.cfg.QryWorkers) {
 		return nil, errors.New("Query workers num must be a power of 2 and > 0 !")
+	}
+
+	// If the config is set to use only client configuration override the query parameter.
+	if q.cfg.UsePreciseAggregations {
+		params.UseOnlyClientAggr = true
 	}
 
 	selectContext := selectQueryContext{
