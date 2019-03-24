@@ -314,10 +314,25 @@ func (cs *chunkStore) writeChunks(mc *MetricsCache, metric *MetricState) (hasPen
 		for pendingSampleIndex < len(cs.pending) && pendingSamplesCount < mc.cfg.BatchSize && partition.InRange(cs.pending[pendingSampleIndex].t) {
 			sampleTime := cs.pending[pendingSampleIndex].t
 
-			var doOmit bool
 			if sampleTime <= cs.maxTime && !mc.cfg.OverrideOld {
 				mc.logger.WarnWith("Omitting the sample - time is earlier than the last sample time for this metric", "metric", metric.Lset, "T", sampleTime)
-				doOmit = true
+
+				// If we have reached te end of the pending events and there are events to update, create an update expression and break from loop,
+				// Otherwise, discard the event and continue normally
+				if pendingSampleIndex == len(cs.pending)-1 {
+					if pendingSamplesCount > 0 {
+						expr = expr + cs.aggrList.SetOrUpdateExpr("v", bucket, isNewBucket)
+						expr = expr + cs.appendExpression(activeChunk)
+						pendingSampleIndex++
+						break
+					} else {
+						pendingSampleIndex++
+						break
+					}
+				} else {
+					pendingSampleIndex++
+					continue
+				}
 			}
 
 			// Init activeChunk if nil (when samples are too old); if still too
@@ -331,19 +346,17 @@ func (cs *chunkStore) writeChunks(mc *MetricsCache, metric *MetricState) (hasPen
 				}
 			}
 
-			if !doOmit {
-				// Advance maximum time processed in metric
-				if sampleTime > cs.maxTime {
-					cs.maxTime = sampleTime
-				}
+			// Advance maximum time processed in metric
+			if sampleTime > cs.maxTime {
+				cs.maxTime = sampleTime
+			}
 
-				// Add a value to the aggregates list
-				cs.aggrList.Aggregate(sampleTime, cs.pending[pendingSampleIndex].v)
+			// Add a value to the aggregates list
+			cs.aggrList.Aggregate(sampleTime, cs.pending[pendingSampleIndex].v)
 
-				if activeChunk != nil {
-					// Add a value to the compressed raw-values chunk
-					activeChunk.appendAttr(sampleTime, cs.pending[pendingSampleIndex].v)
-				}
+			if activeChunk != nil {
+				// Add a value to the compressed raw-values chunk
+				activeChunk.appendAttr(sampleTime, cs.pending[pendingSampleIndex].v)
 			}
 
 			// If this is the last item or last item in the same partition, add
