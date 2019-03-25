@@ -3754,6 +3754,58 @@ func (suite *testQuerySuite) TestServerWindowedAggregationWindowEqualToRollupInt
 	assert.Equal(suite.T(), 1, seriesCount, "series count didn't match expected")
 }
 
+func (suite *testQuerySuite) TestUsePreciseAggregationsConfig() {
+	suite.v3ioConfig.UsePreciseAggregations = true
+	defer func() { suite.v3ioConfig.UsePreciseAggregations = false }()
+	adapter, err := tsdb.NewV3ioAdapter(suite.v3ioConfig, nil, nil)
+	suite.NoError(err, "failed to create v3io adapter.")
+
+	labels1 := utils.LabelsFromStringList("os", "linux")
+	numberOfEvents := 10
+	eventsInterval := 60 * 1000
+
+	ingestedData := []tsdbtest.DataPoint{{suite.basicQueryTime, 10},
+		{int64(suite.basicQueryTime + tsdbtest.MinuteInMillis), 20},
+		{suite.basicQueryTime + 2*tsdbtest.MinuteInMillis, 30},
+		{suite.basicQueryTime + 3*tsdbtest.MinuteInMillis, 40}}
+	testParams := tsdbtest.NewTestParams(suite.T(),
+		tsdbtest.TestOption{
+			Key: tsdbtest.OptTimeSeries,
+			Value: tsdbtest.TimeSeries{tsdbtest.Metric{
+				Name:   "cpu",
+				Labels: labels1,
+				Data:   ingestedData},
+			}})
+	tsdbtest.InsertData(suite.T(), testParams)
+
+	expected := map[string][]tsdbtest.DataPoint{"sum": {{Time: suite.basicQueryTime, Value: 100}},
+		"min": {{Time: suite.basicQueryTime, Value: 10}},
+		"max": {{Time: suite.basicQueryTime, Value: 40}}}
+
+	querierV2, err := adapter.QuerierV2()
+	suite.NoError(err, "failed to create querier v2.")
+
+	params := &pquerier.SelectParams{Name: "cpu", Functions: "sum,max,min", Step: 1 * 60 * 60 * 1000, From: suite.basicQueryTime, To: suite.basicQueryTime + int64(numberOfEvents*eventsInterval)}
+	set, err := querierV2.Select(params)
+	suite.NoError(err, "failed to exeute query,")
+
+	var seriesCount int
+	for set.Next() {
+		seriesCount++
+		iter := set.At().Iterator()
+
+		data, err := tsdbtest.IteratorToSlice(iter)
+		agg := set.At().Labels().Get(aggregate.AggregateLabel)
+		if err != nil {
+			suite.T().Fatal(err)
+		}
+
+		suite.Require().Equal(expected[agg], data, "queried data does not match expected")
+	}
+
+	suite.Require().Equal(3, seriesCount, "series count didn't match expected")
+}
+
 func (suite *testQuerySuite) toMillis(date string) int64 {
 	time, err := tsdbtest.DateStringToMillis(date)
 	suite.NoError(err)
