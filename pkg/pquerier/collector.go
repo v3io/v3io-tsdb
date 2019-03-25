@@ -154,7 +154,7 @@ func aggregateServerAggregates(ctx *selectQueryContext, res *qryResults) {
 					val := binary.LittleEndian.Uint64(bytes[i : i+8])
 					currentValueIndex := (i - 16) / 8
 
-					// Calculate server side aggregate bucket by it's median time
+					// Calculate server side aggregate bucket by its median time
 					currentValueTime := partitionStartTime + int64(currentValueIndex)*rollupInterval + rollupInterval/2
 					currentCell := (currentValueTime - ctx.queryParams.From) / res.query.aggregationParams.Interval
 
