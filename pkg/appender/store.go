@@ -317,18 +317,16 @@ func (cs *chunkStore) writeChunks(mc *MetricsCache, metric *MetricState) (hasPen
 			if sampleTime <= cs.maxTime && !mc.cfg.OverrideOld {
 				mc.logger.WarnWith("Omitting the sample - time is earlier than the last sample time for this metric", "metric", metric.Lset, "T", sampleTime)
 
-				// If we have reached te end of the pending events and there are events to update, create an update expression and break from loop,
+				// If we have reached the end of the pending events and there are events to update, create an update expression and break from loop,
 				// Otherwise, discard the event and continue normally
 				if pendingSampleIndex == len(cs.pending)-1 {
 					if pendingSamplesCount > 0 {
 						expr = expr + cs.aggrList.SetOrUpdateExpr("v", bucket, isNewBucket)
 						expr = expr + cs.appendExpression(activeChunk)
-						pendingSampleIndex++
-						break
-					} else {
-						pendingSampleIndex++
-						break
 					}
+
+					pendingSampleIndex++
+					break
 				} else {
 					pendingSampleIndex++
 					continue
