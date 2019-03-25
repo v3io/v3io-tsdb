@@ -305,8 +305,9 @@ func (suite *testWindowAggregationSuite) TestServerWindowedAggregationWindowBigg
 	tsdbtest.InsertData(suite.T(), testParams)
 
 	expected := map[string][]tsdbtest.DataPoint{"sum": {
-		{Time: suite.basicQueryTime + 5*tsdbtest.HoursInMillis, Value: 100},
-		{Time: suite.basicQueryTime + 10*tsdbtest.HoursInMillis, Value: 390},
+		{Time: suite.basicQueryTime, Value: 0},
+		{Time: suite.basicQueryTime + 5*tsdbtest.HoursInMillis, Value: 150},
+		{Time: suite.basicQueryTime + 10*tsdbtest.HoursInMillis, Value: 350},
 	}}
 
 	querierV2, err := adapter.QuerierV2()
@@ -368,8 +369,9 @@ func (suite *testWindowAggregationSuite) TestServerWindowedAggregationWindowEqua
 	tsdbtest.InsertData(suite.T(), testParams)
 
 	expected := map[string][]tsdbtest.DataPoint{"sum": {
-		{Time: suite.basicQueryTime + 5*tsdbtest.HoursInMillis, Value: 100},
-		{Time: suite.basicQueryTime + 10*tsdbtest.HoursInMillis, Value: 350},
+		{Time: suite.basicQueryTime, Value: 0},
+		{Time: suite.basicQueryTime + 5*tsdbtest.HoursInMillis, Value: 150},
+		{Time: suite.basicQueryTime + 10*tsdbtest.HoursInMillis, Value: 300},
 	}}
 
 	querierV2, err := adapter.QuerierV2()
@@ -431,16 +433,16 @@ func (suite *testWindowAggregationSuite) TestServerWindowedAggregationWindowEqua
 	tsdbtest.InsertData(suite.T(), testParams)
 
 	expected := map[string][]tsdbtest.DataPoint{"sum": {
-		{Time: suite.basicQueryTime + 1*tsdbtest.HoursInMillis, Value: 0},
-		{Time: suite.basicQueryTime + 2*tsdbtest.HoursInMillis, Value: 10},
-		{Time: suite.basicQueryTime + 3*tsdbtest.HoursInMillis, Value: 20},
-		{Time: suite.basicQueryTime + 4*tsdbtest.HoursInMillis, Value: 30},
-		{Time: suite.basicQueryTime + 5*tsdbtest.HoursInMillis, Value: 40},
-		{Time: suite.basicQueryTime + 6*tsdbtest.HoursInMillis, Value: 50},
-		{Time: suite.basicQueryTime + 7*tsdbtest.HoursInMillis, Value: 60},
-		{Time: suite.basicQueryTime + 8*tsdbtest.HoursInMillis, Value: 70},
-		{Time: suite.basicQueryTime + 9*tsdbtest.HoursInMillis, Value: 80},
-		{Time: suite.basicQueryTime + 10*tsdbtest.HoursInMillis, Value: 90},
+		{Time: suite.basicQueryTime, Value: 0},
+		{Time: suite.basicQueryTime + 1*tsdbtest.HoursInMillis, Value: 10},
+		{Time: suite.basicQueryTime + 2*tsdbtest.HoursInMillis, Value: 20},
+		{Time: suite.basicQueryTime + 3*tsdbtest.HoursInMillis, Value: 30},
+		{Time: suite.basicQueryTime + 4*tsdbtest.HoursInMillis, Value: 40},
+		{Time: suite.basicQueryTime + 5*tsdbtest.HoursInMillis, Value: 50},
+		{Time: suite.basicQueryTime + 6*tsdbtest.HoursInMillis, Value: 60},
+		{Time: suite.basicQueryTime + 7*tsdbtest.HoursInMillis, Value: 70},
+		{Time: suite.basicQueryTime + 8*tsdbtest.HoursInMillis, Value: 80},
+		{Time: suite.basicQueryTime + 9*tsdbtest.HoursInMillis, Value: 90},
 	}}
 
 	querierV2, err := adapter.QuerierV2()

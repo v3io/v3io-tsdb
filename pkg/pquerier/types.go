@@ -27,11 +27,11 @@ func (q *qryResults) IsDownsample() bool {
 }
 
 func (q *qryResults) IsServerAggregates() bool {
-	return q.query.aggregationParams != nil && q.query.aggregationParams.CanAggregate(q.query.partition.AggrType())
+	return q.query.aggregationParams != nil && q.query.useServerSideAggregates
 }
 
 func (q *qryResults) IsClientAggregates() bool {
-	return q.query.aggregationParams != nil && !q.query.aggregationParams.CanAggregate(q.query.partition.AggrType())
+	return q.query.aggregationParams != nil && !q.query.useServerSideAggregates
 }
 
 type RequestedColumn struct {
