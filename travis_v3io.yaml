@@ -2,5 +2,5 @@ container: "bigdata"
 workers: 1
 webApiEndpoint: "webapi.default-tenant.app.tsdb-integration.iguazio-cd2.com"
 username: "iguazio"
-password: "UwAH8CXfDEBHpoo4"
+password: "l13dzEbUyukv98yy"
 loglevel: "debug"
