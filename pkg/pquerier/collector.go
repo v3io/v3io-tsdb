@@ -205,7 +205,7 @@ func downsampleRawData(ctx *selectQueryContext, res *qryResults,
 				//tCellIndex := (t - ctx.queryParams.From) / ctx.queryParams.Step
 				if t == currCellTime {
 					_ = res.frame.setDataAt(col.Name(), int(currCell), v)
-				} else { //if tCellIndex == int64(currCell) {
+				} else {
 					prevT, prevV := it.PeakBack()
 
 					// In case it's the first point in the partition use the last point of the previous partition for the interpolation
