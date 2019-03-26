@@ -114,6 +114,10 @@ func (promQuery *V3ioPromQuerier) LabelValues(name string) ([]string, error) {
 	return promQuery.v3ioQuerier.LabelValues(name)
 }
 
+func (promQuery *V3ioPromQuerier) LabelNames() ([]string, error) {
+	return promQuery.v3ioQuerier.LabelNames()
+}
+
 // Close releases the resources of the Querier.
 func (promQuery *V3ioPromQuerier) Close() error {
 	return nil
