@@ -2,10 +2,8 @@ package tsdbtest
 
 import (
 	"fmt"
-	"go/build"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/pkg/errors"
 	"github.com/v3io/v3io-tsdb/pkg/config"
@@ -30,19 +28,26 @@ func GetV3ioConfigPath() (string, error) {
 		return localConfigFile, nil
 	}
 
-	gopath := os.Getenv("GOPATH")
-	if gopath == "" {
-		gopath = build.Default.GOPATH
-	}
-	gopaths := strings.Split(gopath, string(os.PathListSeparator))
-	for _, path := range gopaths {
-		gopathConfig := filepath.Join(path, relativeProjectPath, config.DefaultConfigurationFileName)
-		if _, err := os.Stat(gopathConfig); !os.IsNotExist(err) {
-			return gopathConfig, nil
+	// Look for a parent directory containing a makefile and the configuration file (presumed to be the project root).
+	dirPath := "./"
+	for {
+		_, err := os.Stat(dirPath + "Makefile")
+		if err == nil {
+			confFilePath := dirPath + config.DefaultConfigurationFileName
+			_, err = os.Stat(confFilePath)
+			if err == nil {
+				return confFilePath, nil
+			}
+			break // Bail out if we found the makefile but the config is not there.
 		}
+		absolute, err := filepath.Abs(dirPath)
+		if err != nil || absolute == "/" { // Bail out if we reached the root.
+			break
+		}
+		dirPath += "../"
 	}
 
-	return "", errors.Errorf("config file is not specified and could not be found in GOPATH=%v", gopath)
+	return "", errors.Errorf("config file is not specified and could not be found")
 }
 
 func LoadV3ioConfig() (*config.V3ioConfig, error) {
