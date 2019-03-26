@@ -196,24 +196,29 @@ func downsampleRawData(ctx *selectQueryContext, res *qryResults,
 	}
 	for currCell := 0; currCell < col.Len(); currCell++ {
 		currCellTime := int64(currCell)*ctx.queryParams.Step + ctx.queryParams.From
-		if it.Seek(currCellTime) {
-			t, v := it.At()
-			tCellIndex := (t - ctx.queryParams.From) / ctx.queryParams.Step
-			if t == currCellTime {
-				_ = res.frame.setDataAt(col.Name(), int(currCell), v)
-			} else if tCellIndex == int64(currCell) {
-				prevT, prevV := it.PeakBack()
+		prev, err := col.getBuilder().At(currCell)
 
-				// In case it's the first point in the partition use the last point of the previous partition for the interpolation
-				if prevT == 0 {
-					prevT = previousPartitionLastTime
-					prevV = previousPartitionLastValue
-				}
-				interpolatedT, interpolatedV := col.GetInterpolationFunction()(prevT, t, currCellTime, prevV, v)
+		// Only update a cell if it hasn't been set yet
+		if prev == nil || err != nil {
+			if it.Seek(currCellTime) {
+				t, v := it.At()
+				//tCellIndex := (t - ctx.queryParams.From) / ctx.queryParams.Step
+				if t == currCellTime {
+					_ = res.frame.setDataAt(col.Name(), int(currCell), v)
+				} else { //if tCellIndex == int64(currCell) {
+					prevT, prevV := it.PeakBack()
 
-				// Check if the interpolation was successful in terms of exceeding tolerance
-				if !(interpolatedT == 0 && interpolatedV == 0) {
-					_ = res.frame.setDataAt(col.Name(), int(currCell), interpolatedV)
+					// In case it's the first point in the partition use the last point of the previous partition for the interpolation
+					if prevT == 0 {
+						prevT = previousPartitionLastTime
+						prevV = previousPartitionLastValue
+					}
+					interpolatedT, interpolatedV := col.GetInterpolationFunction()(prevT, t, currCellTime, prevV, v)
+
+					// Check if the interpolation was successful in terms of exceeding tolerance
+					if !(interpolatedT == 0 && interpolatedV == 0) {
+						_ = res.frame.setDataAt(col.Name(), int(currCell), interpolatedV)
+					}
 				}
 			}
 		}

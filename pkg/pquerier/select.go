@@ -160,7 +160,8 @@ func (queryCtx *selectQueryContext) queryPartition(partition *partmgr.DBPartitio
 				queryCtx.queryParams.Step,
 				queryCtx.queryParams.AggregationWindow,
 				partition.RollupTime(),
-				queryCtx.queryParams.Windows)
+				queryCtx.queryParams.Windows,
+				queryCtx.queryParams.disableClientAggr)
 
 			if err != nil {
 				return nil, err
