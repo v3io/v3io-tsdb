@@ -69,7 +69,7 @@ func TestGetV3ioConfigPath(t *testing.T) {
 			}},
 
 		{description: "get config from project root",
-			expectedPath: filepath.Join(projectHome, config.DefaultConfigurationFileName),
+			expectedPath: "./../../../v3io-tsdb-config.yaml",
 			setup: func() func() {
 				// Make this test agnostic to environment variables at runtime (store & recover on exit)
 				configPathEnv := os.Getenv(config.V3ioConfigEnvironmentVariable)
