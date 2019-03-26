@@ -1,8 +1,8 @@
 container: "bigdata"
 workers: 8
-webApiEndpoint: "webapi.default-tenant.app.tsdb-integration.iguazio-cd2.com"
+webApiEndpoint: "18.197.140.60:8081"
 username: "iguazio"
-password: "UwAH8CXfDEBHpoo4"
+password: "l13dzEbUyukv98yy"
 batchSize: 2048
 
 performance:
