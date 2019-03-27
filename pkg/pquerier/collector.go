@@ -332,9 +332,11 @@ func getRelativeCell(time, beginning, interval int64, roundUp bool) int64 {
 	return cell
 }
 
+// Set data to all aggregated columns for the given metric
 func aggregateAllColumns(res *qryResults, cell int64, value float64) {
 	for _, col := range res.frame.columns {
-		if col.GetColumnSpec().metric == res.name {
+		colSpec := col.GetColumnSpec()
+		if colSpec.metric == res.name && colSpec.function != 0 {
 			_ = res.frame.setDataAt(col.Name(), int(cell), value)
 		}
 	}

@@ -484,9 +484,15 @@ func (suite *testSelectDataframeSuite) TestSelectDataframeDaownsampleMetricsHave
 			}})
 	tsdbtest.InsertData(suite.T(), testParams)
 
-	expectedTime := []int64{suite.basicQueryTime - 7*tsdbtest.DaysInMillis, suite.basicQueryTime - 4*tsdbtest.DaysInMillis, suite.basicQueryTime - 1*tsdbtest.DaysInMillis}
-	expected := map[string][]float64{"cpu1": {10, 20, math.NaN()},
-		"cpu2": {math.NaN(), math.NaN(), 30}}
+	expectedTime := []int64{suite.basicQueryTime - 7*tsdbtest.DaysInMillis,
+		suite.basicQueryTime - 4*tsdbtest.DaysInMillis - 2*tsdbtest.MinuteInMillis,
+		suite.basicQueryTime - 4*tsdbtest.DaysInMillis - 1*tsdbtest.MinuteInMillis,
+		suite.basicQueryTime - 4*tsdbtest.DaysInMillis,
+		suite.basicQueryTime - 1*tsdbtest.DaysInMillis - 2*tsdbtest.MinuteInMillis,
+		suite.basicQueryTime - 1*tsdbtest.DaysInMillis - 1*tsdbtest.MinuteInMillis,
+		suite.basicQueryTime - 1*tsdbtest.DaysInMillis}
+	expected := map[string][]float64{"cpu1": {10, 20, 20, 20, math.NaN(), math.NaN(), math.NaN()},
+		"cpu2": {math.NaN(), math.NaN(), math.NaN(), math.NaN(), 30, 30, 30}}
 
 	querierV2, err := adapter.QuerierV2()
 	if err != nil {
