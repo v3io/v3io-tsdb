@@ -181,6 +181,7 @@ func (q *V3ioQuerier) LabelValues(labelKey string) (result []string, err error) 
 	return
 }
 
+// Stub
 func (q *V3ioQuerier) LabelNames() ([]string, error) {
 	return nil, nil
 }
