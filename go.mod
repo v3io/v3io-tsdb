@@ -12,7 +12,6 @@ require (
 	github.com/nuclio/nuclio-sdk-go v0.0.0-20190205170814-3b507fbd0324
 	github.com/nuclio/nuclio-test-go v0.0.0-20180704132150-0ce6587f8e37
 	github.com/nuclio/zap v0.0.2
-	github.com/pavius/impi v0.0.0-20180302134524-c1cbdcb8df2b // indirect
 	github.com/pkg/errors v0.8.1
 	github.com/prometheus/common v0.2.0 // indirect
 	github.com/prometheus/prometheus v2.8.0+incompatible
@@ -26,8 +25,8 @@ require (
 	gopkg.in/yaml.v2 v2.2.2 // indirect
 )
 
-replace labix.org/v2/mgo => github.com/go-mgo/mgo v0.0.0-20190306105200-7446a0344b7872c067b3d6e1b7642571eafbae17
-
-replace launchpad.net/gocheck => github.com/go-check/check v0.0.0-20190306105200-788fd78401277ebd861206a03c884797c6ec5541
-
-replace github.com/xwb1989/sqlparser => github.com/v3io/sqlparser v0.0.0-20190306105200-4d7273501871
+replace (
+	github.com/xwb1989/sqlparser => github.com/v3io/sqlparser v0.0.0-20190306105200-4d7273501871
+	labix.org/v2/mgo => github.com/go-mgo/mgo v0.0.0-20180705113738-7446a0344b7872c067b3d6e1b7642571eafbae17
+	launchpad.net/gocheck => github.com/go-check/check v0.0.0-20180628173108-788fd78401277ebd861206a03c884797c6ec5541
+)
