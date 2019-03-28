@@ -155,7 +155,7 @@ def build_prometheus(V3IO_TSDB_VERSION, internal_status="stable") {
             container('golang') {
                 dir("${BUILD_FOLDER}/src/github.com/${git_project}/${git_project}") {
                     sh """
-                        GO111MODULE=on go get github.com/v3io/v3io-tsdb@${V3IO_TSDB_VERSION}
+                        GO111MODULE=on go get github.com/${git_project_user}/v3io-tsdb@${V3IO_TSDB_VERSION}
                         GO111MODULE=on go mod vendor
                     """
                 }
