@@ -59,10 +59,10 @@ def build_nuclio(V3IO_TSDB_VERSION, internal_status="stable") {
         def git_project = 'tsdb-nuclio'
         stage('prepare sources') {
             container('jnlp') {
-                if(!fileExists("${BUILD_FOLDER}/src/github.com/v3io/${git_project}")) {
+                if (!fileExists("${BUILD_FOLDER}/src/github.com/v3io/${git_project}")) {
                     sh("cd ${BUILD_FOLDER}; git clone https://${GIT_TOKEN}@github.com/${git_project_user}/${git_project}.git src/github.com/v3io/${git_project}")
                 }
-                if ( "${internal_status}" == "unstable" ) {
+                if ("${internal_status}" == "unstable") {
                     dir("${BUILD_FOLDER}/src/github.com/v3io/${git_project}") {
                         sh("git checkout development")
                     }
@@ -77,7 +77,17 @@ def build_nuclio(V3IO_TSDB_VERSION, internal_status="stable") {
                         git clone https://${GIT_TOKEN}@github.com/${git_project_user}/v3io-tsdb.git functions/ingest/vendor/github.com/v3io/v3io-tsdb
                         cd functions/ingest/vendor/github.com/v3io/v3io-tsdb
                         git checkout ${V3IO_TSDB_VERSION}
-                        GO111MODULE=on go mod vendor
+                    """
+                }
+            }
+            container('golang') {
+                dir("${BUILD_FOLDER}/src/github.com/v3io/${git_project}/functions/ingest/vendor/github.com/v3io/v3io-tsdb") {
+                    sh("GO111MODULE=on go mod vendor")
+                }
+            }
+            container('jnlp') {
+                dir("${BUILD_FOLDER}/src/github.com/v3io/${git_project}") {
+                    sh """
                         rm -rf .git vendor/github.com/nuclio vendor/github.com/v3io/frames/vendor/golang.org/x/net vendor/golang.org/x/net
                         cd ${BUILD_FOLDER}/src/github.com/v3io/${git_project}
                         cp -R functions/ingest/vendor/github.com/v3io/v3io-tsdb functions/query/vendor/github.com/v3io/v3io-tsdb
@@ -127,10 +137,10 @@ def build_prometheus(V3IO_TSDB_VERSION, internal_status="stable") {
 
         stage('prepare sources') {
             container('jnlp') {
-                if(!fileExists("${BUILD_FOLDER}/src/github.com/${git_project}/${git_project}")) {
+                if (!fileExists("${BUILD_FOLDER}/src/github.com/${git_project}/${git_project}")) {
                     sh("cd ${BUILD_FOLDER}; git clone https://${GIT_TOKEN}@github.com/${git_project_user}/${git_project}.git src/github.com/${git_project}/${git_project}")
                 }
-                if ( "${internal_status}" == "unstable" ) {
+                if ("${internal_status}" == "unstable") {
                     dir("${BUILD_FOLDER}/src/github.com/${git_project}/${git_project}") {
                         sh("git checkout development")
                     }
@@ -139,9 +149,11 @@ def build_prometheus(V3IO_TSDB_VERSION, internal_status="stable") {
                         sh("git checkout master")
                     }
                 }
+            }
+            container('golang') {
                 dir("${BUILD_FOLDER}/src/github.com/${git_project}/${git_project}") {
                     sh """
-                        GO111MODULE=on go get github.com/v3io/v3io-tsdb@{V3IO_TSDB_VERSION}
+                        GO111MODULE=on go get github.com/v3io/v3io-tsdb@${V3IO_TSDB_VERSION}
                         GO111MODULE=on go mod vendor
                     """
                 }
