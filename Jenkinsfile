@@ -2,7 +2,7 @@ label = "${UUID.randomUUID().toString()}"
 BUILD_FOLDER = "/go"
 attempts=15
 git_project = "v3io-tsdb"
-git_project_user = "gkirok"
+git_project_user = "v3io"
 git_deploy_user = "iguazio-prod-git-user"
 git_deploy_user_token = "iguazio-prod-git-user-token"
 git_deploy_user_private_key = "iguazio-prod-git-user-private-key"
@@ -155,7 +155,7 @@ def build_prometheus(V3IO_TSDB_VERSION, internal_status="stable") {
             container('golang') {
                 dir("${BUILD_FOLDER}/src/github.com/${git_project}/${git_project}") {
                     sh """
-                        GO111MODULE=on go get github.com/${git_project_user}/v3io-tsdb@${V3IO_TSDB_VERSION}
+                        GO111MODULE=on go get github.com/v3io/v3io-tsdb@${V3IO_TSDB_VERSION}
                         GO111MODULE=on go mod vendor
                     """
                 }
