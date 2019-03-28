@@ -202,7 +202,6 @@ func downsampleRawData(ctx *selectQueryContext, res *qryResults,
 		if prev == nil || err != nil {
 			if it.Seek(currCellTime) {
 				t, v := it.At()
-				//tCellIndex := (t - ctx.queryParams.From) / ctx.queryParams.Step
 				if t == currCellTime {
 					_ = res.frame.setDataAt(col.Name(), int(currCell), v)
 				} else {

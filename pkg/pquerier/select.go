@@ -22,9 +22,10 @@ import (
 const defaultToleranceFactor = 2
 
 type selectQueryContext struct {
-	logger    logger.Logger
-	container *v3io.Container
-	workers   int
+	logger     logger.Logger
+	container  *v3io.Container
+	workers    int
+	v3ioConfig *config.V3ioConfig
 
 	queryParams        *SelectParams
 	showAggregateLabel bool
@@ -161,7 +162,8 @@ func (queryCtx *selectQueryContext) queryPartition(partition *partmgr.DBPartitio
 				queryCtx.queryParams.AggregationWindow,
 				partition.RollupTime(),
 				queryCtx.queryParams.Windows,
-				queryCtx.queryParams.disableClientAggr)
+				queryCtx.queryParams.disableClientAggr,
+				queryCtx.v3ioConfig.UseServerAggregateCoefficient)
 
 			if err != nil {
 				return nil, err
