@@ -145,7 +145,6 @@ def build_prometheus(V3IO_TSDB_VERSION, internal_status="stable") {
                         git clone https://${GIT_TOKEN}@github.com/${git_project_user}/v3io-tsdb.git vendor/github.com/v3io/v3io-tsdb
                         cd vendor/github.com/v3io/v3io-tsdb
                         git checkout ${V3IO_TSDB_VERSION}
-                        GO111MODULE=on go mod vendor
                         rm -rf .git vendor/github.com/${git_project} vendor/github.com/v3io/frames/vendor/golang.org/x/net vendor/golang.org/x/net
                     """
                 }
