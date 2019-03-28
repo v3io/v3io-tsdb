@@ -152,6 +152,57 @@ func testIngestDataCase(t *testing.T, testParams tsdbtest.TestParams) {
 	}
 }
 
+func TestIngestDataWithSameTimestamp(t *testing.T) {
+	baseTime := int64(1532209200000)
+	testParams := tsdbtest.NewTestParams(t,
+		tsdbtest.TestOption{
+			Key: tsdbtest.OptTimeSeries,
+			Value: tsdbtest.TimeSeries{tsdbtest.Metric{
+				Name:   "cpu",
+				Labels: utils.LabelsFromStringList("os", "linux"),
+				Data: []tsdbtest.DataPoint{
+					{Time: baseTime, Value: 1},
+					{Time: baseTime, Value: 2}}},
+				tsdbtest.Metric{
+					Name:   "cpu1",
+					Labels: utils.LabelsFromStringList("os", "linux"),
+					Data: []tsdbtest.DataPoint{
+						{Time: baseTime, Value: 2}, {Time: baseTime, Value: 3}}},
+			}})
+
+	defer tsdbtest.SetUp(t, testParams)()
+
+	adapter, err := NewV3ioAdapter(testParams.V3ioConfig(), nil, nil)
+	if err != nil {
+		t.Fatalf("Failed to create v3io adapter. reason: %s", err)
+	}
+
+	appender, err := adapter.Appender()
+	if err != nil {
+		t.Fatalf("Failed to get appender. reason: %s", err)
+	}
+
+	for _, dp := range testParams.TimeSeries() {
+		labels := utils.Labels{utils.Label{Name: "__name__", Value: dp.Name}}
+		labels = append(labels, dp.Labels...)
+
+		ref, err := appender.Add(labels, dp.Data[0].Time, dp.Data[0].Value)
+		if err != nil {
+			t.Fatalf("Failed to add data to appender. reason: %s", err)
+		}
+
+		for _, curr := range dp.Data[1:] {
+			appender.AddFast(labels, ref, curr.Time, curr.Value)
+		}
+
+		if _, err := appender.WaitForCompletion(0); err != nil {
+			t.Fatalf("Failed to wait for appender completion. reason: %s", err)
+		}
+	}
+
+	tsdbtest.ValidateCountOfSamples(t, adapter, "", 2, baseTime-1*tsdbtest.HoursInMillis, baseTime+1*tsdbtest.HoursInMillis, -1)
+}
+
 func TestQueryData(t *testing.T) {
 	testCases := []struct {
 		desc         string
