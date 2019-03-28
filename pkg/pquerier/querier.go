@@ -182,6 +182,11 @@ func (q *V3ioQuerier) LabelValues(labelKey string) (result []string, err error) 
 	return
 }
 
+// Stub
+func (q *V3ioQuerier) LabelNames() ([]string, error) {
+	return nil, nil
+}
+
 func (q *V3ioQuerier) getMetricNames() ([]string, error) {
 	input := v3io.GetItemsInput{
 		Path:           filepath.Join(q.cfg.TablePath, config.NamesDirectory) + "/", // Need a trailing slash

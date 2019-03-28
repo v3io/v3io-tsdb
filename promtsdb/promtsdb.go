@@ -69,7 +69,7 @@ type V3ioPromQuerier struct {
 }
 
 // Select returns a set of series that matches the given label matchers.
-func (promQuery *V3ioPromQuerier) Select(params *storage.SelectParams, oms ...*labels.Matcher) (storage.SeriesSet, error) {
+func (promQuery *V3ioPromQuerier) Select(params *storage.SelectParams, oms ...*labels.Matcher) (storage.SeriesSet, storage.Warnings, error) {
 	name, filter, functions := match2filter(oms, promQuery.logger)
 	noAggr := false
 
@@ -77,10 +77,10 @@ func (promQuery *V3ioPromQuerier) Select(params *storage.SelectParams, oms ...*l
 	if params == nil {
 		labelSets, err := promQuery.v3ioQuerier.GetLabelSets(name, filter)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 
-		return &V3ioPromSeriesSet{newMetadataSeriesSet(labelSets)}, nil
+		return &V3ioPromSeriesSet{newMetadataSeriesSet(labelSets)}, nil, nil
 	}
 
 	promQuery.logger.Debug("SelectParams: %+v", params)
@@ -106,12 +106,16 @@ func (promQuery *V3ioPromQuerier) Select(params *storage.SelectParams, oms ...*l
 		To:        promQuery.maxt}
 
 	set, err := promQuery.v3ioQuerier.SelectProm(selectParams, noAggr)
-	return &V3ioPromSeriesSet{s: set}, err
+	return &V3ioPromSeriesSet{s: set}, nil, err
 }
 
 // LabelValues returns all potential values for a label name.
 func (promQuery *V3ioPromQuerier) LabelValues(name string) ([]string, error) {
 	return promQuery.v3ioQuerier.LabelValues(name)
+}
+
+func (promQuery *V3ioPromQuerier) LabelNames() ([]string, error) {
+	return promQuery.v3ioQuerier.LabelNames()
 }
 
 // Close releases the resources of the Querier.
