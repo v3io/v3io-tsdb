@@ -48,15 +48,16 @@ const (
 	defaultMinimumChunkSize     = 200     // bytes
 	defaultMaximumChunkSize     = 32000   // bytes
 
-	DefaultShardingBucketsCount   = 8
-	DefaultStorageClass           = "local"
-	DefaultIngestionRate          = ""
-	DefaultAggregates             = "" // no aggregates by default
-	DefaultAggregationGranularity = "1h"
-	DefaultLayerRetentionTime     = "1y"
-	DefaultSampleRetentionTime    = 0
-	DefaultLogLevel               = "info"
-	DefaultVerboseLevel           = "debug"
+	DefaultShardingBucketsCount          = 8
+	DefaultStorageClass                  = "local"
+	DefaultIngestionRate                 = ""
+	DefaultAggregates                    = "" // no aggregates by default
+	DefaultAggregationGranularity        = "1h"
+	DefaultLayerRetentionTime            = "1y"
+	DefaultSampleRetentionTime           = 0
+	DefaultLogLevel                      = "info"
+	DefaultVerboseLevel                  = "debug"
+	DefaultUseServerAggregateCoefficient = 3
 
 	// KV attribute names
 	MaxTimeAttrName     = "_maxtime"
@@ -166,6 +167,9 @@ type V3ioConfig struct {
 	DisableNginxMitigation bool `json:"disableNginxMitigation,omitempty"`
 	// explicitly always use client aggregation
 	UsePreciseAggregations bool `json:"usePreciseAggregations,omitempty"`
+	// Coefficient to decide whether or not to use server aggregates optimization
+	// use server aggregations if ` <requested step> / <rollup interval>  >  UseServerAggregateCoefficient`
+	UseServerAggregateCoefficient int `json:"useServerAggregateCoefficient,omitempty"`
 }
 
 type MetricsReporterConfig struct {
@@ -418,5 +422,9 @@ func initDefaults(cfg *V3ioConfig) {
 
 	if cfg.ShardingBucketsCount == 0 {
 		cfg.ShardingBucketsCount = DefaultShardingBucketsCount
+	}
+
+	if cfg.UseServerAggregateCoefficient == 0 {
+		cfg.UseServerAggregateCoefficient = DefaultUseServerAggregateCoefficient
 	}
 }

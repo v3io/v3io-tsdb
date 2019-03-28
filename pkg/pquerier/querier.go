@@ -133,6 +133,7 @@ func (q *V3ioQuerier) baseSelectQry(params *SelectParams, showAggregateLabel boo
 		logger:             q.logger,
 		workers:            q.cfg.QryWorkers,
 		showAggregateLabel: showAggregateLabel,
+		v3ioConfig:         q.cfg,
 	}
 
 	q.logger.Debug("Select query:\n\tMetric: %s\n\tStart Time: %s (%d)\n\tEnd Time: %s (%d)\n\tFunction: %s\n\t"+

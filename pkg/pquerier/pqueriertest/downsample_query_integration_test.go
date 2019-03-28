@@ -92,6 +92,8 @@ func (suite *testDownsampleSuite) TestRawDataSinglePartitionWithDownSample() {
 	tsdbtest.InsertData(suite.T(), testParams)
 
 	expectedData := []tsdbtest.DataPoint{{suite.basicQueryTime, 10},
+		{suite.basicQueryTime + 2*tsdbtest.MinuteInMillis, 30},
+		{suite.basicQueryTime + 4*tsdbtest.MinuteInMillis, 30},
 		{suite.basicQueryTime + 6*tsdbtest.MinuteInMillis, 30},
 		{suite.basicQueryTime + 8*tsdbtest.MinuteInMillis, 40}}
 
@@ -100,7 +102,10 @@ func (suite *testDownsampleSuite) TestRawDataSinglePartitionWithDownSample() {
 		suite.T().Fatalf("Failed to create querier v2, err: %v", err)
 	}
 
-	params := &pquerier.SelectParams{Name: "cpu", Step: 2 * int64(tsdbtest.MinuteInMillis), From: suite.basicQueryTime, To: suite.basicQueryTime + int64(numberOfEvents*eventsInterval)}
+	params := &pquerier.SelectParams{Name: "cpu",
+		Step: 2 * int64(tsdbtest.MinuteInMillis),
+		From: suite.basicQueryTime,
+		To:   suite.basicQueryTime + int64(numberOfEvents*eventsInterval)}
 	set, err := querierV2.Select(params)
 	if err != nil {
 		suite.T().Fatalf("Failed to exeute query, err: %v", err)

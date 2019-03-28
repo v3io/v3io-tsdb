@@ -45,72 +45,20 @@ func (suite *testServerAggregatesSuite) TestRawAggregatesSinglePartition() {
 			}})
 	tsdbtest.InsertData(suite.T(), testParams)
 
-	expected := map[string][]tsdbtest.DataPoint{"sum": {{Time: suite.basicQueryTime, Value: 100}},
-		"min": {{Time: suite.basicQueryTime, Value: 10}},
-		"max": {{Time: suite.basicQueryTime, Value: 40}}}
+	expected := map[string][]tsdbtest.DataPoint{"sum": {{Time: suite.basicQueryTime - 4*tsdbtest.HoursInMillis, Value: 100}},
+		"min": {{Time: suite.basicQueryTime - 4*tsdbtest.HoursInMillis, Value: 10}},
+		"max": {{Time: suite.basicQueryTime - 4*tsdbtest.HoursInMillis, Value: 40}}}
 
 	querierV2, err := adapter.QuerierV2()
 	if err != nil {
 		suite.T().Fatalf("Failed to create querier v2, err: %v", err)
 	}
 
-	params := &pquerier.SelectParams{Name: "cpu", Functions: "sum,max,min", Step: 1 * 60 * 60 * 1000, From: suite.basicQueryTime, To: suite.basicQueryTime + int64(numberOfEvents*eventsInterval)}
-	set, err := querierV2.Select(params)
-	if err != nil {
-		suite.T().Fatalf("Failed to exeute query, err: %v", err)
-	}
-
-	var seriesCount int
-	for set.Next() {
-		seriesCount++
-		iter := set.At().Iterator()
-
-		data, err := tsdbtest.IteratorToSlice(iter)
-		agg := set.At().Labels().Get(aggregate.AggregateLabel)
-		if err != nil {
-			suite.T().Fatal(err)
-		}
-
-		assert.Equal(suite.T(), expected[agg], data, "queried data does not match expected")
-	}
-
-	assert.Equal(suite.T(), 3, seriesCount, "series count didn't match expected")
-}
-
-func (suite *testServerAggregatesSuite) TestRawAggregatesWithQueryIntervalSameAsAggrGranularity() {
-	adapter, err := tsdb.NewV3ioAdapter(suite.v3ioConfig, nil, nil)
-	if err != nil {
-		suite.T().Fatalf("failed to create v3io adapter. reason: %s", err)
-	}
-	labels1 := utils.LabelsFromStringList("os", "linux")
-	numberOfEvents := 10
-	eventsInterval := 60 * 1000
-
-	baseTime := suite.toMillis("2018-07-21T21:00:00Z")
-	ingestedData := []tsdbtest.DataPoint{{baseTime, 10},
-		{int64(baseTime + tsdbtest.MinuteInMillis), 20},
-		{baseTime + 2*tsdbtest.MinuteInMillis, 30},
-		{baseTime + 3*tsdbtest.MinuteInMillis, 40}}
-	testParams := tsdbtest.NewTestParams(suite.T(),
-		tsdbtest.TestOption{
-			Key: tsdbtest.OptTimeSeries,
-			Value: tsdbtest.TimeSeries{tsdbtest.Metric{
-				Name:   "cpu",
-				Labels: labels1,
-				Data:   ingestedData},
-			}})
-	tsdbtest.InsertData(suite.T(), testParams)
-
-	expected := map[string][]tsdbtest.DataPoint{"sum": {{Time: baseTime, Value: 100}},
-		"min": {{Time: baseTime, Value: 10}},
-		"max": {{Time: baseTime, Value: 40}}}
-
-	querierV2, err := adapter.QuerierV2()
-	if err != nil {
-		suite.T().Fatalf("Failed to create querier v2, err: %v", err)
-	}
-
-	params := &pquerier.SelectParams{Name: "cpu", Functions: "sum,max,min", Step: 1 * 60 * 60 * 1000, From: baseTime, To: baseTime + int64(numberOfEvents*eventsInterval)}
+	params := &pquerier.SelectParams{Name: "cpu",
+		Functions: "sum,max,min",
+		Step:      4 * tsdbtest.HoursInMillis,
+		From:      suite.basicQueryTime - 4*tsdbtest.HoursInMillis,
+		To:        suite.basicQueryTime + int64(numberOfEvents*eventsInterval)}
 	set, err := querierV2.Select(params)
 	if err != nil {
 		suite.T().Fatalf("Failed to exeute query, err: %v", err)
@@ -157,16 +105,20 @@ func (suite *testServerAggregatesSuite) TestRawAggregatesSinglePartitionNegative
 			}})
 	tsdbtest.InsertData(suite.T(), testParams)
 
-	expected := map[string][]tsdbtest.DataPoint{"sum": {{Time: suite.basicQueryTime, Value: -100}},
-		"min": {{Time: suite.basicQueryTime, Value: -40}},
-		"max": {{Time: suite.basicQueryTime, Value: -10}}}
+	expected := map[string][]tsdbtest.DataPoint{"sum": {{Time: suite.basicQueryTime - 4*tsdbtest.HoursInMillis, Value: -100}},
+		"min": {{Time: suite.basicQueryTime - 4*tsdbtest.HoursInMillis, Value: -40}},
+		"max": {{Time: suite.basicQueryTime - 4*tsdbtest.HoursInMillis, Value: -10}}}
 
 	querierV2, err := adapter.QuerierV2()
 	if err != nil {
 		suite.T().Fatalf("Failed to create querier v2, err: %v", err)
 	}
 
-	params := &pquerier.SelectParams{Name: "cpu", Functions: "sum,max,min", Step: 1 * 60 * 60 * 1000, From: suite.basicQueryTime, To: suite.basicQueryTime + int64(numberOfEvents*eventsInterval)}
+	params := &pquerier.SelectParams{Name: "cpu",
+		Functions: "sum,max,min",
+		Step:      4 * tsdbtest.HoursInMillis,
+		From:      suite.basicQueryTime - 4*tsdbtest.HoursInMillis,
+		To:        suite.basicQueryTime + int64(numberOfEvents*eventsInterval)}
 	set, err := querierV2.Select(params)
 	if err != nil {
 		suite.T().Fatalf("Failed to exeute query, err: %v", err)
@@ -213,8 +165,8 @@ func (suite *testServerAggregatesSuite) TestRawAggregatesMultiPartition() {
 				Data:   ingestedData},
 			}})
 	tsdbtest.InsertData(suite.T(), testParams)
-	firstStepTime := suite.basicQueryTime - 7*tsdbtest.DaysInMillis
-	secondStepTime := suite.basicQueryTime - tsdbtest.HoursInMillis
+	firstStepTime := suite.basicQueryTime - 7*tsdbtest.DaysInMillis - 1*tsdbtest.HoursInMillis
+	secondStepTime := suite.basicQueryTime - 1*tsdbtest.HoursInMillis
 
 	expected := map[string][]tsdbtest.DataPoint{
 		"sum": {{Time: firstStepTime, Value: 10}, {Time: secondStepTime, Value: 90}},
@@ -229,8 +181,8 @@ func (suite *testServerAggregatesSuite) TestRawAggregatesMultiPartition() {
 
 	params := &pquerier.SelectParams{Name: "cpu",
 		Functions: "sum,max,min,sqr",
-		Step:      tsdbtest.HoursInMillis,
-		From:      suite.basicQueryTime - 7*tsdbtest.DaysInMillis,
+		Step:      4 * tsdbtest.HoursInMillis,
+		From:      suite.basicQueryTime - 7*tsdbtest.DaysInMillis - 1*tsdbtest.HoursInMillis,
 		To:        suite.basicQueryTime + int64(numberOfEvents*eventsInterval)}
 	set, err := querierV2.Select(params)
 	if err != nil {
@@ -279,8 +231,11 @@ func (suite *testServerAggregatesSuite) TestRawAggregatesMultiPartitionNonConcre
 			}})
 	tsdbtest.InsertData(suite.T(), testParams)
 
-	expected := map[string][]tsdbtest.DataPoint{"avg": {{Time: suite.basicQueryTime - 7*tsdbtest.DaysInMillis, Value: 11}, {Time: suite.basicQueryTime - tsdbtest.HoursInMillis, Value: 30}},
-		"stdvar": {{Time: suite.basicQueryTime - 7*tsdbtest.DaysInMillis, Value: 2}, {Time: suite.basicQueryTime - tsdbtest.HoursInMillis, Value: 100}}}
+	firstStepTime := suite.basicQueryTime - 7*tsdbtest.DaysInMillis - 1*tsdbtest.HoursInMillis
+	secondStepTime := suite.basicQueryTime - 1*tsdbtest.HoursInMillis
+
+	expected := map[string][]tsdbtest.DataPoint{"avg": {{Time: firstStepTime, Value: 11}, {Time: secondStepTime, Value: 30}},
+		"stdvar": {{Time: firstStepTime, Value: 2}, {Time: secondStepTime, Value: 100}}}
 
 	querierV2, err := adapter.QuerierV2()
 	if err != nil {
@@ -289,8 +244,8 @@ func (suite *testServerAggregatesSuite) TestRawAggregatesMultiPartitionNonConcre
 
 	params := &pquerier.SelectParams{Name: "cpu",
 		Functions: "avg,stdvar",
-		Step:      tsdbtest.HoursInMillis,
-		From:      suite.basicQueryTime - 7*tsdbtest.DaysInMillis,
+		Step:      4 * tsdbtest.HoursInMillis,
+		From:      suite.basicQueryTime - 7*tsdbtest.DaysInMillis - 1*tsdbtest.HoursInMillis,
 		To:        suite.basicQueryTime + int64(numberOfEvents*eventsInterval)}
 	set, err := querierV2.Select(params)
 	if err != nil {
@@ -335,16 +290,18 @@ func (suite *testServerAggregatesSuite) TestSelectServerAggregatesAndRawByReques
 			}})
 	tsdbtest.InsertData(suite.T(), testParams)
 
-	expected := map[string][]tsdbtest.DataPoint{"sum": {{Time: suite.basicQueryTime, Value: 100}},
-		"": {{suite.basicQueryTime, 10}}}
+	expected := map[string][]tsdbtest.DataPoint{"sum": {{Time: suite.basicQueryTime - 4*tsdbtest.HoursInMillis, Value: 100}},
+		"": {{suite.basicQueryTime - 4*tsdbtest.HoursInMillis, 10}}}
 
 	querierV2, err := adapter.QuerierV2()
 	if err != nil {
 		suite.T().Fatalf("Failed to create querier v2, err: %v", err)
 	}
 
-	params := &pquerier.SelectParams{RequestedColumns: []pquerier.RequestedColumn{{Metric: "cpu", Function: "sum"}, {Metric: "cpu", Interpolator: "next"}},
-		Step: 60 * tsdbtest.MinuteInMillis, From: suite.basicQueryTime, To: suite.basicQueryTime + 5*tsdbtest.MinuteInMillis}
+	params := &pquerier.SelectParams{RequestedColumns: []pquerier.RequestedColumn{{Metric: "cpu", Function: "sum"}, {Metric: "cpu", Interpolator: "next", InterpolationTolerance: 5 * tsdbtest.HoursInMillis}},
+		Step: 4 * tsdbtest.HoursInMillis,
+		From: suite.basicQueryTime - 4*tsdbtest.HoursInMillis,
+		To:   suite.basicQueryTime + 5*tsdbtest.MinuteInMillis}
 
 	set, err := querierV2.Select(params)
 	if err != nil {
