@@ -19,7 +19,7 @@ require (
 	github.com/russross/blackfriday v1.5.2+incompatible // indirect
 	github.com/spf13/cobra v0.0.3
 	github.com/stretchr/testify v1.3.0
-	github.com/v3io/frames v0.4.3
+	github.com/v3io/frames v0.0.0-20190328123118-1dad1ff610509e7b087d9cd390ed1b452caecf15
 	github.com/v3io/v3io-go-http v0.0.0-20190221115935-53e2b487c9a2
 	github.com/xwb1989/sqlparser v0.0.0-20180606152119-120387863bf2
 	gopkg.in/yaml.v2 v2.2.2 // indirect
