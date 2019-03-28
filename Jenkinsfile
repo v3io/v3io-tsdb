@@ -64,10 +64,12 @@ def build_nuclio(V3IO_TSDB_VERSION, internal_status="stable") {
                 }
                 if ("${internal_status}" == "unstable") {
                     dir("${BUILD_FOLDER}/src/github.com/v3io/${git_project}") {
+                        sh("git stash")
                         sh("git checkout development")
                     }
                 } else {
                     dir("${BUILD_FOLDER}/src/github.com/v3io/${git_project}") {
+                        sh("git stash")
                         sh("git checkout master")
                     }
                 }
@@ -144,10 +146,12 @@ def build_prometheus(V3IO_TSDB_VERSION, internal_status="stable") {
                 }
                 if ("${internal_status}" == "unstable") {
                     dir("${BUILD_FOLDER}/src/github.com/${git_project}/${git_project}") {
+                        sh("git stash")
                         sh("git checkout development")
                     }
                 } else {
                     dir("${BUILD_FOLDER}/src/github.com/${git_project}/${git_project}") {
+                        sh("git stash")
                         sh("git checkout master")
                     }
                 }
