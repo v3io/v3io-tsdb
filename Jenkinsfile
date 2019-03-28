@@ -82,13 +82,15 @@ def build_nuclio(V3IO_TSDB_VERSION, internal_status="stable") {
             }
             container('golang') {
                 dir("${BUILD_FOLDER}/src/github.com/v3io/${git_project}/functions/ingest/vendor/github.com/v3io/v3io-tsdb") {
-                    sh("GO111MODULE=on go mod vendor")
+                    sh """
+                        GO111MODULE=on go mod vendor
+                        rm -rf .git vendor/github.com/nuclio vendor/github.com/v3io/frames/vendor/golang.org/x/net vendor/golang.org/x/net
+                    """
                 }
             }
             container('jnlp') {
                 dir("${BUILD_FOLDER}/src/github.com/v3io/${git_project}") {
                     sh """
-                        rm -rf .git vendor/github.com/nuclio vendor/github.com/v3io/frames/vendor/golang.org/x/net vendor/golang.org/x/net
                         cd ${BUILD_FOLDER}/src/github.com/v3io/${git_project}
                         cp -R functions/ingest/vendor/github.com/v3io/v3io-tsdb functions/query/vendor/github.com/v3io/v3io-tsdb
                     """
