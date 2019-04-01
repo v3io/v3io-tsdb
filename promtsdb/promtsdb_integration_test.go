@@ -28,7 +28,7 @@ func TestTsdbIntegration(t *testing.T) {
 	}
 	fmt.Println(cfg)
 
-	adapter, err := NewV3ioProm(cfg, nil, nil)
+	adapter, err := NewV3ioProm(cfg, nil, nil, false)
 	if err != nil {
 		t.Fatal(err)
 	}
