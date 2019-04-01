@@ -19,11 +19,12 @@ import (
 )
 
 type V3ioPromAdapter struct {
-	db     *tsdb.V3ioAdapter
-	logger logger.Logger
+	db                  *tsdb.V3ioAdapter
+	logger              logger.Logger
+	useV3ioAggregations bool
 }
 
-func NewV3ioProm(cfg *config.V3ioConfig, container *v3io.Container, logger logger.Logger) (*V3ioPromAdapter, error) {
+func NewV3ioProm(cfg *config.V3ioConfig, container *v3io.Container, logger logger.Logger, useV3ioAggregations bool) (*V3ioPromAdapter, error) {
 
 	if logger == nil {
 		newLogger, err := utils.NewLogger(cfg.LogLevel)
@@ -34,7 +35,7 @@ func NewV3ioProm(cfg *config.V3ioConfig, container *v3io.Container, logger logge
 	}
 
 	adapter, err := tsdb.NewV3ioAdapter(cfg, container, logger)
-	newAdapter := V3ioPromAdapter{db: adapter, logger: logger.GetChild("v3io-prom-adapter")}
+	newAdapter := V3ioPromAdapter{db: adapter, logger: logger.GetChild("v3io-prom-adapter"), useV3ioAggregations: useV3ioAggregations}
 	return &newAdapter, err
 }
 
@@ -58,7 +59,10 @@ func (a *V3ioPromAdapter) Close() error {
 
 func (a *V3ioPromAdapter) Querier(_ context.Context, mint, maxt int64) (storage.Querier, error) {
 	v3ioQuerier, err := a.db.QuerierV2()
-	promQuerier := V3ioPromQuerier{v3ioQuerier: v3ioQuerier, logger: a.logger.GetChild("v3io-prom-query"), mint: mint, maxt: maxt}
+	promQuerier := V3ioPromQuerier{v3ioQuerier: v3ioQuerier,
+		logger: a.logger.GetChild("v3io-prom-query"),
+		mint:   mint, maxt: maxt,
+		UseAggregatesConfig: a.useV3ioAggregations}
 	return &promQuerier, err
 }
 
@@ -66,6 +70,9 @@ type V3ioPromQuerier struct {
 	v3ioQuerier *pquerier.V3ioQuerier
 	logger      logger.Logger
 	mint, maxt  int64
+
+	UseAggregatesConfig bool
+	UseAggregates       bool
 }
 
 // Select returns a set of series that matches the given label matchers.
@@ -95,6 +102,8 @@ func (promQuery *V3ioPromQuerier) Select(params *storage.SelectParams, oms ...*l
 			} else {
 				noAggr = true
 			}
+		} else if promQuery.UseAggregates && promQuery.UseAggregatesConfig {
+			functions = fmt.Sprintf("%v_all", params.Func)
 		}
 	}
 
