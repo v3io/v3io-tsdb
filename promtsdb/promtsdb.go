@@ -80,6 +80,10 @@ type V3ioPromQuerier struct {
 	UseAggregates       bool // Indicate whether the current query is eligible for using v3io aggregations (should be set after creating a Querier instance)
 }
 
+func (promQuery *V3ioPromQuerier) UseV3ioAggregations() bool {
+	return promQuery.UseAggregates && promQuery.UseAggregatesConfig
+}
+
 // Select returns a set of series that matches the given label matchers.
 func (promQuery *V3ioPromQuerier) Select(params *storage.SelectParams, oms ...*labels.Matcher) (storage.SeriesSet, storage.Warnings, error) {
 	name, filter, functions := match2filter(oms, promQuery.logger)
@@ -107,7 +111,7 @@ func (promQuery *V3ioPromQuerier) Select(params *storage.SelectParams, oms ...*l
 			} else {
 				noAggr = true
 			}
-		} else if promQuery.UseAggregates && promQuery.UseAggregatesConfig {
+		} else if promQuery.UseV3ioAggregations() {
 			functions = fmt.Sprintf("%v_all", params.Func)
 		}
 	}
