@@ -19,12 +19,13 @@ import (
 )
 
 type V3ioPromAdapter struct {
-	db                  *tsdb.V3ioAdapter
-	logger              logger.Logger
-	useV3ioAggregations bool
+	db     *tsdb.V3ioAdapter
+	logger logger.Logger
+
+	useV3ioAggregations bool // Indicator (passed from prometheus.yml) used to indicate whether or not to use v3io aggregations by default
 }
 
-func NewV3ioProm(cfg *config.V3ioConfig, container *v3io.Container, logger logger.Logger, useV3ioAggregations bool) (*V3ioPromAdapter, error) {
+func NewV3ioProm(cfg *config.V3ioConfig, container *v3io.Container, logger logger.Logger) (*V3ioPromAdapter, error) {
 
 	if logger == nil {
 		newLogger, err := utils.NewLogger(cfg.LogLevel)
@@ -35,8 +36,12 @@ func NewV3ioProm(cfg *config.V3ioConfig, container *v3io.Container, logger logge
 	}
 
 	adapter, err := tsdb.NewV3ioAdapter(cfg, container, logger)
-	newAdapter := V3ioPromAdapter{db: adapter, logger: logger.GetChild("v3io-prom-adapter"), useV3ioAggregations: useV3ioAggregations}
+	newAdapter := V3ioPromAdapter{db: adapter, logger: logger.GetChild("v3io-prom-adapter")}
 	return &newAdapter, err
+}
+
+func (a *V3ioPromAdapter) SetUseV3ioAggregations(useV3ioAggregations bool) {
+	a.useV3ioAggregations = useV3ioAggregations
 }
 
 func (a *V3ioPromAdapter) Appender() (storage.Appender, error) {
@@ -71,8 +76,8 @@ type V3ioPromQuerier struct {
 	logger      logger.Logger
 	mint, maxt  int64
 
-	UseAggregatesConfig bool
-	UseAggregates       bool
+	UseAggregatesConfig bool // Indicate whether or not to use v3io aggregations by default (passed from prometheus.yml)
+	UseAggregates       bool // Indicate whether the current query is eligible for using v3io aggregations (should be set after creating a Querier instance)
 }
 
 // Select returns a set of series that matches the given label matchers.
