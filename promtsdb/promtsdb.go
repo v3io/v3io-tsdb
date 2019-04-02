@@ -22,7 +22,7 @@ type V3ioPromAdapter struct {
 	db     *tsdb.V3ioAdapter
 	logger logger.Logger
 
-	useV3ioAggregations bool // Indicator (passed from prometheus.yml) used to indicate whether or not to use v3io aggregations by default
+	useV3ioAggregations bool // Indicate whether or not to use v3io aggregations by default (passed from prometheus.yml)
 }
 
 func NewV3ioProm(cfg *config.V3ioConfig, container *v3io.Container, logger logger.Logger) (*V3ioPromAdapter, error) {
