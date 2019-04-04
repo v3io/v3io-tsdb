@@ -146,6 +146,9 @@ def build_nuclio(V3IO_TSDB_VERSION, internal_status="stable") {
                     }
                 }
             }
+            container('golang') {
+                sh("rm -rf ${BUILD_FOLDER}/src/github.com/${git_project_upstream_user}/${git_project}")
+            }
         }
     }
 }
@@ -211,6 +214,9 @@ def build_prometheus(V3IO_TSDB_VERSION, internal_status="stable") {
                         echo err
                     }
                 }
+            }
+            container('golang') {
+                sh("rm -rf ${BUILD_FOLDER}/src/github.com/${git_project_upstream_user}/${git_project}")
             }
         }
     }
