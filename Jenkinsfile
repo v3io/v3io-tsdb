@@ -130,7 +130,7 @@ def build_nuclio(V3IO_TSDB_VERSION, internal_status="stable") {
                         git add functions/ingest/vendor/github.com functions/query/vendor/github.com;
                     """
                     try {
-                        sh("git commit -am 'Updated TSDB to ${V3IO_TSDB_VERSION}'")
+                        sh("git commit -m 'Updated TSDB to ${V3IO_TSDB_VERSION}'")
                     } catch (err) {
                         echo "Can not commit"
                     }
@@ -182,6 +182,7 @@ def build_prometheus(V3IO_TSDB_VERSION, internal_status="stable") {
                 dir("${BUILD_FOLDER}/src/github.com/${git_project_upstream_user}/${git_project}") {
                     if("${git_project_user}" != "${git_project_upstream_user}") {
                         sh("GO111MODULE=on go mod edit -replace github.com/${git_project_upstream_user}/v3io-tsdb=github.com/${git_project_user}/v3io-tsdb@${V3IO_TSDB_VERSION}")
+                        sh("GO111MODULE=on go get")
                     } else {
                         sh("GO111MODULE=on go get github.com/${git_project_user}/v3io-tsdb@${V3IO_TSDB_VERSION}")
                     }
@@ -201,7 +202,7 @@ def build_prometheus(V3IO_TSDB_VERSION, internal_status="stable") {
                         git add vendor/github.com;
                     """
                     try {
-                        sh("git commit -am 'Updated TSDB to ${V3IO_TSDB_VERSION}'")
+                        sh("git commit -m 'Updated TSDB to ${V3IO_TSDB_VERSION}'")
                     } catch (err) {
                         echo "Can not commit"
                     }
