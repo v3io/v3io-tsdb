@@ -163,34 +163,36 @@ def build_prometheus(V3IO_TSDB_VERSION, internal_status="stable") {
 
         stage('prepare sources') {
             container('jnlp') {
-                if (!fileExists("${BUILD_FOLDER}/src/github.com/${git_project}/${git_project}")) {
-                    sh("cd ${BUILD_FOLDER}; git clone https://${GIT_TOKEN}@github.com/${git_project_user}/${git_project}.git src/github.com/${git_project}/${git_project}")
+                if (!fileExists("${BUILD_FOLDER}/src/github.com/${git_project_upstream_user}/${git_project}")) {
+                    sh("cd ${BUILD_FOLDER}; git clone https://${GIT_TOKEN}@github.com/${git_project_user}/${git_project}.git src/github.com/${git_project_upstream_user}/${git_project}")
                 }
                 if ("${internal_status}" == "unstable") {
-                    dir("${BUILD_FOLDER}/src/github.com/${git_project}/${git_project}") {
+                    dir("${BUILD_FOLDER}/src/github.com/${git_project_upstream_user}/${git_project}") {
                         sh("git stash")
                         sh("git checkout development")
                     }
                 } else {
-                    dir("${BUILD_FOLDER}/src/github.com/${git_project}/${git_project}") {
+                    dir("${BUILD_FOLDER}/src/github.com/${git_project_upstream_user}/${git_project}") {
                         sh("git stash")
                         sh("git checkout master")
                     }
                 }
             }
             container('golang') {
-                dir("${BUILD_FOLDER}/src/github.com/${git_project}/${git_project}") {
-                    sh """
-                        GO111MODULE=on go get github.com/${git_project_user}/v3io-tsdb@${V3IO_TSDB_VERSION}
-                        GO111MODULE=on go mod vendor
-                    """
+                dir("${BUILD_FOLDER}/src/github.com/${git_project_upstream_user}/${git_project}") {
+                    if("${git_project_user}" != "${git_project_upstream_user}") {
+                        sh("GO111MODULE=on go mod edit -replace github.com/${git_project_upstream_user}/v3io-tsdb=github.com/${git_project_user}/v3io-tsdb@${V3IO_TSDB_VERSION}")
+                    } else {
+                        sh("GO111MODULE=on go get github.com/${git_project_user}/v3io-tsdb@${V3IO_TSDB_VERSION}")
+                    }
+                    sh("GO111MODULE=on go mod vendor")
                 }
             }
         }
 
         stage('git push') {
             container('jnlp') {
-                dir("${BUILD_FOLDER}/src/github.com/${git_project}/${git_project}") {
+                dir("${BUILD_FOLDER}/src/github.com/${git_project_upstream_user}/${git_project}") {
                     sh """
                         git config --global user.email '${GIT_USERNAME}@iguazio.com'
                         git config --global user.name '${GIT_USERNAME}'
