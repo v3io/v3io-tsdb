@@ -127,6 +127,41 @@ func TestCreateColumnSpecs(t *testing.T) {
 	}
 }
 
+func TestNegativeCreateColumnSpecs(t *testing.T) {
+	testCases := []struct {
+		desc   string
+		params SelectParams
+	}{
+		{params: SelectParams{Name: "cpu", Functions: "count, count"}},
+
+		{params: SelectParams{Name: "cpu", Functions: "count, max,count"}},
+
+		{params: SelectParams{RequestedColumns: []RequestedColumn{{Metric: "cpu", Function: "count"},
+			{Metric: "cpu", Function: "count"}}}},
+
+		{params: SelectParams{RequestedColumns: []RequestedColumn{{Metric: "cpu", Function: "count"},
+			{Metric: "diskio", Function: "count"},
+			{Metric: "cpu", Function: "count"}}}},
+
+		{params: SelectParams{RequestedColumns: []RequestedColumn{{Metric: "cpu", Function: "count"},
+			{Metric: "diskio", Function: "count"},
+			{Metric: "cpu", Function: "  count "}}}},
+
+		{params: SelectParams{Name: "cpu", Functions: "count, count", UseOnlyClientAggr: true, disableClientAggr: true}},
+	}
+	for _, test := range testCases {
+		t.Run(test.desc, func(t *testing.T) {
+			ctx := selectQueryContext{}
+			ctx.queryParams = &test.params
+			_, _, err := ctx.createColumnSpecs()
+
+			if err == nil {
+				t.Fatal("expected error but finished normally")
+			}
+		})
+	}
+}
+
 func toAggr(str string) aggregate.AggrType {
 	aggr, _ := aggregate.AggregateFromString(str)
 	return aggr
