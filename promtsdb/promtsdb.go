@@ -21,6 +21,8 @@ import (
 type V3ioPromAdapter struct {
 	db     *tsdb.V3ioAdapter
 	logger logger.Logger
+
+	useV3ioAggregations bool // Indicate whether or not to use v3io aggregations by default (passed from prometheus.yml)
 }
 
 func NewV3ioProm(cfg *config.V3ioConfig, container *v3io.Container, logger logger.Logger) (*V3ioPromAdapter, error) {
@@ -36,6 +38,10 @@ func NewV3ioProm(cfg *config.V3ioConfig, container *v3io.Container, logger logge
 	adapter, err := tsdb.NewV3ioAdapter(cfg, container, logger)
 	newAdapter := V3ioPromAdapter{db: adapter, logger: logger.GetChild("v3io-prom-adapter")}
 	return &newAdapter, err
+}
+
+func (a *V3ioPromAdapter) SetUseV3ioAggregations(useV3ioAggregations bool) {
+	a.useV3ioAggregations = useV3ioAggregations
 }
 
 func (a *V3ioPromAdapter) Appender() (storage.Appender, error) {
@@ -58,7 +64,10 @@ func (a *V3ioPromAdapter) Close() error {
 
 func (a *V3ioPromAdapter) Querier(_ context.Context, mint, maxt int64) (storage.Querier, error) {
 	v3ioQuerier, err := a.db.QuerierV2()
-	promQuerier := V3ioPromQuerier{v3ioQuerier: v3ioQuerier, logger: a.logger.GetChild("v3io-prom-query"), mint: mint, maxt: maxt}
+	promQuerier := V3ioPromQuerier{v3ioQuerier: v3ioQuerier,
+		logger: a.logger.GetChild("v3io-prom-query"),
+		mint:   mint, maxt: maxt,
+		UseAggregatesConfig: a.useV3ioAggregations}
 	return &promQuerier, err
 }
 
@@ -66,6 +75,13 @@ type V3ioPromQuerier struct {
 	v3ioQuerier *pquerier.V3ioQuerier
 	logger      logger.Logger
 	mint, maxt  int64
+
+	UseAggregatesConfig bool // Indicate whether or not to use v3io aggregations by default (passed from prometheus.yml)
+	UseAggregates       bool // Indicate whether the current query is eligible for using v3io aggregations (should be set after creating a Querier instance)
+}
+
+func (promQuery *V3ioPromQuerier) UseV3ioAggregations() bool {
+	return promQuery.UseAggregates && promQuery.UseAggregatesConfig
 }
 
 // Select returns a set of series that matches the given label matchers.
@@ -95,6 +111,8 @@ func (promQuery *V3ioPromQuerier) Select(params *storage.SelectParams, oms ...*l
 			} else {
 				noAggr = true
 			}
+		} else if promQuery.UseV3ioAggregations() {
+			functions = fmt.Sprintf("%v_all", params.Func)
 		}
 	}
 
