@@ -279,7 +279,7 @@ func GetOrLoadFromStruct(cfg *V3ioConfig) (*V3ioConfig, error) {
 	return instance, nil
 }
 
-// Eagerly reloads TSDB configuration
+// Eagerly reloads TSDB configuration. Note: not thread-safe
 func UpdateConfig(path string) {
 	instance, failure = loadConfig(path)
 }
