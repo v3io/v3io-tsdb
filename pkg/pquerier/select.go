@@ -219,11 +219,17 @@ func (queryCtx *selectQueryContext) queryPartition(partition *partmgr.DBPartitio
 		for _, q := range queries {
 			q.aggregationParams = nil
 			q.useServerSideAggregates = false
-			q.getItems(queryCtx)
+			err = q.getItems(queryCtx)
+			if err != nil {
+				break
+			}
 		}
 	} else {
 		for _, q := range queries {
-			q.getItems(queryCtx)
+			err = q.getItems(queryCtx)
+			if err != nil {
+				break
+			}
 		}
 	}
 
