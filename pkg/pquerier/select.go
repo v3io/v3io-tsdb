@@ -372,7 +372,12 @@ func (queryCtx *selectQueryContext) processQueryResults(query *partQuery) error 
 func (queryCtx *selectQueryContext) createColumnSpecs() ([]columnMeta, map[string][]columnMeta, error) {
 	var columnsSpec []columnMeta
 	columnsSpecByMetric := make(map[string][]columnMeta)
-	for i, col := range queryCtx.queryParams.getRequestedColumns() {
+	requestedColumns, err := queryCtx.queryParams.getRequestedColumns()
+	if err != nil {
+		return nil, nil, err
+	}
+
+	for i, col := range requestedColumns {
 		_, ok := columnsSpecByMetric[col.Metric]
 		if !ok {
 			columnsSpecByMetric[col.Metric] = []columnMeta{}

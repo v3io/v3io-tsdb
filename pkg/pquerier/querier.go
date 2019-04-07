@@ -53,9 +53,12 @@ type SelectParams struct {
 	disableClientAggr bool
 }
 
-func (s *SelectParams) getRequestedColumns() []RequestedColumn {
+func (s *SelectParams) getRequestedColumns() ([]RequestedColumn, error) {
+	if err := s.validateSelectParams(); err != nil {
+		return nil, err
+	}
 	if s.RequestedColumns != nil {
-		return s.RequestedColumns
+		return s.RequestedColumns, nil
 	}
 	functions := strings.Split(s.Functions, ",")
 	metricNames := strings.Split(s.Name, ",")
@@ -70,7 +73,37 @@ func (s *SelectParams) getRequestedColumns() []RequestedColumn {
 			index++
 		}
 	}
-	return columns
+	return columns, nil
+}
+
+func (s *SelectParams) validateSelectParams() error {
+	if s.UseOnlyClientAggr && s.disableClientAggr {
+		return errors.New("can not query, both `useOnlyClientAggr` and `disableClientAggr` flags are set")
+	}
+
+	if s.RequestedColumns == nil {
+		functions := strings.Split(s.Functions, ",")
+		functionMap := make(map[string]bool, len(functions))
+		for _, function := range functions {
+			trimmed := strings.TrimSpace(function)
+			if functionMap[trimmed] {
+				return fmt.Errorf("function '%v' was requested multiple time", trimmed)
+			}
+			functionMap[trimmed] = true
+		}
+	} else {
+		functionMap := make(map[string]bool, len(s.RequestedColumns))
+		for _, col := range s.RequestedColumns {
+			trimmed := strings.TrimSpace(col.Function)
+			key := fmt.Sprintf("%v-%v", col.Metric, trimmed)
+			if functionMap[key] {
+				return fmt.Errorf("function '%v' for metric '%v' was requested multiple time", trimmed, col.Metric)
+			}
+			functionMap[key] = true
+		}
+	}
+
+	return nil
 }
 
 func (q *V3ioQuerier) SelectProm(params *SelectParams, noAggr bool) (utils.SeriesSet, error) {
