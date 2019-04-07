@@ -197,8 +197,6 @@ func (queryCtx *selectQueryContext) queryPartition(partition *partmgr.DBPartitio
 
 		if newQuery.useServerSideAggregates && !requestAggregatesAndRaw {
 			newQuery.preAggregateLabels = queryCtx.parsePreAggregateLabels(partition)
-		} else {
-			newQuery.preAggregateLabels = []string{}
 		}
 
 		queries = append(queries, newQuery)
