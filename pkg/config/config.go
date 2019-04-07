@@ -33,6 +33,8 @@ import (
 	"github.com/pkg/errors"
 )
 
+var defaultDisableNginxMitigation = true
+
 const (
 	V3ioConfigEnvironmentVariable = "V3IO_TSDB_CONFIG"
 	DefaultConfigurationFileName  = "v3io-tsdb-config.yaml"
@@ -128,9 +130,6 @@ type V3ioConfig struct {
 
 	HttpTimeout string `json:"httpTimeout,omitempty"`
 
-	// Disabled = true disables the V3IO TSDB configuration in Prometheus and
-	// enables the internal Prometheus TSDB instead
-	Disabled bool `json:"disabled,omitempty"`
 	// Log level - "debug" | "info" | "warn" | "error"
 	LogLevel string `json:"logLevel,omitempty"`
 	// Number of parallel V3IO worker routines
@@ -138,8 +137,6 @@ type V3ioConfig struct {
 	// Number of parallel V3IO worker routines for queries;
 	// default = the minimum value between 8 and Workers
 	QryWorkers int `json:"qryWorkers"`
-	// Max uncommitted (delayed) samples allowed per metric
-	MaxBehind int `json:"maxBehind"`
 	// Override last chunk; by default, an append from the last point is attempted upon restart
 	OverrideOld bool `json:"overrideOld"`
 	// Default timeout duration, in seconds; default = 3,600 seconds (1 hour)
@@ -164,7 +161,7 @@ type V3ioConfig struct {
 	// Build Info
 	BuildInfo *BuildInfo `json:"buildInfo,omitempty"`
 	// Override nginx bug
-	DisableNginxMitigation bool `json:"disableNginxMitigation,omitempty"`
+	DisableNginxMitigation *bool `json:"disableNginxMitigation,omitempty"`
 	// explicitly always use client aggregation
 	UsePreciseAggregations bool `json:"usePreciseAggregations,omitempty"`
 	// Coefficient to decide whether or not to use server aggregates optimization
@@ -426,5 +423,9 @@ func initDefaults(cfg *V3ioConfig) {
 
 	if cfg.UseServerAggregateCoefficient == 0 {
 		cfg.UseServerAggregateCoefficient = DefaultUseServerAggregateCoefficient
+	}
+
+	if cfg.DisableNginxMitigation == nil {
+		cfg.DisableNginxMitigation = &defaultDisableNginxMitigation
 	}
 }
