@@ -130,6 +130,9 @@ type V3ioConfig struct {
 
 	HttpTimeout string `json:"httpTimeout,omitempty"`
 
+	// Disabled = true disables the V3IO TSDB configuration in Prometheus and
+	// enables the internal Prometheus TSDB instead
+	Disabled bool `json:"disabled,omitempty"`
 	// Log level - "debug" | "info" | "warn" | "error"
 	LogLevel string `json:"logLevel,omitempty"`
 	// Number of parallel V3IO worker routines
