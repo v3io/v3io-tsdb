@@ -433,9 +433,11 @@ func (d *dataFrame) rawSeriesToColumns() {
 	seriesTodefaultValue := make([]interface{}, len(d.rawColumns))
 	currentTime := int64(math.MaxInt64)
 	nextTime := int64(math.MaxInt64)
+	seriesHasMoreData := make([]bool, len(d.rawColumns))
 
 	for i, rawSeries := range d.rawColumns {
 		if rawSeries.Iterator().Next() {
+			seriesHasMoreData[i] = true
 			t, _ := rawSeries.Iterator().At()
 			if t < nextTime {
 				nextTime = t
@@ -479,20 +481,19 @@ func (d *dataFrame) rawSeriesToColumns() {
 				t, v = iter.At()
 			}
 
-			hasMoreData := true
 			if t == currentTime {
 				columns[seriesIndex].Append(v)
 				if iter.Next() {
 					t, _ = iter.At()
 				} else {
 					nonExhaustedIterators--
-					hasMoreData = false
+					seriesHasMoreData[seriesIndex] = false
 				}
 			} else {
 				columns[seriesIndex].Append(seriesTodefaultValue[seriesIndex])
 			}
 
-			if hasMoreData && t < nextTime {
+			if seriesHasMoreData[seriesIndex] && t < nextTime {
 				nextTime = t
 			}
 		}
