@@ -542,9 +542,8 @@ func (suite *testSelectDataframeSuite) TestSelectDataframeDaownsampleMetricsHave
 
 func (suite *testSelectDataframeSuite) TestQueryDataFrameMultipleMetrics() {
 	adapter, err := tsdb.NewV3ioAdapter(suite.v3ioConfig, nil, nil)
-	if err != nil {
-		suite.T().Fatalf("failed to create v3io adapter. reason: %s", err)
-	}
+	suite.NoError(err, "failed to create v3io adapter")
+
 	metricName1 := "cpu"
 	metricName2 := "diskio"
 	labels1 := utils.LabelsFromStringList("os", "linux")
@@ -587,16 +586,12 @@ func (suite *testSelectDataframeSuite) TestQueryDataFrameMultipleMetrics() {
 	tsdbtest.InsertData(suite.T(), testParams)
 
 	querierV2, err := adapter.QuerierV2()
-	if err != nil {
-		suite.T().Fatalf("Failed to create querier v2, err: %v", err)
-	}
+	suite.NoError(err, "failed to create querier v2")
 
 	params := &pquerier.SelectParams{Filter: "1==1",
 		From: suite.basicQueryTime, To: suite.basicQueryTime + int64(numberOfEvents)*eventsInterval}
 	set, err := querierV2.SelectDataFrame(params)
-	if err != nil {
-		suite.T().Fatalf("Failed to exeute query, err: %v", err)
-	}
+	suite.NoError(err, "failed to exeute query")
 
 	var seriesCount int
 	for set.NextFrame() {
@@ -609,23 +604,23 @@ func (suite *testSelectDataframeSuite) TestQueryDataFrameMultipleMetrics() {
 		for i := 0; i < indexCol.Len(); i++ {
 			t, err := indexCol.TimeAt(i)
 			assert.NoError(suite.T(), err)
-			assert.Equal(suite.T(), expectedData[metricName1][i].Time, t.UnixNano()/int64(time.Millisecond))
+			suite.Require().Equal(expectedData[metricName1][i].Time, t.UnixNano()/int64(time.Millisecond))
 
 			for _, colName := range frame.Names() {
 				col, err := frame.Column(colName)
 				suite.NoError(err)
 				currentExpectedData := expectedData[col.Name()]
-				assert.Equal(suite.T(), len(currentExpectedData), col.Len())
+				suite.Require().Equal(len(currentExpectedData), col.Len())
 				currentExpected := currentExpectedData[i].Value
 				f, err := col.FloatAt(i)
 				assert.NoError(suite.T(), err)
 
 				if !(math.IsNaN(currentExpected) && math.IsNaN(f)) {
-					assert.Equal(suite.T(), currentExpected, f)
+					suite.Require().Equal(currentExpected, f)
 				}
 			}
 		}
 	}
 
-	assert.Equal(suite.T(), 1, seriesCount, "series count didn't match expected")
+	suite.Require().Equal(1, seriesCount, "series count didn't match expected")
 }
