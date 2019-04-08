@@ -342,8 +342,8 @@ podTemplate(label: "${git_project}-${label}", inheritFrom: "jnlp-docker-golang")
                                                 stage('get previous release version') {
                                                     container('jnlp') {
                                                         NEXT_VERSION = github.get_next_tag_version("tsdb-nuclio", git_project_user, GIT_TOKEN)
-
                                                         echo "$NEXT_VERSION"
+                                                        NEXT_VERSION = "${NEXT_VERSION}-${MAIN_TAG_VERSION}"
                                                         next_versions.putAt("tsdb-nuclio", NEXT_VERSION)
                                                     }
                                                 }
@@ -382,8 +382,8 @@ podTemplate(label: "${git_project}-${label}", inheritFrom: "jnlp-docker-golang")
                                                 stage('get previous release version') {
                                                     container('jnlp') {
                                                         NEXT_VERSION = github.get_next_tag_version("frames", git_project_user, GIT_TOKEN)
-
                                                         echo "$NEXT_VERSION"
+                                                        NEXT_VERSION = "${NEXT_VERSION}-${MAIN_TAG_VERSION}"
                                                         next_versions.putAt("frames", NEXT_VERSION)
                                                     }
                                                 }
