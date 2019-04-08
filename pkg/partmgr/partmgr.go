@@ -30,7 +30,6 @@ import (
 	"sync"
 
 	"github.com/pkg/errors"
-	"github.com/prometheus/prometheus/pkg/labels"
 	"github.com/v3io/v3io-go-http"
 	"github.com/v3io/v3io-tsdb/internal/pkg/performance"
 	"github.com/v3io/v3io-tsdb/pkg/aggregate"
@@ -362,7 +361,7 @@ func (p *DBPartition) GetMetricPath(name string, hash uint64, labelNames []strin
 		} else {
 			var namelessLabelNames []string
 			for _, l := range labelNames {
-				if l != labels.MetricName {
+				if l != config.PrometheusMetricNameAttribute {
 					namelessLabelNames = append(namelessLabelNames, l)
 				}
 			}

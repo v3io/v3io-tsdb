@@ -12,17 +12,19 @@ require (
 	github.com/nuclio/nuclio-sdk-go v0.0.0-20190205170814-3b507fbd0324
 	github.com/nuclio/nuclio-test-go v0.0.0-20180704132150-0ce6587f8e37
 	github.com/nuclio/zap v0.0.2
-	github.com/pavius/impi v0.0.0-20180302134524-c1cbdcb8df2b // indirect
 	github.com/pkg/errors v0.8.1
-	github.com/prometheus/common v0.2.0 // indirect
-	github.com/prometheus/prometheus v2.8.0+incompatible
 	github.com/rcrowley/go-metrics v0.0.0-20181016184325-3113b8401b8a
 	github.com/russross/blackfriday v1.5.2+incompatible // indirect
 	github.com/spf13/cobra v0.0.3
+	github.com/spf13/pflag v1.0.3 // indirect
 	github.com/stretchr/testify v1.3.0
 	github.com/v3io/frames v0.0.0-20190328123118-1dad1ff610509e7b087d9cd390ed1b452caecf15
 	github.com/v3io/v3io-go-http v0.0.0-20190221115935-53e2b487c9a2
 	github.com/xwb1989/sqlparser v0.0.0-20180606152119-120387863bf2
+	golang.org/x/net v0.0.0-20181114220301-adae6a3d119a // indirect
+	golang.org/x/sync v0.0.0-20181108010431-42b317875d0f // indirect
+	golang.org/x/sys v0.0.0-20181116152217-5ac8a444bdc5 // indirect
+	google.golang.org/grpc v1.17.0 // indirect
 	gopkg.in/yaml.v2 v2.2.2 // indirect
 )
 
