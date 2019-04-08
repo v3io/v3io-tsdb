@@ -36,6 +36,10 @@ type selectQueryContext struct {
 	totalColumns           int
 	isCrossSeriesAggregate bool
 
+	// In case one of the aggregates of one of the metrics should use client side aggregates
+	// but the user requested to disable client aggregations - return raw data for every requested metric
+	forceRawQuery bool
+
 	dataFrames      map[uint64]*dataFrame
 	frameList       []*dataFrame
 	requestChannels []chan *qryResults
@@ -144,6 +148,9 @@ func (queryCtx *selectQueryContext) queryPartition(partition *partmgr.DBPartitio
 		mint = queryCtx.queryParams.From
 	}
 
+	queryRawInsteadOfAggregates, doForceAllRawQuery := false, false
+	var index int
+
 	for metric := range queryCtx.columnsSpecByMetric {
 		var aggregationParams *aggregate.AggregationParams
 		functions, requestAggregatesAndRaw := queryCtx.metricsAggregatesToString(metric)
@@ -172,7 +179,12 @@ func (queryCtx *selectQueryContext) queryPartition(partition *partmgr.DBPartitio
 
 		}
 
-		newQuery := &partQuery{mint: mint, maxt: maxt, partition: partition, step: queryCtx.queryParams.Step}
+		newQuery := &partQuery{mint: mint,
+			maxt:               maxt,
+			partition:          partition,
+			step:               queryCtx.queryParams.Step,
+			name:               metric,
+			aggregatesAndChunk: requestAggregatesAndRaw}
 		if aggregationParams != nil {
 			// Cross series aggregations cannot use server side aggregates.
 			newQuery.useServerSideAggregates = aggregationParams.CanAggregate(partition.AggrType()) &&
@@ -183,12 +195,40 @@ func (queryCtx *selectQueryContext) queryPartition(partition *partmgr.DBPartitio
 			}
 		}
 
-		var preAggregateLabels []string
 		if newQuery.useServerSideAggregates && !requestAggregatesAndRaw {
-			preAggregateLabels = queryCtx.parsePreAggregateLabels(partition)
+			newQuery.preAggregateLabels = queryCtx.parsePreAggregateLabels(partition)
 		}
-		err = newQuery.getItems(queryCtx, metric, preAggregateLabels, requestAggregatesAndRaw)
+
 		queries = append(queries, newQuery)
+
+		currentQueryShouldQueryRawInsteadOfAggregates := !newQuery.useServerSideAggregates && queryCtx.queryParams.disableClientAggr
+		if len(queryCtx.columnsSpecByMetric) == 1 && currentQueryShouldQueryRawInsteadOfAggregates {
+			doForceAllRawQuery = true
+		} else if index == 0 {
+			queryRawInsteadOfAggregates = currentQueryShouldQueryRawInsteadOfAggregates
+		} else if queryRawInsteadOfAggregates != currentQueryShouldQueryRawInsteadOfAggregates {
+			doForceAllRawQuery = true
+		}
+		index++
+	}
+
+	if doForceAllRawQuery {
+		queryCtx.forceRawQuery = true
+		for _, q := range queries {
+			q.aggregationParams = nil
+			q.useServerSideAggregates = false
+			err = q.getItems(queryCtx)
+			if err != nil {
+				break
+			}
+		}
+	} else {
+		for _, q := range queries {
+			err = q.getItems(queryCtx)
+			if err != nil {
+				break
+			}
+		}
 	}
 
 	return queries, err
@@ -441,7 +481,9 @@ func (queryCtx *selectQueryContext) generateTimeColumn() Column {
 }
 
 func (queryCtx *selectQueryContext) isRawQuery() bool {
-	return (!queryCtx.hasAtLeastOneFunction() && queryCtx.queryParams.Step == 0) || queryCtx.queryParams.disableAllAggr
+	return (!queryCtx.hasAtLeastOneFunction() && queryCtx.queryParams.Step == 0) ||
+		queryCtx.queryParams.disableAllAggr ||
+		queryCtx.forceRawQuery
 }
 
 func (queryCtx *selectQueryContext) hasAtLeastOneFunction() bool {
@@ -478,18 +520,22 @@ type partQuery struct {
 	chunkTime               int64
 	useServerSideAggregates bool
 	aggregationParams       *aggregate.AggregationParams
+
+	name               string
+	preAggregateLabels []string
+	aggregatesAndChunk bool
 }
 
-func (query *partQuery) getItems(ctx *selectQueryContext, name string, preAggregateLabels []string, aggregatesAndChunk bool) error {
+func (query *partQuery) getItems(ctx *selectQueryContext) error {
 
 	path := query.partition.GetTablePath()
-	if len(preAggregateLabels) > 0 {
-		path = fmt.Sprintf("%sagg/%s/", path, strings.Join(preAggregateLabels, ","))
+	if len(query.preAggregateLabels) > 0 {
+		path = fmt.Sprintf("%sagg/%s/", path, strings.Join(query.preAggregateLabels, ","))
 	}
 
 	var shardingKeys []string
-	if name != "" {
-		shardingKeys = query.partition.GetShardingKeys(name)
+	if query.name != "" {
+		shardingKeys = query.partition.GetShardingKeys(query.name)
 	}
 	attrs := []string{config.LabelSetAttrName, config.EncodingAttrName, config.MetricNameAttrName, config.MaxTimeAttrName, config.ObjectNameAttrName}
 
@@ -498,15 +544,15 @@ func (query *partQuery) getItems(ctx *selectQueryContext, name string, preAggreg
 	}
 	// It is possible to request both server aggregates and raw chunk data (to downsample) for the same metric
 	// example: `select max(cpu), avg(cpu), cpu` with step = 1h
-	if !query.useServerSideAggregates || aggregatesAndChunk {
+	if !query.useServerSideAggregates || query.aggregatesAndChunk {
 		chunkAttr, chunk0Time := query.partition.Range2Attrs("v", query.mint-ctx.queryParams.AggregationWindow, query.maxt)
 		query.chunk0Time = chunk0Time
 		query.attrs = append(query.attrs, chunkAttr...)
 	}
 	attrs = append(attrs, query.attrs...)
 
-	ctx.logger.DebugWith("Select - GetItems", "path", path, "attr", attrs, "filter", ctx.queryParams.Filter, "name", name)
-	input := v3io.GetItemsInput{Path: path, AttributeNames: attrs, Filter: ctx.queryParams.Filter, ShardingKey: name}
+	ctx.logger.DebugWith("Select - GetItems", "path", path, "attr", attrs, "filter", ctx.queryParams.Filter, "name", query.name)
+	input := v3io.GetItemsInput{Path: path, AttributeNames: attrs, Filter: ctx.queryParams.Filter, ShardingKey: query.name}
 	iter, err := utils.NewAsyncItemsCursor(ctx.container, &input, ctx.workers, shardingKeys, ctx.logger)
 	if err != nil {
 		return err
