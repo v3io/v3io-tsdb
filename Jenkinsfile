@@ -257,6 +257,9 @@ def build_frames(V3IO_TSDB_VERSION, internal_status="stable") {
                         sh("GO111MODULE=on go get github.com/${git_project_user}/v3io-tsdb@${V3IO_TSDB_VERSION}")
                     }
                     sh("GO111MODULE=on go mod vendor")
+                    sh("chown 1000:1000 ./ -R")
+                    sh("ls -la")
+                    sh("whoami")
                 }
             }
         }
@@ -269,6 +272,9 @@ def build_frames(V3IO_TSDB_VERSION, internal_status="stable") {
                         git config --global user.name '${GIT_USERNAME}'
                         git remote rm origin
                         git remote add origin https://${GIT_USERNAME}:${GIT_TOKEN}@github.com/${git_project_user}/${git_project}.git
+                        git status
+                        whoami
+                        ls -la
                         git add go.mod;
                     """
                     try {
