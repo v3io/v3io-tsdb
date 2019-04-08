@@ -12,6 +12,7 @@ require (
 	github.com/nuclio/nuclio-sdk-go v0.0.0-20190205170814-3b507fbd0324
 	github.com/nuclio/nuclio-test-go v0.0.0-20180704132150-0ce6587f8e37
 	github.com/nuclio/zap v0.0.2
+	github.com/pavius/impi v0.0.0-20180302134524-c1cbdcb8df2b // indirect
 	github.com/pkg/errors v0.8.1
 	github.com/prometheus/common v0.2.0 // indirect
 	github.com/prometheus/prometheus v2.8.0+incompatible

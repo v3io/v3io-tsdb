@@ -558,15 +558,13 @@ func (suite *testSelectDataframeSuite) TestQueryDataFrameMultipleMetrics() {
 		{suite.basicQueryTime + 5*tsdbtest.MinuteInMillis, 26}}
 
 	expectedData := map[string][]tsdbtest.DataPoint{
-		metricName1:
-		{{suite.basicQueryTime, 10},
+		metricName1: {{suite.basicQueryTime, 10},
 			{suite.basicQueryTime + 1*tsdbtest.MinuteInMillis, math.NaN()},
 			{suite.basicQueryTime + 2*tsdbtest.MinuteInMillis, 15},
 			{suite.basicQueryTime + 3*tsdbtest.MinuteInMillis, 18},
 			{suite.basicQueryTime + 4*tsdbtest.MinuteInMillis, math.NaN()},
 			{suite.basicQueryTime + 5*tsdbtest.MinuteInMillis, math.NaN()}},
-		metricName2:
-		{{suite.basicQueryTime, math.NaN()},
+		metricName2: {{suite.basicQueryTime, math.NaN()},
 			{suite.basicQueryTime + 1*tsdbtest.MinuteInMillis, 20},
 			{suite.basicQueryTime + 2*tsdbtest.MinuteInMillis, math.NaN()},
 			{suite.basicQueryTime + 3*tsdbtest.MinuteInMillis, math.NaN()},
