@@ -58,6 +58,7 @@ type chunkStore struct {
 	performanceReporter *performance.MetricReporter
 
 	curChunk int
+	nextTid  int64
 	lastTid  int64
 	chunks   [2]*attrAppender
 
@@ -142,6 +143,7 @@ func (cs *chunkStore) getChunksState(mc *MetricsCache, metric *MetricState) (boo
 	if !cs.isAggr() {
 		cs.chunks[0].initialize(part, t)
 	}
+	cs.nextTid = t
 	cs.aggrList = aggregate.NewAggregatesList(part.AggrType())
 
 	// TODO: if policy to merge w old chunks needs to get prev chunk, vs restart appender
@@ -214,10 +216,9 @@ func (cs *chunkStore) processGetResp(mc *MetricsCache, metric *MetricState, resp
 		if cs.chunks[0].inRange(maxTime) && !mc.cfg.OverrideOld {
 			cs.chunks[0].state |= chunkStateMerge
 		}
-
-		// Set Last TableId - indicate that there is no need to create metric object
-		cs.lastTid = cs.chunks[0].partition.GetStartTime()
 	}
+	// Set Last TableId - indicate that there is no need to create metric object
+	cs.lastTid = cs.nextTid
 }
 
 // Append data to the right chunk and table based on the time and state
@@ -255,6 +256,7 @@ func (cs *chunkStore) chunkByTime(t int64, isVariantEncoding bool) *attrAppender
 		}
 		nextPart, _ := part.NextPart(t)
 		cur.initialize(nextPart, t)
+		cs.nextTid = t
 		cur.appender = app
 		cs.curChunk = cs.curChunk ^ 1
 
@@ -314,8 +316,21 @@ func (cs *chunkStore) writeChunks(mc *MetricsCache, metric *MetricState) (hasPen
 
 			if sampleTime <= cs.maxTime && !mc.cfg.OverrideOld {
 				mc.logger.WarnWith("Omitting the sample - time is earlier than the last sample time for this metric", "metric", metric.Lset, "T", sampleTime)
-				pendingSampleIndex++
-				continue
+
+				// If we have reached the end of the pending events and there are events to update, create an update expression and break from loop,
+				// Otherwise, discard the event and continue normally
+				if pendingSampleIndex == len(cs.pending)-1 {
+					if pendingSamplesCount > 0 {
+						expr = expr + cs.aggrList.SetOrUpdateExpr("v", bucket, isNewBucket)
+						expr = expr + cs.appendExpression(activeChunk)
+					}
+
+					pendingSampleIndex++
+					break
+				} else {
+					pendingSampleIndex++
+					continue
+				}
 			}
 
 			// Init activeChunk if nil (when samples are too old); if still too

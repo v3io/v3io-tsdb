@@ -189,7 +189,7 @@ func (ic *AsyncItemsCursor) processResponse() error {
 	}
 
 	// until IGZ-2.0 there is a bug in Nginx regarding range-scan, the following code is a mitigation for it.
-	if conf.DisableNginxMitigation {
+	if *conf.DisableNginxMitigation {
 		ic.sendNextGetItemsOld(resp)
 	} else {
 		ic.sendNextGetItemsNew(resp)

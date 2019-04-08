@@ -1,3 +1,5 @@
+// +build unit
+
 package querier
 
 import (
@@ -66,6 +68,6 @@ func (suite *testIterSortMergerSuite) TestIterSortMerger() {
 	suite.Require().Equal(uint64(3), iter.At().GetKey())
 }
 
-func TestAddSuite(t *testing.T) {
+func TestIterSortMergerSuiteSuite(t *testing.T) {
 	suite.Run(t, new(testIterSortMergerSuite))
 }

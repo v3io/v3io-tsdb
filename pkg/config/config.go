@@ -33,6 +33,8 @@ import (
 	"github.com/pkg/errors"
 )
 
+var defaultDisableNginxMitigation = true
+
 const (
 	V3ioConfigEnvironmentVariable = "V3IO_TSDB_CONFIG"
 	DefaultConfigurationFileName  = "v3io-tsdb-config.yaml"
@@ -48,15 +50,16 @@ const (
 	defaultMinimumChunkSize     = 200     // bytes
 	defaultMaximumChunkSize     = 32000   // bytes
 
-	DefaultShardingBucketsCount   = 8
-	DefaultStorageClass           = "local"
-	DefaultIngestionRate          = ""
-	DefaultAggregates             = "" // no aggregates by default
-	DefaultAggregationGranularity = "1h"
-	DefaultLayerRetentionTime     = "1y"
-	DefaultSampleRetentionTime    = 0
-	DefaultLogLevel               = "info"
-	DefaultVerboseLevel           = "debug"
+	DefaultShardingBucketsCount          = 8
+	DefaultStorageClass                  = "local"
+	DefaultIngestionRate                 = ""
+	DefaultAggregates                    = "" // no aggregates by default
+	DefaultAggregationGranularity        = "1h"
+	DefaultLayerRetentionTime            = "1y"
+	DefaultSampleRetentionTime           = 0
+	DefaultLogLevel                      = "info"
+	DefaultVerboseLevel                  = "debug"
+	DefaultUseServerAggregateCoefficient = 3
 
 	// KV attribute names
 	MaxTimeAttrName     = "_maxtime"
@@ -137,8 +140,6 @@ type V3ioConfig struct {
 	// Number of parallel V3IO worker routines for queries;
 	// default = the minimum value between 8 and Workers
 	QryWorkers int `json:"qryWorkers"`
-	// Max uncommitted (delayed) samples allowed per metric
-	MaxBehind int `json:"maxBehind"`
 	// Override last chunk; by default, an append from the last point is attempted upon restart
 	OverrideOld bool `json:"overrideOld"`
 	// Default timeout duration, in seconds; default = 3,600 seconds (1 hour)
@@ -163,7 +164,12 @@ type V3ioConfig struct {
 	// Build Info
 	BuildInfo *BuildInfo `json:"buildInfo,omitempty"`
 	// Override nginx bug
-	DisableNginxMitigation bool `json:"disableNginxMitigation,omitempty"`
+	DisableNginxMitigation *bool `json:"disableNginxMitigation,omitempty"`
+	// explicitly always use client aggregation
+	UsePreciseAggregations bool `json:"usePreciseAggregations,omitempty"`
+	// Coefficient to decide whether or not to use server aggregates optimization
+	// use server aggregations if ` <requested step> / <rollup interval>  >  UseServerAggregateCoefficient`
+	UseServerAggregateCoefficient int `json:"useServerAggregateCoefficient,omitempty"`
 }
 
 type MetricsReporterConfig struct {
@@ -274,6 +280,11 @@ func GetOrLoadFromStruct(cfg *V3ioConfig) (*V3ioConfig, error) {
 	})
 
 	return instance, nil
+}
+
+// Eagerly reloads TSDB configuration. Note: not thread-safe
+func UpdateConfig(path string) {
+	instance, failure = loadConfig(path)
 }
 
 // Update the defaults when using an existing configuration structure (custom configuration)
@@ -416,5 +427,13 @@ func initDefaults(cfg *V3ioConfig) {
 
 	if cfg.ShardingBucketsCount == 0 {
 		cfg.ShardingBucketsCount = DefaultShardingBucketsCount
+	}
+
+	if cfg.UseServerAggregateCoefficient == 0 {
+		cfg.UseServerAggregateCoefficient = DefaultUseServerAggregateCoefficient
+	}
+
+	if cfg.DisableNginxMitigation == nil {
+		cfg.DisableNginxMitigation = &defaultDisableNginxMitigation
 	}
 }

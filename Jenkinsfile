@@ -3,6 +3,7 @@ BUILD_FOLDER = "/go"
 attempts=15
 git_project = "v3io-tsdb"
 git_project_user = "v3io"
+git_project_upstream_user = "v3io"
 git_deploy_user = "iguazio-prod-git-user"
 git_deploy_user_token = "iguazio-prod-git-user-token"
 git_deploy_user_private_key = "iguazio-prod-git-user-private-key"
@@ -14,7 +15,7 @@ def build_v3io_tsdb(TAG_VERSION) {
         def git_project = 'v3io-tsdb'
         stage('prepare sources') {
             container('jnlp') {
-                dir("${BUILD_FOLDER}/src/github.com/v3io/${git_project}") {
+                dir("${BUILD_FOLDER}/src/github.com/${git_project_upstream_user}/${git_project}") {
                     git(changelog: false, credentialsId: git_deploy_user_private_key, poll: false, url: "git@github.com:${git_project_user}/${git_project}.git")
                     sh("git checkout ${TAG_VERSION}")
                 }
@@ -23,11 +24,11 @@ def build_v3io_tsdb(TAG_VERSION) {
 
         stage("build ${git_project} binaries in dood") {
             container('golang') {
-                dir("${BUILD_FOLDER}/src/github.com/v3io/${git_project}") {
+                dir("${BUILD_FOLDER}/src/github.com/${git_project_upstream_user}/${git_project}") {
                     sh """
-                        GOOS=linux GOARCH=amd64 TRAVIS_TAG=${TAG_VERSION} make bin
-                        GOOS=darwin GOARCH=amd64 TRAVIS_TAG=${TAG_VERSION} make bin
-                        GOOS=windows GOARCH=amd64 TRAVIS_TAG=${TAG_VERSION} make bin
+                        GO111MODULE=on GOOS=linux GOARCH=amd64 TRAVIS_TAG=${TAG_VERSION} make bin
+                        GO111MODULE=on GOOS=darwin GOARCH=amd64 TRAVIS_TAG=${TAG_VERSION} make bin
+                        GO111MODULE=on GOOS=windows GOARCH=amd64 TRAVIS_TAG=${TAG_VERSION} make bin
                         ls -la /go/bin
                     """
                 }
@@ -59,35 +60,68 @@ def build_nuclio(V3IO_TSDB_VERSION, internal_status="stable") {
         def git_project = 'tsdb-nuclio'
         stage('prepare sources') {
             container('jnlp') {
-                if(!fileExists("${BUILD_FOLDER}/src/github.com/v3io/${git_project}")) {
-                    sh("cd ${BUILD_FOLDER}; git clone https://${GIT_TOKEN}@github.com/${git_project_user}/${git_project}.git src/github.com/v3io/${git_project}")
+                if (!fileExists("${BUILD_FOLDER}/src/github.com/${git_project_upstream_user}/${git_project}")) {
+                    sh("cd ${BUILD_FOLDER}; git clone https://${GIT_TOKEN}@github.com/${git_project_user}/${git_project}.git src/github.com/${git_project_upstream_user}/${git_project}")
                 }
-                if ( "${internal_status}" == "unstable" ) {
-                    dir("${BUILD_FOLDER}/src/github.com/v3io/${git_project}") {
+                if ("${internal_status}" == "unstable") {
+                    dir("${BUILD_FOLDER}/src/github.com/${git_project_upstream_user}/${git_project}") {
+                        sh("git stash")
                         sh("git checkout development")
                     }
                 } else {
-                    dir("${BUILD_FOLDER}/src/github.com/v3io/${git_project}") {
+                    dir("${BUILD_FOLDER}/src/github.com/${git_project_upstream_user}/${git_project}") {
+                        sh("git stash")
                         sh("git checkout master")
                     }
                 }
-                dir("${BUILD_FOLDER}/src/github.com/v3io/${git_project}") {
-                    sh """
-                        rm -rf functions/ingest/vendor/github.com/v3io/v3io-tsdb functions/query/vendor/github.com/v3io/v3io-tsdb
-                        git clone https://${GIT_TOKEN}@github.com/${git_project_user}/v3io-tsdb.git functions/ingest/vendor/github.com/v3io/v3io-tsdb
-                        cd functions/ingest/vendor/github.com/v3io/v3io-tsdb
-                        git checkout ${V3IO_TSDB_VERSION}
-                        rm -rf .git vendor/github.com/nuclio vendor/github.com/v3io/frames/vendor/golang.org/x/net
-                        cd ${BUILD_FOLDER}/src/github.com/v3io/${git_project}
-                        cp -R functions/ingest/vendor/github.com/v3io/v3io-tsdb functions/query/vendor/github.com/v3io/v3io-tsdb
-                    """
-                }
             }
+            parallel(
+                    'update tsdb in ingest': {
+                        container('jnlp') {
+                            dir("${BUILD_FOLDER}/src/github.com/${git_project_upstream_user}/${git_project}") {
+                                sh """
+                                    rm -rf functions/ingest/vendor/github.com/${git_project_upstream_user}/v3io-tsdb
+                                    git clone https://${GIT_TOKEN}@github.com/${git_project_user}/v3io-tsdb.git functions/ingest/vendor/github.com/${git_project_upstream_user}/v3io-tsdb
+                                    cd functions/ingest/vendor/github.com/${git_project_upstream_user}/v3io-tsdb
+                                    git checkout ${V3IO_TSDB_VERSION}
+                                """
+                            }
+                        }
+                        container('golang') {
+                            dir("${BUILD_FOLDER}/src/github.com/${git_project_upstream_user}/${git_project}/functions/ingest/vendor/github.com/${git_project_upstream_user}/v3io-tsdb") {
+                                sh """
+                                    GO111MODULE=on go mod vendor
+                                    rm -rf .git vendor/github.com/nuclio vendor/github.com/${git_project_upstream_user}/frames/vendor/golang.org/x/net vendor/golang.org/x/net
+                                """
+                            }
+                        }
+                    },
+                    'update tsdb in query': {
+                        container('jnlp') {
+                            dir("${BUILD_FOLDER}/src/github.com/${git_project_upstream_user}/${git_project}") {
+                                sh """
+                                    rm -rf functions/query/vendor/github.com/${git_project_upstream_user}/v3io-tsdb
+                                    git clone https://${GIT_TOKEN}@github.com/${git_project_user}/v3io-tsdb.git functions/query/vendor/github.com/${git_project_upstream_user}/v3io-tsdb
+                                    cd functions/query/vendor/github.com/${git_project_upstream_user}/v3io-tsdb
+                                    git checkout ${V3IO_TSDB_VERSION}
+                                """
+                            }
+                        }
+                        container('golang') {
+                            dir("${BUILD_FOLDER}/src/github.com/${git_project_upstream_user}/${git_project}/functions/query/vendor/github.com/${git_project_upstream_user}/v3io-tsdb") {
+                                sh """
+                                    GO111MODULE=on go mod vendor
+                                    rm -rf .git vendor/github.com/nuclio vendor/github.com/${git_project_upstream_user}/frames/vendor/golang.org/x/net vendor/golang.org/x/net
+                                """
+                            }
+                        }
+                    }
+            )
         }
 
         stage('git push') {
             container('jnlp') {
-                dir("${BUILD_FOLDER}/src/github.com/v3io/${git_project}") {
+                dir("${BUILD_FOLDER}/src/github.com/${git_project_upstream_user}/${git_project}") {
                     sh """
                         git config --global user.email '${GIT_USERNAME}@iguazio.com'
                         git config --global user.name '${GIT_USERNAME}'
@@ -96,7 +130,7 @@ def build_nuclio(V3IO_TSDB_VERSION, internal_status="stable") {
                         git add functions/ingest/vendor/github.com functions/query/vendor/github.com;
                     """
                     try {
-                        sh("git commit -am 'Updated TSDB to ${V3IO_TSDB_VERSION}'")
+                        sh("git commit -m 'Updated TSDB to ${V3IO_TSDB_VERSION}'")
                     } catch (err) {
                         echo "Can not commit"
                     }
@@ -111,6 +145,9 @@ def build_nuclio(V3IO_TSDB_VERSION, internal_status="stable") {
                         echo err
                     }
                 }
+            }
+            container('golang') {
+                sh("rm -rf ${BUILD_FOLDER}/src/github.com/${git_project_upstream_user}/${git_project}")
             }
         }
     }
@@ -126,33 +163,37 @@ def build_prometheus(V3IO_TSDB_VERSION, internal_status="stable") {
 
         stage('prepare sources') {
             container('jnlp') {
-                if(!fileExists("${BUILD_FOLDER}/src/github.com/${git_project}/${git_project}")) {
-                    sh("cd ${BUILD_FOLDER}; git clone https://${GIT_TOKEN}@github.com/${git_project_user}/${git_project}.git src/github.com/${git_project}/${git_project}")
+                if (!fileExists("${BUILD_FOLDER}/src/github.com/${git_project_upstream_user}/${git_project}")) {
+                    sh("cd ${BUILD_FOLDER}; git clone https://${GIT_TOKEN}@github.com/${git_project_user}/${git_project}.git src/github.com/${git_project_upstream_user}/${git_project}")
                 }
-                if ( "${internal_status}" == "unstable" ) {
-                    dir("${BUILD_FOLDER}/src/github.com/${git_project}/${git_project}") {
+                if ("${internal_status}" == "unstable") {
+                    dir("${BUILD_FOLDER}/src/github.com/${git_project_upstream_user}/${git_project}") {
+                        sh("git stash")
                         sh("git checkout development")
                     }
                 } else {
-                    dir("${BUILD_FOLDER}/src/github.com/${git_project}/${git_project}") {
+                    dir("${BUILD_FOLDER}/src/github.com/${git_project_upstream_user}/${git_project}") {
+                        sh("git stash")
                         sh("git checkout master")
                     }
                 }
-                dir("${BUILD_FOLDER}/src/github.com/${git_project}/${git_project}") {
-                    sh """
-                        rm -rf vendor/github.com/v3io/v3io-tsdb/
-                        git clone https://${GIT_TOKEN}@github.com/${git_project_user}/v3io-tsdb.git vendor/github.com/v3io/v3io-tsdb
-                        cd vendor/github.com/v3io/v3io-tsdb
-                        git checkout ${V3IO_TSDB_VERSION}
-                        rm -rf .git vendor/github.com/${git_project} vendor/github.com/v3io/frames/vendor/golang.org/x/net
-                    """
+            }
+            container('golang') {
+                dir("${BUILD_FOLDER}/src/github.com/${git_project_upstream_user}/${git_project}") {
+                    if("${git_project_user}" != "${git_project_upstream_user}") {
+                        sh("GO111MODULE=on go mod edit -replace github.com/${git_project_upstream_user}/v3io-tsdb=github.com/${git_project_user}/v3io-tsdb@${V3IO_TSDB_VERSION}")
+                        sh("GO111MODULE=on go get")
+                    } else {
+                        sh("GO111MODULE=on go get github.com/${git_project_user}/v3io-tsdb@${V3IO_TSDB_VERSION}")
+                    }
+                    sh("GO111MODULE=on go mod vendor")
                 }
             }
         }
 
         stage('git push') {
             container('jnlp') {
-                dir("${BUILD_FOLDER}/src/github.com/${git_project}/${git_project}") {
+                dir("${BUILD_FOLDER}/src/github.com/${git_project_upstream_user}/${git_project}") {
                     sh """
                         git config --global user.email '${GIT_USERNAME}@iguazio.com'
                         git config --global user.name '${GIT_USERNAME}'
@@ -161,7 +202,7 @@ def build_prometheus(V3IO_TSDB_VERSION, internal_status="stable") {
                         git add vendor/github.com;
                     """
                     try {
-                        sh("git commit -am 'Updated TSDB to ${V3IO_TSDB_VERSION}'")
+                        sh("git commit -m 'Updated TSDB to ${V3IO_TSDB_VERSION}'")
                     } catch (err) {
                         echo "Can not commit"
                     }
@@ -176,6 +217,9 @@ def build_prometheus(V3IO_TSDB_VERSION, internal_status="stable") {
                         echo err
                     }
                 }
+            }
+            container('golang') {
+                sh("rm -rf ${BUILD_FOLDER}/src/github.com/${git_project_upstream_user}/${git_project}")
             }
         }
     }
@@ -206,9 +250,7 @@ podTemplate(label: "${git_project}-${label}", inheritFrom: "jnlp-docker-golang")
                 if (github.check_tag_expiration(git_project, git_project_user, MAIN_TAG_VERSION, GIT_TOKEN)) {
                     parallel(
                             'v3io-tsdb': {
-                                podTemplate(label: "v3io-tsdb-${label}", inheritFrom: "${git_project}-${label}", containers: [
-                                        containerTemplate(name: 'golang', image: 'golang:1.11')
-                                ]) {
+                                podTemplate(label: "v3io-tsdb-${label}", inheritFrom: "jnlp-docker-golang") {
                                     node("v3io-tsdb-${label}") {
                                         withCredentials([
                                                 string(credentialsId: git_deploy_user_token, variable: 'GIT_TOKEN')
@@ -219,7 +261,7 @@ podTemplate(label: "${git_project}-${label}", inheritFrom: "jnlp-docker-golang")
                                 }
                             },
                             'tsdb-nuclio': {
-                                podTemplate(label: "v3io-tsdb-nuclio-${label}", inheritFrom: "${git_project}-${label}") {
+                                podTemplate(label: "v3io-tsdb-nuclio-${label}", inheritFrom: "jnlp-docker") {
                                     node("v3io-tsdb-nuclio-${label}") {
                                         withCredentials([
                                                 string(credentialsId: git_deploy_user_token, variable: 'GIT_TOKEN')
@@ -259,7 +301,7 @@ podTemplate(label: "${git_project}-${label}", inheritFrom: "jnlp-docker-golang")
                                 }
                             },
                             'prometheus': {
-                                podTemplate(label: "v3io-tsdb-prometheus-${label}", inheritFrom: "${git_project}-${label}") {
+                                podTemplate(label: "v3io-tsdb-prometheus-${label}", inheritFrom: "jnlp-docker") {
                                     node("v3io-tsdb-prometheus-${label}") {
                                         withCredentials([
                                                 string(credentialsId: git_deploy_user_token, variable: 'GIT_TOKEN')
