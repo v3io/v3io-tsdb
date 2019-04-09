@@ -153,7 +153,6 @@ def build_nuclio(V3IO_TSDB_VERSION, internal_status="stable") {
     }
 }
 
-
 def build_prometheus(V3IO_TSDB_VERSION, internal_status="stable") {
     withCredentials([
             usernamePassword(credentialsId: git_deploy_user, passwordVariable: 'GIT_PASSWORD', usernameVariable: 'GIT_USERNAME'),
@@ -225,11 +224,83 @@ def build_prometheus(V3IO_TSDB_VERSION, internal_status="stable") {
     }
 }
 
+def build_frames(V3IO_TSDB_VERSION, internal_status="stable") {
+    withCredentials([
+            usernamePassword(credentialsId: git_deploy_user, passwordVariable: 'GIT_PASSWORD', usernameVariable: 'GIT_USERNAME'),
+            string(credentialsId: git_deploy_user_token, variable: 'GIT_TOKEN')
+    ]) {
+        def git_project = 'prometheus'
+
+        stage('prepare sources') {
+            container('jnlp') {
+                if (!fileExists("${BUILD_FOLDER}/src/github.com/${git_project_upstream_user}/${git_project}")) {
+                    sh("cd ${BUILD_FOLDER}; git clone https://${GIT_TOKEN}@github.com/${git_project_user}/${git_project}.git src/github.com/${git_project_upstream_user}/${git_project}")
+                }
+                if ("${internal_status}" == "unstable") {
+                    dir("${BUILD_FOLDER}/src/github.com/${git_project_upstream_user}/${git_project}") {
+                        sh("git stash")
+                        sh("git checkout development")
+                    }
+                } else {
+                    dir("${BUILD_FOLDER}/src/github.com/${git_project_upstream_user}/${git_project}") {
+                        sh("git stash")
+                        sh("git checkout master")
+                    }
+                }
+            }
+            container('golang') {
+                dir("${BUILD_FOLDER}/src/github.com/${git_project_upstream_user}/${git_project}") {
+                    if("${git_project_user}" != "${git_project_upstream_user}") {
+                        sh("GO111MODULE=on go mod edit -replace github.com/${git_project_upstream_user}/v3io-tsdb=github.com/${git_project_user}/v3io-tsdb@${V3IO_TSDB_VERSION}")
+                        sh("GO111MODULE=on go get")
+                    } else {
+                        sh("GO111MODULE=on go get github.com/${git_project_user}/v3io-tsdb@${V3IO_TSDB_VERSION}")
+                    }
+                    sh("GO111MODULE=on go mod vendor")
+                    sh("chown 1000:1000 ./ -R")
+                }
+            }
+        }
+
+        stage('git push') {
+            container('jnlp') {
+                dir("${BUILD_FOLDER}/src/github.com/${git_project_upstream_user}/${git_project}") {
+                    sh """
+                        git config --global user.email '${GIT_USERNAME}@iguazio.com'
+                        git config --global user.name '${GIT_USERNAME}'
+                        git remote rm origin
+                        git remote add origin https://${GIT_USERNAME}:${GIT_TOKEN}@github.com/${git_project_user}/${git_project}.git
+                        git add go.mod;
+                    """
+                    try {
+                        sh("git commit -m 'Updated TSDB to ${V3IO_TSDB_VERSION}'")
+                    } catch (err) {
+                        echo "Can not commit"
+                    }
+                    try {
+                        if ( "${internal_status}" == "unstable" ) {
+                            sh("git push origin development")
+                        } else {
+                            sh("git push origin master")
+                        }
+                    } catch (err) {
+                        echo "Can not push code"
+                        echo err
+                    }
+                }
+            }
+            container('golang') {
+                sh("rm -rf ${BUILD_FOLDER}/src/github.com/${git_project_upstream_user}/${git_project}")
+            }
+        }
+    }
+}
+
 podTemplate(label: "${git_project}-${label}", inheritFrom: "jnlp-docker-golang") {
     def MAIN_TAG_VERSION
     def next_versions = ['prometheus':null, 'tsdb-nuclio':null]
 
-    pipelinex = library(identifier: 'pipelinex@shellc', retriever: modernSCM(
+    pipelinex = library(identifier: 'pipelinex@refs', retriever: modernSCM(
             [$class:        'GitSCMSource',
              credentialsId: git_deploy_user_private_key,
              remote:        "git@github.com:iguazio/pipelinex.git"])).com.iguazio.pipelinex
@@ -272,8 +343,8 @@ podTemplate(label: "${git_project}-${label}", inheritFrom: "jnlp-docker-golang")
                                                 stage('get previous release version') {
                                                     container('jnlp') {
                                                         NEXT_VERSION = github.get_next_tag_version("tsdb-nuclio", git_project_user, GIT_TOKEN)
-
                                                         echo "$NEXT_VERSION"
+                                                        NEXT_VERSION = "${NEXT_VERSION}-${MAIN_TAG_VERSION}"
                                                         next_versions.putAt("tsdb-nuclio", NEXT_VERSION)
                                                     }
                                                 }
@@ -294,6 +365,46 @@ podTemplate(label: "${git_project}-${label}", inheritFrom: "jnlp-docker-golang")
                                             } else {
                                                 stage('info') {
                                                     echo("Unstable tsdb doesn't trigger tsdb-nuclio")
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            },
+                            'frames': {
+                                podTemplate(label: "v3io-frames-${label}", inheritFrom: "jnlp-docker") {
+                                    node("v3io-frames-${label}") {
+                                        withCredentials([
+                                                string(credentialsId: git_deploy_user_token, variable: 'GIT_TOKEN')
+                                        ]) {
+                                            def NEXT_VERSION
+
+                                            if (MAIN_TAG_VERSION != "unstable") {
+                                                stage('get previous release version') {
+                                                    container('jnlp') {
+                                                        NEXT_VERSION = github.get_next_tag_version("frames", git_project_user, GIT_TOKEN)
+                                                        echo "$NEXT_VERSION"
+                                                        NEXT_VERSION = "${NEXT_VERSION}-${MAIN_TAG_VERSION}"
+                                                        next_versions.putAt("frames", NEXT_VERSION)
+                                                    }
+                                                }
+
+                                                build_frames(MAIN_TAG_VERSION, "unstable")
+                                                build_frames(MAIN_TAG_VERSION)
+
+                                                stage('create frames prerelease') {
+                                                    container('jnlp') {
+                                                        echo "Triggered frames development will be builded with last tsdb stable version"
+                                                        github.delete_release("frames", git_project_user, "unstable", GIT_TOKEN)
+                                                        github.create_prerelease("frames", git_project_user, "unstable", GIT_TOKEN, "development")
+
+                                                        echo "Trigger frames ${NEXT_VERSION} with tsdb ${MAIN_TAG_VERSION}"
+                                                        github.create_prerelease("frames", git_project_user, NEXT_VERSION, GIT_TOKEN)
+                                                    }
+                                                }
+                                            } else {
+                                                stage('info') {
+                                                    echo("Unstable tsdb doesn't trigger frames")
                                                 }
                                             }
                                         }
