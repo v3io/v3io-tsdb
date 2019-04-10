@@ -603,7 +603,13 @@ func (c *basicColumn) setMetricName(name string) {
 	c.name = c.spec.getColumnName()
 }
 
-func (c *basicColumn) SetDataAt(i int, value interface{}) error { return nil }
+func (c *basicColumn) SetDataAt(i int, value interface{}) error {
+	if !c.isValidIndex(i) {
+		return fmt.Errorf("index %d out of bounds [0:%d]", i, c.size)
+	}
+	return nil
+}
+
 func (c *basicColumn) SetData(d interface{}, size int) error {
 	return errors.New("method not supported")
 }
