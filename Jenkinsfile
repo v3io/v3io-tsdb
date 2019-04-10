@@ -229,7 +229,7 @@ def build_frames(V3IO_TSDB_VERSION, internal_status="stable") {
             usernamePassword(credentialsId: git_deploy_user, passwordVariable: 'GIT_PASSWORD', usernameVariable: 'GIT_USERNAME'),
             string(credentialsId: git_deploy_user_token, variable: 'GIT_TOKEN')
     ]) {
-        def git_project = 'prometheus'
+        def git_project = 'frames'
 
         stage('prepare sources') {
             container('jnlp') {
