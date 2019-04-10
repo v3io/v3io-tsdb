@@ -443,11 +443,21 @@ func (queryCtx *selectQueryContext) createColumnSpecs() ([]columnMeta, map[strin
 		if aggregatesMask != 0 {
 			hiddenColumns := aggregate.GetHiddenAggregatesWithCount(aggregatesMask, aggregates)
 			for _, hiddenAggr := range hiddenColumns {
-				hiddenCol := columnMeta{metric: metric, function: hiddenAggr, isHidden: true,
-					interpolationTolerance: metricInterpolationTolerance,
-					interpolationType:      metricInterpolationType}
+				hiddenCol := columnMeta{metric: metric, function: hiddenAggr, isHidden: true}
 				columnsSpec = append(columnsSpec, hiddenCol)
 				columnsSpecByMetric[metric] = append(columnsSpecByMetric[metric], hiddenCol)
+			}
+		}
+
+		// After creating all columns set their interpolation function
+		for i := 0; i < len(columnsSpecByMetric[metric]); i++ {
+			columnsSpecByMetric[metric][i].interpolationType = metricInterpolationType
+			columnsSpecByMetric[metric][i].interpolationTolerance = metricInterpolationTolerance
+		}
+		for i, col := range columnsSpec {
+			if col.metric == metric {
+				columnsSpec[i].interpolationType = metricInterpolationType
+				columnsSpec[i].interpolationTolerance = metricInterpolationTolerance
 			}
 		}
 	}
