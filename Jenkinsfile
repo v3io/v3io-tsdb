@@ -342,9 +342,9 @@ podTemplate(label: "${git_project}-${label}", inheritFrom: "jnlp-docker-golang")
                                             if (MAIN_TAG_VERSION != "unstable") {
                                                 stage('get previous release version') {
                                                     container('jnlp') {
-                                                        NEXT_VERSION = github.get_next_tag_version("tsdb-nuclio", git_project_user, GIT_TOKEN)
-                                                        echo "$NEXT_VERSION"
-                                                        NEXT_VERSION = "${NEXT_VERSION}-${MAIN_TAG_VERSION}"
+                                                        CURRENT_VERSION = github.get_current_tag_version("tsdb-nuclio", git_project_user, GIT_TOKEN)
+                                                        echo "$CURRENT_VERSION"
+                                                        NEXT_VERSION = "${CURRENT_VERSION}-${MAIN_TAG_VERSION}"
                                                         next_versions.putAt("tsdb-nuclio", NEXT_VERSION)
                                                     }
                                                 }
@@ -382,9 +382,9 @@ podTemplate(label: "${git_project}-${label}", inheritFrom: "jnlp-docker-golang")
                                             if (MAIN_TAG_VERSION != "unstable") {
                                                 stage('get previous release version') {
                                                     container('jnlp') {
-                                                        NEXT_VERSION = github.get_next_tag_version("frames", git_project_user, GIT_TOKEN)
-                                                        echo "$NEXT_VERSION"
-                                                        NEXT_VERSION = "${NEXT_VERSION}-${MAIN_TAG_VERSION}"
+                                                        CURRENT_VERSION = github.get_current_tag_version("frames", git_project_user, GIT_TOKEN)
+                                                        echo "$CURRENT_VERSION"
+                                                        NEXT_VERSION = "${CURRENT_VERSION}-${MAIN_TAG_VERSION}"
                                                         next_versions.putAt("frames", NEXT_VERSION)
                                                     }
                                                 }
