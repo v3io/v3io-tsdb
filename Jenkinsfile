@@ -270,7 +270,7 @@ def build_frames(V3IO_TSDB_VERSION, internal_status="stable") {
                         git config --global user.name '${GIT_USERNAME}'
                         git remote rm origin
                         git remote add origin https://${GIT_USERNAME}:${GIT_TOKEN}@github.com/${git_project_user}/${git_project}.git
-                        git add go.mod;
+                        git add go.mod go.sum;
                     """
                     try {
                         sh("git commit -m 'Updated TSDB to ${V3IO_TSDB_VERSION}'")
@@ -342,9 +342,9 @@ podTemplate(label: "${git_project}-${label}", inheritFrom: "jnlp-docker-golang")
                                             if (MAIN_TAG_VERSION != "unstable") {
                                                 stage('get previous release version') {
                                                     container('jnlp') {
-                                                        NEXT_VERSION = github.get_next_tag_version("tsdb-nuclio", git_project_user, GIT_TOKEN)
-                                                        echo "$NEXT_VERSION"
-                                                        NEXT_VERSION = "${NEXT_VERSION}-${MAIN_TAG_VERSION}"
+                                                        CURRENT_VERSION = github.get_short_tag_version("tsdb-nuclio", git_project_user, GIT_TOKEN)
+                                                        echo "$CURRENT_VERSION"
+                                                        NEXT_VERSION = "${CURRENT_VERSION}-${MAIN_TAG_VERSION}"
                                                         next_versions.putAt("tsdb-nuclio", NEXT_VERSION)
                                                     }
                                                 }
@@ -382,9 +382,9 @@ podTemplate(label: "${git_project}-${label}", inheritFrom: "jnlp-docker-golang")
                                             if (MAIN_TAG_VERSION != "unstable") {
                                                 stage('get previous release version') {
                                                     container('jnlp') {
-                                                        NEXT_VERSION = github.get_next_tag_version("frames", git_project_user, GIT_TOKEN)
-                                                        echo "$NEXT_VERSION"
-                                                        NEXT_VERSION = "${NEXT_VERSION}-${MAIN_TAG_VERSION}"
+                                                        CURRENT_VERSION = github.get_short_tag_version("frames", git_project_user, GIT_TOKEN)
+                                                        echo "$CURRENT_VERSION"
+                                                        NEXT_VERSION = "${CURRENT_VERSION}-${MAIN_TAG_VERSION}"
                                                         next_versions.putAt("frames", NEXT_VERSION)
                                                     }
                                                 }
