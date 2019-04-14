@@ -129,19 +129,25 @@ func (p *PartitionManager) TimeToPart(t int64) (*DBPartition, error) {
 	} else {
 		if t >= p.headPartition.startTime {
 			if (t - p.headPartition.startTime) >= p.currentPartitionInterval {
-				_, err := p.createAndUpdatePartition(p.headPartition.startTime + p.currentPartitionInterval)
+				_, err := p.createAndUpdatePartition(p.currentPartitionInterval * (t / p.currentPartitionInterval))
 				if err != nil {
 					return nil, err
 				}
-				return p.TimeToPart(t)
-			} else {
-				return p.headPartition, nil
 			}
+			return p.headPartition, nil
 		} else {
 			// Iterate backwards; ignore the last element as it's the head partition
 			for i := len(p.partitions) - 2; i >= 0; i-- {
 				if t >= p.partitions[i].startTime {
-					return p.partitions[i], nil
+					if t < p.partitions[i].GetEndTime() {
+						return p.partitions[i], nil
+					} else {
+						part, err := p.createAndUpdatePartition(p.currentPartitionInterval * (t / p.currentPartitionInterval))
+						if err != nil {
+							return nil, err
+						}
+						return part, nil
+					}
 				}
 			}
 			head := p.headPartition
@@ -160,20 +166,27 @@ func (p *PartitionManager) createAndUpdatePartition(t int64) (*DBPartition, erro
 		return nil, err
 	}
 	p.currentPartitionInterval = partition.partitionInterval
+
+	schemaPartition := &config.Partition{StartTime: partition.startTime, SchemaInfo: p.schemaConfig.PartitionSchemaInfo}
 	if p.headPartition == nil || time > p.headPartition.startTime {
 		p.headPartition = partition
 		p.partitions = append(p.partitions, partition)
+		p.schemaConfig.Partitions = append(p.schemaConfig.Partitions, schemaPartition)
 	} else {
 		for i, part := range p.partitions {
 			if part.startTime > time {
 				p.partitions = append(p.partitions, nil)
 				copy(p.partitions[i+1:], p.partitions[i:])
 				p.partitions[i] = partition
+
+				p.schemaConfig.Partitions = append(p.schemaConfig.Partitions, nil)
+				copy(p.schemaConfig.Partitions[i+1:], p.schemaConfig.Partitions[i:])
+				p.schemaConfig.Partitions[i] = schemaPartition
 				break
 			}
 		}
 	}
-	p.schemaConfig.Partitions = append(p.schemaConfig.Partitions, &config.Partition{StartTime: partition.startTime, SchemaInfo: p.schemaConfig.PartitionSchemaInfo})
+
 	err = p.updateSchema()
 	return partition, err
 }
