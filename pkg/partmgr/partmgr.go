@@ -30,7 +30,7 @@ import (
 	"sync"
 
 	"github.com/pkg/errors"
-	"github.com/v3io/v3io-go-http"
+	"github.com/v3io/v3io-go/pkg/dataplane"
 	"github.com/v3io/v3io-tsdb/internal/pkg/performance"
 	"github.com/v3io/v3io-tsdb/pkg/aggregate"
 	"github.com/v3io/v3io-tsdb/pkg/config"
@@ -38,7 +38,7 @@ import (
 )
 
 // Create a new partition manager
-func NewPartitionMngr(schemaConfig *config.Schema, cont *v3io.Container, v3ioConfig *config.V3ioConfig) (*PartitionManager, error) {
+func NewPartitionMngr(schemaConfig *config.Schema, cont v3io.Container, v3ioConfig *config.V3ioConfig) (*PartitionManager, error) {
 	currentPartitionInterval, err := utils.Str2duration(schemaConfig.PartitionSchemaInfo.PartitionerInterval)
 	if err != nil {
 		return nil, err
@@ -96,7 +96,7 @@ type PartitionManager struct {
 	headPartition            *DBPartition
 	partitions               []*DBPartition
 	cyclic                   bool
-	container                *v3io.Container
+	container                v3io.Container
 	currentPartitionInterval int64 //TODO update on schema changes
 	v3ioConfig               *config.V3ioConfig
 }
@@ -188,7 +188,7 @@ func (p *PartitionManager) updateSchema() (err error) {
 			return
 		}
 		if p.container != nil { // Tests use case only
-			err = p.container.Sync.PutObject(&v3io.PutObjectInput{Path: path.Join(p.Path(), config.SchemaConfigFileName), Body: data})
+			err = p.container.PutObjectSync(&v3io.PutObjectInput{Path: path.Join(p.Path(), config.SchemaConfigFileName), Body: data})
 		}
 	})
 
@@ -229,7 +229,7 @@ func (p *PartitionManager) ReadAndUpdateSchema() (err error) {
 		err = errors.Wrap(err, "Failed to create timer ReadAndUpdateSchemaTimer.")
 		return
 	}
-	schemaInfoResp, err := p.container.Sync.GetItem(&v3io.GetItemInput{Path: fullPath, AttributeNames: []string{"__mtime_secs", "__mtime_nsecs"}})
+	schemaInfoResp, err := p.container.GetItemSync(&v3io.GetItemInput{Path: fullPath, AttributeNames: []string{"__mtime_secs", "__mtime_nsecs"}})
 	if err != nil {
 		err = errors.Wrapf(err, "Failed to read schema at path '%s'.", fullPath)
 	}
@@ -248,7 +248,7 @@ func (p *PartitionManager) ReadAndUpdateSchema() (err error) {
 		p.schemaMtimeNanosecs = mtimeNsecs
 
 		metricReporter.WithTimer("ReadAndUpdateSchemaTimer", func() {
-			resp, err := p.container.Sync.GetObject(&v3io.GetObjectInput{Path: fullPath})
+			resp, err := p.container.GetObjectSync(&v3io.GetObjectInput{Path: fullPath})
 			if err != nil {
 				err = errors.Wrapf(err, "Failed to read schema at path '%s'.", fullPath)
 			}

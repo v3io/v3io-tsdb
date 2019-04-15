@@ -31,7 +31,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/v3io/v3io-go-http"
+	"github.com/v3io/v3io-go/pkg/dataplane"
 	"github.com/v3io/v3io-tsdb/pkg/aggregate"
 	"github.com/v3io/v3io-tsdb/pkg/chunkenc"
 	"github.com/v3io/v3io-tsdb/pkg/config"
@@ -817,9 +817,12 @@ func TestDeleteTSDB(t *testing.T) {
 	}
 	responseChan := make(chan *v3io.Response)
 	container, _ := adapter.GetContainer()
-	container.ListBucket(&v3io.ListBucketInput{Path: v3ioConfig.TablePath}, 30, responseChan)
+	_, err = container.GetContainerContents(&v3io.GetContainerContentsInput{Path: v3ioConfig.TablePath}, 30, responseChan)
+	if err != nil {
+		t.Fatal(err.Error())
+	}
 	if res := <-responseChan; res.Error != nil {
-		t.Fatal("Failed to create TSDB")
+		t.Fatal(res.Error.Error())
 	}
 
 	now := time.Now().Unix() * 1000 // now time in millis
@@ -827,7 +830,10 @@ func TestDeleteTSDB(t *testing.T) {
 		t.Fatalf("Failed to delete DB on teardown. reason: %s", err)
 	}
 
-	container.ListBucket(&v3io.ListBucketInput{Path: v3ioConfig.TablePath}, 30, responseChan)
+	_, err = container.GetContainerContents(&v3io.GetContainerContentsInput{Path: v3ioConfig.TablePath}, 30, responseChan)
+	if err != nil {
+		t.Fatal(err.Error())
+	}
 	if res := <-responseChan; res.Error == nil {
 		t.Fatal("Did not delete TSDB properly")
 	}
@@ -1005,7 +1011,7 @@ func testDeleteTSDBCase(test *testing.T, testParams tsdbtest.TestParams, deleteF
 		tableSchemaPath := path.Join(tablePath, config.SchemaConfigFileName)
 
 		// Validate: schema does not exist
-		_, err := container.Sync.GetObject(&v3io.GetObjectInput{Path: tableSchemaPath})
+		_, err := container.GetObjectSync(&v3io.GetObjectInput{Path: tableSchemaPath})
 		if err != nil {
 			if utils.IsNotExistsError(err) {
 				// OK - expected
@@ -1015,7 +1021,7 @@ func testDeleteTSDBCase(test *testing.T, testParams tsdbtest.TestParams, deleteF
 		}
 
 		// Validate: table does not exist
-		_, err = container.Sync.GetObject(&v3io.GetObjectInput{Path: tablePath})
+		_, err = container.GetObjectSync(&v3io.GetObjectInput{Path: tablePath})
 		if err != nil {
 			if utils.IsNotExistsError(err) {
 				// OK - expected

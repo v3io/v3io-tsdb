@@ -11,7 +11,7 @@ import (
 	"github.com/nuclio/nuclio-sdk-go"
 	"github.com/nuclio/nuclio-test-go"
 	"github.com/pkg/errors"
-	"github.com/v3io/v3io-go-http"
+	"github.com/v3io/v3io-go/pkg/dataplane"
 	"github.com/v3io/v3io-tsdb/pkg/tsdb"
 	"github.com/v3io/v3io-tsdb/pkg/tsdb/tsdbtest"
 	"github.com/v3io/v3io-tsdb/pkg/tsdb/tsdbtest/testutils"
@@ -149,7 +149,7 @@ func initContext(context *nuclio.Context) error {
 	// Hack - update path to TSDB
 	v3ioConfig.TablePath = tsdbPath
 
-	data := context.DataBinding[defaultDbName].(*v3io.Container)
+	data := context.DataBinding[defaultDbName].(v3io.Container)
 	adapter, err := tsdb.NewV3ioAdapter(v3ioConfig, data, context.Logger)
 	if err != nil {
 		return errors.Wrap(err, "failed to create V3IO Adapter")
