@@ -10,7 +10,7 @@ import (
 
 	"github.com/nuclio/logger"
 	"github.com/pkg/errors"
-	"github.com/v3io/v3io-go-http"
+	"github.com/v3io/v3io-go/pkg/dataplane"
 	"github.com/v3io/v3io-tsdb/internal/pkg/performance"
 	"github.com/v3io/v3io-tsdb/pkg/config"
 	"github.com/v3io/v3io-tsdb/pkg/partmgr"
@@ -18,7 +18,7 @@ import (
 )
 
 // Create a new Querier interface
-func NewV3ioQuerier(container *v3io.Container, logger logger.Logger,
+func NewV3ioQuerier(container v3io.Container, logger logger.Logger,
 	cfg *config.V3ioConfig, partMngr *partmgr.PartitionManager) *V3ioQuerier {
 	newQuerier := V3ioQuerier{
 		container: container,
@@ -32,7 +32,7 @@ func NewV3ioQuerier(container *v3io.Container, logger logger.Logger,
 
 type V3ioQuerier struct {
 	logger              logger.Logger
-	container           *v3io.Container
+	container           v3io.Container
 	cfg                 *config.V3ioConfig
 	partitionMngr       *partmgr.PartitionManager
 	performanceReporter *performance.MetricReporter

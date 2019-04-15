@@ -19,16 +19,16 @@ require (
 	github.com/spf13/pflag v1.0.3 // indirect
 	github.com/stretchr/testify v1.3.0
 	github.com/v3io/frames v0.0.0-20190328123118-1dad1ff610509e7b087d9cd390ed1b452caecf15
-	github.com/v3io/v3io-go-http v0.0.0-20190221115935-53e2b487c9a2
+	github.com/v3io/v3io-go v0.0.0-20180414000000-0e6eb7313eeebd11419cc8af4e75b8894a6a8486
 	github.com/xwb1989/sqlparser v0.0.0-20180606152119-120387863bf2
 	golang.org/x/net v0.0.0-20181114220301-adae6a3d119a // indirect
 	golang.org/x/sync v0.0.0-20181108010431-42b317875d0f // indirect
-	golang.org/x/sys v0.0.0-20181116152217-5ac8a444bdc5 // indirect
 	google.golang.org/grpc v1.17.0 // indirect
 	gopkg.in/yaml.v2 v2.2.2 // indirect
 )
 
 replace (
+	github.com/v3io/v3io-go => github.com/gtopper/v3io-go v0.0.0-20180415000000-18820e17993fb51050908f3fbb599d9d2da659f2
 	github.com/xwb1989/sqlparser => github.com/v3io/sqlparser v0.0.0-20190306105200-4d7273501871
 	labix.org/v2/mgo => github.com/go-mgo/mgo v0.0.0-20180705113738-7446a0344b7872c067b3d6e1b7642571eafbae17
 	launchpad.net/gocheck => github.com/go-check/check v0.0.0-20180628173108-788fd78401277ebd861206a03c884797c6ec5541

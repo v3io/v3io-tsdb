@@ -31,7 +31,8 @@ import (
 
 	"github.com/nuclio/logger"
 	"github.com/pkg/errors"
-	"github.com/v3io/v3io-go-http"
+	"github.com/v3io/v3io-go/pkg/dataplane"
+	"github.com/v3io/v3io-go/pkg/dataplane/http"
 	"github.com/v3io/v3io-tsdb/pkg/appender"
 	"github.com/v3io/v3io-tsdb/pkg/config"
 	"github.com/v3io/v3io-tsdb/pkg/partmgr"
@@ -41,19 +42,22 @@ import (
 	"github.com/v3io/v3io-tsdb/pkg/utils"
 )
 
+const defaultHttpTimeout = 30 * time.Second
+
 type V3ioAdapter struct {
 	startTimeMargin int64
 	logger          logger.Logger
-	container       *v3io.Container
+	container       v3io.Container
+	HttpTimeout     time.Duration
 	MetricsCache    *appender.MetricsCache
 	cfg             *config.V3ioConfig
 	partitionMngr   *partmgr.PartitionManager
 }
 
-func CreateTSDB(v3iocfg *config.V3ioConfig, schema *config.Schema) error {
+func CreateTSDB(cfg *config.V3ioConfig, schema *config.Schema) error {
 
-	lgr, _ := utils.NewLogger(v3iocfg.LogLevel)
-	container, err := utils.CreateContainer(lgr, v3iocfg)
+	lgr, _ := utils.NewLogger(cfg.LogLevel)
+	container, err := utils.CreateContainer(lgr, cfg)
 	if err != nil {
 		return errors.Wrap(err, "Failed to create a data container.")
 	}
@@ -63,24 +67,41 @@ func CreateTSDB(v3iocfg *config.V3ioConfig, schema *config.Schema) error {
 		return errors.Wrap(err, "Failed to marshal the TSDB schema file.")
 	}
 
-	path := pathUtil.Join(v3iocfg.TablePath, config.SchemaConfigFileName)
+	httpTimeout := parseHttpTimeout(cfg, lgr)
+	dataPlaneInput := v3io.DataPlaneInput{Timeout: httpTimeout}
+
+	path := pathUtil.Join(cfg.TablePath, config.SchemaConfigFileName)
 	// Check whether the config file already exists, and abort if it does
-	_, err = container.Sync.GetObject(&v3io.GetObjectInput{Path: path})
+	_, err = container.GetObjectSync(&v3io.GetObjectInput{Path: path, DataPlaneInput: dataPlaneInput})
 	if err == nil {
-		return fmt.Errorf("A TSDB table already exists at path '" + v3iocfg.TablePath + "'.")
+		return fmt.Errorf("A TSDB table already exists at path '" + cfg.TablePath + "'.")
 	}
 
-	err = container.Sync.PutObject(&v3io.PutObjectInput{Path: path, Body: data})
+	err = container.PutObjectSync(&v3io.PutObjectInput{Path: path, Body: data, DataPlaneInput: dataPlaneInput})
 	if err != nil {
 		return errors.Wrapf(err, "Failed to create a TSDB schema at path '%s'.",
-			pathUtil.Join(v3iocfg.WebApiEndpoint, v3iocfg.Container, path))
+			pathUtil.Join(cfg.WebApiEndpoint, cfg.Container, path))
 	}
 	return err
 }
 
+func parseHttpTimeout(cfg *config.V3ioConfig, logger logger.Logger) time.Duration {
+	if cfg.HttpTimeout == "" {
+		return defaultHttpTimeout
+	} else {
+		timeout, err := time.ParseDuration(cfg.HttpTimeout)
+		if err != nil {
+			logger.Warn("Failed to parse httpTimeout '%s'. Defaulting to %d millis.", cfg.HttpTimeout, defaultHttpTimeout/time.Millisecond)
+			return defaultHttpTimeout
+		} else {
+			return timeout
+		}
+	}
+}
+
 // Create a new TSDB adapter, similar to Prometheus TSDB adapter but with a few
 // extensions. The Prometheus compliant adapter is found under /promtsdb.
-func NewV3ioAdapter(cfg *config.V3ioConfig, container *v3io.Container, logger logger.Logger) (*V3ioAdapter, error) {
+func NewV3ioAdapter(cfg *config.V3ioConfig, container v3io.Container, logger logger.Logger) (*V3ioAdapter, error) {
 
 	var err error
 	newV3ioAdapter := V3ioAdapter{}
@@ -93,6 +114,8 @@ func NewV3ioAdapter(cfg *config.V3ioConfig, container *v3io.Container, logger lo
 			return nil, err
 		}
 	}
+
+	newV3ioAdapter.HttpTimeout = parseHttpTimeout(cfg, logger)
 
 	if container != nil {
 		newV3ioAdapter.container = container
@@ -108,25 +131,18 @@ func NewV3ioAdapter(cfg *config.V3ioConfig, container *v3io.Container, logger lo
 	return &newV3ioAdapter, err
 }
 
-func NewContainer(v3ioUrl string, numWorkers int, accessKey string, username string, password string, containerName string, logger logger.Logger) (*v3io.Container, error) {
-	ctx, err := v3io.NewContext(logger, v3ioUrl, numWorkers)
+func NewContainer(v3ioUrl string, numWorkers int, accessKey string, username string, password string, containerName string, logger logger.Logger) (v3io.Container, error) {
+	ctx, err := v3iohttp.NewContext(logger, &v3io.NewContextInput{ClusterEndpoints: []string{v3ioUrl}, NumWorkers: numWorkers})
 	if err != nil {
 		return nil, err
 	}
 
-	// Create session - accessKey will take precedence over user/password if exists
-	sessionConfig := &v3io.SessionConfig{
-		Username:   username,
-		Password:   password,
-		Label:      "tsdb",
-		SessionKey: accessKey,
-	}
-	session, err := ctx.NewSessionFromConfig(sessionConfig)
+	session, err := ctx.NewSession(&v3io.NewSessionInput{Username: username, Password: password, AccessKey: accessKey})
 	if err != nil {
-		return nil, errors.Wrap(err, "Failed to create a session.")
+		return nil, errors.Wrap(err, "Failed to create session.")
 	}
 
-	container, err := session.NewContainer(containerName)
+	container, err := session.NewContainer(&v3io.NewContainerInput{ContainerName: containerName})
 	if err != nil {
 		return nil, err
 	}
@@ -141,14 +157,14 @@ func (a *V3ioAdapter) GetLogger(child string) logger.Logger {
 	return a.logger.GetChild(child)
 }
 
-func (a *V3ioAdapter) GetContainer() (*v3io.Container, string) {
+func (a *V3ioAdapter) GetContainer() (v3io.Container, string) {
 	return a.container, a.cfg.TablePath
 }
 
 func (a *V3ioAdapter) connect() error {
 
 	fullpath := pathUtil.Join(a.cfg.WebApiEndpoint, a.cfg.Container, a.cfg.TablePath)
-	resp, err := a.container.Sync.GetObject(&v3io.GetObjectInput{Path: pathUtil.Join(a.cfg.TablePath, config.SchemaConfigFileName)})
+	resp, err := a.container.GetObjectSync(&v3io.GetObjectInput{Path: pathUtil.Join(a.cfg.TablePath, config.SchemaConfigFileName)})
 	if err != nil {
 		if utils.IsNotExistsError(err) {
 			return errors.Errorf("No TSDB schema file found at '%s'.", fullpath)
@@ -240,7 +256,7 @@ func (a *V3ioAdapter) DeleteDB(deleteAll bool, ignoreErrors bool, fromTime int64
 			return errors.Wrapf(err, "Failed to delete partition '%s'.", part.GetTablePath())
 		}
 		// Delete the Directory object
-		err = a.container.Sync.DeleteObject(&v3io.DeleteObjectInput{Path: part.GetTablePath()})
+		err = a.container.DeleteObjectSync(&v3io.DeleteObjectInput{Path: part.GetTablePath()})
 		if err != nil && !ignoreErrors {
 			return errors.Wrapf(err, "Failed to delete partition object '%s'.", part.GetTablePath())
 		}
@@ -258,7 +274,7 @@ func (a *V3ioAdapter) DeleteDB(deleteAll bool, ignoreErrors bool, fromTime int64
 			return errors.Wrap(err, "Failed to delete the metric-names table.")
 		}
 		// Delete the Directory object
-		err = a.container.Sync.DeleteObject(&v3io.DeleteObjectInput{Path: path})
+		err = a.container.DeleteObjectSync(&v3io.DeleteObjectInput{Path: path})
 		if err != nil && !ignoreErrors {
 			if !utils.IsNotExistsError(err) {
 				return errors.Wrapf(err, "Failed to delete table object '%s'.", path)
@@ -268,13 +284,13 @@ func (a *V3ioAdapter) DeleteDB(deleteAll bool, ignoreErrors bool, fromTime int64
 	if deleteAll {
 		schemaPath := pathUtil.Join(a.cfg.TablePath, config.SchemaConfigFileName)
 		a.logger.Info("Delete the TSDB configuration at '%s'.", schemaPath)
-		err := a.container.Sync.DeleteObject(&v3io.DeleteObjectInput{Path: schemaPath})
+		err := a.container.DeleteObjectSync(&v3io.DeleteObjectInput{Path: schemaPath})
 		if err != nil && !ignoreErrors {
 			return errors.New("The configuration at '" + schemaPath + "' cannot be deleted or doesn't exist.")
 		}
 		// Delete the Directory object
 		path := a.cfg.TablePath + "/"
-		err = a.container.Sync.DeleteObject(&v3io.DeleteObjectInput{Path: path})
+		err = a.container.DeleteObjectSync(&v3io.DeleteObjectInput{Path: path})
 		if err != nil && !ignoreErrors {
 			if !utils.IsNotExistsError(err) {
 				return errors.Wrapf(err, "Failed to delete table object '%s'.", path)

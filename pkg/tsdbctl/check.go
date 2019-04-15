@@ -31,7 +31,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
-	"github.com/v3io/v3io-go-http"
+	"github.com/v3io/v3io-go/pkg/dataplane"
 	"github.com/v3io/v3io-tsdb/pkg/chunkenc"
 	"github.com/v3io/v3io-tsdb/pkg/config"
 	"github.com/v3io/v3io-tsdb/pkg/utils"
@@ -157,7 +157,7 @@ func (cc *checkCommandeer) check() error {
 	return nil
 }
 
-func (cc *checkCommandeer) checkByPath(container *v3io.Container, tablePath string) (chan *v3io.Response, error) {
+func (cc *checkCommandeer) checkByPath(container v3io.Container, tablePath string) (chan *v3io.Response, error) {
 	var err error
 	respChan := make(chan *v3io.Response, 1)
 	objPath := path.Join("/", tablePath, cc.objPath)
@@ -170,7 +170,7 @@ func (cc *checkCommandeer) checkByPath(container *v3io.Container, tablePath stri
 	return respChan, nil
 }
 
-func (cc *checkCommandeer) checkByName(container *v3io.Container, tablePath string) ([]chan *v3io.Response, error) {
+func (cc *checkCommandeer) checkByName(container v3io.Container, tablePath string) ([]chan *v3io.Response, error) {
 
 	var err error
 
@@ -292,9 +292,9 @@ func (cc *checkCommandeer) printValues(bytes []byte) error {
 	return nil
 }
 
-func getSchema(cfg *config.V3ioConfig, container *v3io.Container) (*config.Schema, error) {
+func getSchema(cfg *config.V3ioConfig, container v3io.Container) (*config.Schema, error) {
 	fullpath := path.Join(cfg.WebApiEndpoint, cfg.Container, cfg.TablePath)
-	resp, err := container.Sync.GetObject(&v3io.GetObjectInput{Path: path.Join(cfg.TablePath, config.SchemaConfigFileName)})
+	resp, err := container.GetObjectSync(&v3io.GetObjectInput{Path: path.Join(cfg.TablePath, config.SchemaConfigFileName)})
 	if err != nil {
 		if utils.IsNotExistsError(err) {
 			return nil, errors.Errorf("No TSDB schema file found at '%s'.", fullpath)
