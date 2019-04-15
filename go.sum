@@ -85,8 +85,8 @@ github.com/v3io/frames v0.0.0-20190328123118-1dad1ff610509e7b087d9cd390ed1b452ca
 github.com/v3io/frames v0.0.0-20190328123118-1dad1ff610509e7b087d9cd390ed1b452caecf15/go.mod h1:6aKW4Wl4A+gQhXH0JRCVOLgwvcrLyk+fqEpemuie094=
 github.com/v3io/sqlparser v0.0.0-20190306105200-4d7273501871 h1:myF4tU/HdFWU1UzMdf16cHRbownzsyvL7VKIHqkrSvo=
 github.com/v3io/sqlparser v0.0.0-20190306105200-4d7273501871/go.mod h1:QD2Bo64oyTWzeV8RFehXS0hZEDFgOK99/h2a6ErRu6E=
-github.com/v3io/v3io-go v0.0.0-20180415000000-a0c7cc523b6e17283300c46b385096bdf0278aad h1:E1BHd9pEWH+oMDFruPTk7CzZhyc/dHyy7PA4u/D0gcs=
-github.com/v3io/v3io-go v0.0.0-20180415000000-a0c7cc523b6e17283300c46b385096bdf0278aad/go.mod h1:MHc+d/Jg/y8lV4B9sgwTvuS3tEE9wS+kqtU0+D0Sr78=
+github.com/v3io/v3io-go v0.0.0-20180415132339-a375a09fd7d7a2b4c2abb89ca1c002e077ed9ecf h1:DqNItFdHuKWby6CBWOpka5HYJAzJclI7/5hc4QD26Dk=
+github.com/v3io/v3io-go v0.0.0-20180415132339-a375a09fd7d7a2b4c2abb89ca1c002e077ed9ecf/go.mod h1:MHc+d/Jg/y8lV4B9sgwTvuS3tEE9wS+kqtU0+D0Sr78=
 github.com/v3io/v3io-go-http v0.0.0-20190221115935-53e2b487c9a2 h1:NJc63wM25iS+ci5z7LVwjWD4QM0QpTQw/fovKzatss0=
 github.com/v3io/v3io-go-http v0.0.0-20190221115935-53e2b487c9a2/go.mod h1:GXYcR9MxgfbE3BJdkXki5EclvtS8Nxu2RQNLA8hMMog=
 github.com/v3io/v3io-tsdb v0.0.0-20190328071546-4e85f3df2d205fc7368d54184bb2ceff949ab4bd/go.mod h1:A+5yKC16QxLf+Fy5v7VvIxSw+jwsKHLhUS7dCYFDLAA=
