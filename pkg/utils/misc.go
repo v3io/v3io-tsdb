@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/v3io/v3io-go-http"
+	"github.com/v3io/v3io-go/pkg/errors"
 )
 
 func IsUndefined(value float64) bool {
@@ -25,7 +25,7 @@ func FloatToNormalizedScientificStr(val float64) string {
 }
 
 func IsNotExistsError(err error) bool {
-	errorWithStatusCode, ok := err.(v3io.ErrorWithStatusCode)
+	errorWithStatusCode, ok := err.(v3ioerrors.ErrorWithStatusCode)
 	if !ok {
 		// error of different type
 		return false

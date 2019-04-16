@@ -11,7 +11,7 @@ import (
 	"github.com/nuclio/logger"
 	"github.com/pkg/errors"
 	"github.com/v3io/frames"
-	"github.com/v3io/v3io-go-http"
+	"github.com/v3io/v3io-go/pkg/dataplane"
 	"github.com/v3io/v3io-tsdb/pkg/aggregate"
 	"github.com/v3io/v3io-tsdb/pkg/chunkenc"
 	"github.com/v3io/v3io-tsdb/pkg/config"
@@ -23,7 +23,7 @@ const defaultToleranceFactor = 2
 
 type selectQueryContext struct {
 	logger     logger.Logger
-	container  *v3io.Container
+	container  v3io.Container
 	workers    int
 	v3ioConfig *config.V3ioConfig
 
