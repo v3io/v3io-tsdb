@@ -19,7 +19,7 @@ require (
 	github.com/spf13/pflag v1.0.3 // indirect
 	github.com/stretchr/testify v1.3.0
 	github.com/v3io/frames v0.0.0-20190328123118-1dad1ff610509e7b087d9cd390ed1b452caecf15
-	github.com/v3io/v3io-go v0.0.0-20180415000000-a0c7cc523b6e17283300c46b385096bdf0278aad
+	github.com/v3io/v3io-go v0.0.0-20180415132339-a375a09fd7d7a2b4c2abb89ca1c002e077ed9ecf
 	github.com/xwb1989/sqlparser v0.0.0-20180606152119-120387863bf2
 	golang.org/x/net v0.0.0-20181114220301-adae6a3d119a // indirect
 	golang.org/x/sync v0.0.0-20181108010431-42b317875d0f // indirect

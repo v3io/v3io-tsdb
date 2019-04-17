@@ -79,8 +79,7 @@ func CreateTSDB(cfg *config.V3ioConfig, schema *config.Schema) error {
 
 	err = container.PutObjectSync(&v3io.PutObjectInput{Path: path, Body: data, DataPlaneInput: dataPlaneInput})
 	if err != nil {
-		return errors.Wrapf(err, "Failed to create a TSDB schema at path '%s/%s/%s'.",
-			cfg.WebApiEndpoint, cfg.Container, path)
+		return errors.Wrapf(err, "Failed to create a TSDB schema at path '%s/%s/%s'.", cfg.WebApiEndpoint, cfg.Container, path)
 	}
 	return err
 }
