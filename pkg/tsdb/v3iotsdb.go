@@ -79,8 +79,8 @@ func CreateTSDB(cfg *config.V3ioConfig, schema *config.Schema) error {
 
 	err = container.PutObjectSync(&v3io.PutObjectInput{Path: path, Body: data, DataPlaneInput: dataPlaneInput})
 	if err != nil {
-		return errors.Wrapf(err, "Failed to create a TSDB schema at path '%s'.",
-			pathUtil.Join(cfg.WebApiEndpoint, cfg.Container, path))
+		return errors.Wrapf(err, "Failed to create a TSDB schema at path '%s/%s/%s'.",
+			cfg.WebApiEndpoint, cfg.Container, path)
 	}
 	return err
 }
@@ -163,7 +163,7 @@ func (a *V3ioAdapter) GetContainer() (v3io.Container, string) {
 
 func (a *V3ioAdapter) connect() error {
 
-	fullpath := pathUtil.Join(a.cfg.WebApiEndpoint, a.cfg.Container, a.cfg.TablePath)
+	fullpath := fmt.Sprintf("%s/%s/%s", a.cfg.WebApiEndpoint, a.cfg.Container, a.cfg.TablePath)
 	resp, err := a.container.GetObjectSync(&v3io.GetObjectInput{Path: pathUtil.Join(a.cfg.TablePath, config.SchemaConfigFileName)})
 	if err != nil {
 		if utils.IsNotExistsError(err) {
