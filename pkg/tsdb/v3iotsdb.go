@@ -57,7 +57,8 @@ type V3ioAdapter struct {
 func CreateTSDB(cfg *config.V3ioConfig, schema *config.Schema) error {
 
 	lgr, _ := utils.NewLogger(cfg.LogLevel)
-	container, err := utils.CreateContainer(lgr, cfg)
+	httpTimeout := parseHttpTimeout(cfg, lgr)
+	container, err := utils.CreateContainer(lgr, cfg, httpTimeout)
 	if err != nil {
 		return errors.Wrap(err, "Failed to create a data container.")
 	}
@@ -67,7 +68,6 @@ func CreateTSDB(cfg *config.V3ioConfig, schema *config.Schema) error {
 		return errors.Wrap(err, "Failed to marshal the TSDB schema file.")
 	}
 
-	httpTimeout := parseHttpTimeout(cfg, lgr)
 	dataPlaneInput := v3io.DataPlaneInput{Timeout: httpTimeout}
 
 	path := pathUtil.Join(cfg.TablePath, config.SchemaConfigFileName)
@@ -120,7 +120,7 @@ func NewV3ioAdapter(cfg *config.V3ioConfig, container v3io.Container, logger log
 	if container != nil {
 		newV3ioAdapter.container = container
 	} else {
-		newV3ioAdapter.container, err = utils.CreateContainer(newV3ioAdapter.logger, cfg)
+		newV3ioAdapter.container, err = utils.CreateContainer(newV3ioAdapter.logger, cfg, newV3ioAdapter.HttpTimeout)
 		if err != nil {
 			return nil, errors.Wrap(err, "Failed to create V3IO data container")
 		}
