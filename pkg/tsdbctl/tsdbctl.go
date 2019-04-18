@@ -22,6 +22,7 @@ package tsdbctl
 
 import (
 	"fmt"
+	"net/url"
 	"os"
 	"strings"
 
@@ -39,7 +40,7 @@ type RootCommandeer struct {
 	logger      logger.Logger
 	v3iocfg     *config.V3ioConfig
 	cmd         *cobra.Command
-	v3ioPath    string
+	v3ioUrl     string
 	dbPath      string
 	cfgFilePath string
 	logLevel    string
@@ -73,7 +74,7 @@ func NewRootCommandeer() *RootCommandeer {
 	// although it's documented as Required, because this flag isn't required
 	// for the hidden `time` command + during internal tests we might want to
 	// configure the table path in a configuration file.
-	cmd.PersistentFlags().StringVarP(&commandeer.v3ioPath, "server", "s", defaultV3ioServer,
+	cmd.PersistentFlags().StringVarP(&commandeer.v3ioUrl, "server", "s", defaultV3ioServer,
 		"Web-gateway (web-APIs) service endpoint of an instance of\nthe Iguazio Continuous Data Platform, of the format\n\"<IP address>:<port number=8081>\". Examples: \"localhost:8081\"\n(when running on the target platform); \"192.168.1.100:8081\".")
 	cmd.PersistentFlags().StringVarP(&commandeer.cfgFilePath, "config", "g", "",
 		"Path to a YAML TSDB configuration file. When this flag isn't\nset, the CLI checks for a "+config.DefaultConfigurationFileName+" configuration\nfile in the current directory. CLI flags override file\nconfigurations. Example: \"~/cfg/my_v3io_tsdb_cfg.yaml\".")
@@ -157,49 +158,8 @@ func (rc *RootCommandeer) populateConfig(cfg *config.V3ioConfig) error {
 	if envV3ioApi != "" {
 		cfg.WebApiEndpoint = envV3ioApi
 	}
-
-	if rc.v3ioPath != "" {
-		// Check for username and password in the web-gateway service endpoint
-		// (supported for backwards compatibility)
-		if i := strings.LastIndex(rc.v3ioPath, "@"); i > 0 {
-			usernameAndPassword := rc.v3ioPath[0:i]
-			rc.v3ioPath = rc.v3ioPath[i+1:]
-			if userpass := strings.Split(usernameAndPassword, ":"); len(userpass) > 1 {
-				fmt.Printf("Debug: up0=%s up1=%s u=%s p=%s\n", userpass[0], userpass[1], rc.username, rc.password)
-				if userpass[0] != "" && rc.username != "" {
-					return fmt.Errorf("Username should only be defined once.")
-				} else {
-					cfg.Username = userpass[0]
-				}
-
-				if userpass[1] != "" && rc.password != "" {
-					return fmt.Errorf("Password should only be defined once.")
-				} else {
-					cfg.Password = userpass[1]
-				}
-			} else {
-				if usernameAndPassword != "" && rc.username != "" {
-					return fmt.Errorf("Username should only be defined once.")
-				} else {
-					cfg.Username = usernameAndPassword
-				}
-			}
-		}
-
-		// Check for a container name in the in the web-gateway service endpoint
-		// (supported for backwards compatibility)
-		slash := strings.LastIndex(rc.v3ioPath, "/")
-		if slash == -1 || len(rc.v3ioPath) <= slash+1 {
-			if rc.container != "" {
-				cfg.Container = rc.container
-			} else if cfg.Container == "" {
-				return fmt.Errorf("Missing the name of the TSDB's parent data container.")
-			}
-			cfg.WebApiEndpoint = rc.v3ioPath
-		} else {
-			cfg.WebApiEndpoint = rc.v3ioPath[0:slash]
-			cfg.Container = rc.v3ioPath[slash+1:]
-		}
+	if rc.v3ioUrl != "" {
+		cfg.WebApiEndpoint = rc.v3ioUrl
 	}
 	if rc.container != "" {
 		cfg.Container = rc.container
@@ -222,8 +182,26 @@ func (rc *RootCommandeer) populateConfig(cfg *config.V3ioConfig) error {
 		cfg.LogLevel = config.DefaultLogLevel
 	}
 
+	// Prefix http:// in case that WebApiEndpoint is a pseudo-URL missing a scheme (for backward compatibility).
+	amendedWebApiEndpoint, err := buildUrl(cfg.WebApiEndpoint)
+	if err == nil {
+		cfg.WebApiEndpoint = amendedWebApiEndpoint
+	}
+
 	rc.v3iocfg = cfg
 	return nil
+}
+
+func buildUrl(webApiEndpoint string) (string, error) {
+	if !strings.HasPrefix(webApiEndpoint, "http://") && !strings.HasPrefix(webApiEndpoint, "https://") {
+		webApiEndpoint = "http://" + webApiEndpoint
+	}
+	endpointUrl, err := url.Parse(webApiEndpoint)
+	if err != nil {
+		return "", err
+	}
+	endpointUrl.Path = ""
+	return endpointUrl.String(), nil
 }
 
 func (rc *RootCommandeer) startAdapter() error {
