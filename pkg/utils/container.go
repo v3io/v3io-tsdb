@@ -55,10 +55,11 @@ func NewLogger(level string) (logger.Logger, error) {
 	return log, nil
 }
 
-func CreateContainer(logger logger.Logger, cfg *config.V3ioConfig) (v3io.Container, error) {
+func CreateContainer(logger logger.Logger, cfg *config.V3ioConfig, httpTimeout time.Duration) (v3io.Container, error) {
 	newContextInput := &v3io.NewContextInput{
 		ClusterEndpoints: []string{cfg.WebApiEndpoint},
 		NumWorkers:       cfg.Workers,
+		DialTimeout:      httpTimeout,
 	}
 	context, err := v3iohttp.NewContext(logger, newContextInput)
 	if err != nil {
