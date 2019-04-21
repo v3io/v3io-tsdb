@@ -23,7 +23,6 @@ package tsdbctl
 import (
 	"fmt"
 	"net/url"
-	"os"
 	"strings"
 
 	"github.com/nuclio/logger"
@@ -63,8 +62,6 @@ func NewRootCommandeer() *RootCommandeer {
 		SilenceUsage: true,
 	}
 
-	defaultV3ioServer := os.Getenv("V3IO_SERVICE_URL")
-
 	cmd.PersistentFlags().StringVarP(&commandeer.logLevel, "log-level", "v", "",
 		"Verbose output. Add \"=<level>\" to set the log level -\ndebug | info | warn | error. For example: -v=warn.\n(default - \""+config.DefaultVerboseLevel+"\" when using the flag; \""+config.DefaultLogLevel+"\" otherwise)")
 	cmd.PersistentFlags().Lookup("log-level").NoOptDefVal = config.DefaultVerboseLevel
@@ -74,7 +71,7 @@ func NewRootCommandeer() *RootCommandeer {
 	// although it's documented as Required, because this flag isn't required
 	// for the hidden `time` command + during internal tests we might want to
 	// configure the table path in a configuration file.
-	cmd.PersistentFlags().StringVarP(&commandeer.v3ioUrl, "server", "s", defaultV3ioServer,
+	cmd.PersistentFlags().StringVarP(&commandeer.v3ioUrl, "server", "s", "",
 		"Web-gateway (web-APIs) service endpoint of an instance of\nthe Iguazio Continuous Data Platform, of the format\n\"<IP address>:<port number=8081>\". Examples: \"localhost:8081\"\n(when running on the target platform); \"192.168.1.100:8081\".")
 	cmd.PersistentFlags().StringVarP(&commandeer.cfgFilePath, "config", "g", "",
 		"Path to a YAML TSDB configuration file. When this flag isn't\nset, the CLI checks for a "+config.DefaultConfigurationFileName+" configuration\nfile in the current directory. CLI flags override file\nconfigurations. Example: \"~/cfg/my_v3io_tsdb_cfg.yaml\".")
@@ -147,17 +144,8 @@ func (rc *RootCommandeer) populateConfig(cfg *config.V3ioConfig) error {
 
 	if rc.accessKey != "" {
 		cfg.AccessKey = rc.accessKey
-	} else if rc.password == "" {
-		envAccessKey := os.Getenv("V3IO_ACCESS_KEY")
-		if envAccessKey != "" {
-			cfg.AccessKey = envAccessKey
-		}
 	}
 
-	envV3ioApi := os.Getenv("V3IO_API")
-	if envV3ioApi != "" {
-		cfg.WebApiEndpoint = envV3ioApi
-	}
 	if rc.v3ioUrl != "" {
 		cfg.WebApiEndpoint = rc.v3ioUrl
 	}
