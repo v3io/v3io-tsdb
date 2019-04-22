@@ -109,21 +109,20 @@ func (suite *testTsdbctlSuite) TestConfigFromEnvVarsAndPassword() {
 	defer os.Setenv("V3IO_ACCESS_KEY", oldAccessKey)
 
 	rc := RootCommandeer{container: "test", username: "Vel@Odar", password: "p455w0rd"}
-	cfg := &config.V3ioConfig{TablePath: "/x/y/z"}
+	cfg, err := config.GetOrLoadFromStruct(&config.V3ioConfig{TablePath: "/x/y/z"})
 	suite.Require().Nil(err)
 
+	expectedCfg := *cfg
 	err = rc.populateConfig(cfg)
-	expectedCfg := &config.V3ioConfig{
-		WebApiEndpoint: "http://host-from-env:123",
-		Container:      "test",
-		TablePath:      "/x/y/z",
-		Username:       "Vel@Odar",
-		Password:       "p455w0rd",
-		LogLevel:       "info",
-	}
+	expectedCfg.WebApiEndpoint = "http://host-from-env:123"
+	expectedCfg.Container = "test"
+	expectedCfg.TablePath = "/x/y/z"
+	expectedCfg.Username = "Vel@Odar"
+	expectedCfg.Password = "p455w0rd"
+	expectedCfg.LogLevel = "info"
 
 	suite.Require().Nil(err)
-	suite.Require().Equal(expectedCfg, rc.v3iocfg)
+	suite.Require().Equal(&expectedCfg, rc.v3iocfg)
 }
 
 func (suite *testTsdbctlSuite) TestConfigFromEnvVars() {
@@ -138,20 +137,18 @@ func (suite *testTsdbctlSuite) TestConfigFromEnvVars() {
 	defer os.Setenv("V3IO_ACCESS_KEY", oldAccessKey)
 
 	rc := RootCommandeer{container: "test"}
-	cfg := &config.V3ioConfig{TablePath: "/x/y/z"}
-	suite.Require().Nil(err)
+	cfg, err := config.GetOrLoadFromStruct(&config.V3ioConfig{TablePath: "/x/y/z"})
+	suite.NoError(err)
 
+	expectedCfg := *cfg
 	err = rc.populateConfig(cfg)
-	expectedCfg := &config.V3ioConfig{
-		WebApiEndpoint: "http://host-from-env:123",
-		Container:      "test",
-		TablePath:      "/x/y/z",
-		AccessKey:      "key-from-env",
-		LogLevel:       "info",
-	}
+	expectedCfg.WebApiEndpoint = "http://host-from-env:123"
+	expectedCfg.AccessKey = "key-from-env"
+	expectedCfg.Container = "test"
+	expectedCfg.LogLevel = "info"
 
 	suite.Require().Nil(err)
-	suite.Require().Equal(expectedCfg, rc.v3iocfg)
+	suite.Require().Equal(&expectedCfg, rc.v3iocfg)
 }
 
 func TestTsdbctlSuite(t *testing.T) {

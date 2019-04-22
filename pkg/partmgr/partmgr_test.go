@@ -90,8 +90,9 @@ func TestNewPartitionMngrBadInput(t *testing.T) {
 			AggregationGranularity: "boo",
 		},
 	}
-	v3ioConfig := &config.V3ioConfig{}
-	_, err := NewPartitionMngr(schemaConfig, nil, v3ioConfig)
+	v3ioConfig, err := config.GetOrLoadFromStruct(&config.V3ioConfig{})
+	assert.NoError(t, err)
+	_, err = NewPartitionMngr(schemaConfig, nil, v3ioConfig)
 	assert.Error(t, err)
 }
 
