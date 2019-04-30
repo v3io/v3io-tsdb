@@ -25,6 +25,7 @@ import (
 	"fmt"
 	"math"
 	"path"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -34,6 +35,7 @@ import (
 	"github.com/v3io/v3io-tsdb/internal/pkg/performance"
 	"github.com/v3io/v3io-tsdb/pkg/aggregate"
 	"github.com/v3io/v3io-tsdb/pkg/config"
+	"github.com/v3io/v3io-tsdb/pkg/tsdb/schema"
 	"github.com/v3io/v3io-tsdb/pkg/utils"
 )
 
@@ -51,43 +53,6 @@ func NewPartitionMngr(schemaConfig *config.Schema, cont v3io.Container, v3ioConf
 	return newMngr, nil
 }
 
-// Create and initialize a new partition
-func NewDBPartition(pmgr *PartitionManager, startTime int64, path string) (*DBPartition, error) {
-	rollupTime, err := utils.Str2duration(pmgr.schemaConfig.PartitionSchemaInfo.AggregationGranularity)
-	if err != nil {
-		return nil, err
-	}
-	partitionInterval, err := utils.Str2duration(pmgr.schemaConfig.PartitionSchemaInfo.PartitionerInterval)
-	if err != nil {
-		return nil, err
-	}
-	chunkInterval, err := utils.Str2duration(pmgr.schemaConfig.PartitionSchemaInfo.ChunckerInterval)
-	if err != nil {
-		return nil, err
-	}
-	newPart := DBPartition{
-		manager:           pmgr,
-		path:              path,
-		startTime:         startTime,
-		partitionInterval: partitionInterval,
-		chunkInterval:     chunkInterval,
-		prefix:            "",
-		retentionDays:     pmgr.schemaConfig.PartitionSchemaInfo.SampleRetention,
-		rollupTime:        rollupTime,
-	}
-
-	aggrType, _, err := aggregate.AggregatesFromStringListWithCount(pmgr.schemaConfig.PartitionSchemaInfo.Aggregates)
-	if err != nil {
-		return nil, err
-	}
-	newPart.defaultRollups = aggrType
-	if rollupTime != 0 {
-		newPart.rollupBuckets = int(math.Ceil(float64(partitionInterval) / float64(rollupTime)))
-	}
-
-	return &newPart, nil
-}
-
 type PartitionManager struct {
 	mtx                      sync.RWMutex
 	schemaConfig             *config.Schema
@@ -101,6 +66,9 @@ type PartitionManager struct {
 	v3ioConfig               *config.V3ioConfig
 }
 
+func (p *PartitionManager) GetPartitionsTablePath() string {
+	return path.Join(p.Path(), "partitions")
+}
 func (p *PartitionManager) Path() string {
 	return p.v3ioConfig.TablePath
 }
@@ -195,6 +163,9 @@ func (p *PartitionManager) updateSchema() (err error) {
 
 	metricReporter := performance.ReporterInstanceFromConfig(p.v3ioConfig)
 	metricReporter.WithTimer("UpdateSchemaTimer", func() {
+		// updating schema version and copying partitions to kv table.
+		p.schemaConfig.TableSchemaInfo.Version = schema.Version
+
 		data, err := json.Marshal(p.schemaConfig)
 		if err != nil {
 			err = errors.Wrap(err, "Failed to update a new partition in the schema file.")
@@ -202,6 +173,22 @@ func (p *PartitionManager) updateSchema() (err error) {
 		}
 		if p.container != nil { // Tests use case only
 			err = p.container.PutObjectSync(&v3io.PutObjectInput{Path: path.Join(p.Path(), config.SchemaConfigFileName), Body: data})
+
+			items := make(map[string]map[string]interface{})
+			for _, part := range p.partitions {
+				items[fmt.Sprintf("%v", part.startTime)] = part.ToMap()
+			}
+
+			input := &v3io.PutItemsInput{Path: p.GetPartitionsTablePath(), Items: items}
+			resp, err := p.container.PutItemsSync(input)
+
+			if err != nil {
+				err = errors.Wrap(err, "failed to update partitions table.")
+			}
+			output := resp.Output.(*v3io.PutItemsOutput)
+			if !output.Success {
+				err = fmt.Errorf("got one or more errors, err: %v", output.Errors)
+			}
 		}
 	})
 
@@ -227,6 +214,17 @@ func (p *PartitionManager) DeletePartitionsFromSchema(partitionsToDelete []*DBPa
 		}
 
 	}
+
+	// Delete from partitions KV table
+	if p.container != nil { // Tests use case only
+		for _, partToDelete := range partitionsToDelete {
+			err := p.container.DeleteObjectSync(&v3io.DeleteObjectInput{Path: path.Join(p.GetPartitionsTablePath(), fmt.Sprintf("%v", partToDelete.startTime))})
+			if err != nil {
+				return err
+			}
+		}
+	}
+
 	return p.updateSchema()
 }
 
@@ -282,6 +280,14 @@ func (p *PartitionManager) ReadAndUpdateSchema() (err error) {
 }
 
 func (p *PartitionManager) updatePartitionsFromSchema(schema *config.Schema) error {
+	if schema.TableSchemaInfo.Version == 3 {
+		return p.newLoadPartitions()
+	}
+
+	return p.oldLoadPartitions(schema)
+}
+
+func (p *PartitionManager) oldLoadPartitions(schema *config.Schema) error {
 	p.partitions = []*DBPartition{}
 	for _, part := range schema.Partitions {
 		partPath := path.Join(p.Path(), strconv.FormatInt(part.StartTime/1000, 10)) + "/"
@@ -296,6 +302,52 @@ func (p *PartitionManager) updatePartitionsFromSchema(schema *config.Schema) err
 			p.headPartition = newPart
 		}
 	}
+	return nil
+}
+
+func (p *PartitionManager) newLoadPartitions() error {
+	if p.container == nil { // Tests use case only
+		return nil
+	}
+
+	getItems := &v3io.GetItemsInput{Path: p.GetPartitionsTablePath() + "/",
+		AttributeNames: []string{"*"}}
+
+	logger, err := utils.NewLogger(p.v3ioConfig.LogLevel)
+	if err != nil {
+		return err
+	}
+	iter, err := utils.NewAsyncItemsCursor(p.container, getItems, p.v3ioConfig.QryWorkers, []string{}, logger)
+	if err != nil {
+		return err
+	}
+
+	p.partitions = []*DBPartition{}
+	for iter.Next() {
+		startTime := iter.GetField(config.ObjectNameAttrName).(string)
+		intStartTime, err := strconv.ParseInt(startTime, 10, 64)
+		partPath := path.Join(p.Path(), strconv.FormatInt(intStartTime/1000, 10)) + "/"
+
+		if err != nil {
+			return errors.Wrapf(err, "invalid partition name '%v'", startTime)
+		}
+
+		newPart, err := NewDBPartitionFromMap(p, intStartTime, partPath, iter.GetItem())
+		if err != nil {
+			return err
+		}
+		p.partitions = append(p.partitions, newPart)
+		if p.headPartition == nil {
+			p.headPartition = newPart
+		} else if p.headPartition.startTime < newPart.startTime {
+			p.headPartition = newPart
+		}
+	}
+
+	sort.SliceStable(p.partitions, func(i, j int) bool {
+		return p.partitions[i].startTime < p.partitions[j].startTime
+	})
+
 	return nil
 }
 
@@ -321,6 +373,93 @@ type DBPartition struct {
 	defaultRollups    aggregate.AggrType // Default aggregation functions to apply on sample update
 	rollupTime        int64              // Time range per aggregation bucket
 	rollupBuckets     int                // Total number of aggregation buckets per partition
+}
+
+// Create and initialize a new partition
+func NewDBPartition(pmgr *PartitionManager, startTime int64, path string) (*DBPartition, error) {
+	rollupTime, err := utils.Str2duration(pmgr.schemaConfig.PartitionSchemaInfo.AggregationGranularity)
+	if err != nil {
+		return nil, err
+	}
+	partitionInterval, err := utils.Str2duration(pmgr.schemaConfig.PartitionSchemaInfo.PartitionerInterval)
+	if err != nil {
+		return nil, err
+	}
+	chunkInterval, err := utils.Str2duration(pmgr.schemaConfig.PartitionSchemaInfo.ChunckerInterval)
+	if err != nil {
+		return nil, err
+	}
+	newPart := DBPartition{
+		manager:           pmgr,
+		path:              path,
+		startTime:         startTime,
+		partitionInterval: partitionInterval,
+		chunkInterval:     chunkInterval,
+		prefix:            "",
+		retentionDays:     pmgr.schemaConfig.PartitionSchemaInfo.SampleRetention,
+		rollupTime:        rollupTime,
+	}
+
+	aggrType, _, err := aggregate.AggregatesFromStringListWithCount(pmgr.schemaConfig.PartitionSchemaInfo.Aggregates)
+	if err != nil {
+		return nil, err
+	}
+	newPart.defaultRollups = aggrType
+	if rollupTime != 0 {
+		newPart.rollupBuckets = int(math.Ceil(float64(partitionInterval) / float64(rollupTime)))
+	}
+
+	return &newPart, nil
+}
+
+// Create and initialize a new partition
+func NewDBPartitionFromMap(pmgr *PartitionManager, startTime int64, path string, item v3io.Item) (*DBPartition, error) {
+	rollupTime, err := item.GetFieldInt("rollupTime")
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse rollupTime for partition: %v, rollup: %v", startTime, item.GetField("rollupTime"))
+	}
+
+	partitionInterval, err := item.GetFieldInt("partitionInterval")
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse partitionInterval for partition: %v, interval: %v", startTime, item.GetField("partitionInterval"))
+	}
+
+	chunkInterval, err := item.GetFieldInt("chunkInterval")
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse chunk Interval for partition: %v, interval: %v", startTime, item.GetField("chunkInterval"))
+	}
+
+	retention, err := item.GetFieldInt("retentionDays")
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to parse retention days for partition: %v, retention: %v", startTime, item.GetField("retentionDays"))
+	}
+
+	stringAggregates, err := item.GetFieldString("aggregates")
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to parse aggregates for partition: %v, aggregates: %v", startTime, item.GetField("aggregates"))
+	}
+	mask, _, err := aggregate.AggregatesFromStringListWithCount(strings.Split(stringAggregates, ","))
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to parse aggregates from string for partition: %v, aggregates: %v", startTime, stringAggregates)
+	}
+
+	newPart := DBPartition{
+		manager:           pmgr,
+		path:              path,
+		startTime:         startTime,
+		partitionInterval: int64(partitionInterval),
+		chunkInterval:     int64(chunkInterval),
+		prefix:            "",
+		retentionDays:     retention,
+		rollupTime:        int64(rollupTime),
+		defaultRollups:    mask,
+	}
+
+	if rollupTime != 0 {
+		newPart.rollupBuckets = int(math.Ceil(float64(partitionInterval) / float64(rollupTime)))
+	}
+
+	return &newPart, nil
 }
 
 func (p *DBPartition) PreAggregates() []config.PreAggregate {
@@ -496,6 +635,16 @@ func (p *DBPartition) Range2Cids(mint, maxt int64) []int {
 
 func (p *DBPartition) GetHashingBuckets() int {
 	return p.manager.schemaConfig.TableSchemaInfo.ShardingBucketsCount
+}
+
+func (p *DBPartition) ToMap() map[string]interface{} {
+	attributes := make(map[string]interface{})
+	attributes["aggregates"] = aggregate.AggregateMaskToString(p.AggrType())
+	attributes["rollupTime"] = p.rollupTime
+	attributes["chunkInterval"] = p.chunkInterval
+	attributes["partitionInterval"] = p.partitionInterval
+	attributes["retentionDays"] = p.retentionDays
+	return attributes
 }
 
 // Convert a time in milliseconds to day and hour integers

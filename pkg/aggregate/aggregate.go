@@ -295,6 +295,22 @@ func IsCountAggregate(aggr AggrType) bool { return aggr == aggrTypeCount }
 
 func HasAggregates(mask AggrType) bool { return mask != aggrTypeNone }
 
+func AggregateMaskToString(mask AggrType) string {
+	var output strings.Builder
+	aggCount := 0
+	for _, raw := range rawAggregates {
+		if mask&raw == raw {
+			if aggCount != 0 {
+				output.WriteString(",")
+			}
+			output.WriteString(aggrToString[raw])
+			aggCount++
+		}
+	}
+
+	return output.String()
+}
+
 func ToAttrName(aggr AggrType) string {
 	return config.AggregateAttrPrefix + aggr.String()
 }
