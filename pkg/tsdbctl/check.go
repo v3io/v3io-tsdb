@@ -293,7 +293,7 @@ func (cc *checkCommandeer) printValues(bytes []byte) error {
 }
 
 func getSchema(cfg *config.V3ioConfig, container v3io.Container) (*config.Schema, error) {
-	fullpath := path.Join(cfg.WebApiEndpoint, cfg.Container, cfg.TablePath)
+	fullpath := fmt.Sprintf("%s/%s/%s", cfg.WebApiEndpoint, cfg.Container, cfg.TablePath)
 	resp, err := container.GetObjectSync(&v3io.GetObjectInput{Path: path.Join(cfg.TablePath, config.SchemaConfigFileName)})
 	if err != nil {
 		if utils.IsNotExistsError(err) {

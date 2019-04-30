@@ -37,8 +37,8 @@ type testTsdbctlSuite struct {
 }
 
 func (suite *testTsdbctlSuite) TestPopulateConfigWithTenant() {
-	rc := RootCommandeer{v3ioPath: "Vel@Odar:p455w0rd@localhost:80123/123"}
-	cfg := &config.V3ioConfig{Username: "Vel@Odar", Password: "p455w0rd", TablePath: "/x/y/z"}
+	rc := RootCommandeer{v3ioUrl: "localhost:80123"}
+	cfg := &config.V3ioConfig{Username: "Vel@Odar", Password: "p455w0rd", Container: "123", TablePath: "/x/y/z"}
 
 	err := rc.populateConfig(cfg)
 	suite.Require().Nil(err)
@@ -52,11 +52,11 @@ func (suite *testTsdbctlSuite) TestPopulateConfigWithTenant() {
 
 	expectedRc := RootCommandeer{
 		v3iocfg:  cfg,
-		v3ioPath: "localhost:80123/123",
+		v3ioUrl:  "localhost:80123",
 		Reporter: metricReporter,
 	}
 	expectedCfg := &config.V3ioConfig{
-		WebApiEndpoint: "localhost:80123",
+		WebApiEndpoint: "http://localhost:80123",
 		Container:      "123",
 		TablePath:      "/x/y/z",
 		Username:       "Vel@Odar",
@@ -79,12 +79,12 @@ func (suite *testTsdbctlSuite) TestContainerConfig() {
 	suite.Require().NoError(err)
 	defer os.Setenv("V3IO_ACCESS_KEY", oldAccessKey)
 
-	rc := RootCommandeer{v3ioPath: "Vel@Odar:p455w0rd@localhost:80123/123", container: "test", accessKey: "acce55-key"}
+	rc := RootCommandeer{v3ioUrl: "localhost:80123/123", container: "test", accessKey: "acce55-key"}
 	cfg := &config.V3ioConfig{Username: "Vel@Odar", Password: "p455w0rd", TablePath: "/x/y/z"}
 
 	err = rc.populateConfig(cfg)
 	expectedCfg := &config.V3ioConfig{
-		WebApiEndpoint: "localhost:80123",
+		WebApiEndpoint: "http://localhost:80123",
 		Container:      "test",
 		TablePath:      "/x/y/z",
 		Username:       "Vel@Odar",
@@ -109,21 +109,20 @@ func (suite *testTsdbctlSuite) TestConfigFromEnvVarsAndPassword() {
 	defer os.Setenv("V3IO_ACCESS_KEY", oldAccessKey)
 
 	rc := RootCommandeer{container: "test", username: "Vel@Odar", password: "p455w0rd"}
-	cfg := &config.V3ioConfig{TablePath: "/x/y/z"}
+	cfg, err := config.GetOrLoadFromStruct(&config.V3ioConfig{TablePath: "/x/y/z"})
 	suite.Require().Nil(err)
 
+	expectedCfg := *cfg
 	err = rc.populateConfig(cfg)
-	expectedCfg := &config.V3ioConfig{
-		WebApiEndpoint: "host-from-env:123",
-		Container:      "test",
-		TablePath:      "/x/y/z",
-		Username:       "Vel@Odar",
-		Password:       "p455w0rd",
-		LogLevel:       "info",
-	}
+	expectedCfg.WebApiEndpoint = "http://host-from-env:123"
+	expectedCfg.Container = "test"
+	expectedCfg.TablePath = "/x/y/z"
+	expectedCfg.Username = "Vel@Odar"
+	expectedCfg.Password = "p455w0rd"
+	expectedCfg.LogLevel = "info"
 
 	suite.Require().Nil(err)
-	suite.Require().Equal(expectedCfg, rc.v3iocfg)
+	suite.Require().Equal(&expectedCfg, rc.v3iocfg)
 }
 
 func (suite *testTsdbctlSuite) TestConfigFromEnvVars() {
@@ -138,20 +137,18 @@ func (suite *testTsdbctlSuite) TestConfigFromEnvVars() {
 	defer os.Setenv("V3IO_ACCESS_KEY", oldAccessKey)
 
 	rc := RootCommandeer{container: "test"}
-	cfg := &config.V3ioConfig{TablePath: "/x/y/z"}
-	suite.Require().Nil(err)
+	cfg, err := config.GetOrLoadFromStruct(&config.V3ioConfig{TablePath: "/x/y/z"})
+	suite.NoError(err)
 
+	expectedCfg := *cfg
 	err = rc.populateConfig(cfg)
-	expectedCfg := &config.V3ioConfig{
-		WebApiEndpoint: "host-from-env:123",
-		Container:      "test",
-		TablePath:      "/x/y/z",
-		AccessKey:      "key-from-env",
-		LogLevel:       "info",
-	}
+	expectedCfg.WebApiEndpoint = "http://host-from-env:123"
+	expectedCfg.AccessKey = "key-from-env"
+	expectedCfg.Container = "test"
+	expectedCfg.LogLevel = "info"
 
 	suite.Require().Nil(err)
-	suite.Require().Equal(expectedCfg, rc.v3iocfg)
+	suite.Require().Equal(&expectedCfg, rc.v3iocfg)
 }
 
 func TestTsdbctlSuite(t *testing.T) {

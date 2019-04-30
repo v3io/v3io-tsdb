@@ -24,7 +24,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"net/url"
 	"os"
 	"strings"
 	"sync"
@@ -383,12 +382,6 @@ func loadFromData(data []byte) (*V3ioConfig, error) {
 }
 
 func initDefaults(cfg *V3ioConfig) {
-	// Prefix http:// in case that WebApiEndpoint is a pseudo-URL missing a scheme (for backward compatibility).
-	amendedWebApiEndpoint, err := buildUrl(cfg.WebApiEndpoint)
-	if err == nil {
-		cfg.WebApiEndpoint = amendedWebApiEndpoint
-	}
-
 	if cfg.BuildInfo == nil {
 		cfg.BuildInfo = BuildMetadta
 	}
@@ -443,15 +436,20 @@ func initDefaults(cfg *V3ioConfig) {
 	if cfg.DisableNginxMitigation == nil {
 		cfg.DisableNginxMitigation = &defaultDisableNginxMitigation
 	}
-}
 
-func buildUrl(webApiEndpoint string) (string, error) {
-	if !strings.HasPrefix(webApiEndpoint, "http://") && !strings.HasPrefix(webApiEndpoint, "https://") {
-		webApiEndpoint = "http://" + webApiEndpoint
+	if cfg.WebApiEndpoint == "" {
+		cfg.WebApiEndpoint = os.Getenv("V3IO_API")
 	}
-	urlPath, err := url.Parse(webApiEndpoint)
-	if err != nil {
-		return "", err
+
+	if cfg.AccessKey == "" {
+		cfg.AccessKey = os.Getenv("V3IO_ACCESS_KEY")
 	}
-	return urlPath.String(), nil
+
+	if cfg.Username == "" {
+		cfg.Username = os.Getenv("V3IO_USERNAME")
+	}
+
+	if cfg.Password == "" {
+		cfg.Password = os.Getenv("V3IO_PASSWORD")
+	}
 }
