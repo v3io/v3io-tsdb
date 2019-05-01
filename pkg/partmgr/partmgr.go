@@ -69,6 +69,7 @@ type PartitionManager struct {
 func (p *PartitionManager) GetPartitionsTablePath() string {
 	return path.Join(p.Path(), "partitions")
 }
+
 func (p *PartitionManager) Path() string {
 	return p.v3ioConfig.TablePath
 }
@@ -159,8 +160,9 @@ func (p *PartitionManager) createAndUpdatePartition(t int64) (*DBPartition, erro
 	return partition, err
 }
 
-func (p *PartitionManager) updateSchema() (err error) {
+func (p *PartitionManager) updateSchema() error {
 
+	var outerError error
 	metricReporter := performance.ReporterInstanceFromConfig(p.v3ioConfig)
 	metricReporter.WithTimer("UpdateSchemaTimer", func() {
 		// updating schema version and copying partitions to kv table.
@@ -168,31 +170,36 @@ func (p *PartitionManager) updateSchema() (err error) {
 
 		data, err := json.Marshal(p.schemaConfig)
 		if err != nil {
-			err = errors.Wrap(err, "Failed to update a new partition in the schema file.")
+			outerError = errors.Wrap(err, "Failed to update a new partition in the schema file.")
 			return
 		}
 		if p.container != nil { // Tests use case only
 			err = p.container.PutObjectSync(&v3io.PutObjectInput{Path: path.Join(p.Path(), config.SchemaConfigFileName), Body: data})
-
+			if err != nil {
+				outerError = err
+				return
+			}
 			items := make(map[string]map[string]interface{})
 			for _, part := range p.partitions {
-				items[fmt.Sprintf("%v", part.startTime)] = part.ToMap()
+				items[strconv.FormatInt(part.startTime, 10)] = part.ToMap()
 			}
 
 			input := &v3io.PutItemsInput{Path: p.GetPartitionsTablePath(), Items: items}
 			resp, err := p.container.PutItemsSync(input)
 
 			if err != nil {
-				err = errors.Wrap(err, "failed to update partitions table.")
+				outerError = errors.Wrap(err, "failed to update partitions table.")
+				return
 			}
 			output := resp.Output.(*v3io.PutItemsOutput)
 			if !output.Success {
-				err = fmt.Errorf("got one or more errors, err: %v", output.Errors)
+				outerError = fmt.Errorf("got one or more errors, err: %v", output.Errors)
+				return
 			}
 		}
 	})
 
-	return
+	return outerError
 }
 
 func (p *PartitionManager) DeletePartitionsFromSchema(partitionsToDelete []*DBPartition) error {
@@ -218,7 +225,7 @@ func (p *PartitionManager) DeletePartitionsFromSchema(partitionsToDelete []*DBPa
 	// Delete from partitions KV table
 	if p.container != nil { // Tests use case only
 		for _, partToDelete := range partitionsToDelete {
-			err := p.container.DeleteObjectSync(&v3io.DeleteObjectInput{Path: path.Join(p.GetPartitionsTablePath(), fmt.Sprintf("%v", partToDelete.startTime))})
+			err := p.container.DeleteObjectSync(&v3io.DeleteObjectInput{Path: path.Join(p.GetPartitionsTablePath(), strconv.FormatInt(partToDelete.startTime, 10))})
 			if err != nil {
 				return err
 			}
@@ -259,20 +266,20 @@ func (p *PartitionManager) ReadAndUpdateSchema() (err error) {
 		p.schemaMtimeNanosecs = mtimeNsecs
 
 		metricReporter.WithTimer("ReadAndUpdateSchemaTimer", func() {
-			resp, err := p.container.GetObjectSync(&v3io.GetObjectInput{Path: fullPath})
-			if err != nil {
-				err = errors.Wrapf(err, "Failed to read schema at path '%s'.", fullPath)
+			resp, innerError := p.container.GetObjectSync(&v3io.GetObjectInput{Path: fullPath})
+			if innerError != nil {
+				err = errors.Wrapf(innerError, "Failed to read schema at path '%s'.", fullPath)
 			}
 
 			schema := &config.Schema{}
-			err = json.Unmarshal(resp.Body(), schema)
-			if err != nil {
-				err = errors.Wrapf(err, "Failed to unmarshal schema at path '%s'.", fullPath)
+			innerError = json.Unmarshal(resp.Body(), schema)
+			if innerError != nil {
+				err = errors.Wrapf(innerError, "Failed to unmarshal schema at path '%s'.", fullPath)
 			}
 			p.schemaConfig = schema
-			err = p.updatePartitionsFromSchema(schema)
-			if err != nil {
-				err = errors.Wrapf(err, "Failed to update partitions from schema at path '%s'.", fullPath)
+			innerError = p.updatePartitionsFromSchema(schema)
+			if innerError != nil {
+				err = errors.Wrapf(innerError, "Failed to update partitions from schema at path '%s'.", fullPath)
 			}
 		})
 	}
