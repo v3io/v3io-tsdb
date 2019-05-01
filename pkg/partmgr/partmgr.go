@@ -269,17 +269,20 @@ func (p *PartitionManager) ReadAndUpdateSchema() (err error) {
 			resp, innerError := p.container.GetObjectSync(&v3io.GetObjectInput{Path: fullPath})
 			if innerError != nil {
 				err = errors.Wrapf(innerError, "Failed to read schema at path '%s'.", fullPath)
+				return
 			}
 
 			schema := &config.Schema{}
 			innerError = json.Unmarshal(resp.Body(), schema)
 			if innerError != nil {
 				err = errors.Wrapf(innerError, "Failed to unmarshal schema at path '%s'.", fullPath)
+				return
 			}
 			p.schemaConfig = schema
 			innerError = p.updatePartitionsFromSchema(schema)
 			if innerError != nil {
 				err = errors.Wrapf(innerError, "Failed to update partitions from schema at path '%s'.", fullPath)
+				return
 			}
 		})
 	}
