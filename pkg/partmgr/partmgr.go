@@ -179,7 +179,7 @@ func (p *PartitionManager) updateSchema() error {
 				outerError = err
 				return
 			}
-			items := make(map[string]map[string]interface{})
+			items := make(map[string]map[string]interface{}, len(p.partitions))
 			for _, part := range p.partitions {
 				items[strconv.FormatInt(part.startTime, 10)] = part.ToMap()
 			}
@@ -336,12 +336,11 @@ func (p *PartitionManager) newLoadPartitions() error {
 	for iter.Next() {
 		startTime := iter.GetField(config.ObjectNameAttrName).(string)
 		intStartTime, err := strconv.ParseInt(startTime, 10, 64)
-		partPath := path.Join(p.Path(), strconv.FormatInt(intStartTime/1000, 10)) + "/"
-
 		if err != nil {
 			return errors.Wrapf(err, "invalid partition name '%v'", startTime)
 		}
 
+		partPath := path.Join(p.Path(), strconv.FormatInt(intStartTime/1000, 10)) + "/"
 		newPart, err := NewDBPartitionFromMap(p, intStartTime, partPath, iter.GetItem())
 		if err != nil {
 			return err
@@ -648,7 +647,7 @@ func (p *DBPartition) GetHashingBuckets() int {
 }
 
 func (p *DBPartition) ToMap() map[string]interface{} {
-	attributes := make(map[string]interface{})
+	attributes := make(map[string]interface{}, 5)
 	attributes["aggregates"] = aggregate.AggregateMaskToString(p.AggrType())
 	attributes["rollupTime"] = p.rollupTime
 	attributes["chunkInterval"] = p.chunkInterval
