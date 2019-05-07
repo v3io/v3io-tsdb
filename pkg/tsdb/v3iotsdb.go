@@ -176,11 +176,12 @@ func (a *V3ioAdapter) connect() error {
 	tableSchema := config.Schema{}
 	err = json.Unmarshal(resp.Body(), &tableSchema)
 	if err != nil {
-		return errors.Wrapf(err, "Failed to unmarshal the TSDB schema at '%s'.", fullpath)
+		return errors.Wrapf(err, "Failed to unmarshal the TSDB schema at '%s', got: %v .", fullpath, string(resp.Body()))
 	}
 
+	// in order to support backward compatibility we do not fail on version mismatch and only logging warning
 	if tableSchema.TableSchemaInfo.Version != schema.Version {
-		return errors.Errorf("Table Schema version mismatch - existing table schema version is %d while the tsdb library version is %d! Make sure to create the table with same library version",
+		a.logger.Warn("Table Schema version mismatch - existing table schema version is %d while the tsdb library version is %d! Make sure to create the table with same library version",
 			tableSchema.TableSchemaInfo.Version, schema.Version)
 	}
 
@@ -281,12 +282,23 @@ func (a *V3ioAdapter) DeleteDB(deleteAll bool, ignoreErrors bool, fromTime int64
 		}
 	}
 	if deleteAll {
+		// Delete Schema file
 		schemaPath := pathUtil.Join(a.cfg.TablePath, config.SchemaConfigFileName)
 		a.logger.Info("Delete the TSDB configuration at '%s'.", schemaPath)
 		err := a.container.DeleteObjectSync(&v3io.DeleteObjectInput{Path: schemaPath})
 		if err != nil && !ignoreErrors {
 			return errors.New("The configuration at '" + schemaPath + "' cannot be deleted or doesn't exist.")
 		}
+
+		// Delete Partitions directory
+		partitionsKvPath := a.partitionMngr.GetPartitionsTablePath() + "/"
+		err = a.container.DeleteObjectSync(&v3io.DeleteObjectInput{Path: partitionsKvPath})
+		if err != nil && !ignoreErrors {
+			if !utils.IsNotExistsError(err) {
+				return errors.Wrapf(err, "Failed to delete partitions kv table '%s'.", partitionsKvPath)
+			}
+		}
+
 		// Delete the Directory object
 		path := a.cfg.TablePath + "/"
 		err = a.container.DeleteObjectSync(&v3io.DeleteObjectInput{Path: path})

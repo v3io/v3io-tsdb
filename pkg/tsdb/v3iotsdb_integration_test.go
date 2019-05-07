@@ -953,7 +953,11 @@ func testDeleteTSDBCase(test *testing.T, testParams tsdbtest.TestParams, deleteF
 	adapter, teardown := tsdbtest.SetUpWithData(test, testParams)
 	defer teardown()
 
-	pm, err := partmgr.NewPartitionMngr(adapter.GetSchema(), nil, testParams.V3ioConfig())
+	container, err := utils.CreateContainer(adapter.GetLogger("container"), testParams.V3ioConfig(), adapter.HttpTimeout)
+	if err != nil {
+		test.Fatalf("failed to create new container. reason: %s", err)
+	}
+	pm, err := partmgr.NewPartitionMngr(adapter.GetSchema(), container, testParams.V3ioConfig())
 	if err != nil {
 		test.Fatalf("Failed to create new partition manager. reason: %s", err)
 	}
@@ -968,7 +972,7 @@ func testDeleteTSDBCase(test *testing.T, testParams tsdbtest.TestParams, deleteF
 	}
 
 	if !deleteAll {
-		pm1, err := partmgr.NewPartitionMngr(adapter.GetSchema(), nil, testParams.V3ioConfig())
+		pm1, err := partmgr.NewPartitionMngr(adapter.GetSchema(), container, testParams.V3ioConfig())
 		remainingParts := pm1.PartsForRange(0, math.MaxInt64, false)
 		assert.Equal(test, len(remainingParts), initialNumberOfPartitions-len(partitionsToDelete))
 
