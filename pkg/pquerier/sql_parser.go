@@ -44,7 +44,10 @@ func ParseQuery(sql string) (*SelectParams, string, error) {
 
 			switch expr := col.Expr.(type) {
 			case *sqlparser.FuncExpr:
-				parseFuncExpr(expr, &currCol)
+				err := parseFuncExpr(expr, &currCol)
+				if err != nil {
+					return nil, "", err
+				}
 			case *sqlparser.ColName:
 				currCol.Metric = removeBackticks(sqlparser.String(expr.Name))
 			default:
@@ -151,6 +154,7 @@ func removeBackticks(origin string) string {
 
 func validateColumnNames(params *SelectParams) error {
 	names := make(map[string]bool)
+	requestedMetrics := make(map[string]bool)
 
 	for _, column := range params.RequestedColumns {
 		columnName := column.GetColumnName()
@@ -158,6 +162,13 @@ func validateColumnNames(params *SelectParams) error {
 			return fmt.Errorf("column name '%v' apears more than once in select query", columnName)
 		}
 		names[columnName] = true
+		requestedMetrics[column.Metric] = true
+	}
+
+	for _, column := range params.RequestedColumns {
+		if requestedMetrics[column.Alias] {
+			return fmt.Errorf("cannot use a metric name as an alias, alias: %v", column.Alias)
+		}
 	}
 
 	return nil

@@ -83,7 +83,8 @@ func TestNegativeParseQuery(t *testing.T) {
 	}{
 		{input: "select columnA as something, columnB as something"},
 		{input: "select avg(columnA) as something, columnB as something"},
-		{input: "select avg(*) as something, columnB as something"},
+		{input: "select avg(*) as something"},
+		{input: "select avg(cpu), max(cpu) as cpu"},
 	}
 	for _, test := range testCases {
 		t.Run(test.input, func(tt *testing.T) {
