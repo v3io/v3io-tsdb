@@ -70,6 +70,11 @@ func ParseQuery(sql string) (*SelectParams, string, error) {
 		selectParams.GroupBy = strings.TrimPrefix(sqlparser.String(slct.GroupBy), " group by ")
 	}
 
+	err = validateColumnNames(selectParams)
+	if err != nil {
+		return nil, "", err
+	}
+
 	return selectParams, fromTable, nil
 }
 
@@ -109,6 +114,10 @@ func parseFuncExpr(expr *sqlparser.FuncExpr, destCol *RequestedColumn) error {
 				parseFuncExpr(innerExpr, destCol)
 			}
 		}
+
+		if destCol.Metric == "" && destCol.Alias != "" {
+			return fmt.Errorf("cannot alias a wildcard")
+		}
 	}
 
 	return nil
@@ -138,4 +147,18 @@ func parseFilter(originalFilter string) (string, error) {
 }
 func removeBackticks(origin string) string {
 	return strings.Replace(origin, "`", "", -1)
+}
+
+func validateColumnNames(params *SelectParams) error {
+	names := make(map[string]bool)
+
+	for _, column := range params.RequestedColumns {
+		columnName := column.GetColumnName()
+		if names[columnName] {
+			return fmt.Errorf("column name '%v' apears more than once in select query", columnName)
+		}
+		names[columnName] = true
+	}
+
+	return nil
 }
