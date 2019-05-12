@@ -166,7 +166,7 @@ func validateColumnNames(params *SelectParams) error {
 	}
 
 	for _, column := range params.RequestedColumns {
-		if requestedMetrics[column.Alias] {
+		if column.Alias != "" && requestedMetrics[column.Alias] {
 			return fmt.Errorf("cannot use a metric name as an alias, alias: %v", column.Alias)
 		}
 	}
