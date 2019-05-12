@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/pkg/errors"
 	"github.com/v3io/v3io-tsdb/pkg/utils"
 	"github.com/xwb1989/sqlparser"
 )
@@ -119,7 +120,7 @@ func parseFuncExpr(expr *sqlparser.FuncExpr, destCol *RequestedColumn) error {
 		}
 
 		if destCol.Metric == "" && destCol.Alias != "" {
-			return fmt.Errorf("cannot alias a wildcard")
+			return errors.New("cannot alias a wildcard")
 		}
 	}
 
@@ -159,7 +160,7 @@ func validateColumnNames(params *SelectParams) error {
 	for _, column := range params.RequestedColumns {
 		columnName := column.GetColumnName()
 		if names[columnName] {
-			return fmt.Errorf("column name '%v' apears more than once in select query", columnName)
+			return fmt.Errorf("column name '%v' appears more than once in select query", columnName)
 		}
 		names[columnName] = true
 		requestedMetrics[column.Metric] = true
