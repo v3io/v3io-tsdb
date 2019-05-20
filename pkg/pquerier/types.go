@@ -51,6 +51,17 @@ func (col *RequestedColumn) GetFunction() string {
 	return strings.TrimSuffix(col.Function, aggregate.CrossSeriesSuffix)
 }
 
+func (col *RequestedColumn) GetColumnName() string {
+	if col.Alias != "" {
+		return col.Alias
+	}
+	// If no aggregations are requested (raw down sampled data)
+	if col.Function == "" {
+		return col.Metric
+	}
+	return fmt.Sprintf("%v(%v)", col.Function, col.Metric)
+}
+
 type columnMeta struct {
 	metric                 string
 	alias                  string

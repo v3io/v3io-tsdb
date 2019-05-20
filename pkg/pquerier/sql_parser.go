@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/pkg/errors"
 	"github.com/v3io/v3io-tsdb/pkg/utils"
 	"github.com/xwb1989/sqlparser"
 )
@@ -44,7 +45,10 @@ func ParseQuery(sql string) (*SelectParams, string, error) {
 
 			switch expr := col.Expr.(type) {
 			case *sqlparser.FuncExpr:
-				parseFuncExpr(expr, &currCol)
+				err := parseFuncExpr(expr, &currCol)
+				if err != nil {
+					return nil, "", err
+				}
 			case *sqlparser.ColName:
 				currCol.Metric = removeBackticks(sqlparser.String(expr.Name))
 			default:
@@ -68,6 +72,11 @@ func ParseQuery(sql string) (*SelectParams, string, error) {
 	}
 	if slct.GroupBy != nil {
 		selectParams.GroupBy = strings.TrimPrefix(sqlparser.String(slct.GroupBy), " group by ")
+	}
+
+	err = validateColumnNames(selectParams)
+	if err != nil {
+		return nil, "", err
 	}
 
 	return selectParams, fromTable, nil
@@ -109,6 +118,10 @@ func parseFuncExpr(expr *sqlparser.FuncExpr, destCol *RequestedColumn) error {
 				parseFuncExpr(innerExpr, destCol)
 			}
 		}
+
+		if destCol.Metric == "" && destCol.Alias != "" {
+			return errors.New("cannot alias a wildcard")
+		}
 	}
 
 	return nil
@@ -138,4 +151,26 @@ func parseFilter(originalFilter string) (string, error) {
 }
 func removeBackticks(origin string) string {
 	return strings.Replace(origin, "`", "", -1)
+}
+
+func validateColumnNames(params *SelectParams) error {
+	names := make(map[string]bool)
+	requestedMetrics := make(map[string]bool)
+
+	for _, column := range params.RequestedColumns {
+		columnName := column.GetColumnName()
+		if names[columnName] {
+			return fmt.Errorf("column name '%v' appears more than once in select query", columnName)
+		}
+		names[columnName] = true
+		requestedMetrics[column.Metric] = true
+	}
+
+	for _, column := range params.RequestedColumns {
+		if column.Alias != "" && requestedMetrics[column.Alias] {
+			return fmt.Errorf("cannot use a metric name as an alias, alias: %v", column.Alias)
+		}
+	}
+
+	return nil
 }
