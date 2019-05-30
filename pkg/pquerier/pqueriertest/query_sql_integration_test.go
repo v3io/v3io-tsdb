@@ -274,9 +274,7 @@ func (suite *testSQLSyntaxQuerySuite) TestAggregateSeriesWithAlias() {
 
 func (suite *testSQLSyntaxQuerySuite) TestAggregateSeriesWildcardOnPartOfTheColumns() {
 	adapter, err := tsdb.NewV3ioAdapter(suite.v3ioConfig, nil, nil)
-	if err != nil {
-		suite.T().Fatalf("failed to create v3io adapter. reason: %s", err)
-	}
+	suite.NoError(err, "failed to create v3io adapter")
 
 	labels1 := utils.LabelsFromStringList("os", "linux")
 	numberOfEvents := 10
@@ -302,9 +300,7 @@ func (suite *testSQLSyntaxQuerySuite) TestAggregateSeriesWildcardOnPartOfTheColu
 	expectedResult := map[string]float64{"max(cpu)": 40, "max(diskio)": 40, "min(cpu)": 10}
 
 	querierV2, err := adapter.QuerierV2()
-	if err != nil {
-		suite.T().Fatalf("Failed to create querier v2, err: %v", err)
-	}
+	suite.NoError(err, "failed to create querier v2")
 
 	params, _, _ := pquerier.ParseQuery("select max(*), min(cpu)")
 
@@ -312,9 +308,7 @@ func (suite *testSQLSyntaxQuerySuite) TestAggregateSeriesWildcardOnPartOfTheColu
 	params.To = suite.basicQueryTime + int64(numberOfEvents*eventsInterval)
 
 	set, err := querierV2.Select(params)
-	if err != nil {
-		suite.T().Fatalf("Failed to exeute query, err: %v", err)
-	}
+	suite.NoError(err, "failed to exeute query")
 
 	var seriesCount int
 	for set.Next() {
@@ -326,9 +320,9 @@ func (suite *testSQLSyntaxQuerySuite) TestAggregateSeriesWildcardOnPartOfTheColu
 		if err != nil {
 			suite.T().Fatal(err)
 		}
-		assert.Equal(suite.T(), 1, len(data), "queried data does not match expected")
-		assert.Equal(suite.T(), expectedResult[expectedKey], data[0].Value, "queried data does not match expected")
+		suite.Require().Equal(1, len(data), "queried data does not match expected")
+		suite.Require().Equal(expectedResult[expectedKey], data[0].Value, "queried data does not match expected")
 	}
 
-	assert.Equal(suite.T(), len(expectedResult), seriesCount, "series count didn't match expected")
+	suite.Require().Equal(len(expectedResult), seriesCount, "series count didn't match expected")
 }
