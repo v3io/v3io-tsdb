@@ -73,7 +73,7 @@ type columnMeta struct {
 }
 
 // if a user specifies he wants all metrics
-func (c *columnMeta) isWildcard() bool { return c.metric == "*" }
+func (c *columnMeta) isWildcard() bool { return c.metric == "" }
 
 // Concrete Column = has real data behind it, Virtual column = described as a function on top of concrete columns
 func (c columnMeta) isConcrete() bool { return c.function == 0 || aggregate.IsRawAggregate(c.function) }

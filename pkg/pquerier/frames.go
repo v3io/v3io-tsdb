@@ -116,11 +116,12 @@ func NewDataFrame(columnsSpec []columnMeta, indexColumn Column, lset utils.Label
 		df.nonEmptyRowsIndicators = make([]bool, columnSize)
 		// In case user wanted all metrics, save the template for every metric.
 		// Once we know what metrics we have we will create Columns out of the column Templates
-		if getAllMetrics {
-			df.columnsTemplates = columnsSpec
-		} else {
-			for i, col := range columnsSpec {
-				df.metrics[col.metric] = struct{}{}
+		df.columnsTemplates = []columnMeta{}
+		i := 0
+		for _, col := range columnsSpec {
+			if col.isWildcard() {
+				df.columnsTemplates = append(df.columnsTemplates, col)
+			} else {
 				column, err := createColumn(col, columnSize, useServerAggregates)
 				if err != nil {
 					return nil, err
@@ -130,12 +131,12 @@ func NewDataFrame(columnsSpec []columnMeta, indexColumn Column, lset utils.Label
 				}
 				df.columns = append(df.columns, column)
 				df.columnByName[col.getColumnName()] = i
+				i++
 			}
-
-			for _, col := range df.columns {
-				if !col.GetColumnSpec().isConcrete() {
-					fillDependantColumns(col, df)
-				}
+		}
+		for _, col := range df.columns {
+			if !col.GetColumnSpec().isConcrete() {
+				fillDependantColumns(col, df)
 			}
 		}
 	}

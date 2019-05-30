@@ -271,3 +271,64 @@ func (suite *testSQLSyntaxQuerySuite) TestAggregateSeriesWithAlias() {
 
 	assert.Equal(suite.T(), 1, seriesCount, "series count didn't match expected")
 }
+
+func (suite *testSQLSyntaxQuerySuite) TestAggregateSeriesWildcardOnPartOfTheColumns() {
+	adapter, err := tsdb.NewV3ioAdapter(suite.v3ioConfig, nil, nil)
+	if err != nil {
+		suite.T().Fatalf("failed to create v3io adapter. reason: %s", err)
+	}
+
+	labels1 := utils.LabelsFromStringList("os", "linux")
+	numberOfEvents := 10
+	eventsInterval := 60 * 1000
+
+	ingestData := []tsdbtest.DataPoint{{suite.basicQueryTime, 10},
+		{int64(suite.basicQueryTime + tsdbtest.MinuteInMillis), 20},
+		{suite.basicQueryTime + 2*tsdbtest.MinuteInMillis, 30},
+		{suite.basicQueryTime + 3*tsdbtest.MinuteInMillis, 40}}
+	testParams := tsdbtest.NewTestParams(suite.T(),
+		tsdbtest.TestOption{
+			Key: tsdbtest.OptTimeSeries,
+			Value: tsdbtest.TimeSeries{tsdbtest.Metric{
+				Name:   "cpu",
+				Labels: labels1,
+				Data:   ingestData},
+				tsdbtest.Metric{
+					Name:   "diskio",
+					Labels: labels1,
+					Data:   ingestData},
+			}})
+	tsdbtest.InsertData(suite.T(), testParams)
+	expectedResult := map[string]float64{"max(cpu)": 40, "max(diskio)": 40, "min(cpu)": 10}
+
+	querierV2, err := adapter.QuerierV2()
+	if err != nil {
+		suite.T().Fatalf("Failed to create querier v2, err: %v", err)
+	}
+
+	params, _, _ := pquerier.ParseQuery("select max(*), min(cpu)")
+
+	params.From = suite.basicQueryTime
+	params.To = suite.basicQueryTime + int64(numberOfEvents*eventsInterval)
+
+	set, err := querierV2.Select(params)
+	if err != nil {
+		suite.T().Fatalf("Failed to exeute query, err: %v", err)
+	}
+
+	var seriesCount int
+	for set.Next() {
+		seriesCount++
+		iter := set.At().Iterator()
+		labels := set.At().Labels()
+		expectedKey := fmt.Sprintf("%v(%v)", labels.Get(aggregate.AggregateLabel), labels.Get(config.PrometheusMetricNameAttribute))
+		data, err := tsdbtest.IteratorToSlice(iter)
+		if err != nil {
+			suite.T().Fatal(err)
+		}
+		assert.Equal(suite.T(), 1, len(data), "queried data does not match expected")
+		assert.Equal(suite.T(), expectedResult[expectedKey], data[0].Value, "queried data does not match expected")
+	}
+
+	assert.Equal(suite.T(), len(expectedResult), seriesCount, "series count didn't match expected")
+}
