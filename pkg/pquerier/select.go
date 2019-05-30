@@ -390,10 +390,7 @@ func (queryCtx *selectQueryContext) createColumnSpecs() ([]columnMeta, map[strin
 		if tolerance == 0 {
 			tolerance = queryCtx.queryParams.Step * defaultToleranceFactor
 		}
-		colMeta := columnMeta{metric: col.Metric,
-			alias:                  col.Alias,
-			interpolationType:      inter,
-			interpolationTolerance: tolerance}
+		colMeta := columnMeta{metric: col.Metric, alias: col.Alias, interpolationType: inter, interpolationTolerance: tolerance}
 
 		if col.GetFunction() != "" {
 			// validating that all given aggregates are either cross series or not
