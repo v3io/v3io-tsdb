@@ -103,6 +103,19 @@ func TestIngestData(t *testing.T) {
 					}}},
 			),
 		},
+		{desc: "Should ingest into first partition in epoch without corruption (TSDB-67)",
+			params: tsdbtest.NewTestParams(t,
+				tsdbtest.TestOption{
+					Key: tsdbtest.OptTimeSeries,
+					Value: tsdbtest.TimeSeries{tsdbtest.Metric{
+						Name:   "cool-cpu",
+						Labels: utils.LabelsFromStringList("os", "linux", "iguaz", "yesplease"),
+						Data: []tsdbtest.DataPoint{
+							{Time: 10, Value: 314.3},
+						},
+					}}},
+			),
+		},
 	}
 
 	for _, test := range testCases {

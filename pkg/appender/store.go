@@ -42,7 +42,10 @@ const maxLateArrivalInterval = 59 * 60 * 1000 // Max late arrival of 59min
 
 // Create a chunk store with two chunks (current, previous)
 func NewChunkStore(logger logger.Logger, labelNames []string, aggrsOnly bool) *chunkStore {
-	store := chunkStore{logger: logger}
+	store := chunkStore{
+		logger:  logger,
+		lastTid: -1,
+	}
 	if !aggrsOnly {
 		store.chunks[0] = &attrAppender{}
 		store.chunks[1] = &attrAppender{}
