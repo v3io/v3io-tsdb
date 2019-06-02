@@ -32,7 +32,6 @@ type selectQueryContext struct {
 
 	columnsSpec            []columnMeta
 	columnsSpecByMetric    map[string][]columnMeta
-	isAllMetrics           bool
 	totalColumns           int
 	isCrossSeriesAggregate bool
 
@@ -347,7 +346,6 @@ func (queryCtx *selectQueryContext) processQueryResults(query *partQuery) error 
 				lset,
 				hash,
 				queryCtx.isRawQuery(),
-				queryCtx.isAllMetrics,
 				queryCtx.getResultBucketsSize(),
 				results.IsServerAggregates(),
 				queryCtx.showAggregateLabel)
@@ -410,7 +408,6 @@ func (queryCtx *selectQueryContext) createColumnSpecs() ([]columnMeta, map[strin
 		}
 		columnsSpecByMetric[col.Metric] = append(columnsSpecByMetric[col.Metric], colMeta)
 		columnsSpec = append(columnsSpec, colMeta)
-		queryCtx.isAllMetrics = queryCtx.isAllMetrics || col.Metric == ""
 	}
 
 	// Adding hidden columns if needed
