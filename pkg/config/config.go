@@ -436,4 +436,20 @@ func initDefaults(cfg *V3ioConfig) {
 	if cfg.DisableNginxMitigation == nil {
 		cfg.DisableNginxMitigation = &defaultDisableNginxMitigation
 	}
+
+	if cfg.WebApiEndpoint == "" {
+		cfg.WebApiEndpoint = os.Getenv("V3IO_API")
+	}
+
+	if cfg.AccessKey == "" {
+		cfg.AccessKey = os.Getenv("V3IO_ACCESS_KEY")
+	}
+
+	if cfg.Username == "" {
+		cfg.Username = os.Getenv("V3IO_USERNAME")
+	}
+
+	if cfg.Password == "" {
+		cfg.Password = os.Getenv("V3IO_PASSWORD")
+	}
 }

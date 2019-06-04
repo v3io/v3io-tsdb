@@ -51,6 +51,17 @@ func (col *RequestedColumn) GetFunction() string {
 	return strings.TrimSuffix(col.Function, aggregate.CrossSeriesSuffix)
 }
 
+func (col *RequestedColumn) GetColumnName() string {
+	if col.Alias != "" {
+		return col.Alias
+	}
+	// If no aggregations are requested (raw down sampled data)
+	if col.Function == "" {
+		return col.Metric
+	}
+	return fmt.Sprintf("%v(%v)", col.Function, col.Metric)
+}
+
 type columnMeta struct {
 	metric                 string
 	alias                  string
@@ -62,7 +73,7 @@ type columnMeta struct {
 }
 
 // if a user specifies he wants all metrics
-func (c *columnMeta) isWildcard() bool { return c.metric == "*" }
+func (c *columnMeta) isWildcard() bool { return c.metric == "" }
 
 // Concrete Column = has real data behind it, Virtual column = described as a function on top of concrete columns
 func (c columnMeta) isConcrete() bool { return c.function == 0 || aggregate.IsRawAggregate(c.function) }

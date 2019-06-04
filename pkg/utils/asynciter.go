@@ -27,7 +27,8 @@ import (
 
 	"github.com/nuclio/logger"
 	"github.com/pkg/errors"
-	"github.com/v3io/v3io-go-http"
+	"github.com/v3io/v3io-go/pkg/dataplane"
+	"github.com/v3io/v3io-go/pkg/errors"
 	"github.com/v3io/v3io-tsdb/pkg/config"
 )
 
@@ -44,7 +45,7 @@ type AsyncItemsCursor struct {
 	itemIndex    int
 	items        []v3io.Item
 	input        *v3io.GetItemsInput
-	container    *v3io.Container
+	container    v3io.Container
 	logger       logger.Logger
 
 	responseChan  chan *v3io.Response
@@ -54,9 +55,7 @@ type AsyncItemsCursor struct {
 	Cnt           int
 }
 
-func NewAsyncItemsCursor(
-	container *v3io.Container, input *v3io.GetItemsInput,
-	workers int, shardingKeys []string, logger logger.Logger) (*AsyncItemsCursor, error) {
+func NewAsyncItemsCursor(container v3io.Container, input *v3io.GetItemsInput, workers int, shardingKeys []string, logger logger.Logger) (*AsyncItemsCursor, error) {
 
 	// TODO: use workers from Context.numWorkers (if no ShardingKey)
 	if workers == 0 || input.ShardingKey != "" {
@@ -167,7 +166,7 @@ func (ic *AsyncItemsCursor) processResponse() error {
 	defer resp.Release()
 
 	// Ignore 404s
-	if e, hasErrorCode := resp.Error.(v3io.ErrorWithStatusCode); hasErrorCode && e.StatusCode() == http.StatusNotFound {
+	if e, hasErrorCode := resp.Error.(v3ioerrors.ErrorWithStatusCode); hasErrorCode && e.StatusCode() == http.StatusNotFound {
 		ic.logger.Debug("Got 404 - error: %v, request: %v", resp.Error, resp.Request().Input)
 		ic.lastShards++
 		return nil

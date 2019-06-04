@@ -1,8 +1,5 @@
 container: "bigdata"
 workers: 8
-webApiEndpoint: "3.120.101.162:8081"
-username: "iguazio"
-password: "gHghngzF8uf3GDRs"
 batchSize: 2048
 
 performance:

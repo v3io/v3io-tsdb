@@ -27,7 +27,7 @@ import (
 
 	"github.com/nuclio/logger"
 	"github.com/pkg/errors"
-	"github.com/v3io/v3io-go-http"
+	"github.com/v3io/v3io-go/pkg/dataplane"
 	"github.com/v3io/v3io-tsdb/internal/pkg/performance"
 	"github.com/v3io/v3io-tsdb/pkg/config"
 	"github.com/v3io/v3io-tsdb/pkg/partmgr"
@@ -109,7 +109,7 @@ type MetricsCache struct {
 	cfg           *config.V3ioConfig
 	partitionMngr *partmgr.PartitionManager
 	mtx           sync.RWMutex
-	container     *v3io.Container
+	container     v3io.Container
 	logger        logger.Logger
 	started       bool
 
@@ -132,7 +132,7 @@ type MetricsCache struct {
 	performanceReporter *performance.MetricReporter
 }
 
-func NewMetricsCache(container *v3io.Container, logger logger.Logger, cfg *config.V3ioConfig,
+func NewMetricsCache(container v3io.Container, logger logger.Logger, cfg *config.V3ioConfig,
 	partMngr *partmgr.PartitionManager) *MetricsCache {
 
 	newCache := MetricsCache{container: container, logger: logger, cfg: cfg, partitionMngr: partMngr}

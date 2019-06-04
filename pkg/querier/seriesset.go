@@ -22,7 +22,7 @@ package querier
 
 import (
 	"github.com/nuclio/logger"
-	"github.com/v3io/v3io-go-http"
+	"github.com/v3io/v3io-go/pkg/dataplane"
 	"github.com/v3io/v3io-tsdb/pkg/aggregate"
 	"github.com/v3io/v3io-tsdb/pkg/config"
 	"github.com/v3io/v3io-tsdb/pkg/partmgr"
@@ -53,7 +53,7 @@ type V3ioSeriesSet struct {
 
 // Get relevant items and attributes from the TSDB and create an iterator
 // TODO: get items per partition + merge, per partition calc attrs
-func (s *V3ioSeriesSet) getItems(partition *partmgr.DBPartition, name, filter string, container *v3io.Container, workers int) error {
+func (s *V3ioSeriesSet) getItems(partition *partmgr.DBPartition, name, filter string, container v3io.Container, workers int) error {
 
 	path := partition.GetTablePath()
 	shardingKeys := []string{}

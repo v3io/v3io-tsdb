@@ -31,7 +31,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/v3io/v3io-go-http"
+	"github.com/v3io/v3io-go/pkg/dataplane"
 	"github.com/v3io/v3io-tsdb/pkg/aggregate"
 	"github.com/v3io/v3io-tsdb/pkg/chunkenc"
 	"github.com/v3io/v3io-tsdb/pkg/config"
@@ -100,6 +100,19 @@ func TestIngestData(t *testing.T) {
 							{Time: 1532940510, Value: 314.3},
 							{Time: 1532940510 + 5, Value: 300.3},
 							{Time: 1532940510 - 10, Value: 3234.6}},
+					}}},
+			),
+		},
+		{desc: "Should ingest into first partition in epoch without corruption (TSDB-67)",
+			params: tsdbtest.NewTestParams(t,
+				tsdbtest.TestOption{
+					Key: tsdbtest.OptTimeSeries,
+					Value: tsdbtest.TimeSeries{tsdbtest.Metric{
+						Name:   "cool-cpu",
+						Labels: utils.LabelsFromStringList("os", "linux", "iguaz", "yesplease"),
+						Data: []tsdbtest.DataPoint{
+							{Time: 10, Value: 314.3},
+						},
 					}}},
 			),
 		},
@@ -817,9 +830,12 @@ func TestDeleteTSDB(t *testing.T) {
 	}
 	responseChan := make(chan *v3io.Response)
 	container, _ := adapter.GetContainer()
-	container.ListBucket(&v3io.ListBucketInput{Path: v3ioConfig.TablePath}, 30, responseChan)
+	_, err = container.GetContainerContents(&v3io.GetContainerContentsInput{Path: v3ioConfig.TablePath}, 30, responseChan)
+	if err != nil {
+		t.Fatal(err.Error())
+	}
 	if res := <-responseChan; res.Error != nil {
-		t.Fatal("Failed to create TSDB")
+		t.Fatal(res.Error.Error())
 	}
 
 	now := time.Now().Unix() * 1000 // now time in millis
@@ -827,7 +843,10 @@ func TestDeleteTSDB(t *testing.T) {
 		t.Fatalf("Failed to delete DB on teardown. reason: %s", err)
 	}
 
-	container.ListBucket(&v3io.ListBucketInput{Path: v3ioConfig.TablePath}, 30, responseChan)
+	_, err = container.GetContainerContents(&v3io.GetContainerContentsInput{Path: v3ioConfig.TablePath}, 30, responseChan)
+	if err != nil {
+		t.Fatal(err.Error())
+	}
 	if res := <-responseChan; res.Error == nil {
 		t.Fatal("Did not delete TSDB properly")
 	}
@@ -947,7 +966,11 @@ func testDeleteTSDBCase(test *testing.T, testParams tsdbtest.TestParams, deleteF
 	adapter, teardown := tsdbtest.SetUpWithData(test, testParams)
 	defer teardown()
 
-	pm, err := partmgr.NewPartitionMngr(adapter.GetSchema(), nil, testParams.V3ioConfig())
+	container, err := utils.CreateContainer(adapter.GetLogger("container"), testParams.V3ioConfig(), adapter.HttpTimeout)
+	if err != nil {
+		test.Fatalf("failed to create new container. reason: %s", err)
+	}
+	pm, err := partmgr.NewPartitionMngr(adapter.GetSchema(), container, testParams.V3ioConfig())
 	if err != nil {
 		test.Fatalf("Failed to create new partition manager. reason: %s", err)
 	}
@@ -962,7 +985,7 @@ func testDeleteTSDBCase(test *testing.T, testParams tsdbtest.TestParams, deleteF
 	}
 
 	if !deleteAll {
-		pm1, err := partmgr.NewPartitionMngr(adapter.GetSchema(), nil, testParams.V3ioConfig())
+		pm1, err := partmgr.NewPartitionMngr(adapter.GetSchema(), container, testParams.V3ioConfig())
 		remainingParts := pm1.PartsForRange(0, math.MaxInt64, false)
 		assert.Equal(test, len(remainingParts), initialNumberOfPartitions-len(partitionsToDelete))
 
@@ -1005,7 +1028,7 @@ func testDeleteTSDBCase(test *testing.T, testParams tsdbtest.TestParams, deleteF
 		tableSchemaPath := path.Join(tablePath, config.SchemaConfigFileName)
 
 		// Validate: schema does not exist
-		_, err := container.Sync.GetObject(&v3io.GetObjectInput{Path: tableSchemaPath})
+		_, err := container.GetObjectSync(&v3io.GetObjectInput{Path: tableSchemaPath})
 		if err != nil {
 			if utils.IsNotExistsError(err) {
 				// OK - expected
@@ -1015,7 +1038,7 @@ func testDeleteTSDBCase(test *testing.T, testParams tsdbtest.TestParams, deleteF
 		}
 
 		// Validate: table does not exist
-		_, err = container.Sync.GetObject(&v3io.GetObjectInput{Path: tablePath})
+		_, err = container.GetObjectSync(&v3io.GetObjectInput{Path: tablePath})
 		if err != nil {
 			if utils.IsNotExistsError(err) {
 				// OK - expected

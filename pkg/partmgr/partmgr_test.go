@@ -50,17 +50,8 @@ func TestCreateNewPartition(tst *testing.T) {
 	if err != nil {
 		tst.FailNow()
 	}
-	assert.Equal(tst, 3, len(manager.partitions))
+	assert.Equal(tst, 2, len(manager.partitions))
 	assert.Equal(tst, manager.headPartition, part)
-
-	// Add (insert) in the middle
-	part, err = manager.TimeToPart(startTime + (interval * 2))
-	assert.Nil(tst, err, "Failed converting time to a partition.")
-	if err != nil {
-		tst.FailNow()
-	}
-	assert.Equal(tst, 3, len(manager.partitions))
-	assert.Equal(tst, manager.partitions[1], part)
 
 	// Add first
 	part, err = manager.TimeToPart(startTime)
@@ -68,7 +59,7 @@ func TestCreateNewPartition(tst *testing.T) {
 	if err != nil {
 		tst.FailNow()
 	}
-	assert.Equal(tst, 4, len(manager.partitions))
+	assert.Equal(tst, 3, len(manager.partitions))
 	assert.Equal(tst, manager.partitions[0], part)
 }
 
@@ -99,8 +90,9 @@ func TestNewPartitionMngrBadInput(t *testing.T) {
 			AggregationGranularity: "boo",
 		},
 	}
-	v3ioConfig := &config.V3ioConfig{}
-	_, err := NewPartitionMngr(schemaConfig, nil, v3ioConfig)
+	v3ioConfig, err := config.GetOrLoadFromStruct(&config.V3ioConfig{})
+	assert.NoError(t, err)
+	_, err = NewPartitionMngr(schemaConfig, nil, v3ioConfig)
 	assert.Error(t, err)
 }
 

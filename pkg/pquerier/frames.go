@@ -101,7 +101,7 @@ func (fi *frameIterator) Err() error {
 }
 
 // data frame, holds multiple value columns and an index (time) column
-func NewDataFrame(columnsSpec []columnMeta, indexColumn Column, lset utils.Labels, hash uint64, isRawQuery, getAllMetrics bool, columnSize int, useServerAggregates, showAggregateLabel bool) (*dataFrame, error) {
+func NewDataFrame(columnsSpec []columnMeta, indexColumn Column, lset utils.Labels, hash uint64, isRawQuery bool, columnSize int, useServerAggregates, showAggregateLabel bool) (*dataFrame, error) {
 	df := &dataFrame{lset: lset, hash: hash, isRawSeries: isRawQuery, showAggregateLabel: showAggregateLabel}
 	// is raw query
 	if isRawQuery {
@@ -114,13 +114,14 @@ func NewDataFrame(columnsSpec []columnMeta, indexColumn Column, lset utils.Label
 		df.metricToCountColumn = map[string]Column{}
 		df.metrics = map[string]struct{}{}
 		df.nonEmptyRowsIndicators = make([]bool, columnSize)
-		// In case user wanted all metrics, save the template for every metric.
-		// Once we know what metrics we have we will create Columns out of the column Templates
-		if getAllMetrics {
-			df.columnsTemplates = columnsSpec
-		} else {
-			for i, col := range columnsSpec {
-				df.metrics[col.metric] = struct{}{}
+
+		i := 0
+		for _, col := range columnsSpec {
+			// In case user wanted all metrics, save the template for every metric.
+			// Once we know what metrics we have we will create Columns out of the column Templates
+			if col.isWildcard() {
+				df.columnsTemplates = append(df.columnsTemplates, col)
+			} else {
 				column, err := createColumn(col, columnSize, useServerAggregates)
 				if err != nil {
 					return nil, err
@@ -130,12 +131,12 @@ func NewDataFrame(columnsSpec []columnMeta, indexColumn Column, lset utils.Label
 				}
 				df.columns = append(df.columns, column)
 				df.columnByName[col.getColumnName()] = i
+				i++
 			}
-
-			for _, col := range df.columns {
-				if !col.GetColumnSpec().isConcrete() {
-					fillDependantColumns(col, df)
-				}
+		}
+		for _, col := range df.columns {
+			if !col.GetColumnSpec().isConcrete() {
+				fillDependantColumns(col, df)
 			}
 		}
 	}

@@ -76,3 +76,22 @@ func TestParseQuery(t *testing.T) {
 		})
 	}
 }
+
+func TestNegativeParseQuery(t *testing.T) {
+	testCases := []struct {
+		input string
+	}{
+		{input: "select columnA as something, columnB as something"},
+		{input: "select avg(columnA) as something, columnB as something"},
+		{input: "select avg(*) as something"},
+		{input: "select avg(cpu), max(cpu) as cpu"},
+	}
+	for _, test := range testCases {
+		t.Run(test.input, func(tt *testing.T) {
+			_, _, err := pquerier.ParseQuery(test.input)
+			if err == nil {
+				tt.Fatalf("expected error but finished successfully")
+			}
+		})
+	}
+}
