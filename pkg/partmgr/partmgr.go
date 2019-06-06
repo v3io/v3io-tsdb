@@ -290,7 +290,7 @@ func (p *PartitionManager) ReadAndUpdateSchema() (err error) {
 }
 
 func (p *PartitionManager) updatePartitionsFromSchema(schema *config.Schema) error {
-	if schema.TableSchemaInfo.Version == 3 {
+	if schema.TableSchemaInfo.Version == 3 && !p.v3ioConfig.LoadPartitionsFromSchemaFile {
 		return p.newLoadPartitions()
 	}
 
