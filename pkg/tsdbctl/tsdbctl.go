@@ -22,9 +22,6 @@ package tsdbctl
 
 import (
 	"fmt"
-	"net/url"
-	"strings"
-
 	"github.com/nuclio/logger"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
@@ -170,26 +167,8 @@ func (rc *RootCommandeer) populateConfig(cfg *config.V3ioConfig) error {
 		cfg.LogLevel = config.DefaultLogLevel
 	}
 
-	// Prefix http:// in case that WebApiEndpoint is a pseudo-URL missing a scheme (for backward compatibility).
-	amendedWebApiEndpoint, err := buildUrl(cfg.WebApiEndpoint)
-	if err == nil {
-		cfg.WebApiEndpoint = amendedWebApiEndpoint
-	}
-
 	rc.v3iocfg = cfg
 	return nil
-}
-
-func buildUrl(webApiEndpoint string) (string, error) {
-	if !strings.HasPrefix(webApiEndpoint, "http://") && !strings.HasPrefix(webApiEndpoint, "https://") {
-		webApiEndpoint = "http://" + webApiEndpoint
-	}
-	endpointUrl, err := url.Parse(webApiEndpoint)
-	if err != nil {
-		return "", err
-	}
-	endpointUrl.Path = ""
-	return endpointUrl.String(), nil
 }
 
 func (rc *RootCommandeer) startAdapter() error {

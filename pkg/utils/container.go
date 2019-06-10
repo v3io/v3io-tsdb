@@ -23,6 +23,8 @@ package utils
 import (
 	"encoding/binary"
 	"fmt"
+	"net/url"
+	"strings"
 	"time"
 
 	"github.com/nuclio/logger"
@@ -56,8 +58,13 @@ func NewLogger(level string) (logger.Logger, error) {
 }
 
 func CreateContainer(logger logger.Logger, cfg *config.V3ioConfig, httpTimeout time.Duration) (v3io.Container, error) {
+	endpointUrl, err := buildUrl(cfg.WebApiEndpoint)
+	if err != nil {
+		return nil, err
+	}
+
 	newContextInput := &v3io.NewContextInput{
-		ClusterEndpoints: []string{cfg.WebApiEndpoint},
+		ClusterEndpoints: []string{endpointUrl},
 		NumWorkers:       cfg.Workers,
 		DialTimeout:      httpTimeout,
 	}
@@ -81,6 +88,18 @@ func CreateContainer(logger logger.Logger, cfg *config.V3ioConfig, httpTimeout t
 	}
 
 	return container, nil
+}
+
+func buildUrl(webApiEndpoint string) (string, error) {
+	if !strings.HasPrefix(webApiEndpoint, "http://") && !strings.HasPrefix(webApiEndpoint, "https://") {
+		webApiEndpoint = "http://" + webApiEndpoint
+	}
+	endpointUrl, err := url.Parse(webApiEndpoint)
+	if err != nil {
+		return "", err
+	}
+	endpointUrl.Path = ""
+	return endpointUrl.String(), nil
 }
 
 // Convert a V3IO blob to an integers array
