@@ -144,7 +144,7 @@ func calculatePartitionAndChunkInterval(rateInHours, minChunkSize, maxChunkSize,
 }
 
 func rateToHours(samplesIngestionRate string) (int, error) {
-	parsingError := errors.New(`Invalid samples ingestion rate. The rate must be of the format "[0-9]+/[mhd]". For example, "12/m".`)
+	parsingError := errors.New(`Invalid samples ingestion rate. The rate must be of the format "[0-9]+/[smh]". For example, "12/m".`)
 
 	if len(samplesIngestionRate) < 3 {
 		return 0, parsingError
