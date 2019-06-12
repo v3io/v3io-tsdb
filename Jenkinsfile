@@ -80,10 +80,8 @@ def build_nuclio(V3IO_TSDB_VERSION, internal_status="stable") {
                         container('jnlp') {
                             dir("${BUILD_FOLDER}/src/github.com/${git_project_upstream_user}/${git_project}") {
                                 sh """
-                                    rm -rf functions/ingest/vendor/github.com/${git_project_upstream_user}/v3io-tsdb
-                                    git clone https://${GIT_TOKEN}@github.com/${git_project_user}/v3io-tsdb.git functions/ingest/vendor/github.com/${git_project_upstream_user}/v3io-tsdb
-                                    cd functions/ingest/vendor/github.com/${git_project_upstream_user}/v3io-tsdb
-                                    git checkout ${V3IO_TSDB_VERSION}
+                                    GO111MODULE=on go get github.com/${git_project_user}/v3io-tsdb@${V3IO_TSDB_VERSION}
+                                    GO111MODULE=on go mod tidy
                                 """
                             }
                         }
