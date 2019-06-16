@@ -98,10 +98,8 @@ def build_nuclio(V3IO_TSDB_VERSION, internal_status="stable") {
                         container('jnlp') {
                             dir("${BUILD_FOLDER}/src/github.com/${git_project_upstream_user}/${git_project}") {
                                 sh """
-                                    rm -rf functions/query/vendor/github.com/${git_project_upstream_user}/v3io-tsdb
-                                    git clone https://${GIT_TOKEN}@github.com/${git_project_user}/v3io-tsdb.git functions/query/vendor/github.com/${git_project_upstream_user}/v3io-tsdb
-                                    cd functions/query/vendor/github.com/${git_project_upstream_user}/v3io-tsdb
-                                    git checkout ${V3IO_TSDB_VERSION}
+                                    GO111MODULE=on go get github.com/${git_project_user}/v3io-tsdb@${V3IO_TSDB_VERSION}
+                                    GO111MODULE=on go mod tidy
                                 """
                             }
                         }
@@ -436,8 +434,10 @@ podTemplate(label: "${git_project}-${label}", inheritFrom: "jnlp-docker-golang")
                                                 if (TAG_VERSION) {
                                                     stage('get previous release version') {
                                                         container('jnlp') {
-                                                            NEXT_VERSION = "v${TAG_VERSION}-${MAIN_TAG_VERSION}"
-
+                                                            CURRENT_VERSION = github.get_current_tag_version("prometheus", git_project_user, GIT_TOKEN)
+                                                            echo "$CURRENT_VERSION"
+                                                            version_list=CURRENT_VERSION.split('-')
+                                                            NEXT_VERSION = "v${TAG_VERSION}-${version_list[1]}-${MAIN_TAG_VERSION}"
                                                             echo "$NEXT_VERSION"
                                                             next_versions.putAt('prometheus', NEXT_VERSION)
                                                         }
