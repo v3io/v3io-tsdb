@@ -238,16 +238,21 @@ func (d *dataFrame) addMetricIfNotExist(metricName string, columnSize int, useSe
 }
 
 func (d *dataFrame) addMetricFromTemplate(metricName string, columnSize int, useServerAggregates bool) error {
-	newColumns := make([]Column, len(d.columnsTemplates))
-	for i, col := range d.columnsTemplates {
+	var newColumns []Column
+	for _, col := range d.columnsTemplates {
 		col.metric = metricName
 		newCol, err := createColumn(col, columnSize, useServerAggregates)
 		if err != nil {
 			return err
 		}
 
-		newColumns[i] = newCol
-		if aggregate.IsCountAggregate(col.function) {
+		// Make sure there is only 1 count column per metric.
+		// Count is the only column we automatically add so in some cases we get multiple count columns in the templates.
+		_, ok := d.metricToCountColumn[metricName]
+		if !aggregate.IsCountAggregate(col.function) || !ok {
+			newColumns = append(newColumns, newCol)
+		}
+		if aggregate.IsCountAggregate(col.function) && !ok {
 			d.metricToCountColumn[metricName] = newCol
 		}
 	}

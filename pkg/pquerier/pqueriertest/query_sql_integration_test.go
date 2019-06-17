@@ -326,3 +326,58 @@ func (suite *testSQLSyntaxQuerySuite) TestAggregateSeriesWildcardOnPartOfTheColu
 
 	suite.Require().Equal(len(expectedResult), seriesCount, "series count didn't match expected")
 }
+
+func (suite *testSQLSyntaxQuerySuite) TestAggregateSeriesWildcardOnPartOfTheColumnsWithVirtualColumn() {
+	adapter, err := tsdb.NewV3ioAdapter(suite.v3ioConfig, nil, nil)
+	suite.NoError(err, "failed to create v3io adapter")
+
+	labels1 := utils.LabelsFromStringList("os", "linux")
+	numberOfEvents := 10
+	eventsInterval := 60 * 1000
+
+	ingestData := []tsdbtest.DataPoint{{suite.basicQueryTime, 10},
+		{int64(suite.basicQueryTime + tsdbtest.MinuteInMillis), 20},
+		{suite.basicQueryTime + 2*tsdbtest.MinuteInMillis, 30},
+		{suite.basicQueryTime + 3*tsdbtest.MinuteInMillis, 40}}
+	testParams := tsdbtest.NewTestParams(suite.T(),
+		tsdbtest.TestOption{
+			Key: tsdbtest.OptTimeSeries,
+			Value: tsdbtest.TimeSeries{tsdbtest.Metric{
+				Name:   "cpu",
+				Labels: labels1,
+				Data:   ingestData},
+				tsdbtest.Metric{
+					Name:   "diskio",
+					Labels: labels1,
+					Data:   ingestData},
+			}})
+	tsdbtest.InsertData(suite.T(), testParams)
+	expectedResult := map[string]float64{"avg(cpu)": 25, "avg(diskio)": 25, "min(cpu)": 10}
+
+	querierV2, err := adapter.QuerierV2()
+	suite.NoError(err, "failed to create querier v2")
+
+	params, _, _ := pquerier.ParseQuery("select avg(*), min(cpu)")
+
+	params.From = suite.basicQueryTime
+	params.To = suite.basicQueryTime + int64(numberOfEvents*eventsInterval)
+
+	set, err := querierV2.Select(params)
+	suite.NoError(err, "failed to exeute query")
+
+	var seriesCount int
+	for set.Next() {
+		seriesCount++
+		iter := set.At().Iterator()
+		labels := set.At().Labels()
+		expectedKey := fmt.Sprintf("%v(%v)", labels.Get(aggregate.AggregateLabel), labels.Get(config.PrometheusMetricNameAttribute))
+		data, err := tsdbtest.IteratorToSlice(iter)
+		if err != nil {
+			suite.T().Fatal(err)
+		}
+		suite.Require().Equal(1, len(data), "queried data does not match expected")
+		suite.Require().Equal(expectedResult[expectedKey], data[0].Value, "queried data does not match expected")
+	}
+
+	suite.Require().Equal(len(expectedResult), seriesCount, "series count didn't match expected")
+}
