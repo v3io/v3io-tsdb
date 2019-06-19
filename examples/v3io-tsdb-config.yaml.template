@@ -4,13 +4,13 @@
 # TODO: In your configuration file, delete the configuration keys that you
 #       don't need and replace the "<...>" placeholders.
 
-# Endpoint of an Iguazio Continuous Data Platform web-gateway (web-API) service,
+# Endpoint of an Iguazio Data Science Platform web-gateway (web-API) service,
 # consisting of an IP address or resolvable host domain name, and a port number
 # (currently, always port 8081)
 # Example: "192.168.1.100:8081"
 webApiEndpoint: "<IP address/host name>:8081"
 
-# Name of an Iguazio Continuous Data Platform container for storing the TSDB table
+# Name of an Iguazio Data Science Platform container for storing the TSDB table
 # Example: "bigdata"
 container: "<container name>"
 
