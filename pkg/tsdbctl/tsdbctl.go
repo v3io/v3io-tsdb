@@ -70,13 +70,13 @@ func NewRootCommandeer() *RootCommandeer {
 	// for the hidden `time` command + during internal tests we might want to
 	// configure the table path in a configuration file.
 	cmd.PersistentFlags().StringVarP(&commandeer.v3ioUrl, "server", "s", "",
-		"Web-gateway (web-APIs) service endpoint of an instance of\nthe Iguazio Continuous Data Platform, of the format\n\"<IP address>:<port number=8081>\". Examples: \"localhost:8081\"\n(when running on the target platform); \"192.168.1.100:8081\".")
+		"Web-gateway (web-APIs) service endpoint of an instance of\nthe Iguazio Data Science Platform, of the format\n\"<IP address>:<port number=8081>\". Examples: \"localhost:8081\"\n(when running on the target platform); \"192.168.1.100:8081\".")
 	cmd.PersistentFlags().StringVarP(&commandeer.cfgFilePath, "config", "g", "",
 		"Path to a YAML TSDB configuration file. When this flag isn't\nset, the CLI checks for a "+config.DefaultConfigurationFileName+" configuration\nfile in the current directory. CLI flags override file\nconfigurations. Example: \"~/cfg/my_v3io_tsdb_cfg.yaml\".")
 	cmd.PersistentFlags().StringVarP(&commandeer.container, "container", "c", "",
-		"The name of an Iguazio Continuous Data Platform data container\nin which to create the TSDB table. Example: \"bigdata\".")
+		"The name of an Iguazio Data Science Platform data container\nin which to create the TSDB table. Example: \"bigdata\".")
 	cmd.PersistentFlags().StringVarP(&commandeer.username, "username", "u", "",
-		"Username of an Iguazio Continuous Data Platform user.")
+		"Username of an Iguazio Data Science Platform user.")
 	cmd.PersistentFlags().StringVarP(&commandeer.password, "password", "p", "",
 		"Password of the configured user (see -u|--username).")
 	cmd.PersistentFlags().StringVarP(&commandeer.accessKey, "access-key", "k", "",
