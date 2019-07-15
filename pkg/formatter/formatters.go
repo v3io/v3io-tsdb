@@ -68,9 +68,13 @@ func (f csvFormatter) Write(out io.Writer, set utils.SeriesSet) error {
 
 		iter := series.Iterator()
 		for iter.Next() {
-
-			t, v := iter.At()
-			_ = writer.Write([]string{name, labelStr, fmt.Sprintf("%.6f", v), strconv.FormatInt(t, 10)})
+			if iter.Encoding() == chunkenc.EncXOR {
+				t, v := iter.At()
+				_ = writer.Write([]string{name, labelStr, fmt.Sprintf("%.6f", v), strconv.FormatInt(t, 10)})
+			} else {
+				t, v := iter.AtString()
+				_ = writer.Write([]string{name, labelStr, fmt.Sprintf("%v", v), strconv.FormatInt(t, 10)})
+			}
 		}
 
 		if iter.Err() != nil {
@@ -110,11 +114,17 @@ func (f simpleJsonFormatter) Write(out io.Writer, set utils.SeriesSet) error {
 		firstItem := true
 		for iter.Next() {
 
-			t, v := iter.At()
 			if !firstItem {
 				datapoints = datapoints + ","
 			}
-			datapoints = datapoints + fmt.Sprintf("[%.6f,%d]", v, t)
+			if iter.Encoding() == chunkenc.EncXOR {
+				t, v := iter.At()
+				datapoints = datapoints + fmt.Sprintf("[%.6f,%d]", v, t)
+			} else {
+				t, v := iter.AtString()
+				datapoints = datapoints + fmt.Sprintf("[\"%v\",%d]", v, t)
+			}
+
 			firstItem = false
 		}
 
