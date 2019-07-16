@@ -63,7 +63,7 @@ build:
 	  --workdir /go/src/github.com/v3io/v3io-tsdb \
 	  --env GOOS=$(GOOS) \
 	  --env GOARCH=$(GOARCH) \
-	  golang:1.11 \
+	  golang:1.12 \
 	  make bin
 
 .PHONY: bin
