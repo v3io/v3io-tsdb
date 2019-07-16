@@ -186,6 +186,7 @@ def build_prometheus(V3IO_TSDB_VERSION, internal_status="stable") {
                         sh("GO111MODULE=on go mod edit -replace github.com/${git_project_upstream_user}/v3io-tsdb=github.com/${git_project_upstream_user}/v3io-tsdb@${V3IO_TSDB_VERSION}")
                     }
                     sh("GO111MODULE=on go mod vendor")
+                    sh("chown 1000:1000 ./ -R")
                 }
             }
         }
