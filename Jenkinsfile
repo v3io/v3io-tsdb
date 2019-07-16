@@ -198,7 +198,7 @@ def build_prometheus(V3IO_TSDB_VERSION, internal_status="stable") {
                         git config --global user.name '${GIT_USERNAME}'
                         git remote rm origin
                         git remote add origin https://${GIT_USERNAME}:${GIT_TOKEN}@github.com/${git_project_user}/${git_project}.git
-                        git add vendor/github.com;
+                        git add go.mod go.sum vendor/modules.txt;
                     """
                     try {
                         sh("git commit -m 'Updated TSDB to ${V3IO_TSDB_VERSION}'")
@@ -270,7 +270,7 @@ def build_frames(V3IO_TSDB_VERSION, internal_status="stable") {
                         git config --global user.name '${GIT_USERNAME}'
                         git remote rm origin
                         git remote add origin https://${GIT_USERNAME}:${GIT_TOKEN}@github.com/${git_project_user}/${git_project}.git
-                        git add go.mod go.sum;
+                        git add go.mod go.sum vendor/modules.txt;
                     """
                     try {
                         sh("git commit -m 'Updated TSDB to ${V3IO_TSDB_VERSION}'")
