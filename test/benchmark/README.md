@@ -1,7 +1,7 @@
 # Running the Benchmark Test
 
 ## Prerequisites
-- A fully operational [Iguazio Continuous Data Platform](https://www.iguazio.com) setup (with data and application nodes)
+- A fully operational [Iguazio Data Science Platform](https://www.iguazio.com) setup (with data and application nodes)
  
 ## Configuration
 

@@ -97,7 +97,7 @@ Arguments:
 	cmd.Flags().StringVarP(&commandeer.output, "output", "o", formatter.DefaultOutputFormat,
 		"Output format in which to display the query results -\n\"text\" | \"csv\" | \"json\".")
 	cmd.Flags().StringVarP(&commandeer.filter, "filter", "f", "",
-		"Query filter, as an Iguazio Continuous Data Platform\nfilter expression. To reference a metric name from within\nthe query filter, use the \"__name__\" attribute.\nExamples: \"method=='get'\"; \"__name__='cpu' AND os=='win'\".")
+		"Query filter, as an Iguazio Data Science Platform\nfilter expression. To reference a metric name from within\nthe query filter, use the \"__name__\" attribute.\nExamples: \"method=='get'\"; \"__name__='cpu' AND os=='win'\".")
 	cmd.Flags().StringVarP(&commandeer.last, "last", "l", "",
 		"Return data for the specified time period before the\ncurrent time, of the format \"[0-9]+[mhd]\" (where\n'm' = minutes, 'h' = hours, and 'd' = days>). When setting\nthis flag, don't set the -b|--begin or -e|--end flags.\nExamples: \"1h\"; \"15m\"; \"30d\" to return data for the last\n1 hour, 15 minutes, or 30 days.")
 	cmd.Flags().StringVarP(&commandeer.aggregationWindow, "aggregation-window", "w", "",
