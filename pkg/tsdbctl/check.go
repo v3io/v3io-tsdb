@@ -328,7 +328,7 @@ func getSchema(cfg *config.V3ioConfig, container v3io.Container) (*config.Schema
 func getEncoding(enc string) (chunkenc.Encoding, error) {
 	intEncoding, err := strconv.Atoi(enc)
 	if err != nil {
-		return 0, fmt.Errorf("error parsing encoding type of chunk, got: %v, error: %v", enc, err)
+		return 0, fmt.Errorf("error parsing encoding type, encoding type should be numberic, got: %v", enc)
 	} else {
 		return chunkenc.Encoding(intEncoding), nil
 	}
