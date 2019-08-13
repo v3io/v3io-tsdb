@@ -106,6 +106,23 @@ func NewDataFrame(columnsSpec []columnMeta, indexColumn Column, lset utils.Label
 	// is raw query
 	if isRawQuery {
 		df.columnByName = make(map[string]int, len(columnsSpec))
+		df.rawColumns = make([]utils.Series, len(columnsSpec))
+
+		// Create the columns in the DF based on the requested columns order.
+		for i, col := range columnsSpec {
+			if col.metric == "" {
+				df.isWildcardSelect = true
+				break
+			}
+			df.columnByName[col.getColumnName()] = i
+		}
+
+		// If no specific order was requested (like when querying for all metrics),
+		// discard order and reset columns for future initialization.
+		if df.isWildcardSelect {
+			df.columnByName = make(map[string]int, len(columnsSpec))
+			df.rawColumns = []utils.Series{}
+		}
 	} else {
 		numOfColumns := len(columnsSpec)
 		df.index = indexColumn
@@ -228,6 +245,8 @@ type dataFrame struct {
 
 	metrics             map[string]struct{}
 	metricToCountColumn map[string]Column
+
+	isWildcardSelect bool
 }
 
 func (d *dataFrame) addMetricIfNotExist(metricName string, columnSize int, useServerAggregates bool) error {
