@@ -107,9 +107,9 @@ func rawCollector(ctx *selectQueryContext, res *qryResults) {
 	ctx.logger.Debug("using Raw Collector for metric %v", res.name)
 
 	if res.frame.isWildcardSelect {
-		frameIndex, ok := res.frame.columnByName[res.name]
+		columnIndex, ok := res.frame.columnByName[res.name]
 		if ok {
-			res.frame.rawColumns[frameIndex].(*V3ioRawSeries).AddChunks(res)
+			res.frame.rawColumns[columnIndex].(*V3ioRawSeries).AddChunks(res)
 		} else {
 			series, err := NewRawSeries(res, ctx.logger.GetChild("v3ioRawSeries"))
 			if err != nil {
@@ -120,17 +120,17 @@ func rawCollector(ctx *selectQueryContext, res *qryResults) {
 			res.frame.columnByName[res.name] = len(res.frame.rawColumns) - 1
 		}
 	} else {
-		frameIndex := res.frame.columnByName[res.name]
-		rawColumn := res.frame.rawColumns[frameIndex]
+		columnIndex := res.frame.columnByName[res.name]
+		rawColumn := res.frame.rawColumns[columnIndex]
 		if rawColumn != nil {
-			res.frame.rawColumns[frameIndex].(*V3ioRawSeries).AddChunks(res)
+			res.frame.rawColumns[columnIndex].(*V3ioRawSeries).AddChunks(res)
 		} else {
 			series, err := NewRawSeries(res, ctx.logger.GetChild("v3ioRawSeries"))
 			if err != nil {
 				ctx.errorChannel <- err
 				return
 			}
-			res.frame.rawColumns[frameIndex] = series
+			res.frame.rawColumns[columnIndex] = series
 		}
 	}
 }
