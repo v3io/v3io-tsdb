@@ -56,12 +56,16 @@ func newSchema(samplesIngestionRate, aggregationGranularity, aggregatesList stri
 		return nil, errors.New("Cross label aggregations must be used in conjunction with aggregations.")
 	}
 
+	if len(aggregates) == 0 {
+		aggregates = strings.Split(config.DefaultAggregates, ",")
+	}
+
 	defaultRollup := config.Rollup{
-		Aggregates:             []string{},
+		Aggregates:             aggregates,
 		AggregationGranularity: aggregationGranularity,
 		StorageClass:           config.DefaultStorageClass,
-		SampleRetention:        sampleRetention,                  //TODO: make configurable
-		LayerRetentionTime:     config.DefaultLayerRetentionTime, //TODO: make configurable
+		SampleRetention:        sampleRetention, //TODO: make configurable
+		LayerRetentionTime:     config.DefaultLayerRetentionTime,
 	}
 
 	var preaggregates []config.PreAggregate
@@ -81,10 +85,6 @@ func newSchema(samplesIngestionRate, aggregationGranularity, aggregatesList stri
 		PartitionerInterval:  partitionInterval,
 		ChunckerInterval:     chunkInterval,
 		PreAggregates:        preaggregates,
-	}
-
-	if len(aggregates) == 0 {
-		aggregates = strings.Split(config.DefaultAggregates, ",")
 	}
 
 	fields, err := aggregate.SchemaFieldFromString(aggregates, "v")
