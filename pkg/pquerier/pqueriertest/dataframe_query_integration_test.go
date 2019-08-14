@@ -687,7 +687,7 @@ func (suite *testSelectDataframeSuite) TestColumnOrder() {
 
 		indexCol := frame.Indices()[0]
 		assert.Equal(suite.T(), 6, indexCol.Len())
-		suite.Require().Equal(columnOrder,strings.Join(frame.Names(), ","))
+		suite.Require().Equal(columnOrder, strings.Join(frame.Names(), ","))
 		for i := 0; i < indexCol.Len(); i++ {
 			t, err := indexCol.TimeAt(i)
 			assert.NoError(suite.T(), err)
