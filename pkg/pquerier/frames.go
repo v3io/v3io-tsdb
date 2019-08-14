@@ -106,7 +106,6 @@ func NewDataFrame(columnsSpec []columnMeta, indexColumn Column, lset utils.Label
 	// is raw query
 	if isRawQuery {
 		df.columnByName = make(map[string]int, len(columnsSpec))
-		df.rawColumns = make([]utils.Series, len(columnsSpec))
 
 		// Create the columns in the DF based on the requested columns order.
 		for i, col := range columnsSpec {
@@ -122,6 +121,9 @@ func NewDataFrame(columnsSpec []columnMeta, indexColumn Column, lset utils.Label
 		if df.isWildcardSelect {
 			df.columnByName = make(map[string]int, len(columnsSpec))
 			df.rawColumns = []utils.Series{}
+		} else {
+			// Initialize `rawcolumns` to the requested size.
+			df.rawColumns = make([]utils.Series, len(columnsSpec))
 		}
 	} else {
 		numOfColumns := len(columnsSpec)
