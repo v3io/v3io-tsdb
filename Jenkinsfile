@@ -333,7 +333,7 @@ podTemplate(label: "${git_project}-${label}", inheritFrom: "jnlp-docker-golang")
                                 }
                             },
                             'tsdb-nuclio': {
-                                podTemplate(label: "v3io-tsdb-nuclio-${label}", inheritFrom: "jnlp-docker") {
+                                podTemplate(label: "v3io-tsdb-nuclio-${label}", inheritFrom: "jnlp-docker-golang") {
                                     node("v3io-tsdb-nuclio-${label}") {
                                         withCredentials([
                                                 string(credentialsId: git_deploy_user_token, variable: 'GIT_TOKEN')
@@ -373,7 +373,7 @@ podTemplate(label: "${git_project}-${label}", inheritFrom: "jnlp-docker-golang")
                                 }
                             },
                             'frames': {
-                                podTemplate(label: "v3io-frames-${label}", inheritFrom: "jnlp-docker") {
+                                podTemplate(label: "v3io-frames-${label}", inheritFrom: "jnlp-docker-golang") {
                                     node("v3io-frames-${label}") {
                                         withCredentials([
                                                 string(credentialsId: git_deploy_user_token, variable: 'GIT_TOKEN')
@@ -413,7 +413,7 @@ podTemplate(label: "${git_project}-${label}", inheritFrom: "jnlp-docker-golang")
                                 }
                             },
                             'prometheus': {
-                                podTemplate(label: "v3io-tsdb-prometheus-${label}", inheritFrom: "jnlp-docker") {
+                                podTemplate(label: "v3io-tsdb-prometheus-${label}", inheritFrom: "jnlp-docker-golang") {
                                     node("v3io-tsdb-prometheus-${label}") {
                                         withCredentials([
                                                 string(credentialsId: git_deploy_user_token, variable: 'GIT_TOKEN')
