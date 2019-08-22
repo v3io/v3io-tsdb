@@ -161,7 +161,8 @@ func (cc *checkCommandeer) checkByPath(container v3io.Container, tablePath strin
 	var err error
 	respChan := make(chan *v3io.Response, 1)
 	objPath := path.Join("/", tablePath, cc.objPath)
-	allAttrs := append(cc.attrs, config.MetricNameAttrName, config.LabelSetAttrName, config.MaxTimeAttrName)
+	allAttrs := append(cc.attrs, config.MetricNameAttrName, config.LabelSetAttrName,
+		config.MaxTimeAttrName, config.EncodingAttrName)
 	input := v3io.GetItemInput{Path: objPath, AttributeNames: allAttrs}
 	_, err = container.GetItem(&input, nil, respChan)
 	if err != nil {
@@ -222,7 +223,12 @@ func (cc *checkCommandeer) printResponse(resp *v3io.Response) error {
 	metricName, _ := item.GetFieldString(config.MetricNameAttrName)
 	lsetString, _ := item.GetFieldString(config.LabelSetAttrName)
 	maxtime, _ := item.GetFieldInt(config.MaxTimeAttrName)
-	fmt.Printf("Metric Item: %s,  %s{%s}  maxtime: %d\n", objPath, metricName, lsetString, maxtime)
+	stringEnc, _ := item.GetFieldString(config.EncodingAttrName)
+	encoding, err := getEncoding(stringEnc)
+	if err != nil {
+		return err
+	}
+	fmt.Printf("Metric Item: %s,  %s{%s}  maxtime: %d, encoding: %v\n", objPath, metricName, lsetString, maxtime, encoding)
 
 	// Decompress and print metrics
 	for attr, values := range item {
@@ -234,7 +240,7 @@ func (cc *checkCommandeer) printResponse(resp *v3io.Response) error {
 				if strings.HasPrefix(attr, config.AggregateAttrPrefix) {
 					cc.printArrays(attr, bytes)
 				} else {
-					err := cc.printValues(bytes)
+					err := cc.printValues(bytes, encoding)
 					if err != nil {
 						return err
 					}
@@ -263,8 +269,8 @@ func (cc *checkCommandeer) printArrays(attr string, bytes []byte) {
 	result.WriteString("]")
 	fmt.Println(result.String())
 }
-func (cc *checkCommandeer) printValues(bytes []byte) error {
-	chunk, err := chunkenc.FromData(cc.rootCommandeer.logger, chunkenc.EncXOR, bytes, 0)
+func (cc *checkCommandeer) printValues(bytes []byte, encoding chunkenc.Encoding) error {
+	chunk, err := chunkenc.FromData(cc.rootCommandeer.logger, encoding, bytes, 0)
 	if err != nil {
 		cc.rootCommandeer.logger.ErrorWith("Error reading chunk buffer.", "err", err)
 		return err
@@ -272,9 +278,16 @@ func (cc *checkCommandeer) printValues(bytes []byte) error {
 		count := 0
 		iter := chunk.Iterator()
 		for iter.Next() {
-			t, v := iter.At()
+			var v interface{}
+			var t int64
+			if encoding == chunkenc.EncXOR {
+				t, v = iter.At()
+			} else {
+				t, v = iter.AtString()
+			}
+
 			tstr := time.Unix(int64(t/1000), 0).UTC().Format(time.RFC3339)
-			fmt.Printf("\t\tUnix timestamp=%d, t=%s, v=%.4f\n", t, tstr, v)
+			fmt.Printf("\t\tUnix timestamp=%d, t=%s, v=%v\n", t, tstr, v)
 			count++
 		}
 		if iter.Err() != nil {
@@ -310,4 +323,13 @@ func getSchema(cfg *config.V3ioConfig, container v3io.Container) (*config.Schema
 		return nil, err
 	}
 	return tableSchema, nil
+}
+
+func getEncoding(enc string) (chunkenc.Encoding, error) {
+	intEncoding, err := strconv.Atoi(enc)
+	if err != nil {
+		return 0, fmt.Errorf("error parsing encoding type, encoding type should be numberic, got: %v", enc)
+	} else {
+		return chunkenc.Encoding(intEncoding), nil
+	}
 }

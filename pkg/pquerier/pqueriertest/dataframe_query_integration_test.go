@@ -624,3 +624,90 @@ func (suite *testSelectDataframeSuite) TestQueryDataFrameMultipleMetrics() {
 
 	suite.Require().Equal(1, seriesCount, "series count didn't match expected")
 }
+
+func (suite *testSelectDataframeSuite) TestColumnOrder() {
+	adapter, err := tsdb.NewV3ioAdapter(suite.v3ioConfig, nil, nil)
+	suite.NoError(err, "failed to create v3io adapter")
+
+	metricName1 := "cpu"
+	metricName2 := "diskio"
+	labels1 := utils.LabelsFromStringList("os", "linux")
+	numberOfEvents := 5
+	eventsInterval := int64(tsdbtest.MinuteInMillis)
+	ingestData1 := []tsdbtest.DataPoint{{suite.basicQueryTime, 10},
+		{suite.basicQueryTime + 2*tsdbtest.MinuteInMillis, 15},
+		{suite.basicQueryTime + 3*tsdbtest.MinuteInMillis, 18}}
+	ingestData2 := []tsdbtest.DataPoint{{suite.basicQueryTime + tsdbtest.MinuteInMillis, 20},
+		{suite.basicQueryTime + 4*tsdbtest.MinuteInMillis, 22},
+		{suite.basicQueryTime + 5*tsdbtest.MinuteInMillis, 26}}
+
+	expectedData := map[string][]tsdbtest.DataPoint{
+		metricName1: {{suite.basicQueryTime, 10},
+			{suite.basicQueryTime + 1*tsdbtest.MinuteInMillis, math.NaN()},
+			{suite.basicQueryTime + 2*tsdbtest.MinuteInMillis, 15},
+			{suite.basicQueryTime + 3*tsdbtest.MinuteInMillis, 18},
+			{suite.basicQueryTime + 4*tsdbtest.MinuteInMillis, math.NaN()},
+			{suite.basicQueryTime + 5*tsdbtest.MinuteInMillis, math.NaN()}},
+		metricName2: {{suite.basicQueryTime, math.NaN()},
+			{suite.basicQueryTime + 1*tsdbtest.MinuteInMillis, 20},
+			{suite.basicQueryTime + 2*tsdbtest.MinuteInMillis, math.NaN()},
+			{suite.basicQueryTime + 3*tsdbtest.MinuteInMillis, math.NaN()},
+			{suite.basicQueryTime + 4*tsdbtest.MinuteInMillis, 22},
+			{suite.basicQueryTime + 5*tsdbtest.MinuteInMillis, 26}}}
+
+	testParams := tsdbtest.NewTestParams(suite.T(),
+		tsdbtest.TestOption{
+			Key: tsdbtest.OptTimeSeries,
+			Value: tsdbtest.TimeSeries{tsdbtest.Metric{
+				Name:   metricName1,
+				Labels: labels1,
+				Data:   ingestData1},
+				tsdbtest.Metric{
+					Name:   metricName2,
+					Labels: labels1,
+					Data:   ingestData2},
+			}})
+
+	tsdbtest.InsertData(suite.T(), testParams)
+
+	querierV2, err := adapter.QuerierV2()
+	suite.NoError(err, "failed to create querier v2")
+
+	columnOrder := "diskio,cpu"
+	params := &pquerier.SelectParams{Name: columnOrder,
+		From: suite.basicQueryTime, To: suite.basicQueryTime + int64(numberOfEvents)*eventsInterval}
+	set, err := querierV2.SelectDataFrame(params)
+	suite.NoError(err, "failed to exeute query")
+
+	var seriesCount int
+	for set.NextFrame() {
+		seriesCount++
+		frame, err := set.GetFrame()
+		suite.NoError(err)
+
+		indexCol := frame.Indices()[0]
+		assert.Equal(suite.T(), 6, indexCol.Len())
+		suite.Require().Equal(columnOrder, strings.Join(frame.Names(), ","))
+		for i := 0; i < indexCol.Len(); i++ {
+			t, err := indexCol.TimeAt(i)
+			assert.NoError(suite.T(), err)
+			suite.Require().Equal(expectedData[metricName1][i].Time, t.UnixNano()/int64(time.Millisecond))
+
+			for _, colName := range frame.Names() {
+				col, err := frame.Column(colName)
+				suite.NoError(err)
+				currentExpectedData := expectedData[col.Name()]
+				suite.Require().Equal(len(currentExpectedData), col.Len())
+				currentExpected := currentExpectedData[i].Value
+				f, err := col.FloatAt(i)
+				assert.NoError(suite.T(), err)
+
+				if !(math.IsNaN(currentExpected) && math.IsNaN(f)) {
+					suite.Require().Equal(currentExpected, f)
+				}
+			}
+		}
+	}
+
+	suite.Require().Equal(1, seriesCount, "series count didn't match expected")
+}
