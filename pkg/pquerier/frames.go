@@ -446,7 +446,7 @@ func (d *dataFrame) finishAllColumns() error {
 //	t1		  NaN		  v2
 //	t2		  v1		  v3
 //
-func (d *dataFrame) rawSeriesToColumns() {
+func (d *dataFrame) rawSeriesToColumns() error {
 	var timeData []time.Time
 
 	columns := make([]frames.ColumnBuilder, len(d.rawColumns))
@@ -458,6 +458,9 @@ func (d *dataFrame) rawSeriesToColumns() {
 	seriesHasMoreData := make([]bool, len(d.rawColumns))
 
 	for i, rawSeries := range d.rawColumns {
+		if rawSeries == nil {
+			return errors.Errorf("failed to obtain column '%s'", d.columns[i].Name())
+		}
 		if rawSeries.Iterator().Next() {
 			seriesHasMoreData[i] = true
 			t, _ := rawSeries.Iterator().At()
@@ -536,6 +539,8 @@ func (d *dataFrame) rawSeriesToColumns() {
 	}
 
 	d.isRawColumnsGenerated = true
+
+	return nil
 }
 
 func (d *dataFrame) shouldGenerateRawColumns() bool { return d.isRawSeries && !d.isRawColumnsGenerated }
