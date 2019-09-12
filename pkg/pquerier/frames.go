@@ -471,7 +471,14 @@ func (d *dataFrame) rawSeriesToColumns() error {
 
 	for i, rawSeries := range d.rawColumns {
 		if rawSeries == nil {
-			return errors.Errorf("failed to obtain column '%s'", d.columns[i].Name())
+			missingColumn := "(unknown column)"
+			for columnName, index := range d.columnByName {
+				if index == i {
+					missingColumn = fmt.Sprintf("'%s'", columnName)
+					break
+				}
+			}
+			return errors.Errorf("failed to obtain column %s", missingColumn)
 		}
 		if rawSeries.Iterator().Next() {
 			seriesHasMoreData[i] = true
