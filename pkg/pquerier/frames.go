@@ -330,21 +330,30 @@ func (d *dataFrame) ColumnAt(i int) (Column, error) {
 		return nil, fmt.Errorf("index %d out of bounds [0:%d]", i, d.Len())
 	}
 	if d.shouldGenerateRawColumns() {
-		d.rawSeriesToColumns()
+		err := d.rawSeriesToColumns()
+		if err != nil {
+			return nil, err
+		}
 	}
 	return d.columns[i], nil
 }
 
-func (d *dataFrame) Columns() []Column {
+func (d *dataFrame) Columns() ([]Column, error) {
 	if d.shouldGenerateRawColumns() {
-		d.rawSeriesToColumns()
+		err := d.rawSeriesToColumns()
+		if err != nil {
+			return nil, err
+		}
 	}
-	return d.columns
+	return d.columns, nil
 }
 
 func (d *dataFrame) Column(name string) (Column, error) {
 	if d.shouldGenerateRawColumns() {
-		d.rawSeriesToColumns()
+		err := d.rawSeriesToColumns()
+		if err != nil {
+			return nil, err
+		}
 	}
 	i, ok := d.columnByName[name]
 	if !ok {
@@ -354,11 +363,14 @@ func (d *dataFrame) Column(name string) (Column, error) {
 	return d.columns[i], nil
 }
 
-func (d *dataFrame) Index() Column {
+func (d *dataFrame) Index() (Column, error) {
 	if d.shouldGenerateRawColumns() {
-		d.rawSeriesToColumns()
+		err := d.rawSeriesToColumns()
+		if err != nil {
+			return nil, err
+		}
 	}
-	return d.index
+	return d.index, nil
 }
 
 func (d *dataFrame) TimeSeries(i int) (utils.Series, error) {
@@ -451,7 +463,7 @@ func (d *dataFrame) finishAllColumns() error {
 //	t1		  NaN		  v2
 //	t2		  v1		  v3
 //
-func (d *dataFrame) rawSeriesToColumns() {
+func (d *dataFrame) rawSeriesToColumns() error {
 	var timeData []time.Time
 
 	columns := make([]frames.ColumnBuilder, len(d.rawColumns))
@@ -463,6 +475,16 @@ func (d *dataFrame) rawSeriesToColumns() {
 	seriesHasMoreData := make([]bool, len(d.rawColumns))
 
 	for i, rawSeries := range d.rawColumns {
+		if rawSeries == nil {
+			missingColumn := "(unknown column)"
+			for columnName, index := range d.columnByName {
+				if index == i {
+					missingColumn = fmt.Sprintf("'%s'", columnName)
+					break
+				}
+			}
+			return errors.Errorf("failed to obtain column %s", missingColumn)
+		}
 		if rawSeries.Iterator().Next() {
 			seriesHasMoreData[i] = true
 			t, _ := rawSeries.Iterator().At()
@@ -541,6 +563,8 @@ func (d *dataFrame) rawSeriesToColumns() {
 	}
 
 	d.isRawColumnsGenerated = true
+
+	return nil
 }
 
 func (d *dataFrame) shouldGenerateRawColumns() bool { return d.isRawSeries && !d.isRawColumnsGenerated }
@@ -548,7 +572,10 @@ func (d *dataFrame) shouldGenerateRawColumns() bool { return d.isRawSeries && !d
 func (d *dataFrame) GetFrame() (frames.Frame, error) {
 	var framesColumns []frames.Column
 	if d.shouldGenerateRawColumns() {
-		d.rawSeriesToColumns()
+		err := d.rawSeriesToColumns()
+		if err != nil {
+			return nil, err
+		}
 	}
 	for _, col := range d.columns {
 		if !col.GetColumnSpec().isHidden {
