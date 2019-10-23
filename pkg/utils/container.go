@@ -64,9 +64,8 @@ func CreateContainer(logger logger.Logger, cfg *config.V3ioConfig, httpTimeout t
 	}
 
 	newContextInput := &v3io.NewContextInput{
-		ClusterEndpoints: []string{endpointUrl},
-		NumWorkers:       cfg.Workers,
-		DialTimeout:      httpTimeout,
+		NumWorkers:  cfg.Workers,
+		DialTimeout: httpTimeout,
 	}
 	context, err := v3iohttp.NewContext(logger, newContextInput)
 	if err != nil {
@@ -74,6 +73,7 @@ func CreateContainer(logger logger.Logger, cfg *config.V3ioConfig, httpTimeout t
 	}
 
 	session, err := context.NewSession(&v3io.NewSessionInput{
+		URL:       endpointUrl,
 		Username:  cfg.Username,
 		Password:  cfg.Password,
 		AccessKey: cfg.AccessKey,
