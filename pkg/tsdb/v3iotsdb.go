@@ -131,12 +131,12 @@ func NewV3ioAdapter(cfg *config.V3ioConfig, container v3io.Container, logger log
 }
 
 func NewContainer(v3ioUrl string, numWorkers int, accessKey string, username string, password string, containerName string, logger logger.Logger) (v3io.Container, error) {
-	ctx, err := v3iohttp.NewContext(logger, &v3io.NewContextInput{ClusterEndpoints: []string{v3ioUrl}, NumWorkers: numWorkers})
+	ctx, err := v3iohttp.NewContext(logger, v3iohttp.NewDefaultClient(), &v3io.NewContextInput{NumWorkers: numWorkers})
 	if err != nil {
 		return nil, err
 	}
 
-	session, err := ctx.NewSession(&v3io.NewSessionInput{Username: username, Password: password, AccessKey: accessKey})
+	session, err := ctx.NewSession(&v3io.NewSessionInput{URL: v3ioUrl, Username: username, Password: password, AccessKey: accessKey})
 	if err != nil {
 		return nil, errors.Wrap(err, "Failed to create session.")
 	}
