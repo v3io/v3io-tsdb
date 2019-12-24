@@ -250,14 +250,17 @@ func (p *PartitionManager) ReadAndUpdateSchema() (err error) {
 	schemaInfoResp, err := p.container.GetItemSync(&v3io.GetItemInput{Path: fullPath, AttributeNames: []string{"__mtime_secs", "__mtime_nsecs"}})
 	if err != nil {
 		err = errors.Wrapf(err, "Failed to read schema at path '%s'.", fullPath)
+		return
 	}
 	mtimeSecs, err := schemaInfoResp.Output.(*v3io.GetItemOutput).Item.GetFieldInt("__mtime_secs")
 	if err != nil {
 		err = errors.Wrapf(err, "Failed to get start time (mtime) in seconds from the schema at '%s'.", fullPath)
+		return
 	}
 	mtimeNsecs, err := schemaInfoResp.Output.(*v3io.GetItemOutput).Item.GetFieldInt("__mtime_nsecs")
 	if err != nil {
 		err = errors.Wrapf(err, "Failed to get start time (mtime) in nanoseconds from the schema at '%s'.", fullPath)
+		return
 	}
 
 	// Get schema only if the schema has changed
