@@ -44,7 +44,7 @@ test:
 	go test -v -race -tags unit -count 1 $(TOPLEVEL_DIRS)
 
 .PHONY: integration
-integration: get
+integration:
 	go test -race -tags integration -p 1 -count 1 $(TOPLEVEL_DIRS) # p=1 to force Go to run pkg tests serially.
 
 .PHONY: bench
