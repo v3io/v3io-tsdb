@@ -39,20 +39,16 @@ BUILD_OPTS := -ldflags " \
 
 TSDB_BUILD_COMMAND ?= CGO_ENABLED=0 go build $(BUILD_OPTS) ./cmd/tsdbctl
 
-.PHONY: get
-get:
-	go get -v -t -tags "unit integration" $(TOPLEVEL_DIRS)
-
 .PHONY: test
-test: get
-	go test -race -tags unit -count 1 $(TOPLEVEL_DIRS)
+test:
+	go test -v -race -tags unit -count 1 $(TOPLEVEL_DIRS)
 
 .PHONY: integration
 integration: get
 	go test -race -tags integration -p 1 -count 1 $(TOPLEVEL_DIRS) # p=1 to force Go to run pkg tests serially.
 
 .PHONY: bench
-bench: get
+bench:
 	go test -run=XXX -bench='^BenchmarkIngest$$' -benchtime 10s -timeout 5m ./test/benchmark/...
 
 .PHONY: build
@@ -67,7 +63,7 @@ build:
 	  make bin
 
 .PHONY: bin
-bin: get
+bin:
 	${TSDB_BUILD_COMMAND}
 
 .PHONY: lint
