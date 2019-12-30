@@ -1,8 +1,3 @@
-# All top-level dirs except for vendor/.
-TOPLEVEL_DIRS=`ls -d ./*/. | grep -v '^./vendor/.$$' | grep -v '^./examples/.$$' | sed 's/\.$$/.../'`
-TOPLEVEL_DIRS_GOFMT_SYNTAX=`ls -d ./*/. | grep -v '^./vendor/.$$'` | grep -v '^./examples/.$$'
-TOPLEVEL_DIRS_IMPI_SYNTAX=`ls -d ./*/. | grep -v '^./vendor/.$$' | grep -v '^./examples/.$$' | sed 's/$$/../'`
-
 GIT_COMMIT_HASH := $(shell git rev-parse HEAD)
 GIT_BRANCH=$(shell git rev-parse --abbrev-ref HEAD)
 ifeq ($(GIT_BRANCH),)
@@ -41,11 +36,11 @@ TSDB_BUILD_COMMAND ?= CGO_ENABLED=0 go build $(BUILD_OPTS) ./cmd/tsdbctl
 
 .PHONY: test
 test:
-	go test -v -race -tags unit -count 1 $(TOPLEVEL_DIRS)
+	go test -v -race -tags unit -count 1 ./...
 
 .PHONY: integration
 integration:
-	go test -race -tags integration -p 1 -count 1 $(TOPLEVEL_DIRS) # p=1 to force Go to run pkg tests serially.
+	go test -race -tags integration -p 1 -count 1 ./... # p=1 to force Go to run pkg tests serially.
 
 .PHONY: bench
 bench:
@@ -68,7 +63,7 @@ bin:
 
 .PHONY: lint
 lint:
-ifeq ($(shell gofmt -l $(TOPLEVEL_DIRS_GOFMT_SYNTAX)),)
+ifeq ($(shell gofmt -l ./...),)
 	# gofmt OK
 else
 	$(error Please run `go fmt ./...` to format the code)
@@ -82,5 +77,5 @@ endif
 		--skip pkg/controller/apis \
 		--skip pkg/controller/client \
 		--scheme stdLocalThirdParty \
-		$(TOPLEVEL_DIRS_IMPI_SYNTAX)
+		./...
 	# Imports OK
