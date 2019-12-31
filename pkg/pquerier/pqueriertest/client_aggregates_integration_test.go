@@ -735,7 +735,7 @@ func (suite *testClientAggregatesSuite) TestQueryNonExistingMetric() {
 		suite.T().Fatalf("Failed to create querier v2, err: %v", err)
 	}
 
-	params := &pquerier.SelectParams{Name: "cpu, tal", Functions:"max, avg",
+	params := &pquerier.SelectParams{Name: "cpu, tal", Functions: "max, avg",
 		From: suite.basicQueryTime, To: suite.basicQueryTime + 4*tsdbtest.MinuteInMillis}
 	_, err = querierV2.SelectDataFrame(params)
 	suite.Error(err, "expected error but finished successfully")
