@@ -63,7 +63,7 @@ bin:
 
 .PHONY: lint
 lint:
-ifeq ($(shell gofmt -l ./...),)
+ifeq ($(shell gofmt -l .),)
 	# gofmt OK
 else
 	$(error Please run `go fmt ./...` to format the code)

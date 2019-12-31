@@ -30,7 +30,7 @@ func deleteTestConfig(t *testing.T, path string) {
 }
 
 func TestGetV3ioConfigPath(t *testing.T) {
-	projectHome := "."
+	projectHome := "../../.."
 	testCases := []struct {
 		description  string
 		expectedPath string
