@@ -40,7 +40,7 @@ test:
 
 .PHONY: integration
 integration:
-	go test -race -tags integration -p 1 -count 1 ./... # p=1 to force Go to run pkg tests serially.
+	go test -v -race -tags integration -p 1 -count 1 ./... # p=1 to force Go to run pkg tests serially.
 
 .PHONY: bench
 bench:
