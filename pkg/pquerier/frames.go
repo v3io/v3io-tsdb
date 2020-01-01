@@ -469,16 +469,20 @@ func (d *dataFrame) rawSeriesToColumns() error {
 	nextTime := int64(math.MaxInt64)
 	seriesHasMoreData := make([]bool, len(d.rawColumns))
 
+	emptyMetrics := make(map[int]string)
+
 	for i, rawSeries := range d.rawColumns {
 		if rawSeries == nil {
 			missingColumn := "(unknown column)"
 			for columnName, index := range d.columnByName {
 				if index == i {
-					missingColumn = fmt.Sprintf("'%s'", columnName)
+					missingColumn = columnName
 					break
 				}
 			}
-			return errors.Errorf("failed to obtain column %s", missingColumn)
+			emptyMetrics[i] = missingColumn
+			nonExhaustedIterators--
+			continue
 		}
 		if rawSeries.Iterator().Next() {
 			seriesHasMoreData[i] = true
@@ -514,6 +518,9 @@ func (d *dataFrame) rawSeriesToColumns() error {
 		timeData = append(timeData, time.Unix(currentTime/1000, (currentTime%1000)*1e6))
 
 		for seriesIndex, rawSeries := range d.rawColumns {
+			if rawSeries == nil {
+				continue
+			}
 			iter := rawSeries.Iterator()
 
 			var v interface{}
@@ -550,11 +557,32 @@ func (d *dataFrame) rawSeriesToColumns() error {
 
 	d.columns = make([]Column, len(d.rawColumns))
 	for i, series := range d.rawColumns {
+		if series == nil {
+			continue
+		}
+
 		name := series.Labels().Get(config.PrometheusMetricNameAttribute)
 		spec := columnMeta{metric: name}
 		col := NewDataColumn(name, spec, numberOfRows, seriesToDataType[i])
 		col.framesCol = columns[i].Finish()
 		d.columns[i] = col
+	}
+
+	if len(emptyMetrics) > 0 {
+		nullValues := make([]float64, numberOfRows)
+		for i := 0; i < numberOfRows; i++ {
+			nullValues[i] = math.NaN()
+		}
+		for index, metricName := range emptyMetrics {
+			spec := columnMeta{metric: metricName}
+			col := NewDataColumn(metricName, spec, numberOfRows, frames.FloatType)
+			framesCol, err := frames.NewSliceColumn(metricName, nullValues)
+			if err != nil {
+				return errors.Wrap(err, fmt.Sprintf("could not create empty column '%v'", metricName))
+			}
+			col.framesCol = framesCol
+			d.columns[index] = col
+		}
 	}
 
 	d.isRawColumnsGenerated = true
