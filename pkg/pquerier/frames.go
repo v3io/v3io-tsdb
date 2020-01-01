@@ -578,7 +578,7 @@ func (d *dataFrame) rawSeriesToColumns() error {
 			col := NewDataColumn(metricName, spec, numberOfRows, frames.FloatType)
 			framesCol, err := frames.NewSliceColumn(metricName, nullValues)
 			if err != nil {
-				return err
+				return errors.Wrap(err, fmt.Sprintf("could not create empty column '%v'", metricName))
 			}
 			col.framesCol = framesCol
 			d.columns[index] = col

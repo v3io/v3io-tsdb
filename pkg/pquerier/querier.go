@@ -185,7 +185,6 @@ func (q *V3ioQuerier) baseSelectQry(params *SelectParams, showAggregateLabel boo
 
 		var existingMetrics map[string]bool
 		existingMetrics, err = q.getExistingMetricNamesMap()
-
 		if err != nil {
 			return
 		}
