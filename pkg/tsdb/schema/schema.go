@@ -48,7 +48,7 @@ func newSchema(samplesIngestionRate, aggregationGranularity, aggregatesList stri
 	}
 
 	if err := validateAggregatesGranularity(aggregationGranularity, partitionInterval, len(aggregates) > 0); err != nil {
-		return nil, errors.Wrapf(err, "Failed to parse aggregation granularity '%s'.", aggregationGranularity)
+		return nil, err
 	}
 
 	parsedCrossLabelSets := aggregate.ParseCrossLabelSets(crossLabelSets)
@@ -162,7 +162,7 @@ func rateToHours(samplesIngestionRate string) (int, error) {
 		return 0, errors.Wrap(err, parsingError.Error())
 	}
 	if i <= 0 {
-		return 0, fmt.Errorf("invalid samples ingestion rate (%s). The rate cannot have a negative number of samples", samplesIngestionRate)
+		return 0, fmt.Errorf("Invalid samples ingestion rate (%s). The rate cannot have a negative number of samples.", samplesIngestionRate)
 	}
 	switch last {
 	case 's':
@@ -180,17 +180,17 @@ func validateAggregatesGranularity(aggregationGranularity string, partitionInter
 	dayMillis := 24 * int64(time.Hour/time.Millisecond)
 	duration, err := utils.Str2duration(aggregationGranularity)
 	if err != nil {
-		return err
+		return errors.Wrapf(err, "Failed to parse aggregation granularity '%s'.", aggregationGranularity)
 	}
 
 	if dayMillis%duration != 0 && duration%dayMillis != 0 {
-		return errors.New("the aggregation granularity should be a divisor or a dividend of 1 day. Examples: \"10m\"; \"30m\"; \"2h\".")
+		return errors.New("The aggregation granularity should be a divisor or a dividend of 1 day. Examples: \"10m\"; \"30m\"; \"2h\".")
 	}
 
 	if hasAggregates {
 		partitionIntervalDuration, _ := utils.Str2duration(partitionInterval) // safe to ignore error since we create 'partitionInterval'
 		if partitionIntervalDuration/duration > MaxV3ioArraySize {
-			return errors.New("the aggregation granularity is to close to the expected rate provided. Try increasing the granularity to get an aggregation performance impact")
+			return errors.New("The aggregation granularity is too close to the ingestion rate provided. Try increasing the granularity to get an aggregation performance impact.")
 		}
 	}
 	return nil
