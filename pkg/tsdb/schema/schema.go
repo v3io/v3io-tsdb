@@ -13,7 +13,8 @@ import (
 )
 
 const (
-	Version = 3
+	Version          = 3
+	MaxV3ioArraySize = 130000
 )
 
 func NewSchema(v3ioCfg *config.V3ioConfig, samplesIngestionRate, aggregationGranularity, aggregatesList string, crossLabelSets string) (*config.Schema, error) {
@@ -36,10 +37,6 @@ func newSchema(samplesIngestionRate, aggregationGranularity, aggregatesList stri
 		return nil, errors.Wrapf(err, "Invalid samples ingestion rate (%s).", samplesIngestionRate)
 	}
 
-	if err := validateAggregatesGranularity(aggregationGranularity); err != nil {
-		return nil, errors.Wrapf(err, "Failed to parse aggregation granularity '%s'.", aggregationGranularity)
-	}
-
 	chunkInterval, partitionInterval, err := calculatePartitionAndChunkInterval(rateInHours, minChunkSize, maxChunkSize, maxSampleSize, maxPartitionSize)
 	if err != nil {
 		return nil, errors.Wrap(err, "Failed to calculate the chunk interval.")
@@ -48,6 +45,10 @@ func newSchema(samplesIngestionRate, aggregationGranularity, aggregatesList stri
 	aggregates, err := aggregate.RawAggregatesToStringList(aggregatesList)
 	if err != nil {
 		return nil, errors.Wrapf(err, "Failed to parse aggregates list '%s'.", aggregatesList)
+	}
+
+	if err := validateAggregatesGranularity(aggregationGranularity, partitionInterval, len(aggregates) > 0); err != nil {
+		return nil, err
 	}
 
 	parsedCrossLabelSets := aggregate.ParseCrossLabelSets(crossLabelSets)
@@ -175,15 +176,22 @@ func rateToHours(samplesIngestionRate string) (int, error) {
 	}
 }
 
-func validateAggregatesGranularity(aggregationGranularity string) error {
+func validateAggregatesGranularity(aggregationGranularity string, partitionInterval string, hasAggregates bool) error {
 	dayMillis := 24 * int64(time.Hour/time.Millisecond)
 	duration, err := utils.Str2duration(aggregationGranularity)
 	if err != nil {
-		return err
+		return errors.Wrapf(err, "Failed to parse aggregation granularity '%s'.", aggregationGranularity)
 	}
 
 	if dayMillis%duration != 0 && duration%dayMillis != 0 {
 		return errors.New("The aggregation granularity should be a divisor or a dividend of 1 day. Examples: \"10m\"; \"30m\"; \"2h\".")
+	}
+
+	if hasAggregates {
+		partitionIntervalDuration, _ := utils.Str2duration(partitionInterval) // safe to ignore error since we create 'partitionInterval'
+		if partitionIntervalDuration/duration > MaxV3ioArraySize {
+			return errors.New("The aggregation granularity is too close to the ingestion rate provided. Try increasing the granularity to get an aggregation performance impact.")
+		}
 	}
 	return nil
 }
