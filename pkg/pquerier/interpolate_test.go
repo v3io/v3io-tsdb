@@ -52,7 +52,7 @@ func (suite *testInterpolationSuite) TestNaN() {
 }
 
 func (suite *testInterpolationSuite) TestPrev() {
-	fntype, err := StrToInterpolateType("prev")
+	fntype, err := StrToInterpolateType("prev_val")
 	suite.Require().Nil(err)
 	fn := GetInterpolateFunc(fntype, math.MaxInt64)
 	t, v := fn(10, 110, 60, 100, 200)
@@ -61,7 +61,7 @@ func (suite *testInterpolationSuite) TestPrev() {
 }
 
 func (suite *testInterpolationSuite) TestNext() {
-	fntype, err := StrToInterpolateType("next")
+	fntype, err := StrToInterpolateType("next_val")
 	suite.Require().Nil(err)
 	fn := GetInterpolateFunc(fntype, math.MaxInt64)
 	t, v := fn(10, 110, 60, 100, 200)
