@@ -744,6 +744,7 @@ func (suite *testRawQuerySuite) TestQueryMetricDoesNotHaveData() {
 	}
 }
 
+// Regression test for IG-13690
 func (suite *testRawQuerySuite) TestQueryMultiMetricsInconsistentLabels() {
 	adapter, err := tsdb.NewV3ioAdapter(suite.v3ioConfig, nil, nil)
 	if err != nil {
