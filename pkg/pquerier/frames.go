@@ -53,25 +53,28 @@ func (fi *frameIterator) Next() bool {
 		numberOfColumnsInCurrentSeries = len(fi.ctx.frameList[fi.setIndex].columnByName)
 	}
 
-	// can advance series within a frame
 	if fi.seriesIndex < numberOfColumnsInCurrentSeries-1 {
+		// can advance series within a frame
 		fi.seriesIndex++
-		if fi.isCurrentSeriesHidden() {
-			return fi.Next()
-		}
-		return true
-	}
-
-	// already in the last column in the last frame
-	if fi.setIndex+1 >= len(fi.ctx.frameList) {
+	} else if fi.setIndex+1 >= len(fi.ctx.frameList) {
+		// already in the last column in the last frame
 		return false
+	} else {
+		// advance to next frame
+		fi.setIndex++
+		fi.seriesIndex = 0
 	}
 
-	fi.setIndex++
-	fi.seriesIndex = 0
 	if fi.isCurrentSeriesHidden() {
 		return fi.Next()
 	}
+
+	series := fi.ctx.frameList[fi.setIndex]
+	// If raw series is nil
+	if series.isRawSeries && series.rawColumns[fi.seriesIndex] == nil {
+		return fi.Next()
+	}
+
 	return true
 }
 

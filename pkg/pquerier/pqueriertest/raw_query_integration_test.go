@@ -743,3 +743,42 @@ func (suite *testRawQuerySuite) TestQueryMetricDoesNotHaveData() {
 		}
 	}
 }
+
+// Regression test for IG-13690
+func (suite *testRawQuerySuite) TestQueryMultiMetricsInconsistentLabels() {
+	adapter, err := tsdb.NewV3ioAdapter(suite.v3ioConfig, nil, nil)
+	if err != nil {
+		suite.T().Fatalf("failed to create v3io adapter. reason: %s", err)
+	}
+
+	labels := utils.LabelsFromStringList("os", "linux")
+	cpuData := []tsdbtest.DataPoint{{suite.basicQueryTime, 10}}
+	diskioData := []tsdbtest.DataPoint{{suite.basicQueryTime, 10}}
+	testParams := tsdbtest.NewTestParams(suite.T(),
+		tsdbtest.TestOption{
+			Key: tsdbtest.OptTimeSeries,
+			Value: tsdbtest.TimeSeries{
+				tsdbtest.Metric{Name: "cpu", Labels: labels, Data: cpuData},
+				tsdbtest.Metric{Name: "diskio", Data: diskioData},
+			}})
+	tsdbtest.InsertData(suite.T(), testParams)
+
+	querierV2, err := adapter.QuerierV2()
+	if err != nil {
+		suite.T().Fatalf("Failed to create querier v2, err: %v", err)
+	}
+
+	params := &pquerier.SelectParams{
+		Name: "cpu, diskio",
+		From: suite.basicQueryTime,
+		To:   suite.basicQueryTime + 4*tsdbtest.MinuteInMillis,
+	}
+	iter, err := querierV2.Select(params)
+	if err != nil {
+		suite.T().Fatalf("Failed to exeute query, err: %v", err)
+	}
+
+	for iter.Next() {
+		suite.NotNil(iter.At(), "Iterator yielded a nil series")
+	}
+}
