@@ -1,6 +1,7 @@
 container: "bigdata"
 workers: 8
 batchSize: 2048
+loglevel: "info"
 
 performance:
   reportOnShutdown: false

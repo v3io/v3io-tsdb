@@ -183,6 +183,13 @@ func (q *V3ioQuerier) baseSelectQry(params *SelectParams, showAggregateLabel boo
 			return
 		}
 
+		var existingMetrics map[string]bool
+		existingMetrics, err = q.getExistingMetricNamesMap()
+		if err != nil {
+			return
+		}
+		selectContext.existingMetrics = existingMetrics
+
 		minExistingTime, maxExistingTime := parts[0].GetStartTime(), parts[len(parts)-1].GetEndTime()
 		if params.From < minExistingTime {
 			params.From = minExistingTime
@@ -196,6 +203,18 @@ func (q *V3ioQuerier) baseSelectQry(params *SelectParams, showAggregateLabel boo
 	})
 
 	return
+}
+
+func (q *V3ioQuerier) getExistingMetricNamesMap() (map[string]bool, error) {
+	metrics, err := q.getMetricNames()
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to fetch existing metrics")
+	}
+	existingMetrics := make(map[string]bool, len(metrics))
+	for _, metric := range metrics {
+		existingMetrics[metric] = true
+	}
+	return existingMetrics, nil
 }
 
 func isPowerOfTwo(x int) bool {

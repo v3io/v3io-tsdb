@@ -24,13 +24,17 @@ func TestParseQuery(t *testing.T) {
 				Interpolator:           "linear",
 				InterpolationTolerance: 10 * tsdbtest.MinuteInMillis}}}},
 
-		{input: "select max(prev(columnA)), avg(columnB)",
-			output: &pquerier.SelectParams{RequestedColumns: []pquerier.RequestedColumn{{Metric: "columnA", Interpolator: "prev", Function: "max"},
+		{input: "select max(prev_val(columnA)), avg(columnB)",
+			output: &pquerier.SelectParams{RequestedColumns: []pquerier.RequestedColumn{{Metric: "columnA", Interpolator: "prev_val", Function: "max"},
 				{Metric: "columnB", Function: "avg"}}}},
 
-		{input: "select max(prev(columnA, '1h')) as ahsheli, avg(columnB)",
+		{input: "select max(next_val(columnA)), avg(columnB)",
+			output: &pquerier.SelectParams{RequestedColumns: []pquerier.RequestedColumn{{Metric: "columnA", Interpolator: "next_val", Function: "max"},
+				{Metric: "columnB", Function: "avg"}}}},
+
+		{input: "select max(prev_val(columnA, '1h')) as ahsheli, avg(columnB)",
 			output: &pquerier.SelectParams{RequestedColumns: []pquerier.RequestedColumn{{Metric: "columnA",
-				Interpolator:           "prev",
+				Interpolator:           "prev_val",
 				Function:               "max",
 				Alias:                  "ahsheli",
 				InterpolationTolerance: tsdbtest.HoursInMillis},

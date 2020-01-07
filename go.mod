@@ -4,29 +4,26 @@ go 1.12
 
 require (
 	github.com/cespare/xxhash v1.1.0
-	github.com/cpuguy83/go-md2man v1.0.8 // indirect
+	github.com/cpuguy83/go-md2man v1.0.10 // indirect
 	github.com/ghodss/yaml v1.0.0
 	github.com/imdario/mergo v0.3.7
-	github.com/inconshreveable/mousetrap v1.0.0 // indirect
+	github.com/kr/pretty v0.1.0 // indirect
 	github.com/nuclio/logger v0.0.1
 	github.com/nuclio/nuclio-sdk-go v0.0.0-20190205170814-3b507fbd0324
 	github.com/nuclio/nuclio-test-go v0.0.0-20180704132150-0ce6587f8e37
 	github.com/nuclio/zap v0.0.2
-	github.com/philhofer/fwd v1.0.0 // indirect
 	github.com/pkg/errors v0.8.1
 	github.com/rcrowley/go-metrics v0.0.0-20181016184325-3113b8401b8a
-	github.com/russross/blackfriday v1.5.2+incompatible // indirect
 	github.com/spf13/cobra v0.0.3
-	github.com/spf13/pflag v1.0.3 // indirect
-	github.com/stretchr/testify v1.3.0
-	github.com/tinylib/msgp v1.1.0 // indirect
-	github.com/v3io/frames v0.0.0-20190328123118-1dad1ff610509e7b087d9cd390ed1b452caecf15
-	github.com/v3io/v3io-go v0.0.0-20190826150152-1f2c9a9a61cb715410a35662f5ddab2b306f95e7
+	github.com/spf13/pflag v1.0.5 // indirect
+	github.com/stretchr/testify v1.4.0
+	github.com/tinylib/msgp v1.1.1 // indirect
+	github.com/v3io/frames v0.6.8-v0.9.11
+	github.com/v3io/v3io-go v0.0.5-0.20191205125653-9003ae83f0b6
+	github.com/v3io/v3io-go-http v0.0.0-20190415143924-cc2fbcde6663 // indirect
 	github.com/xwb1989/sqlparser v0.0.0-20180606152119-120387863bf2
-	golang.org/x/net v0.0.0-20181114220301-adae6a3d119a // indirect
-	golang.org/x/sync v0.0.0-20181108010431-42b317875d0f // indirect
-	google.golang.org/grpc v1.17.0 // indirect
-	gopkg.in/yaml.v2 v2.2.2 // indirect
+	google.golang.org/genproto v0.0.0-20181026194446-8b5d7a19e2d9 // indirect
+	gopkg.in/check.v1 v1.0.0-20180628173108-788fd7840127 // indirect
 )
 
 replace (

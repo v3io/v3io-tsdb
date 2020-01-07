@@ -298,7 +298,7 @@ func (suite *testServerAggregatesSuite) TestSelectServerAggregatesAndRawByReques
 		suite.T().Fatalf("Failed to create querier v2, err: %v", err)
 	}
 
-	params := &pquerier.SelectParams{RequestedColumns: []pquerier.RequestedColumn{{Metric: "cpu", Function: "sum"}, {Metric: "cpu", Interpolator: "next", InterpolationTolerance: 5 * tsdbtest.HoursInMillis}},
+	params := &pquerier.SelectParams{RequestedColumns: []pquerier.RequestedColumn{{Metric: "cpu", Function: "sum"}, {Metric: "cpu", Interpolator: "next_val", InterpolationTolerance: 5 * tsdbtest.HoursInMillis}},
 		Step: 4 * tsdbtest.HoursInMillis,
 		From: suite.basicQueryTime - 4*tsdbtest.HoursInMillis,
 		To:   suite.basicQueryTime + 5*tsdbtest.MinuteInMillis}

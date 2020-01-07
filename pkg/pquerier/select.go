@@ -44,6 +44,8 @@ type selectQueryContext struct {
 	requestChannels []chan *qryResults
 	errorChannel    chan error
 	wg              sync.WaitGroup
+
+	existingMetrics map[string]bool
 }
 
 func (queryCtx *selectQueryContext) start(parts []*partmgr.DBPartition, params *SelectParams) (*frameIterator, error) {
@@ -374,6 +376,10 @@ func (queryCtx *selectQueryContext) createColumnSpecs() ([]columnMeta, map[strin
 	}
 
 	for i, col := range requestedColumns {
+		if col.Metric != "" && !queryCtx.existingMetrics[col.Metric] {
+			return nil, nil, fmt.Errorf("metric '%v' does not exist", col.Metric)
+		}
+
 		_, ok := columnsSpecByMetric[col.Metric]
 		if !ok {
 			columnsSpecByMetric[col.Metric] = []columnMeta{}

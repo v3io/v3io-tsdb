@@ -35,9 +35,9 @@ func (it InterpolationType) String() string {
 	case interpolateNaN:
 		return "nan"
 	case interpolatePrev:
-		return "prev"
+		return "prev_val"
 	case interpolateNext:
-		return "next"
+		return "next_val"
 	case interpolateLinear:
 		return "linear"
 	default:
@@ -62,9 +62,9 @@ func StrToInterpolateType(str string) (InterpolationType, error) {
 		return interpolateNone, nil
 	case "nan":
 		return interpolateNaN, nil
-	case "prev":
+	case "prev_val":
 		return interpolatePrev, nil
-	case "next":
+	case "next_val":
 		return interpolateNext, nil
 	case "lin", "linear":
 		return interpolateLinear, nil

@@ -76,6 +76,7 @@ func mainCollector(ctx *selectQueryContext, responseChannel chan *qryResults) {
 			}
 			lsetAttr, _ := res.fields[config.LabelSetAttrName].(string)
 			lset, _ := utils.LabelsFromString(lsetAttr)
+			lset = append(lset, utils.Label{Name: config.MetricNameAttrName, Value: res.name})
 			currentResultHash := lset.Hash()
 
 			// Aggregating cross series aggregates, only supported over raw data.
