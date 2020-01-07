@@ -266,7 +266,7 @@ func (suite *testCrossSeriesAggregatesSuite) TestCrossSeriesAggregatesWithInterp
 	querierV2, err := adapter.QuerierV2()
 	suite.Require().NoError(err, "failed to create querier v2")
 
-	selectParams, _, err := pquerier.ParseQuery("select sum_all(prev(cpu)), min_all(prev(cpu)), max_all(prev(cpu))")
+	selectParams, _, err := pquerier.ParseQuery("select sum_all(prev_val(cpu)), min_all(prev_val(cpu)), max_all(prev_val(cpu))")
 	suite.NoError(err)
 	selectParams.Step = 2 * tsdbtest.MinuteInMillis
 	selectParams.From = suite.basicQueryTime
@@ -341,7 +341,7 @@ func (suite *testCrossSeriesAggregatesSuite) TestCrossSeriesAggregatesMultiParti
 	querierV2, err := adapter.QuerierV2()
 	suite.Require().NoError(err, "failed to create querier v2")
 
-	selectParams, _, err := pquerier.ParseQuery("select sum_all(prev(cpu)), min_all(prev(cpu)),avg_all(prev(cpu))")
+	selectParams, _, err := pquerier.ParseQuery("select sum_all(prev_val(cpu)), min_all(prev_val(cpu)),avg_all(prev_val(cpu))")
 	suite.NoError(err)
 	selectParams.Step = 2 * tsdbtest.MinuteInMillis
 	selectParams.From = suite.basicQueryTime - 7*tsdbtest.DaysInMillis
@@ -426,7 +426,7 @@ func (suite *testCrossSeriesAggregatesSuite) TestCrossSeriesAggregatesMultiParti
 	querierV2, err := adapter.QuerierV2()
 	suite.Require().NoError(err, "failed to create querier v2")
 
-	selectParams, _, err := pquerier.ParseQuery("select sum_all(prev(cpu)), min_all(prev(cpu)),avg_all(prev(cpu)),count_all(prev(cpu))")
+	selectParams, _, err := pquerier.ParseQuery("select sum_all(prev_val(cpu)), min_all(prev_val(cpu)),avg_all(prev_val(cpu)),count_all(prev_val(cpu))")
 	suite.NoError(err)
 	selectParams.Step = 2 * tsdbtest.MinuteInMillis
 	selectParams.From = suite.basicQueryTime - 7*tsdbtest.DaysInMillis
@@ -491,7 +491,7 @@ func (suite *testCrossSeriesAggregatesSuite) TestCrossSeriesAggregatesWithInterp
 	querierV2, err := adapter.QuerierV2()
 	suite.Require().NoError(err, "failed to create querier v2")
 
-	selectParams, _, err := pquerier.ParseQuery("select sum_all(prev(cpu)), min_all(prev(cpu)), max_all(prev(cpu))")
+	selectParams, _, err := pquerier.ParseQuery("select sum_all(prev_val(cpu)), min_all(prev_val(cpu)), max_all(prev_val(cpu))")
 	suite.NoError(err)
 	selectParams.Step = 5 * tsdbtest.MinuteInMillis
 	selectParams.From = suite.basicQueryTime
@@ -611,7 +611,7 @@ func (suite *testCrossSeriesAggregatesSuite) TestOnlyVirtualCrossSeriesAggregate
 	querierV2, err := adapter.QuerierV2()
 	suite.Require().NoError(err, "failed to create querier v2")
 
-	selectParams, _, err := pquerier.ParseQuery("select avg_all(prev(cpu))")
+	selectParams, _, err := pquerier.ParseQuery("select avg_all(prev_val(cpu))")
 	suite.NoError(err)
 	selectParams.Step = 2 * tsdbtest.MinuteInMillis
 	selectParams.From = suite.basicQueryTime

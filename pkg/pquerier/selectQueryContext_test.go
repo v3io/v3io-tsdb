@@ -102,7 +102,7 @@ func TestCreateColumnSpecs(t *testing.T) {
 				{metric: "cpu", function: toAggr("sum"), interpolationType: interpolateLinear, isHidden: true}}}},
 
 		{params: SelectParams{RequestedColumns: []RequestedColumn{{Metric: "cpu", Function: "count", Interpolator: "linear"},
-			{Metric: "diskio", Function: "count", Interpolator: "prev"},
+			{Metric: "diskio", Function: "count", Interpolator: "prev_val"},
 			{Metric: "diskio", Function: "sum"}}},
 			expectedSpecs: []columnMeta{{metric: "cpu", function: toAggr("count"), interpolationType: interpolateLinear},
 				{metric: "diskio", function: toAggr("count"), interpolationType: interpolatePrev},
