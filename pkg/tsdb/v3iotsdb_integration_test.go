@@ -1114,9 +1114,7 @@ func TestIngestDataStringThenFloat(t *testing.T) {
 		t.Fatalf("Failed to wait for appender completion. reason: %s", err)
 	}
 
-	tsdbtest.ValidateCountOfSamples(t, adapter, "cpu",
-		1, 0, 1532950510000,
-		-1)
+	tsdbtest.ValidateCountOfSamples(t, adapter, "cpu", 1, 0, 1532950510000, -1)
 }
 
 func iteratorToSlice(it chunkenc.Iterator) ([]tsdbtest.DataPoint, error) {

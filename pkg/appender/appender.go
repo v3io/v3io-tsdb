@@ -250,15 +250,15 @@ func (mc *MetricsCache) Add(lset utils.LabelsIfc, t int64, v interface{}) (uint6
 	metric.setError(nil)
 
 	if isValueVariantType != metric.isVariant {
-		var firstType string
-		if firstType = "numeric"; isValueVariantType {
-			firstType = "string"
+		newValueType := "numeric"
+		if isValueVariantType {
+			newValueType = "string"
 		}
-		var secondType string
-		if secondType = "numeric"; metric.isVariant {
-			secondType = "string"
+		existingValueType := "numeric"
+		if metric.isVariant {
+			existingValueType = "string"
 		}
-		return 0, errors.Errorf("cannot append %v type metric to %v type metric", firstType, secondType)
+		return 0, errors.Errorf("Cannot append %v type metric to %v type metric.", newValueType, existingValueType)
 	}
 
 	mc.appendTV(metric, t, v)
