@@ -13,6 +13,7 @@ import (
 	"github.com/v3io/v3io-tsdb/internal/pkg/performance"
 	"github.com/v3io/v3io-tsdb/pkg/chunkenc"
 	"github.com/v3io/v3io-tsdb/pkg/config"
+	"github.com/v3io/v3io-tsdb/pkg/pquerier"
 	. "github.com/v3io/v3io-tsdb/pkg/tsdb"
 	"github.com/v3io/v3io-tsdb/pkg/tsdb/tsdbtest/testutils"
 	"github.com/v3io/v3io-tsdb/pkg/utils"
@@ -217,12 +218,17 @@ func ValidateCountOfSamples(t testing.TB, adapter *V3ioAdapter, metricName strin
 		stepSize = queryAggStep
 	}
 
-	qry, err := adapter.Querier(nil, startTimeMs-stepSize, endTimeMs)
+	qry, err := adapter.QuerierV2()
 	if err != nil {
 		t.Fatal(err, "Failed to create a Querier instance.")
 	}
 
-	set, err := qry.Select("", "count", stepSize, fmt.Sprintf("starts(__name__, '%v')", metricName))
+	selectParams := &pquerier.SelectParams{From: startTimeMs - stepSize,
+		To:        endTimeMs,
+		Functions: "count",
+		Step:      stepSize,
+		Filter:    fmt.Sprintf("starts(__name__, '%v')", metricName)}
+	set, err := qry.Select(selectParams)
 
 	var actualCount int
 	for set.Next() {
