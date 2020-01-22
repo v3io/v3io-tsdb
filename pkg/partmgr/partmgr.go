@@ -179,21 +179,21 @@ func (p *PartitionManager) updateSchema() error {
 				outerError = err
 				return
 			}
-			items := make(map[string]map[string]interface{}, len(p.partitions))
+			attributes := make(map[string]interface{}, len(p.partitions))
 			for _, part := range p.partitions {
-				items[strconv.FormatInt(part.startTime, 10)] = part.ToMap()
+				marshalledPartition, err := json.Marshal(part.ToMap())
+				if err != nil {
+					outerError = err
+					return
+				}
+				attributes[strconv.FormatInt(part.startTime, 10)] = marshalledPartition
 			}
 
-			input := &v3io.PutItemsInput{Path: p.GetPartitionsTablePath(), Items: items}
-			resp, err := p.container.PutItemsSync(input)
+			input := &v3io.PutItemInput{Path: p.GetPartitionsTablePath(), Attributes: attributes}
+			err := p.container.PutItemSync(input)
 
 			if err != nil {
 				outerError = errors.Wrap(err, "failed to update partitions table.")
-				return
-			}
-			output := resp.Output.(*v3io.PutItemsOutput)
-			if !output.Success {
-				outerError = fmt.Errorf("got one or more errors, err: %v", output.Errors)
 				return
 			}
 		}
@@ -323,28 +323,30 @@ func (p *PartitionManager) newLoadPartitions() error {
 		return nil
 	}
 
-	getItems := &v3io.GetItemsInput{Path: p.GetPartitionsTablePath() + "/",
+	getItem := &v3io.GetItemInput{Path: p.GetPartitionsTablePath(),
 		AttributeNames: []string{"*"}}
 
-	logger, err := utils.NewLogger(p.v3ioConfig.LogLevel)
-	if err != nil {
-		return err
-	}
-	iter, err := utils.NewAsyncItemsCursor(p.container, getItems, p.v3ioConfig.QryWorkers, []string{}, logger)
+	response, err := p.container.GetItemSync(getItem)
 	if err != nil {
 		return err
 	}
 
+	output := response.Output.(*v3io.GetItemOutput)
 	p.partitions = []*DBPartition{}
-	for iter.Next() {
-		startTime := iter.GetField(config.ObjectNameAttrName).(string)
-		intStartTime, err := strconv.ParseInt(startTime, 10, 64)
+	for partitionStartTime, partitionAttrBlob := range output.Item {
+		intStartTime, err := strconv.ParseInt(partitionStartTime, 10, 64)
 		if err != nil {
-			return errors.Wrapf(err, "invalid partition name '%v'", startTime)
+			return errors.Wrapf(err, "invalid partition name '%v'", partitionStartTime)
 		}
 
 		partPath := path.Join(p.Path(), strconv.FormatInt(intStartTime/1000, 10)) + "/"
-		newPart, err := NewDBPartitionFromMap(p, intStartTime, partPath, iter.GetItem())
+
+		partitionAttr := make(map[string]interface{}, 5)
+		err = json.Unmarshal(partitionAttrBlob.([]byte), &partitionAttr)
+		if err != nil {
+			return err
+		}
+		newPart, err := NewDBPartitionFromMap(p, intStartTime, partPath, partitionAttr)
 		if err != nil {
 			return err
 		}
