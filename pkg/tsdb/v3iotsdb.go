@@ -290,15 +290,6 @@ func (a *V3ioAdapter) DeleteDB(deleteAll bool, ignoreErrors bool, fromTime int64
 			return errors.New("The configuration at '" + schemaPath + "' cannot be deleted or doesn't exist.")
 		}
 
-		// Delete Partitions directory
-		partitionsKvPath := a.partitionMngr.GetPartitionsTablePath() + "/"
-		err = a.container.DeleteObjectSync(&v3io.DeleteObjectInput{Path: partitionsKvPath})
-		if err != nil && !ignoreErrors {
-			if !utils.IsNotExistsError(err) {
-				return errors.Wrapf(err, "Failed to delete partitions kv table '%s'.", partitionsKvPath)
-			}
-		}
-
 		// Delete the Directory object
 		path := a.cfg.TablePath + "/"
 		err = a.container.DeleteObjectSync(&v3io.DeleteObjectInput{Path: path})

@@ -39,6 +39,10 @@ import (
 	"github.com/v3io/v3io-tsdb/pkg/utils"
 )
 
+const (
+	partitionAttributePrefix = "p"
+)
+
 // Create a new partition manager
 func NewPartitionMngr(schemaConfig *config.Schema, cont v3io.Container, v3ioConfig *config.V3ioConfig) (*PartitionManager, error) {
 	currentPartitionInterval, err := utils.Str2duration(schemaConfig.PartitionSchemaInfo.PartitionerInterval)
@@ -46,7 +50,7 @@ func NewPartitionMngr(schemaConfig *config.Schema, cont v3io.Container, v3ioConf
 		return nil, err
 	}
 	newMngr := &PartitionManager{schemaConfig: schemaConfig, cyclic: false, container: cont, currentPartitionInterval: currentPartitionInterval, v3ioConfig: v3ioConfig}
-	err = newMngr.updatePartitionsFromSchema(schemaConfig)
+	err = newMngr.updatePartitionsFromSchema(schemaConfig, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -173,8 +177,9 @@ func (p *PartitionManager) updateSchema() error {
 			outerError = errors.Wrap(err, "Failed to update a new partition in the schema file.")
 			return
 		}
+		schemaFilePath := path.Join(p.Path(), config.SchemaConfigFileName)
 		if p.container != nil { // Tests use case only
-			err = p.container.PutObjectSync(&v3io.PutObjectInput{Path: path.Join(p.Path(), config.SchemaConfigFileName), Body: data})
+			err = p.container.PutObjectSync(&v3io.PutObjectInput{Path: schemaFilePath, Body: data})
 			if err != nil {
 				outerError = err
 				return
@@ -186,10 +191,10 @@ func (p *PartitionManager) updateSchema() error {
 					outerError = err
 					return
 				}
-				attributes[strconv.FormatInt(part.startTime, 10)] = marshalledPartition
+				attributes[part.GetPartitionAttributeName()] = marshalledPartition
 			}
 
-			input := &v3io.PutItemInput{Path: p.GetPartitionsTablePath(), Attributes: attributes}
+			input := &v3io.PutItemInput{Path: schemaFilePath, Attributes: attributes}
 			err := p.container.PutItemSync(input)
 
 			if err != nil {
@@ -219,16 +224,21 @@ func (p *PartitionManager) DeletePartitionsFromSchema(partitionsToDelete []*DBPa
 				break
 			}
 		}
-
 	}
 
 	// Delete from partitions KV table
 	if p.container != nil { // Tests use case only
+		deletePartitionExpression := strings.Builder{}
 		for _, partToDelete := range partitionsToDelete {
-			err := p.container.DeleteObjectSync(&v3io.DeleteObjectInput{Path: path.Join(p.GetPartitionsTablePath(), strconv.FormatInt(partToDelete.startTime, 10))})
-			if err != nil {
-				return err
-			}
+			deletePartitionExpression.WriteString("delete(")
+			deletePartitionExpression.WriteString(partToDelete.GetPartitionAttributeName())
+			deletePartitionExpression.WriteString(");")
+		}
+		expression := deletePartitionExpression.String()
+		schemaFilePath := path.Join(p.Path(), config.SchemaConfigFileName)
+		err := p.container.UpdateItemSync(&v3io.UpdateItemInput{Path: schemaFilePath, Expression: &expression})
+		if err != nil {
+			return err
 		}
 	}
 
@@ -242,24 +252,26 @@ func (p *PartitionManager) ReadAndUpdateSchema() (err error) {
 		return
 	}
 
-	fullPath := path.Join(p.Path(), config.SchemaConfigFileName)
+	schemaFilePath := path.Join(p.Path(), config.SchemaConfigFileName)
 	if err != nil {
 		err = errors.Wrap(err, "Failed to create timer ReadAndUpdateSchemaTimer.")
 		return
 	}
-	schemaInfoResp, err := p.container.GetItemSync(&v3io.GetItemInput{Path: fullPath, AttributeNames: []string{"__mtime_secs", "__mtime_nsecs"}})
+	schemaInfoResp, err := p.container.GetItemSync(&v3io.GetItemInput{Path: schemaFilePath, AttributeNames: []string{"**"}})
 	if err != nil {
-		err = errors.Wrapf(err, "Failed to read schema at path '%s'.", fullPath)
+		err = errors.Wrapf(err, "Failed to read schema at path '%s'.", schemaFilePath)
 		return
 	}
-	mtimeSecs, err := schemaInfoResp.Output.(*v3io.GetItemOutput).Item.GetFieldInt("__mtime_secs")
+
+	schemaGetItemResponse := schemaInfoResp.Output.(*v3io.GetItemOutput)
+	mtimeSecs, err := schemaGetItemResponse.Item.GetFieldInt("__mtime_secs")
 	if err != nil {
-		err = errors.Wrapf(err, "Failed to get start time (mtime) in seconds from the schema at '%s'.", fullPath)
+		err = errors.Wrapf(err, "Failed to get start time (mtime) in seconds from the schema at '%s'.", schemaFilePath)
 		return
 	}
-	mtimeNsecs, err := schemaInfoResp.Output.(*v3io.GetItemOutput).Item.GetFieldInt("__mtime_nsecs")
+	mtimeNsecs, err := schemaGetItemResponse.Item.GetFieldInt("__mtime_nsecs")
 	if err != nil {
-		err = errors.Wrapf(err, "Failed to get start time (mtime) in nanoseconds from the schema at '%s'.", fullPath)
+		err = errors.Wrapf(err, "Failed to get start time (mtime) in nanoseconds from the schema at '%s'.", schemaFilePath)
 		return
 	}
 
@@ -269,22 +281,22 @@ func (p *PartitionManager) ReadAndUpdateSchema() (err error) {
 		p.schemaMtimeNanosecs = mtimeNsecs
 
 		metricReporter.WithTimer("ReadAndUpdateSchemaTimer", func() {
-			resp, innerError := p.container.GetObjectSync(&v3io.GetObjectInput{Path: fullPath})
+			resp, innerError := p.container.GetObjectSync(&v3io.GetObjectInput{Path: schemaFilePath})
 			if innerError != nil {
-				err = errors.Wrapf(innerError, "Failed to read schema at path '%s'.", fullPath)
+				err = errors.Wrapf(innerError, "Failed to read schema at path '%s'.", schemaFilePath)
 				return
 			}
 
 			schema := &config.Schema{}
 			innerError = json.Unmarshal(resp.Body(), schema)
 			if innerError != nil {
-				err = errors.Wrapf(innerError, "Failed to unmarshal schema at path '%s'.", fullPath)
+				err = errors.Wrapf(innerError, "Failed to unmarshal schema at path '%s'.", schemaFilePath)
 				return
 			}
 			p.schemaConfig = schema
-			innerError = p.updatePartitionsFromSchema(schema)
+			innerError = p.updatePartitionsFromSchema(schema, schemaGetItemResponse)
 			if innerError != nil {
-				err = errors.Wrapf(innerError, "Failed to update partitions from schema at path '%s'.", fullPath)
+				err = errors.Wrapf(innerError, "Failed to update partitions from schema at path '%s'.", schemaFilePath)
 				return
 			}
 		})
@@ -292,9 +304,9 @@ func (p *PartitionManager) ReadAndUpdateSchema() (err error) {
 	return
 }
 
-func (p *PartitionManager) updatePartitionsFromSchema(schema *config.Schema) error {
-	if schema.TableSchemaInfo.Version == 3 && !p.v3ioConfig.LoadPartitionsFromSchemaFile {
-		return p.newLoadPartitions()
+func (p *PartitionManager) updatePartitionsFromSchema(schema *config.Schema, schemaAttributesResponse *v3io.GetItemOutput) error {
+	if schema.TableSchemaInfo.Version == 4 && !p.v3ioConfig.LoadPartitionsFromSchemaFile {
+		return p.newLoadPartitions(schemaAttributesResponse)
 	}
 
 	return p.oldLoadPartitions(schema)
@@ -318,23 +330,28 @@ func (p *PartitionManager) oldLoadPartitions(schema *config.Schema) error {
 	return nil
 }
 
-func (p *PartitionManager) newLoadPartitions() error {
+func (p *PartitionManager) newLoadPartitions(schemaAttributesResponse *v3io.GetItemOutput) error {
 	if p.container == nil { // Tests use case only
 		return nil
 	}
 
-	getItem := &v3io.GetItemInput{Path: p.GetPartitionsTablePath(),
-		AttributeNames: []string{"*"}}
+	if schemaAttributesResponse == nil {
+		schemaFilePath := path.Join(p.Path(), config.SchemaConfigFileName)
+		schemaInfoResp, err := p.container.GetItemSync(&v3io.GetItemInput{Path: schemaFilePath, AttributeNames: []string{"*"}})
+		if err != nil {
+			return errors.Wrapf(err, "Failed to read schema at path '%s'.", schemaFilePath)
+		}
 
-	response, err := p.container.GetItemSync(getItem)
-	if err != nil {
-		return err
+		schemaAttributesResponse = schemaInfoResp.Output.(*v3io.GetItemOutput)
 	}
 
-	output := response.Output.(*v3io.GetItemOutput)
 	p.partitions = []*DBPartition{}
-	for partitionStartTime, partitionAttrBlob := range output.Item {
-		intStartTime, err := strconv.ParseInt(partitionStartTime, 10, 64)
+	for partitionStartTime, partitionAttrBlob := range schemaAttributesResponse.Item {
+		// Only process "partition" attributes
+		if !strings.HasPrefix(partitionStartTime, partitionAttributePrefix) {
+			continue
+		}
+		intStartTime, err := strconv.ParseInt(partitionStartTime[1:], 10, 64)
 		if err != nil {
 			return errors.Wrapf(err, "invalid partition name '%v'", partitionStartTime)
 		}
@@ -504,6 +521,11 @@ func (p *DBPartition) GetEndTime() int64 {
 // Return the path to this partition's TSDB table
 func (p *DBPartition) GetTablePath() string {
 	return p.path
+}
+
+// Return the name of this partition's attribute name
+func (p *DBPartition) GetPartitionAttributeName() string {
+	return fmt.Sprintf("%v%v", partitionAttributePrefix, strconv.FormatInt(p.startTime, 10))
 }
 
 // Return a list of sharding keys matching the given item name
