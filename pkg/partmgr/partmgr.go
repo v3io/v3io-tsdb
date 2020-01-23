@@ -70,6 +70,10 @@ type PartitionManager struct {
 	v3ioConfig               *config.V3ioConfig
 }
 
+func (p *PartitionManager) GetSchemaFilePath() string {
+	return path.Join(p.Path(), config.SchemaConfigFileName)
+}
+
 func (p *PartitionManager) GetPartitionsTablePath() string {
 	return path.Join(p.Path(), "partitions")
 }
@@ -165,7 +169,6 @@ func (p *PartitionManager) createAndUpdatePartition(t int64) (*DBPartition, erro
 }
 
 func (p *PartitionManager) updateSchema() error {
-
 	var outerError error
 	metricReporter := performance.ReporterInstanceFromConfig(p.v3ioConfig)
 	metricReporter.WithTimer("UpdateSchemaTimer", func() {
@@ -177,7 +180,7 @@ func (p *PartitionManager) updateSchema() error {
 			outerError = errors.Wrap(err, "Failed to update a new partition in the schema file.")
 			return
 		}
-		schemaFilePath := path.Join(p.Path(), config.SchemaConfigFileName)
+		schemaFilePath := p.GetSchemaFilePath()
 		if p.container != nil { // Tests use case only
 			err = p.container.PutObjectSync(&v3io.PutObjectInput{Path: schemaFilePath, Body: data})
 			if err != nil {
@@ -235,8 +238,7 @@ func (p *PartitionManager) DeletePartitionsFromSchema(partitionsToDelete []*DBPa
 			deletePartitionExpression.WriteString(");")
 		}
 		expression := deletePartitionExpression.String()
-		schemaFilePath := path.Join(p.Path(), config.SchemaConfigFileName)
-		err := p.container.UpdateItemSync(&v3io.UpdateItemInput{Path: schemaFilePath, Expression: &expression})
+		err := p.container.UpdateItemSync(&v3io.UpdateItemInput{Path: p.GetSchemaFilePath(), Expression: &expression})
 		if err != nil {
 			return err
 		}
@@ -252,7 +254,7 @@ func (p *PartitionManager) ReadAndUpdateSchema() (err error) {
 		return
 	}
 
-	schemaFilePath := path.Join(p.Path(), config.SchemaConfigFileName)
+	schemaFilePath := p.GetSchemaFilePath()
 	if err != nil {
 		err = errors.Wrap(err, "Failed to create timer ReadAndUpdateSchemaTimer.")
 		return
@@ -281,38 +283,43 @@ func (p *PartitionManager) ReadAndUpdateSchema() (err error) {
 		p.schemaMtimeNanosecs = mtimeNsecs
 
 		metricReporter.WithTimer("ReadAndUpdateSchemaTimer", func() {
-			resp, innerError := p.container.GetObjectSync(&v3io.GetObjectInput{Path: schemaFilePath})
-			if innerError != nil {
-				err = errors.Wrapf(innerError, "Failed to read schema at path '%s'.", schemaFilePath)
-				return
-			}
-
-			schema := &config.Schema{}
-			innerError = json.Unmarshal(resp.Body(), schema)
-			if innerError != nil {
-				err = errors.Wrapf(innerError, "Failed to unmarshal schema at path '%s'.", schemaFilePath)
-				return
-			}
-			p.schemaConfig = schema
-			innerError = p.updatePartitionsFromSchema(schema, schemaGetItemResponse)
-			if innerError != nil {
-				err = errors.Wrapf(innerError, "Failed to update partitions from schema at path '%s'.", schemaFilePath)
-				return
-			}
+			err = p.updatePartitionsFromSchema(nil, schemaGetItemResponse)
+			return
 		})
 	}
 	return
 }
 
-func (p *PartitionManager) updatePartitionsFromSchema(schema *config.Schema, schemaAttributesResponse *v3io.GetItemOutput) error {
-	if schema.TableSchemaInfo.Version == 4 && !p.v3ioConfig.LoadPartitionsFromSchemaFile {
-		return p.newLoadPartitions(schemaAttributesResponse)
+func (p *PartitionManager) updatePartitionsFromSchema(schemaConfig *config.Schema, schemaGetItemResponse *v3io.GetItemOutput) error {
+	var currentSchemaVersion int
+	if schemaConfig == nil {
+		currentSchemaVersion = p.schemaConfig.TableSchemaInfo.Version
+	} else {
+		currentSchemaVersion = schemaConfig.TableSchemaInfo.Version
 	}
 
-	return p.oldLoadPartitions(schema)
+	if currentSchemaVersion == 4 && !p.v3ioConfig.LoadPartitionsFromSchemaFile {
+		return p.newLoadPartitions(schemaGetItemResponse)
+	}
+
+	return p.oldLoadPartitions(schemaConfig)
 }
 
 func (p *PartitionManager) oldLoadPartitions(schema *config.Schema) error {
+	if schema == nil {
+		schemaFilePath := p.GetSchemaFilePath()
+		resp, innerError := p.container.GetObjectSync(&v3io.GetObjectInput{Path: schemaFilePath})
+		if innerError != nil {
+			return errors.Wrapf(innerError, "Failed to read schema at path '%s'.", schemaFilePath)
+		}
+
+		schema = &config.Schema{}
+		innerError = json.Unmarshal(resp.Body(), schema)
+		if innerError != nil {
+			return errors.Wrapf(innerError, "Failed to unmarshal schema at path '%s'.", schemaFilePath)
+		}
+	}
+
 	p.partitions = []*DBPartition{}
 	for _, part := range schema.Partitions {
 		partPath := path.Join(p.Path(), strconv.FormatInt(part.StartTime/1000, 10)) + "/"
@@ -336,7 +343,7 @@ func (p *PartitionManager) newLoadPartitions(schemaAttributesResponse *v3io.GetI
 	}
 
 	if schemaAttributesResponse == nil {
-		schemaFilePath := path.Join(p.Path(), config.SchemaConfigFileName)
+		schemaFilePath := p.GetSchemaFilePath()
 		schemaInfoResp, err := p.container.GetItemSync(&v3io.GetItemInput{Path: schemaFilePath, AttributeNames: []string{"*"}})
 		if err != nil {
 			return errors.Wrapf(err, "Failed to read schema at path '%s'.", schemaFilePath)

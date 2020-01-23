@@ -170,7 +170,6 @@ func (a *V3ioAdapter) connect() error {
 		} else {
 			return errors.Wrapf(err, "Failed to read a TSDB schema from '%s'.", fullpath)
 		}
-
 	}
 
 	tableSchema := config.Schema{}
