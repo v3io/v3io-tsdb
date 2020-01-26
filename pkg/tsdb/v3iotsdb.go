@@ -179,7 +179,7 @@ func (a *V3ioAdapter) connect() error {
 	}
 
 	// in order to support backward compatibility we do not fail on version mismatch and only logging warning
-	if tableSchema.TableSchemaInfo.Version != schema.Version {
+	if a.cfg.LoadPartitionsFromSchemaAttr && tableSchema.TableSchemaInfo.Version != schema.Version {
 		a.logger.Warn("Table Schema version mismatch - existing table schema version is %d while the tsdb library version is %d! Make sure to create the table with same library version",
 			tableSchema.TableSchemaInfo.Version, schema.Version)
 	}

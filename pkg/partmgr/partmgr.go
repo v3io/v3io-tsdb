@@ -298,7 +298,7 @@ func (p *PartitionManager) updatePartitionsFromSchema(schemaConfig *config.Schem
 		currentSchemaVersion = schemaConfig.TableSchemaInfo.Version
 	}
 
-	if currentSchemaVersion == 4 && !p.v3ioConfig.LoadPartitionsFromSchemaFile {
+	if currentSchemaVersion == 4 && p.v3ioConfig.LoadPartitionsFromSchemaAttr {
 		return p.newLoadPartitions(schemaGetItemResponse)
 	}
 
