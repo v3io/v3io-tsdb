@@ -748,7 +748,7 @@ func (suite *testRawQuerySuite) TestQueryMultiMetricsInconsistentLabels() {
 
 func (suite *testRawQuerySuite) TestLoadPartitionsFromAttributes() {
 	suite.v3ioConfig.LoadPartitionsFromSchemaAttr = true
-	defer func() {suite.v3ioConfig.LoadPartitionsFromSchemaAttr = false}()
+	defer func() { suite.v3ioConfig.LoadPartitionsFromSchemaAttr = false }()
 
 	adapter, err := tsdb.NewV3ioAdapter(suite.v3ioConfig, nil, nil)
 	if err != nil {
