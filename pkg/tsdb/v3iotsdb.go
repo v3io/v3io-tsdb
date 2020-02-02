@@ -343,6 +343,10 @@ func (a v3ioAppender) WaitForCompletion(timeout time.Duration) (int, error) {
 	return a.metricsCache.WaitForCompletion(timeout)
 }
 
+func (a v3ioAppender) Close() {
+	a.metricsCache.Close()
+}
+
 // In V3IO, all operations are committed (no client cache)
 func (a v3ioAppender) Commit() error   { return nil }
 func (a v3ioAppender) Rollback() error { return nil }
@@ -354,4 +358,5 @@ type Appender interface {
 	WaitForCompletion(timeout time.Duration) (int, error)
 	Commit() error
 	Rollback() error
+	Close()
 }
