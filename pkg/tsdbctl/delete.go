@@ -30,17 +30,21 @@ import (
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/v3io/v3io-tsdb/pkg/config"
+	"github.com/v3io/v3io-tsdb/pkg/tsdb"
 	"github.com/v3io/v3io-tsdb/pkg/utils"
 )
 
 type delCommandeer struct {
 	cmd            *cobra.Command
 	rootCommandeer *RootCommandeer
-	deleteAll      bool
-	ignoreErrors   bool
 	force          bool
-	fromTime       string
-	toTime         string
+
+	deleteAll    bool
+	ignoreErrors bool
+	fromTime     string
+	toTime       string
+	filter       string
+	metrics      string
 }
 
 func newDeleteCommandeer(rootCommandeer *RootCommandeer) *delCommandeer {
@@ -81,6 +85,10 @@ Notes:
 		"End (maximum) time for the delete operation, as a string containing an\nRFC 3339 time string, a Unix timestamp in milliseconds, or a relative\ntime of the format \"now\" or \"now-[0-9]+[mhd]\" (where 'm' = minutes,\n'h' = hours, and 'd' = days). Examples: \"2018-09-26T14:10:20Z\";\n\"1537971006000\"; \"now-3h\"; \"now-7d\". (default \"now\")")
 	cmd.Flags().StringVarP(&commandeer.fromTime, "begin", "b", "",
 		"Start (minimum) time for the delete operation, as a string containing\nan RFC 3339 time, a Unix timestamp in milliseconds, a relative time of\nthe format \"now\" or \"now-[0-9]+[mhd]\" (where 'm' = minutes, 'h' = hours,\nand 'd' = days), or 0 for the earliest time. Examples:\n\"2016-01-02T15:34:26Z\"; \"1451748866\"; \"now-90m\"; \"0\". (default =\n<end time> - 1h)")
+	cmd.Flags().StringVar(&commandeer.filter, "filter", "",
+		"Query filter, as an Iguazio Data Science Platform\nfilter expression. \nExamples: \"method=='get'\"; \"method=='get' AND os=='win'\".")
+	cmd.Flags().StringVarP(&commandeer.metrics, "metrics", "m", "",
+		"Comma-separated list of metric names to delete. If you don't set this argument, all metrics will be deleted according to the time range and filter specified.")
 	commandeer.cmd = cmd
 
 	return commandeer
@@ -128,7 +136,20 @@ func (dc *delCommandeer) delete() error {
 		}
 	}
 
-	err = dc.rootCommandeer.adapter.DeleteDB(dc.deleteAll, dc.ignoreErrors, from, to)
+	var metricsToDelete []string
+	if dc.metrics != "" {
+		for _, m := range strings.Split(dc.metrics, ",") {
+			metricsToDelete = append(metricsToDelete, strings.TrimSpace(m))
+		}
+	}
+
+	params := tsdb.DeleteParams{DeleteAll: dc.deleteAll,
+		IgnoreErrors: dc.ignoreErrors,
+		From:         from,
+		To:           to,
+		Metrics:      metricsToDelete,
+		Filter:       dc.filter}
+	err = dc.rootCommandeer.adapter.DeleteDB(params)
 	if err != nil {
 		return errors.Wrapf(err, "Failed to delete %s TSDB table '%s' in container '%s'.", partialMsg, dc.rootCommandeer.v3iocfg.TablePath, dc.rootCommandeer.v3iocfg.Container)
 	}

@@ -24,18 +24,14 @@ package tsdb_test
 
 import (
 	"encoding/json"
-	"math"
-	"path"
 	"sort"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/v3io/v3io-go/pkg/dataplane"
 	"github.com/v3io/v3io-tsdb/pkg/aggregate"
 	"github.com/v3io/v3io-tsdb/pkg/chunkenc"
 	"github.com/v3io/v3io-tsdb/pkg/config"
-	"github.com/v3io/v3io-tsdb/pkg/partmgr"
 	. "github.com/v3io/v3io-tsdb/pkg/tsdb"
 	"github.com/v3io/v3io-tsdb/pkg/tsdb/tsdbtest"
 	"github.com/v3io/v3io-tsdb/pkg/tsdb/tsdbtest/testutils"
@@ -838,8 +834,7 @@ func TestDeleteTSDB(t *testing.T) {
 		t.Fatal(res.Error.Error())
 	}
 
-	now := time.Now().Unix() * 1000 // now time in millis
-	if err := adapter.DeleteDB(true, true, 0, now); err != nil {
+	if err := adapter.DeleteDB(DeleteParams{DeleteAll: true, IgnoreErrors: true}); err != nil {
 		t.Fatalf("Failed to delete DB on teardown. reason: %s", err)
 	}
 
@@ -849,203 +844,6 @@ func TestDeleteTSDB(t *testing.T) {
 	}
 	if res := <-responseChan; res.Error == nil {
 		t.Fatal("Did not delete TSDB properly")
-	}
-}
-
-func TestDeleteTable(t *testing.T) {
-	ta, _ := time.Parse(time.RFC3339, "2018-10-03T05:00:00Z")
-	t1 := ta.Unix() * 1000
-	tb, _ := time.Parse(time.RFC3339, "2018-10-07T05:00:00Z")
-	t2 := tb.Unix() * 1000
-	tc, _ := time.Parse(time.RFC3339, "2018-10-11T05:00:00Z")
-	t3 := tc.Unix() * 1000
-	td, _ := time.Parse(time.RFC3339, "now + 1w")
-	futurePoint := td.Unix() * 1000
-
-	testCases := []struct {
-		desc         string
-		deleteFrom   int64
-		deleteTo     int64
-		deleteAll    bool
-		ignoreErrors bool
-		data         []tsdbtest.DataPoint
-		expected     []tsdbtest.DataPoint
-		ignoreReason string
-	}{
-		{desc: "Should delete all table by time",
-			deleteFrom:   0,
-			deleteTo:     9999999999999,
-			deleteAll:    false,
-			ignoreErrors: true,
-			data: []tsdbtest.DataPoint{{Time: t1, Value: 222.2},
-				{Time: t2, Value: 333.3},
-				{Time: t3, Value: 444.4}},
-			expected: []tsdbtest.DataPoint{},
-		},
-		{desc: "Should delete all table by deleteAll",
-			deleteFrom:   0,
-			deleteTo:     0,
-			deleteAll:    true,
-			ignoreErrors: true,
-			data: []tsdbtest.DataPoint{{Time: t1, Value: 222.2},
-				{Time: t2, Value: 333.3},
-				{Time: t3, Value: 444.4},
-				{Time: futurePoint, Value: 555.5}},
-			expected: []tsdbtest.DataPoint{},
-		},
-		{desc: "Should skip partial partition at begining",
-			deleteFrom:   t1 - 10000,
-			deleteTo:     9999999999999,
-			deleteAll:    false,
-			ignoreErrors: true,
-			data: []tsdbtest.DataPoint{{Time: t1, Value: 222.2},
-				{Time: t2, Value: 333.3},
-				{Time: t3, Value: 444.4}},
-			expected: []tsdbtest.DataPoint{{Time: t1, Value: 222.2}},
-		},
-		{desc: "Should skip partial partition at end",
-			deleteFrom:   0,
-			deleteTo:     t3 + 10000,
-			deleteAll:    false,
-			ignoreErrors: true,
-			data: []tsdbtest.DataPoint{{Time: t1, Value: 222.2},
-				{Time: t2, Value: 333.3},
-				{Time: t3, Value: 444.4}},
-			expected: []tsdbtest.DataPoint{{Time: t3, Value: 444.4}},
-		},
-		{desc: "Should skip partial partition at beginning and end not in range",
-			deleteFrom:   t1 + 10000,
-			deleteTo:     t3 - 10000,
-			deleteAll:    false,
-			ignoreErrors: true,
-			data: []tsdbtest.DataPoint{{Time: t1, Value: 222.2},
-				{Time: t2, Value: 333.3},
-				{Time: t3, Value: 444.4}},
-			expected: []tsdbtest.DataPoint{{Time: t1, Value: 222.2},
-				{Time: t3, Value: 444.4}},
-		},
-		{desc: "Should skip partial partition at beginning and end although in range",
-			deleteFrom:   t1 - 10000,
-			deleteTo:     t3 + 10000,
-			deleteAll:    false,
-			ignoreErrors: true,
-			data: []tsdbtest.DataPoint{{Time: t1, Value: 222.2},
-				{Time: t2, Value: 333.3},
-				{Time: t3, Value: 444.4}},
-			expected: []tsdbtest.DataPoint{{Time: t1, Value: 222.2},
-				{Time: t3, Value: 444.4}},
-		},
-	}
-
-	for _, test := range testCases {
-		t.Run(test.desc, func(t *testing.T) {
-			if test.ignoreReason != "" {
-				t.Skip(test.ignoreReason)
-			}
-			testDeleteTSDBCase(t,
-				tsdbtest.NewTestParams(t,
-					tsdbtest.TestOption{
-						Key:   tsdbtest.OptDropTableOnTearDown,
-						Value: !test.deleteAll},
-					tsdbtest.TestOption{
-						Key: tsdbtest.OptTimeSeries,
-						Value: tsdbtest.TimeSeries{tsdbtest.Metric{
-							Name:   "metricToDelete",
-							Labels: utils.LabelsFromStringList("os", "linux"),
-							Data:   test.data,
-						}}},
-				),
-				test.deleteFrom, test.deleteTo, test.ignoreErrors, test.deleteAll, test.expected)
-		})
-	}
-}
-
-func testDeleteTSDBCase(test *testing.T, testParams tsdbtest.TestParams, deleteFrom int64, deleteTo int64, ignoreErrors bool, deleteAll bool,
-	expected []tsdbtest.DataPoint) {
-
-	adapter, teardown := tsdbtest.SetUpWithData(test, testParams)
-	defer teardown()
-
-	container, err := utils.CreateContainer(adapter.GetLogger("container"), testParams.V3ioConfig(), adapter.HttpTimeout)
-	if err != nil {
-		test.Fatalf("failed to create new container. reason: %s", err)
-	}
-	pm, err := partmgr.NewPartitionMngr(adapter.GetSchema(), container, testParams.V3ioConfig())
-	if err != nil {
-		test.Fatalf("Failed to create new partition manager. reason: %s", err)
-	}
-
-	initiaPartitions := pm.PartsForRange(0, math.MaxInt64, true)
-	initialNumberOfPartitions := len(initiaPartitions)
-
-	partitionsToDelete := pm.PartsForRange(deleteFrom, deleteTo, false)
-
-	if err := adapter.DeleteDB(deleteAll, ignoreErrors, deleteFrom, deleteTo); err != nil {
-		test.Fatalf("Failed to delete DB. reason: %s", err)
-	}
-
-	if !deleteAll {
-		pm1, err := partmgr.NewPartitionMngr(adapter.GetSchema(), container, testParams.V3ioConfig())
-		remainingParts := pm1.PartsForRange(0, math.MaxInt64, false)
-		assert.Equal(test, len(remainingParts), initialNumberOfPartitions-len(partitionsToDelete))
-
-		qry, err := adapter.Querier(nil, 0, math.MaxInt64)
-		if err != nil {
-			test.Fatalf("Failed to create Querier. reason: %v", err)
-		}
-
-		for _, metric := range testParams.TimeSeries() {
-			set, err := qry.Select(metric.Name, "", 0, "")
-			if err != nil {
-				test.Fatalf("Failed to run Select. reason: %v", err)
-			}
-
-			set.Next()
-			if set.Err() != nil {
-				test.Fatalf("Failed to query metric. reason: %v", set.Err())
-			}
-
-			series := set.At()
-			if series == nil && len(expected) == 0 {
-				//table is expected to be empty
-			} else if series != nil {
-				iter := series.Iterator()
-				if iter.Err() != nil {
-					test.Fatalf("Failed to query data series. reason: %v", iter.Err())
-				}
-
-				actual, err := iteratorToSlice(iter)
-				if err != nil {
-					test.Fatal(err)
-				}
-				assert.ElementsMatch(test, expected, actual)
-			} else {
-				test.Fatalf("Result series is empty while expected result set is not!")
-			}
-		}
-	} else {
-		container, tablePath := adapter.GetContainer()
-		tableSchemaPath := path.Join(tablePath, config.SchemaConfigFileName)
-
-		// Validate: schema does not exist
-		_, err := container.GetObjectSync(&v3io.GetObjectInput{Path: tableSchemaPath})
-		if err != nil {
-			if utils.IsNotExistsError(err) {
-				// OK - expected
-			} else {
-				test.Fatalf("Failed to read a TSDB schema from '%s'.\nError: %v", tableSchemaPath, err)
-			}
-		}
-
-		// Validate: table does not exist
-		_, err = container.GetObjectSync(&v3io.GetObjectInput{Path: tablePath})
-		if err != nil {
-			if utils.IsNotExistsError(err) {
-				// OK - expected
-			} else {
-				test.Fatalf("Failed to read a TSDB schema from '%s'.\nError: %v", tablePath, err)
-			}
-		}
 	}
 }
 
