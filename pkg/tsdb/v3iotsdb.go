@@ -440,7 +440,13 @@ func getItemsWorker(container v3io.Container, input *v3io.GetItemsInput, partiti
 
 		for _, item := range output.Items {
 			item["partition"] = partition
-			filesToDeleteChan <- item
+
+			select {
+			case filesToDeleteChan <- item:
+			default:
+				return
+			}
+
 		}
 		if output.Last {
 			terminationChan <- nil
