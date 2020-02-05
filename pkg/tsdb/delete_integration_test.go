@@ -1111,28 +1111,3 @@ func testDeleteTSDBCase(test *testing.T, testParams tsdbtest.TestParams, deleteP
 		}
 	}
 }
-
-func TestSomeDelete(t *testing.T) {
-	testParams := tsdbtest.NewTestParams(t)
-	testParams.V3ioConfig().TablePath = "tal"
-	testParams.V3ioConfig().LogLevel = "info"
-
-	adapter, err := NewV3ioAdapter(testParams.V3ioConfig(), nil, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	//container, err := utils.CreateContainer(adapter.GetLogger("container"), testParams.V3ioConfig(), adapter.HttpTimeout)
-	//if err != nil {
-	//	t.Fatalf("failed to create new container. reason: %s", err)
-	//}
-
-	deleteParams := DeleteParams{From: 1517764903000,
-		To:      1517864903000,
-		Metrics: []string{"metric4"},
-	}
-
-	err = adapter.DeleteDB(deleteParams)
-
-	fmt.Printf("Finidhed deleting DB, got err: %v", err)
-}
