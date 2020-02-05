@@ -7,6 +7,7 @@ require (
 	github.com/cpuguy83/go-md2man v1.0.10 // indirect
 	github.com/ghodss/yaml v1.0.0
 	github.com/imdario/mergo v0.3.7
+	github.com/kr/pretty v0.2.0 // indirect
 	github.com/nuclio/logger v0.0.1
 	github.com/nuclio/nuclio-sdk-go v0.0.0-20190205170814-3b507fbd0324
 	github.com/nuclio/nuclio-test-go v0.0.0-20180704132150-0ce6587f8e37
@@ -21,6 +22,8 @@ require (
 	github.com/v3io/v3io-go v0.0.5-0.20191205125653-9003ae83f0b6
 	github.com/v3io/v3io-go-http v0.0.0-20190415143924-cc2fbcde6663 // indirect
 	github.com/xwb1989/sqlparser v0.0.0-20180606152119-120387863bf2
+	google.golang.org/genproto v0.0.0-20181026194446-8b5d7a19e2d9 // indirect
+	gopkg.in/check.v1 v1.0.0-20180628173108-788fd7840127 // indirect
 )
 
 replace (

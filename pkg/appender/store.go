@@ -418,17 +418,18 @@ func (cs *chunkStore) writeChunks(mc *MetricsCache, metric *MetricState) (hasPen
 
 			var encodingExpr string
 			if !cs.isAggr() {
-				encodingExpr = fmt.Sprintf("%v='%d'; ", config.EncodingAttrName, activeChunk.appender.Encoding())
+				encodingExpr = fmt.Sprintf("%s='%d'; ", config.EncodingAttrName, activeChunk.appender.Encoding())
 			}
-			lsetExpr := fmt.Sprintf("%v='%s'; ", config.LabelSetAttrName, metric.key)
+			lsetExpr := fmt.Sprintf("%s='%s'; ", config.LabelSetAttrName, metric.key)
 			expr = lblexpr + encodingExpr + lsetExpr + expr
 		}
 
 		// Call the V3IO async UpdateItem method
+		conditionExpr := fmt.Sprintf("%s == %d", config.EncodingAttrName, activeChunk.appender.Encoding())
 		expr += fmt.Sprintf("%v=%d;", config.MaxTimeAttrName, cs.maxTime) // TODO: use max() expr
 		path := partition.GetMetricPath(metric.name, metric.hash, cs.labelNames, cs.isAggr())
 		request, err := mc.container.UpdateItem(
-			&v3io.UpdateItemInput{Path: path, Expression: &expr}, metric, mc.responseChan)
+			&v3io.UpdateItemInput{Path: path, Expression: &expr, Condition: conditionExpr}, metric, mc.responseChan)
 		if err != nil {
 			mc.logger.ErrorWith("UpdateItem failed", "err", err)
 			hasPendingUpdates = false

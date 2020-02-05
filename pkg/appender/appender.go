@@ -122,7 +122,9 @@ type MetricsCache struct {
 	updatesComplete chan int
 	newUpdates      chan int
 
-	lastMetric     uint64
+	lastMetric uint64
+
+	// TODO: consider switching to synch.Map (https://golang.org/pkg/sync/#Map)
 	cacheMetricMap map[cacheKey]*MetricState // TODO: maybe use hash as key & combine w ref
 	cacheRefMap    map[uint64]*MetricState   // TODO: maybe turn to list + free list, periodically delete old matrics
 

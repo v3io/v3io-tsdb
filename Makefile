@@ -34,6 +34,10 @@ BUILD_OPTS := -ldflags " \
 
 TSDB_BUILD_COMMAND ?= CGO_ENABLED=0 go build $(BUILD_OPTS) ./cmd/tsdbctl
 
+.PHONY: get
+get:
+	GO111MODULE="on" go mod tidy
+
 .PHONY: test
 test:
 	go test -v -race -tags unit -count 1 ./...
