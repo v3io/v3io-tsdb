@@ -112,7 +112,7 @@ func TestDeleteTable(t *testing.T) {
 			}},
 			deleteParams: DeleteParams{
 				From: partitions1StartTime,
-				To:   partitions2StartTime -1,
+				To:   partitions2StartTime - 1,
 			},
 			expectedData: map[string][]tsdbtest.DataPoint{"cpu": {{Time: defaultTimeMillis + 2*tsdbtest.DaysInMillis, Value: 1.2},
 				{Time: defaultTimeMillis + 2*tsdbtest.DaysInMillis + 5*tsdbtest.MinuteInMillis, Value: 1.3},
@@ -140,7 +140,7 @@ func TestDeleteTable(t *testing.T) {
 			}},
 			deleteParams: DeleteParams{
 				From:   partitions1StartTime,
-				To:     partitions2StartTime -1,
+				To:     partitions2StartTime - 1,
 				Filter: "os == 'win'",
 			},
 			expectedData: map[string][]tsdbtest.DataPoint{"cpu-win": {{Time: defaultTimeMillis + 2*tsdbtest.DaysInMillis, Value: 1.2},
@@ -236,7 +236,7 @@ func TestDeleteTable(t *testing.T) {
 			}},
 			deleteParams: DeleteParams{
 				From:    partitions1StartTime,
-				To:      partitions2StartTime -1,
+				To:      partitions2StartTime - 1,
 				Metrics: []string{"cpu"},
 				Filter:  "os == 'linux'",
 			},
@@ -933,6 +933,63 @@ func TestDeleteTable(t *testing.T) {
 					{Time: defaultTimeMillis + 4*tsdbtest.DaysInMillis + 1*tsdbtest.HoursInMillis + 10*tsdbtest.MinuteInMillis, Value: 1.3}}},
 			expectedPartitions: []int64{partitions1StartTime, partitions2StartTime, partitions3StartTime},
 		},
+		{
+			desc: "Should delete partially last chunk and update max time",
+			data: tsdbtest.TimeSeries{tsdbtest.Metric{
+				Name: "cpu",
+				Data: generalData,
+			}},
+			deleteParams: DeleteParams{
+				From: partitions3StartTime + 1*tsdbtest.HoursInMillis + 6*tsdbtest.MinuteInMillis,
+				To:   partitions3StartTime + 1*tsdbtest.HoursInMillis + 11*tsdbtest.MinuteInMillis,
+			},
+			expectedData: map[string][]tsdbtest.DataPoint{"cpu": {
+				{Time: defaultTimeMillis, Value: 1.2},
+				{Time: defaultTimeMillis + 5*tsdbtest.MinuteInMillis, Value: 1.3},
+				{Time: defaultTimeMillis + 10*tsdbtest.MinuteInMillis, Value: 1.4},
+				{Time: defaultTimeMillis + 1*tsdbtest.HoursInMillis + 5*tsdbtest.MinuteInMillis, Value: 1.2},
+				{Time: defaultTimeMillis + 1*tsdbtest.HoursInMillis + 10*tsdbtest.MinuteInMillis, Value: 1.3},
+
+				{Time: defaultTimeMillis + 2*tsdbtest.DaysInMillis, Value: 1.2},
+				{Time: defaultTimeMillis + 2*tsdbtest.DaysInMillis + 5*tsdbtest.MinuteInMillis, Value: 1.3},
+				{Time: defaultTimeMillis + 2*tsdbtest.DaysInMillis + 10*tsdbtest.MinuteInMillis, Value: 1.4},
+				{Time: defaultTimeMillis + 2*tsdbtest.DaysInMillis + 1*tsdbtest.HoursInMillis + 5*tsdbtest.MinuteInMillis, Value: 1.2},
+				{Time: defaultTimeMillis + 2*tsdbtest.DaysInMillis + 1*tsdbtest.HoursInMillis + 10*tsdbtest.MinuteInMillis, Value: 1.3},
+
+				{Time: defaultTimeMillis + 4*tsdbtest.DaysInMillis, Value: 1.2},
+				{Time: defaultTimeMillis + 4*tsdbtest.DaysInMillis + 5*tsdbtest.MinuteInMillis, Value: 1.3},
+				{Time: defaultTimeMillis + 4*tsdbtest.DaysInMillis + 10*tsdbtest.MinuteInMillis, Value: 1.4},
+				{Time: defaultTimeMillis + 4*tsdbtest.DaysInMillis + 1*tsdbtest.HoursInMillis + 5*tsdbtest.MinuteInMillis, Value: 1.2}}},
+			expectedPartitions: []int64{partitions1StartTime, partitions2StartTime, partitions3StartTime},
+		},
+		{
+			desc: "Should delete whole last chunk and update max time",
+			data: tsdbtest.TimeSeries{tsdbtest.Metric{
+				Name: "cpu",
+				Data: generalData,
+			}},
+			deleteParams: DeleteParams{
+				From: partitions3StartTime + 1*tsdbtest.HoursInMillis,
+				To:   partitions3StartTime + 2*tsdbtest.HoursInMillis,
+			},
+			expectedData: map[string][]tsdbtest.DataPoint{"cpu": {
+				{Time: defaultTimeMillis, Value: 1.2},
+				{Time: defaultTimeMillis + 5*tsdbtest.MinuteInMillis, Value: 1.3},
+				{Time: defaultTimeMillis + 10*tsdbtest.MinuteInMillis, Value: 1.4},
+				{Time: defaultTimeMillis + 1*tsdbtest.HoursInMillis + 5*tsdbtest.MinuteInMillis, Value: 1.2},
+				{Time: defaultTimeMillis + 1*tsdbtest.HoursInMillis + 10*tsdbtest.MinuteInMillis, Value: 1.3},
+
+				{Time: defaultTimeMillis + 2*tsdbtest.DaysInMillis, Value: 1.2},
+				{Time: defaultTimeMillis + 2*tsdbtest.DaysInMillis + 5*tsdbtest.MinuteInMillis, Value: 1.3},
+				{Time: defaultTimeMillis + 2*tsdbtest.DaysInMillis + 10*tsdbtest.MinuteInMillis, Value: 1.4},
+				{Time: defaultTimeMillis + 2*tsdbtest.DaysInMillis + 1*tsdbtest.HoursInMillis + 5*tsdbtest.MinuteInMillis, Value: 1.2},
+				{Time: defaultTimeMillis + 2*tsdbtest.DaysInMillis + 1*tsdbtest.HoursInMillis + 10*tsdbtest.MinuteInMillis, Value: 1.3},
+
+				{Time: defaultTimeMillis + 4*tsdbtest.DaysInMillis, Value: 1.2},
+				{Time: defaultTimeMillis + 4*tsdbtest.DaysInMillis + 5*tsdbtest.MinuteInMillis, Value: 1.3},
+				{Time: defaultTimeMillis + 4*tsdbtest.DaysInMillis + 10*tsdbtest.MinuteInMillis, Value: 1.4}}},
+			expectedPartitions: []int64{partitions1StartTime, partitions2StartTime, partitions3StartTime},
+		},
 	}
 
 	for _, test := range testCases {
@@ -1053,4 +1110,29 @@ func testDeleteTSDBCase(test *testing.T, testParams tsdbtest.TestParams, deleteP
 			}
 		}
 	}
+}
+
+func TestSomeDelete(t *testing.T) {
+	testParams := tsdbtest.NewTestParams(t)
+	testParams.V3ioConfig().TablePath = "tal"
+	testParams.V3ioConfig().LogLevel = "info"
+
+	adapter, err := NewV3ioAdapter(testParams.V3ioConfig(), nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	//container, err := utils.CreateContainer(adapter.GetLogger("container"), testParams.V3ioConfig(), adapter.HttpTimeout)
+	//if err != nil {
+	//	t.Fatalf("failed to create new container. reason: %s", err)
+	//}
+
+	deleteParams := DeleteParams{From: 1517764903000,
+		To:      1517864903000,
+		Metrics: []string{"metric4"},
+	}
+
+	err = adapter.DeleteDB(deleteParams)
+
+	fmt.Printf("Finidhed deleting DB, got err: %v", err)
 }

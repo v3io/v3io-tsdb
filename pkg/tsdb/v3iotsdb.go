@@ -52,7 +52,7 @@ const (
 	defaultHttpTimeout = 30 * time.Second
 
 	errorCodeString              = "ErrorCode"
-	falseConditionOuterErrorCode = "184549378"    // todo: change codes
+	falseConditionOuterErrorCode = "184549378" // todo: change codes
 	falseConditionInnerErrorCode = "385876025"
 )
 
@@ -326,7 +326,7 @@ func (a *V3ioAdapter) DeletePartitionsData(deleteParams *DeleteParams) error {
 	deleteTerminationChan := make(chan error, a.cfg.Workers)
 	errChannelLength := len(partitions) + a.cfg.Workers
 	onErrorTerminationChannel := make(chan struct{}, errChannelLength)
-	systemAttributesToFetch := []string{config.ObjectNameAttrName, config.MtimeSecsAttributeName, config.MtimeNSecsAttributeName, config.EncodingAttrName}
+	systemAttributesToFetch := []string{config.ObjectNameAttrName, config.MtimeSecsAttributeName, config.MtimeNSecsAttributeName, config.EncodingAttrName, config.MaxTimeAttrName}
 	var getItemsWorkers, getItemsTerminated, deletesTerminated int
 
 	for i := 0; i <= a.cfg.Workers; i++ {
@@ -381,6 +381,7 @@ func (a *V3ioAdapter) DeletePartitionsData(deleteParams *DeleteParams) error {
 		}
 	}
 
+	a.logger.Info("finished issuing all get items!")
 	if getItemsWorkers != 0 {
 		for deletesTerminated < a.cfg.Workers {
 			select {
@@ -413,6 +414,8 @@ func (a *V3ioAdapter) DeletePartitionsData(deleteParams *DeleteParams) error {
 		close(fileToDeleteChan)
 	}
 
+	a.logger.Info("going to delete partitions from schema")
+
 	err := a.partitionMngr.DeletePartitionsFromSchema(entirelyDeletedPartitions)
 	if err != nil {
 		return err
@@ -439,6 +442,8 @@ func getItemsWorker(container v3io.Container, input *v3io.GetItemsInput, partiti
 
 		for _, item := range output.Items {
 			item["partition"] = partition
+
+			fmt.Printf("  (D)  -  got item response - %v\n", item)
 			filesToDeleteChan <- &item
 		}
 		if output.Last {
@@ -469,10 +474,14 @@ func deleteObjectWorker(container v3io.Container, deleteParams *DeleteParams, lo
 			}
 			fullFileName := pathUtil.Join(currentPartition.GetTablePath(), fileName)
 
+			logger.Info("got item to delete - %v", fullFileName)
+
 			// Delete whole object
 			if deleteParams.From <= currentPartition.GetStartTime() &&
 				deleteParams.To >= currentPartition.GetEndTime() {
 				input := &v3io.DeleteObjectInput{Path: fullFileName}
+
+				logger.Info("deleting whole object - %v", fullFileName)
 				err = container.DeleteObjectSync(input)
 				if err != nil {
 					terminationChan <- err
@@ -497,6 +506,7 @@ func deleteObjectWorker(container v3io.Container, deleteParams *DeleteParams, lo
 					terminationChan <- err
 					return
 				}
+
 				for attributeName, value := range *itemToDelete {
 					if strings.HasPrefix(attributeName, "_v") {
 						// Check whether the whole chunk attribute needed to be deleted or just part of it.
@@ -514,6 +524,13 @@ func deleteObjectWorker(container v3io.Container, deleteParams *DeleteParams, lo
 						}
 					}
 				}
+
+				dbMaxTime := int64(itemToDelete.GetField(config.MaxTimeAttrName).(int))
+
+				// Update the partition's max time if needed.
+				if deleteParams.From < dbMaxTime && deleteParams.To >= dbMaxTime {
+					deleteUpdateExpression.WriteString(fmt.Sprintf("%v=%v;", config.MaxTimeAttrName, deleteParams.From))
+				}
 				epxrStr := deleteUpdateExpression.String()
 				condition := fmt.Sprintf("%v == %v and %v == %v",
 					config.MtimeSecsAttributeName, mtimeSecs,
@@ -521,6 +538,9 @@ func deleteObjectWorker(container v3io.Container, deleteParams *DeleteParams, lo
 				input := &v3io.UpdateItemInput{Path: fullFileName,
 					Expression: &epxrStr,
 					Condition:  condition}
+
+				logger.Info("going to delete item '%v' with expression '%v'", fullFileName, epxrStr)
+
 				err = container.UpdateItemSync(input)
 				if err != nil {
 					returnError := err
@@ -565,6 +585,7 @@ func generatePartialChunkDeleteExpression(logger logger.Logger, expr *strings.Bu
 	if err != nil {
 		return err
 	}
+
 	iter := chunk.Iterator()
 	for iter.Next() {
 		var t int64
