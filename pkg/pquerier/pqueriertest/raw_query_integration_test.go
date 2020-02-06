@@ -633,43 +633,6 @@ func (suite *testRawQuerySuite) TestDifferentMetricsInDifferentPartitions() {
 	assert.Equal(suite.T(), 1, seriesCount, "series count didn't match expected")
 }
 
-func (suite *testRawQuerySuite) TestQueryNonExistingMetric() {
-	adapter, err := tsdb.NewV3ioAdapter(suite.v3ioConfig, nil, nil)
-	if err != nil {
-		suite.T().Fatalf("failed to create v3io adapter. reason: %s", err)
-	}
-
-	labels := utils.LabelsFromStringList("os", "linux")
-	cpuData := []tsdbtest.DataPoint{{suite.basicQueryTime, 10},
-		{int64(suite.basicQueryTime + tsdbtest.MinuteInMillis), 20},
-		{suite.basicQueryTime + 2*tsdbtest.MinuteInMillis, 30},
-		{suite.basicQueryTime + 3*tsdbtest.MinuteInMillis, 40}}
-	diskioData := []tsdbtest.DataPoint{{suite.basicQueryTime, 10}}
-	testParams := tsdbtest.NewTestParams(suite.T(),
-		tsdbtest.TestOption{
-			Key: tsdbtest.OptTimeSeries,
-			Value: tsdbtest.TimeSeries{tsdbtest.Metric{
-				Name:   "cpu",
-				Labels: labels,
-				Data:   cpuData},
-				tsdbtest.Metric{
-					Name:   "diskio",
-					Labels: labels,
-					Data:   diskioData},
-			}})
-	tsdbtest.InsertData(suite.T(), testParams)
-
-	querierV2, err := adapter.QuerierV2()
-	if err != nil {
-		suite.T().Fatalf("Failed to create querier v2, err: %v", err)
-	}
-
-	params := &pquerier.SelectParams{Name: "cpu, tal", From: suite.basicQueryTime, To: suite.basicQueryTime + 4*tsdbtest.MinuteInMillis}
-	_, err = querierV2.SelectDataFrame(params)
-	suite.Error(err, "expected error but finished successfully")
-
-}
-
 func (suite *testRawQuerySuite) TestQueryMetricDoesNotHaveData() {
 	adapter, err := tsdb.NewV3ioAdapter(suite.v3ioConfig, nil, nil)
 	if err != nil {
@@ -781,4 +744,63 @@ func (suite *testRawQuerySuite) TestQueryMultiMetricsInconsistentLabels() {
 	for iter.Next() {
 		suite.NotNil(iter.At(), "Iterator yielded a nil series")
 	}
+}
+
+func (suite *testRawQuerySuite) TestLoadPartitionsFromAttributes() {
+	suite.v3ioConfig.LoadPartitionsFromSchemaAttr = true
+	defer func() { suite.v3ioConfig.LoadPartitionsFromSchemaAttr = false }()
+
+	adapter, err := tsdb.NewV3ioAdapter(suite.v3ioConfig, nil, nil)
+	if err != nil {
+		suite.T().Fatalf("failed to create v3io adapter. reason: %s", err)
+	}
+
+	labels1 := utils.LabelsFromStringList("os", "linux")
+	labels2 := utils.LabelsFromStringList("os", "mac")
+	numberOfEvents := 5
+	eventsInterval := int64(tsdbtest.MinuteInMillis)
+	expectedData := []tsdbtest.DataPoint{{suite.basicQueryTime - 7*tsdbtest.DaysInMillis, 10},
+		{int64(suite.basicQueryTime + tsdbtest.MinuteInMillis), 20},
+		{suite.basicQueryTime + 2*eventsInterval, 30},
+		{suite.basicQueryTime + 3*eventsInterval, 40}}
+
+	testParams := tsdbtest.NewTestParams(suite.T(),
+		tsdbtest.TestOption{
+			Key: tsdbtest.OptTimeSeries,
+			Value: tsdbtest.TimeSeries{tsdbtest.Metric{
+				Name:   "cpu",
+				Labels: labels1,
+				Data:   expectedData},
+				tsdbtest.Metric{
+					Name:   "cpu",
+					Labels: labels2,
+					Data:   expectedData},
+			}})
+
+	tsdbtest.InsertData(suite.T(), testParams)
+
+	querierV2, err := adapter.QuerierV2()
+	if err != nil {
+		suite.T().Fatalf("Failed to create querier v2, err: %v", err)
+	}
+
+	params := &pquerier.SelectParams{Name: "cpu", From: suite.basicQueryTime - 8*tsdbtest.DaysInMillis, To: suite.basicQueryTime + int64(numberOfEvents)*eventsInterval}
+	set, err := querierV2.Select(params)
+	if err != nil {
+		suite.T().Fatalf("Failed to exeute query, err: %v", err)
+	}
+
+	var seriesCount int
+	for set.Next() {
+		seriesCount++
+		iter := set.At().Iterator()
+		data, err := tsdbtest.IteratorToSlice(iter)
+		if err != nil {
+			suite.T().Fatal(err)
+		}
+
+		assert.Equal(suite.T(), expectedData, data, "queried data does not match expected")
+	}
+
+	assert.Equal(suite.T(), 2, seriesCount, "series count didn't match expected")
 }
