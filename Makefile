@@ -32,7 +32,7 @@ BUILD_OPTS := -ldflags " \
   -X $(CONFIG_PKG).branch=$(GIT_BRANCH)" \
  -v -o "$(GOPATH)/bin/$(TSDBCTL_BIN_NAME)"
 
-TSDB_BUILD_COMMAND ?= CGO_ENABLED=0 go build $(BUILD_OPTS) ./cmd/tsdbctl
+TSDB_BUILD_COMMAND ?= GO111MODULE="on" CGO_ENABLED=0 go build $(BUILD_OPTS) ./cmd/tsdbctl
 
 .PHONY: get
 get:
