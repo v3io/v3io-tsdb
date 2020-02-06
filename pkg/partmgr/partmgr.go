@@ -623,7 +623,7 @@ func (p *DBPartition) TimeToChunkId(tmilli int64) (int, error) {
 }
 
 // Check if a chunk (by attribute name) is in the given time range.
-func (p *DBPartition) IsChunkInRangeByAttr(attr string, mint, maxt int64) (bool) {
+func (p *DBPartition) IsChunkInRangeByAttr(attr string, mint, maxt int64) bool {
 
 	// Discard '_v' prefix
 	chunkIdStr := attr[2:]

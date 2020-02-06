@@ -4,13 +4,13 @@ package tsdb_test
 
 import (
 	"fmt"
-	"github.com/pkg/errors"
 	"math"
 	"path"
 	"strconv"
 	"testing"
 	"time"
 
+	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	v3io "github.com/v3io/v3io-go/pkg/dataplane"
 	"github.com/v3io/v3io-tsdb/pkg/config"
