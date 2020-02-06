@@ -360,10 +360,11 @@ func (a *V3ioAdapter) DeletePartitionsData(deleteParams *DeleteParams) error {
 				chunkAttributesToFetch, _ = part.Range2Attrs("v", deleteParams.From, deleteParams.To)
 			}
 
+			allAttributes := append(chunkAttributesToFetch, systemAttributesToFetch...)
 			if len(deleteParams.Metrics) == 0 {
 				getItemsWorkers++
 				input := &v3io.GetItemsInput{Path: part.GetTablePath(),
-					AttributeNames: append(chunkAttributesToFetch, systemAttributesToFetch...),
+					AttributeNames: allAttributes,
 					Filter:         deleteParams.Filter}
 				go getItemsWorker(a.container, input, part, fileToDeleteChan, getItemsTerminationChan, onErrorTerminationChannel)
 			} else {
@@ -371,7 +372,7 @@ func (a *V3ioAdapter) DeletePartitionsData(deleteParams *DeleteParams) error {
 					for _, shardingKey := range part.GetShardingKeys(metric) {
 						getItemsWorkers++
 						input := &v3io.GetItemsInput{Path: part.GetTablePath(),
-							AttributeNames: append(chunkAttributesToFetch, systemAttributesToFetch...),
+							AttributeNames: allAttributes,
 							Filter:         deleteParams.Filter,
 							ShardingKey:    shardingKey}
 						go getItemsWorker(a.container, input, part, fileToDeleteChan, getItemsTerminationChan, onErrorTerminationChannel)
