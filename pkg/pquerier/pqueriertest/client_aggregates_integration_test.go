@@ -80,7 +80,9 @@ func (suite *testClientAggregatesSuite) TestQueryAggregateWithNameWildcard() {
 			suite.T().Fatal(err)
 		}
 
-		assert.Equal(suite.T(), expected[metricName][aggr], data, "queried data does not match expected")
+		for i, dataPoint := range data {
+			suite.Require().True(dataPoint.Equals(expected[metricName][aggr][i]), "queried data does not match expected")
+		}
 	}
 
 	assert.Equal(suite.T(), len(expectedData)*len(expected), seriesCount, "series count didn't match expected")
@@ -139,7 +141,9 @@ func (suite *testClientAggregatesSuite) TestQueryAggregateWithFilterOnMetricName
 			suite.T().Fatal(err)
 		}
 
-		assert.Equal(suite.T(), expected[metricName][aggr], data, "queried data does not match expected")
+		for i, dataPoint := range data {
+			suite.Require().True(dataPoint.Equals(expected[metricName][aggr][i]), "queried data does not match expected")
+		}
 	}
 
 	assert.Equal(suite.T(), 1, seriesCount, "series count didn't match expected")
@@ -195,7 +199,9 @@ func (suite *testClientAggregatesSuite) TestClientAggregatesSinglePartition() {
 			suite.T().Fatal(err)
 		}
 
-		assert.Equal(suite.T(), expected[agg], data, "queried data does not match expected")
+		for i, dataPoint := range data {
+			suite.Require().True(dataPoint.Equals(expected[agg][i]), "queried data does not match expected")
+		}
 	}
 
 	assert.Equal(suite.T(), 3, seriesCount, "series count didn't match expected")
@@ -255,7 +261,9 @@ func (suite *testClientAggregatesSuite) TestClientAggregatesMultiPartition() {
 			suite.T().Fatal(err)
 		}
 
-		assert.Equal(suite.T(), expected[agg], data, "queried data does not match expected")
+		for i, dataPoint := range data {
+			suite.Require().True(dataPoint.Equals(expected[agg][i]), "queried data does not match expected")
+		}
 	}
 
 	assert.Equal(suite.T(), 3, seriesCount, "series count didn't match expected")
@@ -315,7 +323,9 @@ func (suite *testClientAggregatesSuite) TestClientAggregatesMultiPartitionNonCon
 			suite.T().Fatal(err)
 		}
 
-		assert.Equal(suite.T(), expected[agg], data, "queried data does not match expected")
+		for i, dataPoint := range data {
+			suite.Require().True(dataPoint.Equals(expected[agg][i]), "queried data does not match expected")
+		}
 	}
 
 	assert.Equal(suite.T(), len(expected), seriesCount, "series count didn't match expected")
@@ -371,7 +381,9 @@ func (suite *testClientAggregatesSuite) TestClientAggregatesMultiPartitionOneSte
 			suite.T().Fatal(err)
 		}
 
-		assert.Equal(suite.T(), expected[agg], data, "queried data does not match expected")
+		for i, dataPoint := range data {
+			suite.Require().True(dataPoint.Equals(expected[agg][i]), "queried data does not match expected")
+		}
 	}
 
 	assert.Equal(suite.T(), 1, seriesCount, "series count didn't match expected")
@@ -473,7 +485,9 @@ func (suite *testClientAggregatesSuite) TestSelectAggregatesByRequestedColumns()
 			suite.T().Fatal(err)
 		}
 
-		assert.Equal(suite.T(), expected[agg], data, "queried data does not match expected")
+		for i, dataPoint := range data {
+			suite.Require().True(dataPoint.Equals(expected[agg][i]), "queried data does not match expected")
+		}
 	}
 
 	assert.Equal(suite.T(), 3, seriesCount, "series count didn't match expected")
@@ -530,7 +544,9 @@ func (suite *testClientAggregatesSuite) TestSelectAggregatesAndRawByRequestedCol
 			suite.T().Fatal(err)
 		}
 
-		assert.Equal(suite.T(), expected[agg], data, "queried data does not match expected")
+		for i, dataPoint := range data {
+			suite.Require().True(dataPoint.Equals(expected[agg][i]), "queried data does not match expected")
+		}
 	}
 
 	assert.Equal(suite.T(), 2, seriesCount, "series count didn't match expected")
@@ -588,7 +604,9 @@ func (suite *testClientAggregatesSuite) TestQueryAllData() {
 			suite.T().Fatal(err)
 		}
 
-		assert.Equal(suite.T(), expected[agg], data, "queried data does not match expected")
+		for i, dataPoint := range data {
+			suite.Require().True(dataPoint.Equals(expected[agg][i]), "queried data does not match expected")
+		}
 	}
 
 	assert.Equal(suite.T(), 3, seriesCount, "series count didn't match expected")
@@ -618,7 +636,8 @@ func (suite *testClientAggregatesSuite) TestAggregatesWithZeroStep() {
 			}})
 	tsdbtest.InsertData(suite.T(), testParams)
 
-	expected := map[string][]tsdbtest.DataPoint{"max": {{Time: suite.basicQueryTime, Value: 40}},
+	expected := map[string][]tsdbtest.DataPoint{
+		"max":   {{Time: suite.basicQueryTime, Value: 40}},
 		"min":   {{Time: suite.basicQueryTime, Value: 10}},
 		"sum":   {{Time: suite.basicQueryTime, Value: 100}},
 		"count": {{Time: suite.basicQueryTime, Value: 4}},
@@ -646,7 +665,9 @@ func (suite *testClientAggregatesSuite) TestAggregatesWithZeroStep() {
 			suite.T().Fatal(err)
 		}
 
-		assert.Equal(suite.T(), expected[agg], data, "queried data does not match expected")
+		for i, dataPoint := range expected[agg] {
+			suite.Require().True(dataPoint.Equals(data[i]), "queried data does not match expected")
+		}
 	}
 
 	assert.Equal(suite.T(), 4, seriesCount, "series count didn't match expected")
@@ -698,7 +719,9 @@ func (suite *testClientAggregatesSuite) TestUsePreciseAggregationsConfig() {
 			suite.T().Fatal(err)
 		}
 
-		suite.Require().Equal(expected[agg], data, "queried data does not match expected")
+		for i, dataPoint := range data {
+			suite.Require().True(dataPoint.Equals(expected[agg][i]), "queried data does not match expected")
+		}
 	}
 
 	suite.Require().Equal(3, seriesCount, "series count didn't match expected")

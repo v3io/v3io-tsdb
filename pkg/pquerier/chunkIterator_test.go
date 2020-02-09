@@ -85,11 +85,26 @@ func (suite *testRawChunkIterSuite) TestRawChunkIteratorWithZeroValue() {
 			prevT, prevV := iter.PeakBack()
 
 			suite.Require().Equal(ingestData[index].Time, t, "current time does not match")
-			suite.Require().Equal(ingestData[index].Value, v, "current value does not match")
+
+			switch val := ingestData[index].Value.(type) {
+			case float64:
+				suite.Require().Equal(val, v, "current value does not match")
+			case int:
+				suite.Require().Equal(float64(val), v, "current value does not match")
+			default:
+				suite.Require().Equal(ingestData[index].Value, prevV, "current value does not match")
+			}
 
 			if index > 0 {
 				suite.Require().Equal(ingestData[index-1].Time, prevT, "current time does not match")
-				suite.Require().Equal(ingestData[index-1].Value, prevV, "current value does not match")
+				switch val := ingestData[index-1].Value.(type) {
+				case float64:
+					suite.Require().Equal(val, prevV, "current value does not match")
+				case int:
+					suite.Require().Equal(float64(val), prevV, "current value does not match")
+				default:
+					suite.Require().Equal(ingestData[index-1].Value, prevV, "current value does not match")
+				}
 			}
 			index++
 		}

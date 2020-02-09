@@ -3,6 +3,7 @@
 package pqueriertest
 
 import (
+	"errors"
 	"fmt"
 	"math"
 	"strings"
@@ -86,7 +87,17 @@ func (suite *testSelectDataframeSuite) TestAggregatesWithZeroStepSelectDataframe
 			currentColAggregate := strings.Split(col.Name(), "(")[0]
 			f, err := col.FloatAt(0)
 			assert.NoError(suite.T(), err)
-			suite.Require().Equal(expected[currentColAggregate].Value, f)
+
+			var expectedFloat float64
+			switch val := expected[currentColAggregate].Value.(type) {
+			case int:
+				expectedFloat = float64(val)
+			case float64:
+				expectedFloat = val
+			default:
+				suite.Failf("invalid data type", "expected int or float, actual type is %t", val)
+			}
+			suite.Require().Equal(expectedFloat, f)
 		}
 	}
 
@@ -208,11 +219,23 @@ func (suite *testSelectDataframeSuite) Test2Series1EmptySelectDataframe() {
 			assert.Equal(suite.T(), len(ingestedData), col.Len())
 			for i := 0; i < col.Len(); i++ {
 				currentExpected := expected[col.Name()][i].Value
-				f, err := col.FloatAt(i)
-				assert.NoError(suite.T(), err)
-
-				if !(math.IsNaN(currentExpected) && math.IsNaN(f)) {
-					assert.Equal(suite.T(), currentExpected, f)
+				switch val := currentExpected.(type) {
+				case float64:
+					fv, err := col.FloatAt(i)
+					assert.NoError(suite.T(), err)
+					if !(math.IsNaN(val) && math.IsNaN(fv)) {
+						assert.Equal(suite.T(), currentExpected, fv)
+					}
+				case int:
+					iv, err := col.FloatAt(i)
+					assert.NoError(suite.T(), err)
+					assert.Equal(suite.T(), float64(val), iv)
+				case string:
+					sv, err := col.StringAt(i)
+					assert.NoError(suite.T(), err)
+					assert.Equal(suite.T(), val, sv)
+				default:
+					assert.Error(suite.T(), errors.New("unsupported data type"))
 				}
 			}
 		}
@@ -368,11 +391,24 @@ func (suite *testSelectDataframeSuite) TestQueryDataFrameMultipleMetricsWithMult
 				currentExpectedData := expectedData[fmt.Sprintf("%v-%v", col.Name(), frame.Labels()["os"])]
 				assert.Equal(suite.T(), len(currentExpectedData), col.Len())
 				currentExpected := currentExpectedData[i].Value
-				f, err := col.FloatAt(i)
-				assert.NoError(suite.T(), err)
 
-				if !(math.IsNaN(currentExpected) && math.IsNaN(f)) {
-					assert.Equal(suite.T(), currentExpected, f)
+				switch val := currentExpected.(type) {
+				case float64:
+					f, err := col.FloatAt(i)
+					assert.NoError(suite.T(), err)
+					if !(math.IsNaN(val) && math.IsNaN(f)) {
+						assert.Equal(suite.T(), currentExpected, f)
+					}
+				case int:
+					iv, err := col.FloatAt(i)
+					assert.NoError(suite.T(), err)
+					assert.Equal(suite.T(), float64(val), iv)
+				case string:
+					s, err := col.StringAt(i)
+					assert.NoError(suite.T(), err)
+					assert.Equal(suite.T(), val, s)
+				default:
+					assert.Error(suite.T(), errors.New("unsupported data type"))
 				}
 			}
 		}
@@ -612,11 +648,24 @@ func (suite *testSelectDataframeSuite) TestQueryDataFrameMultipleMetrics() {
 				currentExpectedData := expectedData[col.Name()]
 				suite.Require().Equal(len(currentExpectedData), col.Len())
 				currentExpected := currentExpectedData[i].Value
-				f, err := col.FloatAt(i)
-				assert.NoError(suite.T(), err)
 
-				if !(math.IsNaN(currentExpected) && math.IsNaN(f)) {
-					suite.Require().Equal(currentExpected, f)
+				switch val := currentExpected.(type) {
+				case float64:
+					f, err := col.FloatAt(i)
+					assert.NoError(suite.T(), err)
+					if !(math.IsNaN(val) && math.IsNaN(f)) {
+						assert.Equal(suite.T(), currentExpected, f)
+					}
+				case int:
+					iv, err := col.FloatAt(i)
+					assert.NoError(suite.T(), err)
+					assert.Equal(suite.T(), float64(val), iv)
+				case string:
+					s, err := col.StringAt(i)
+					assert.NoError(suite.T(), err)
+					assert.Equal(suite.T(), val, s)
+				default:
+					assert.Error(suite.T(), errors.New("unsupported data type"))
 				}
 			}
 		}
@@ -699,11 +748,23 @@ func (suite *testSelectDataframeSuite) TestColumnOrder() {
 				currentExpectedData := expectedData[col.Name()]
 				suite.Require().Equal(len(currentExpectedData), col.Len())
 				currentExpected := currentExpectedData[i].Value
-				f, err := col.FloatAt(i)
-				assert.NoError(suite.T(), err)
-
-				if !(math.IsNaN(currentExpected) && math.IsNaN(f)) {
-					suite.Require().Equal(currentExpected, f)
+				switch val := currentExpected.(type) {
+				case float64:
+					fv, err := col.FloatAt(i)
+					assert.NoError(suite.T(), err)
+					if !(math.IsNaN(val) && math.IsNaN(fv)) {
+						assert.Equal(suite.T(), currentExpected, fv)
+					}
+				case int:
+					iv, err := col.FloatAt(i)
+					assert.NoError(suite.T(), err)
+					assert.Equal(suite.T(), float64(val), iv)
+				case string:
+					sv, err := col.StringAt(i)
+					assert.NoError(suite.T(), err)
+					assert.Equal(suite.T(), val, sv)
+				default:
+					assert.Error(suite.T(), errors.New("unsupported data type"))
 				}
 			}
 		}

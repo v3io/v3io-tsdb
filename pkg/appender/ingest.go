@@ -24,12 +24,12 @@ import (
 	"fmt"
 	"net/http"
 	"reflect"
-	"strings"
 	"time"
 
 	"github.com/pkg/errors"
 	"github.com/v3io/v3io-go/pkg/dataplane"
 	"github.com/v3io/v3io-go/pkg/errors"
+	"github.com/v3io/v3io-tsdb/pkg/utils"
 )
 
 // Start event loops for handling metric updates (appends and Get/Update DB responses)
@@ -301,8 +301,8 @@ func (mc *MetricsCache) handleResponse(metric *MetricState, resp *v3io.Response,
 			// Metrics with too many update errors go into Error state
 			metric.retryCount++
 			if e, hasStatusCode := resp.Error.(v3ioerrors.ErrorWithStatusCode); hasStatusCode && e.StatusCode() != http.StatusServiceUnavailable {
-				// If condition was evaluated as false log this and discard error.
-				if isFalseConditionError(resp.Error) {
+				// If condition was evaluated as false log this and report this error upstream.
+				if utils.IsFalseConditionError(resp.Error) {
 					req := reqInput.(*v3io.UpdateItemInput)
 					// This might happen on attempt to add metric value of wrong type, i.e. float <-> string
 					errMsg := fmt.Sprintf("condition %q was evaluated to 'False' for item %q", req.Condition, req.Path)
@@ -382,23 +382,4 @@ func (mc *MetricsCache) nameUpdateRespLoop() {
 func setError(mc *MetricsCache, metric *MetricState, err error) {
 	metric.setError(err)
 	mc.lastError = err
-}
-
-const (
-	errorCodeString              = "ErrorCode"
-	falseConditionOuterErrorCode = "16777244"
-	falseConditionInnerErrorCode = "16777245"
-)
-
-// Check if the current error was caused specifically because the condition was evaluated to false.
-func isFalseConditionError(err error) bool {
-	errString := err.Error()
-
-	if strings.Count(errString, errorCodeString) == 2 &&
-		strings.Contains(errString, falseConditionOuterErrorCode) &&
-		strings.Contains(errString, falseConditionInnerErrorCode) {
-		return true
-	}
-
-	return false
 }

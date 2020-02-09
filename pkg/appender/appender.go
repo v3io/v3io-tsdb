@@ -219,7 +219,10 @@ func (mc *MetricsCache) Add(lset utils.LabelsIfc, t int64, v interface{}) (uint6
 
 	isValueVariantType := false
 	// If the value is not of Float type assume it's variant type.
-	if _, ok := v.(float64); !ok {
+	switch v.(type) {
+	case int, int64, float64, float32:
+		isValueVariantType = false
+	default:
 		isValueVariantType = true
 	}
 
