@@ -82,10 +82,7 @@ func (suite *testCrossSeriesAggregatesSuite) TestCrossSeriesAggregatesTimesFalls
 		if err != nil {
 			suite.T().Fatal(err)
 		}
-
-		for i, dataPoint := range data {
-			suite.Require().True(dataPoint.Equals(expected[agg][i]), "queried data does not match expected")
-		}
+		suite.compareSingleMetricWithAggregator(data, expected, agg)
 	}
 
 	suite.Require().Equal(len(expected), seriesCount, "series count didn't match expected")
@@ -155,9 +152,7 @@ func (suite *testCrossSeriesAggregatesSuite) TestCrossSeriesAggregates() {
 			suite.T().Fatal(err)
 		}
 
-		for i, dataPoint := range data {
-			suite.Require().True(dataPoint.Equals(expected[agg][i]), "queried data does not match expected")
-		}
+		suite.compareSingleMetricWithAggregator(data, expected, agg)
 	}
 
 	suite.Require().Equal(len(expected), seriesCount, "series count didn't match expected")
@@ -223,9 +218,7 @@ func (suite *testCrossSeriesAggregatesSuite) TestCrossSeriesAggregatesMultiParti
 			suite.T().Fatal(err)
 		}
 
-		for i, dataPoint := range data {
-			suite.Require().True(dataPoint.Equals(expected[agg][i]), "queried data does not match expected")
-		}
+		suite.compareSingleMetricWithAggregator(data, expected, agg)
 	}
 
 	suite.Require().Equal(len(expected), seriesCount, "series count didn't match expected")
@@ -291,9 +284,7 @@ func (suite *testCrossSeriesAggregatesSuite) TestCrossSeriesAggregatesWithInterp
 			suite.T().Fatal(err)
 		}
 
-		for i, dataPoint := range data {
-			suite.Require().True(dataPoint.Equals(expected[agg][i]), "queried data does not match expected")
-		}
+		suite.compareSingleMetricWithAggregator(data, expected, agg)
 	}
 
 	suite.Require().Equal(len(expected), seriesCount, "series count didn't match expected")
@@ -367,10 +358,7 @@ func (suite *testCrossSeriesAggregatesSuite) TestCrossSeriesAggregatesMultiParti
 		if err != nil {
 			suite.T().Fatal(err)
 		}
-
-		for i, dataPoint := range data {
-			suite.Require().True(dataPoint.Equals(expected[agg][i]), "queried data does not match expected")
-		}
+		suite.compareSingleMetricWithAggregator(data, expected, agg)
 	}
 
 	suite.Require().Equal(len(expected), seriesCount, "series count didn't match expected")
@@ -454,10 +442,7 @@ func (suite *testCrossSeriesAggregatesSuite) TestCrossSeriesAggregatesMultiParti
 		if err != nil {
 			suite.T().Fatal(err)
 		}
-
-		for i, dataPoint := range data {
-			suite.Require().True(dataPoint.Equals(expected[agg][i]), "queried data does not match expected")
-		}
+		suite.compareSingleMetricWithAggregator(data, expected, agg)
 	}
 
 	suite.Require().Equal(len(expected), seriesCount, "series count didn't match expected")
@@ -524,10 +509,7 @@ func (suite *testCrossSeriesAggregatesSuite) TestCrossSeriesAggregatesWithInterp
 		if err != nil {
 			suite.T().Fatal(err)
 		}
-
-		for i, dataPoint := range data {
-			suite.Require().True(dataPoint.Equals(expected[agg][i]), "queried data does not match expected")
-		}
+		suite.compareSingleMetricWithAggregator(data, expected, agg)
 	}
 
 	suite.Require().Equal(len(expected), seriesCount, "series count didn't match expected")
@@ -584,9 +566,7 @@ func (suite *testCrossSeriesAggregatesSuite) TestCrossSeriesAggregatesSinglePart
 			suite.T().Fatal(err)
 		}
 
-		for i, dataPoint := range data {
-			suite.Require().True(dataPoint.Equals(expected[agg][i]), "queried data does not match expected")
-		}
+		suite.compareSingleMetricWithAggregator(data, expected, agg)
 	}
 
 	suite.Require().Equal(len(expected), seriesCount, "series count didn't match expected")
@@ -645,10 +625,7 @@ func (suite *testCrossSeriesAggregatesSuite) TestOnlyVirtualCrossSeriesAggregate
 		if err != nil {
 			suite.T().Fatal(err)
 		}
-
-		for i, dataPoint := range data {
-			suite.Require().True(dataPoint.Equals(expected[agg][i]), "queried data does not match expected")
-		}
+		suite.compareSingleMetricWithAggregator(data, expected, agg)
 	}
 
 	suite.Require().Equal(len(expected), seriesCount, "series count didn't match expected")
@@ -717,9 +694,7 @@ func (suite *testCrossSeriesAggregatesSuite) TestCrossSeriesAggregatesSameLabelM
 		metricName := set.At().Labels().Get(config.PrometheusMetricNameAttribute)
 		suite.NoError(err)
 
-		for i, dataPoint := range data {
-			suite.Require().True(dataPoint.Equals(expected[fmt.Sprintf("%v-%v", agg, metricName)][i]), "queried data does not match expected")
-		}
+		suite.compareSingleMetricWithAggregator(data, expected, fmt.Sprintf("%v-%v", agg, metricName))
 	}
 
 	suite.Require().Equal(len(expected), seriesCount, "series count didn't match expected")
@@ -788,10 +763,20 @@ func (suite *testCrossSeriesAggregatesSuite) TestCrossSeriesAggregatesDifferentL
 		data, err := tsdbtest.IteratorToSlice(iter)
 		suite.NoError(err)
 
-		for i, dataPoint := range data {
-			suite.Require().True(dataPoint.Equals(expected[i]), "queried data does not match expected")
-		}
+		suite.compareSingleMetric(data, expected)
 	}
 
 	suite.Require().Equal(2, seriesCount, "series count didn't match expected")
+}
+
+func (suite *testCrossSeriesAggregatesSuite) compareSingleMetric(data []tsdbtest.DataPoint, expected []tsdbtest.DataPoint) {
+	for i, dataPoint := range data {
+		suite.Require().True(dataPoint.Equals(expected[i]), "queried data does not match expected")
+	}
+}
+
+func (suite *testCrossSeriesAggregatesSuite) compareSingleMetricWithAggregator(data []tsdbtest.DataPoint, expected map[string][]tsdbtest.DataPoint, agg string) {
+	for i, dataPoint := range data {
+		suite.Require().True(dataPoint.Equals(expected[agg][i]), "queried data does not match expected")
+	}
 }

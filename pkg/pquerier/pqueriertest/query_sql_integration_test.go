@@ -88,10 +88,7 @@ func (suite *testSQLSyntaxQuerySuite) TestGroupByOneLabelSinglePartition() {
 		agg := set.At().Labels().Get(aggregate.AggregateLabel)
 		groupByValue := set.At().Labels().Get("os")
 		suite.Require().NoError(err)
-
-		for i, dataPoint := range expected[groupByValue][agg] {
-			suite.Require().True(dataPoint.Equals(data[i]), "queried data does not match expected")
-		}
+		suite.compareMultipleMetrics(data, expected, groupByValue, agg)
 	}
 
 	suite.Require().Equal(4, seriesCount, "series count didn't match expected")
@@ -174,10 +171,7 @@ func (suite *testSQLSyntaxQuerySuite) TestGroupByMultipleLabelsSinglePartition()
 		labelsStr := strings.Join(groupByValue, "-")
 
 		suite.Require().NoError(err)
-
-		for i, dataPoint := range expected[labelsStr][agg] {
-			suite.Require().True(dataPoint.Equals(data[i]), "queried data does not match expected")
-		}
+		suite.compareMultipleMetrics(data, expected, labelsStr, agg)
 	}
 
 	suite.Require().Equal(6, seriesCount, "series count didn't match expected")
@@ -384,4 +378,10 @@ func (suite *testSQLSyntaxQuerySuite) TestAggregateSeriesWildcardOnPartOfTheColu
 	}
 
 	suite.Require().Equal(len(expectedResult), seriesCount, "series count didn't match expected")
+}
+
+func (suite *testSQLSyntaxQuerySuite) compareMultipleMetrics(data []tsdbtest.DataPoint, expected map[string]map[string][]tsdbtest.DataPoint, metricName string, aggr string) {
+	for i, dataPoint := range data {
+		suite.Require().True(dataPoint.Equals(expected[metricName][aggr][i]), "queried data does not match expected")
+	}
 }

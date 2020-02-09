@@ -92,7 +92,7 @@ func (suite *testRawChunkIterSuite) TestRawChunkIteratorWithZeroValue() {
 			case int:
 				suite.Require().Equal(float64(val), v, "current value does not match")
 			default:
-				suite.Require().Equal(ingestData[index].Value, prevV, "current value does not match")
+				suite.Require().Equal(val, v, "current value does not match")
 			}
 
 			if index > 0 {
@@ -103,7 +103,7 @@ func (suite *testRawChunkIterSuite) TestRawChunkIteratorWithZeroValue() {
 				case int:
 					suite.Require().Equal(float64(val), prevV, "current value does not match")
 				default:
-					suite.Require().Equal(ingestData[index-1].Value, prevV, "current value does not match")
+					suite.Require().Equal(val, prevV, "current value does not match")
 				}
 			}
 			index++

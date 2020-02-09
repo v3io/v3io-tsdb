@@ -80,9 +80,7 @@ func (suite *testClientAggregatesSuite) TestQueryAggregateWithNameWildcard() {
 			suite.T().Fatal(err)
 		}
 
-		for i, dataPoint := range data {
-			suite.Require().True(dataPoint.Equals(expected[metricName][aggr][i]), "queried data does not match expected")
-		}
+		suite.compareMultipleMetrics(data, expected, metricName, aggr)
 	}
 
 	assert.Equal(suite.T(), len(expectedData)*len(expected), seriesCount, "series count didn't match expected")
@@ -141,9 +139,7 @@ func (suite *testClientAggregatesSuite) TestQueryAggregateWithFilterOnMetricName
 			suite.T().Fatal(err)
 		}
 
-		for i, dataPoint := range data {
-			suite.Require().True(dataPoint.Equals(expected[metricName][aggr][i]), "queried data does not match expected")
-		}
+		suite.compareMultipleMetrics(data, expected, metricName, aggr)
 	}
 
 	assert.Equal(suite.T(), 1, seriesCount, "series count didn't match expected")
@@ -199,9 +195,7 @@ func (suite *testClientAggregatesSuite) TestClientAggregatesSinglePartition() {
 			suite.T().Fatal(err)
 		}
 
-		for i, dataPoint := range data {
-			suite.Require().True(dataPoint.Equals(expected[agg][i]), "queried data does not match expected")
-		}
+		suite.compareSingleMetricWithAggregator(data, expected, agg)
 	}
 
 	assert.Equal(suite.T(), 3, seriesCount, "series count didn't match expected")
@@ -225,8 +219,8 @@ func (suite *testClientAggregatesSuite) TestClientAggregatesMultiPartition() {
 		tsdbtest.TestOption{
 			Key: tsdbtest.OptTimeSeries,
 			Value: tsdbtest.TimeSeries{tsdbtest.Metric{
-				Name:   "cpu",
 				Labels: labels1,
+				Name:   "cpu",
 				Data:   ingestedData},
 			}})
 	tsdbtest.InsertData(suite.T(), testParams)
@@ -261,9 +255,7 @@ func (suite *testClientAggregatesSuite) TestClientAggregatesMultiPartition() {
 			suite.T().Fatal(err)
 		}
 
-		for i, dataPoint := range data {
-			suite.Require().True(dataPoint.Equals(expected[agg][i]), "queried data does not match expected")
-		}
+		suite.compareSingleMetricWithAggregator(data, expected, agg)
 	}
 
 	assert.Equal(suite.T(), 3, seriesCount, "series count didn't match expected")
@@ -323,9 +315,7 @@ func (suite *testClientAggregatesSuite) TestClientAggregatesMultiPartitionNonCon
 			suite.T().Fatal(err)
 		}
 
-		for i, dataPoint := range data {
-			suite.Require().True(dataPoint.Equals(expected[agg][i]), "queried data does not match expected")
-		}
+		suite.compareSingleMetricWithAggregator(data, expected, agg)
 	}
 
 	assert.Equal(suite.T(), len(expected), seriesCount, "series count didn't match expected")
@@ -381,9 +371,7 @@ func (suite *testClientAggregatesSuite) TestClientAggregatesMultiPartitionOneSte
 			suite.T().Fatal(err)
 		}
 
-		for i, dataPoint := range data {
-			suite.Require().True(dataPoint.Equals(expected[agg][i]), "queried data does not match expected")
-		}
+		suite.compareSingleMetricWithAggregator(data, expected, agg)
 	}
 
 	assert.Equal(suite.T(), 1, seriesCount, "series count didn't match expected")
@@ -485,9 +473,7 @@ func (suite *testClientAggregatesSuite) TestSelectAggregatesByRequestedColumns()
 			suite.T().Fatal(err)
 		}
 
-		for i, dataPoint := range data {
-			suite.Require().True(dataPoint.Equals(expected[agg][i]), "queried data does not match expected")
-		}
+		suite.compareSingleMetricWithAggregator(data, expected, agg)
 	}
 
 	assert.Equal(suite.T(), 3, seriesCount, "series count didn't match expected")
@@ -544,9 +530,7 @@ func (suite *testClientAggregatesSuite) TestSelectAggregatesAndRawByRequestedCol
 			suite.T().Fatal(err)
 		}
 
-		for i, dataPoint := range data {
-			suite.Require().True(dataPoint.Equals(expected[agg][i]), "queried data does not match expected")
-		}
+		suite.compareSingleMetricWithAggregator(data, expected, agg)
 	}
 
 	assert.Equal(suite.T(), 2, seriesCount, "series count didn't match expected")
@@ -604,9 +588,7 @@ func (suite *testClientAggregatesSuite) TestQueryAllData() {
 			suite.T().Fatal(err)
 		}
 
-		for i, dataPoint := range data {
-			suite.Require().True(dataPoint.Equals(expected[agg][i]), "queried data does not match expected")
-		}
+		suite.compareSingleMetricWithAggregator(data, expected, agg)
 	}
 
 	assert.Equal(suite.T(), 3, seriesCount, "series count didn't match expected")
@@ -719,9 +701,7 @@ func (suite *testClientAggregatesSuite) TestUsePreciseAggregationsConfig() {
 			suite.T().Fatal(err)
 		}
 
-		for i, dataPoint := range data {
-			suite.Require().True(dataPoint.Equals(expected[agg][i]), "queried data does not match expected")
-		}
+		suite.compareSingleMetricWithAggregator(data, expected, agg)
 	}
 
 	suite.Require().Equal(3, seriesCount, "series count didn't match expected")
@@ -763,4 +743,16 @@ func (suite *testClientAggregatesSuite) TestQueryNonExistingMetric() {
 	_, err = querierV2.SelectDataFrame(params)
 	suite.Error(err, "expected error but finished successfully")
 
+}
+
+func (suite *testClientAggregatesSuite) compareMultipleMetrics(data []tsdbtest.DataPoint, expected map[string]map[string][]tsdbtest.DataPoint, metricName string, aggr string) {
+	for i, dataPoint := range data {
+		suite.Require().True(dataPoint.Equals(expected[metricName][aggr][i]), "queried data does not match expected")
+	}
+}
+
+func (suite *testClientAggregatesSuite) compareSingleMetricWithAggregator(data []tsdbtest.DataPoint, expected map[string][]tsdbtest.DataPoint, agg string) {
+	for i, dataPoint := range data {
+		suite.Require().True(dataPoint.Equals(expected[agg][i]), "queried data does not match expected")
+	}
 }

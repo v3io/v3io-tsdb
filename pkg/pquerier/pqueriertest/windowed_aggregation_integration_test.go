@@ -80,9 +80,7 @@ func (suite *testWindowAggregationSuite) TestClientWindowedAggregationWindowBigg
 			suite.T().Fatal(err)
 		}
 
-		for i, dataPoint := range expected[agg] {
-			suite.Require().True(dataPoint.Equals(data[i]), "queried data does not match expected")
-		}
+		suite.compareSingleMetricWithAggregator(data, expected, agg)
 	}
 
 	assert.Equal(suite.T(), 1, seriesCount, "series count didn't match expected")
@@ -146,9 +144,7 @@ func (suite *testWindowAggregationSuite) TestClientWindowedAggregationWindowSmal
 			suite.T().Fatal(err)
 		}
 
-		for i, dataPoint := range expected[agg] {
-			suite.Require().True(dataPoint.Equals(data[i]), "queried data does not match expected")
-		}
+		suite.compareSingleMetricWithAggregator(data, expected, agg)
 	}
 
 	assert.Equal(suite.T(), 1, seriesCount, "series count didn't match expected")
@@ -212,9 +208,7 @@ func (suite *testWindowAggregationSuite) TestClientWindowedAggregationWindowEqua
 			suite.T().Fatal(err)
 		}
 
-		for i, dataPoint := range expected[agg] {
-			suite.Require().True(dataPoint.Equals(data[i]), "queried data does not match expected")
-		}
+		suite.compareSingleMetricWithAggregator(data, expected, agg)
 	}
 
 	assert.Equal(suite.T(), 1, seriesCount, "series count didn't match expected")
@@ -279,9 +273,7 @@ func (suite *testWindowAggregationSuite) TestClientWindowedAggregationWindowExce
 			suite.T().Fatal(err)
 		}
 
-		for i, dataPoint := range expected[agg] {
-			suite.Require().True(dataPoint.Equals(data[i]), "queried data does not match expected")
-		}
+		suite.compareSingleMetricWithAggregator(data, expected, agg)
 	}
 
 	assert.Equal(suite.T(), 1, seriesCount, "series count didn't match expected")
@@ -345,9 +337,7 @@ func (suite *testWindowAggregationSuite) TestServerWindowedAggregationWindowBigg
 			suite.T().Fatal(err)
 		}
 
-		for i, dataPoint := range expected[agg] {
-			suite.Require().True(dataPoint.Equals(data[i]), "queried data does not match expected")
-		}
+		suite.compareSingleMetricWithAggregator(data, expected, agg)
 	}
 
 	assert.Equal(suite.T(), 1, seriesCount, "series count didn't match expected")
@@ -411,9 +401,7 @@ func (suite *testWindowAggregationSuite) TestServerWindowedAggregationWindowEqua
 			suite.T().Fatal(err)
 		}
 
-		for i, dataPoint := range expected[agg] {
-			suite.Require().True(dataPoint.Equals(data[i]), "queried data does not match expected")
-		}
+		suite.compareSingleMetricWithAggregator(data, expected, agg)
 	}
 
 	assert.Equal(suite.T(), 1, seriesCount, "series count didn't match expected")
@@ -483,11 +471,14 @@ func (suite *testWindowAggregationSuite) TestServerWindowedAggregationWindowEqua
 		if err != nil {
 			suite.T().Fatal(err)
 		}
-
-		for i, dataPoint := range expected[agg] {
-			suite.Require().True(dataPoint.Equals(data[i]), "queried data does not match expected")
-		}
+		suite.compareSingleMetricWithAggregator(data, expected, agg)
 	}
 
 	assert.Equal(suite.T(), 1, seriesCount, "series count didn't match expected")
+}
+
+func (suite *testWindowAggregationSuite) compareSingleMetricWithAggregator(data []tsdbtest.DataPoint, expected map[string][]tsdbtest.DataPoint, agg string) {
+	for i, dataPoint := range data {
+		suite.Require().True(dataPoint.Equals(expected[agg][i]), "queried data does not match expected")
+	}
 }
