@@ -267,6 +267,10 @@ func (a *V3ioAdapter) DeleteDB(deleteParams DeleteParams) error {
 		// Ignore time boundaries
 		deleteParams.From = 0
 		deleteParams.To = math.MaxInt64
+	} else {
+		if deleteParams.To == 0 {
+			deleteParams.To = time.Now().Unix() * 1000
+		}
 	}
 
 	// Delete Data
@@ -324,8 +328,12 @@ func (a *V3ioAdapter) DeletePartitionsData(deleteParams *DeleteParams) error {
 	fileToDeleteChan := make(chan v3io.Item, 1024)
 	getItemsTerminationChan := make(chan error, len(partitions))
 	deleteTerminationChan := make(chan error, a.cfg.Workers)
-	errChannelLength := len(partitions) + a.cfg.Workers
-	onErrorTerminationChannel := make(chan struct{}, errChannelLength)
+	numOfGetItemsRoutines := len(partitions)
+	if len(deleteParams.Metrics) > 0 {
+		numOfGetItemsRoutines = numOfGetItemsRoutines * len(deleteParams.Metrics)
+	}
+	goRoutinesNum := numOfGetItemsRoutines + a.cfg.Workers
+	onErrorTerminationChannel := make(chan struct{}, goRoutinesNum)
 	systemAttributesToFetch := []string{config.ObjectNameAttrName, config.MtimeSecsAttributeName, config.MtimeNSecsAttributeName, config.EncodingAttrName, config.MaxTimeAttrName}
 	var getItemsWorkers, getItemsTerminated, deletesTerminated int
 
@@ -366,7 +374,7 @@ func (a *V3ioAdapter) DeletePartitionsData(deleteParams *DeleteParams) error {
 				input := &v3io.GetItemsInput{Path: part.GetTablePath(),
 					AttributeNames: allAttributes,
 					Filter:         deleteParams.Filter}
-				go getItemsWorker(a.container, input, part, fileToDeleteChan, getItemsTerminationChan, onErrorTerminationChannel)
+				go getItemsWorker(a.logger, a.container, input, part, fileToDeleteChan, getItemsTerminationChan, onErrorTerminationChannel)
 			} else {
 				for _, metric := range deleteParams.Metrics {
 					for _, shardingKey := range part.GetShardingKeys(metric) {
@@ -375,37 +383,39 @@ func (a *V3ioAdapter) DeletePartitionsData(deleteParams *DeleteParams) error {
 							AttributeNames: allAttributes,
 							Filter:         deleteParams.Filter,
 							ShardingKey:    shardingKey}
-						go getItemsWorker(a.container, input, part, fileToDeleteChan, getItemsTerminationChan, onErrorTerminationChannel)
+						go getItemsWorker(a.logger, a.container, input, part, fileToDeleteChan, getItemsTerminationChan, onErrorTerminationChannel)
 					}
 				}
 			}
 		}
 	}
 
+	a.logger.Debug("issued %v getItems", getItemsWorkers)
 	if getItemsWorkers != 0 {
 		for deletesTerminated < a.cfg.Workers {
 			select {
 			case err := <-getItemsTerminationChan:
+				a.logger.Debug("finished getItems worker, total finished: %v, error: %v", getItemsTerminated+1, err)
 				if err != nil {
 					// If requested to ignore non-existing tables do not return error.
 					if errorWithStatusCode, ok := err.(v3ioerrors.ErrorWithStatusCode); !ok || !deleteParams.IgnoreErrors || errorWithStatusCode.StatusCode() != http.StatusNotFound {
-						for i := 0; i < errChannelLength; i++ {
+						for i := 0; i < goRoutinesNum; i++ {
 							onErrorTerminationChannel <- struct{}{}
 						}
-						close(fileToDeleteChan)
 						return errors.Wrapf(err, "GetItems failed during recursive delete.")
 					}
 				}
 				getItemsTerminated++
+
 				if getItemsTerminated == getItemsWorkers {
 					close(fileToDeleteChan)
 				}
 			case err := <-deleteTerminationChan:
+				a.logger.Debug("finished delete worker, total finished: %v, err: %v", deletesTerminated+1, err)
 				if err != nil {
-					for i := 0; i < errChannelLength; i++ {
+					for i := 0; i < goRoutinesNum; i++ {
 						onErrorTerminationChannel <- struct{}{}
 					}
-					close(fileToDeleteChan)
 					return errors.Wrapf(err, "Delete failed during recursive delete.")
 				}
 				deletesTerminated++
@@ -415,6 +425,7 @@ func (a *V3ioAdapter) DeletePartitionsData(deleteParams *DeleteParams) error {
 		close(fileToDeleteChan)
 	}
 
+	a.logger.Debug("finished deleting data, removing partitions from schema")
 	err := a.partitionMngr.DeletePartitionsFromSchema(entirelyDeletedPartitions)
 	if err != nil {
 		return err
@@ -423,7 +434,8 @@ func (a *V3ioAdapter) DeletePartitionsData(deleteParams *DeleteParams) error {
 	return nil
 }
 
-func getItemsWorker(container v3io.Container, input *v3io.GetItemsInput, partition *partmgr.DBPartition, filesToDeleteChan chan<- v3io.Item, terminationChan chan<- error, onErrorTerminationChannel <-chan struct{}) {
+func getItemsWorker(logger logger.Logger, container v3io.Container, input *v3io.GetItemsInput, partition *partmgr.DBPartition,
+	filesToDeleteChan chan<- v3io.Item, terminationChan chan<- error, onErrorTerminationChannel <-chan struct{}) {
 	for {
 		select {
 		case _ = <-onErrorTerminationChannel:
@@ -431,6 +443,8 @@ func getItemsWorker(container v3io.Container, input *v3io.GetItemsInput, partiti
 			return
 		default:
 		}
+
+		logger.Debug("going to getItems for partition '%v', input: %v", partition.GetTablePath(), *input)
 		resp, err := container.GetItemsSync(input)
 		if err != nil {
 			terminationChan <- err
@@ -442,12 +456,15 @@ func getItemsWorker(container v3io.Container, input *v3io.GetItemsInput, partiti
 		for _, item := range output.Items {
 			item["partition"] = partition
 
+			// In case we got error on delete while iterating getItems response
 			select {
-			case filesToDeleteChan <- item:
-			default:
+			case _ = <-onErrorTerminationChannel:
+				terminationChan <- nil
 				return
+			default:
 			}
 
+			filesToDeleteChan <- item
 		}
 		if output.Last {
 			terminationChan <- nil
@@ -480,8 +497,9 @@ func deleteObjectWorker(container v3io.Container, deleteParams *DeleteParams, lo
 			// Delete whole object
 			if deleteParams.From <= currentPartition.GetStartTime() &&
 				deleteParams.To >= currentPartition.GetEndTime() {
-				input := &v3io.DeleteObjectInput{Path: fullFileName}
 
+				logger.Debug("delete entire item '%v' ", fullFileName)
+				input := &v3io.DeleteObjectInput{Path: fullFileName}
 				err = container.DeleteObjectSync(input)
 				if err != nil {
 					terminationChan <- err
@@ -533,13 +551,15 @@ func deleteObjectWorker(container v3io.Container, deleteParams *DeleteParams, lo
 				}
 
 				if deleteUpdateExpression.Len() > 0 {
-					epxrStr := deleteUpdateExpression.String()
+					exprStr := deleteUpdateExpression.String()
 					condition := fmt.Sprintf("%v == %v and %v == %v",
 						config.MtimeSecsAttributeName, mtimeSecs,
 						config.MtimeNSecsAttributeName, mtimeNSecs)
 					input := &v3io.UpdateItemInput{Path: fullFileName,
-						Expression: &epxrStr,
+						Expression: &exprStr,
 						Condition:  condition}
+
+					logger.Debug("delete item '%v' with expression '%v'", fullFileName, exprStr)
 
 					err = container.UpdateItemSync(input)
 					if err != nil {
