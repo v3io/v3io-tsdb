@@ -131,7 +131,7 @@ type MetricsCache struct {
 	lastError           error
 	performanceReporter *performance.MetricReporter
 
-	stopChan      chan int
+	stopChan chan int
 }
 
 func NewMetricsCache(container v3io.Container, logger logger.Logger, cfg *config.V3ioConfig,
