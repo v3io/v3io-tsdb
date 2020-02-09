@@ -742,17 +742,4 @@ func (suite *testClientAggregatesSuite) TestQueryNonExistingMetric() {
 		From: suite.basicQueryTime, To: suite.basicQueryTime + 4*tsdbtest.MinuteInMillis}
 	_, err = querierV2.SelectDataFrame(params)
 	suite.Error(err, "expected error but finished successfully")
-
-}
-
-func (suite *testClientAggregatesSuite) compareMultipleMetrics(data []tsdbtest.DataPoint, expected map[string]map[string][]tsdbtest.DataPoint, metricName string, aggr string) {
-	for i, dataPoint := range data {
-		suite.Require().True(dataPoint.Equals(expected[metricName][aggr][i]), "queried data does not match expected")
-	}
-}
-
-func (suite *testClientAggregatesSuite) compareSingleMetricWithAggregator(data []tsdbtest.DataPoint, expected map[string][]tsdbtest.DataPoint, agg string) {
-	for i, dataPoint := range data {
-		suite.Require().True(dataPoint.Equals(expected[agg][i]), "queried data does not match expected")
-	}
 }

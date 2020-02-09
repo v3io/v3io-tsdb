@@ -768,15 +768,3 @@ func (suite *testCrossSeriesAggregatesSuite) TestCrossSeriesAggregatesDifferentL
 
 	suite.Require().Equal(2, seriesCount, "series count didn't match expected")
 }
-
-func (suite *testCrossSeriesAggregatesSuite) compareSingleMetric(data []tsdbtest.DataPoint, expected []tsdbtest.DataPoint) {
-	for i, dataPoint := range data {
-		suite.Require().True(dataPoint.Equals(expected[i]), "queried data does not match expected")
-	}
-}
-
-func (suite *testCrossSeriesAggregatesSuite) compareSingleMetricWithAggregator(data []tsdbtest.DataPoint, expected map[string][]tsdbtest.DataPoint, agg string) {
-	for i, dataPoint := range data {
-		suite.Require().True(dataPoint.Equals(expected[agg][i]), "queried data does not match expected")
-	}
-}

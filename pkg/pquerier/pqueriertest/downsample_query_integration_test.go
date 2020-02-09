@@ -181,9 +181,3 @@ func (suite *testDownsampleSuite) TestRawDataDownSampleMultiPartitions() {
 
 	assert.Equal(suite.T(), 1, seriesCount, "series count didn't match expected")
 }
-
-func (suite *testDownsampleSuite) compareSingleMetric(data []tsdbtest.DataPoint, expected []tsdbtest.DataPoint) {
-	for i, dataPoint := range data {
-		suite.Require().True(dataPoint.Equals(expected[i]), "queried data does not match expected")
-	}
-}

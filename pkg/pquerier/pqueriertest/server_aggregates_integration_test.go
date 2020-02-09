@@ -381,11 +381,3 @@ func (suite *testServerAggregatesSuite) TestAggregatesWithDisabledClientAggregat
 
 	assert.Equal(suite.T(), 1, seriesCount, "series count didn't match expected")
 }
-
-func (suite *testServerAggregatesSuite) compareSingleMetricWithAggregator(data []tsdbtest.DataPoint, expected map[string][]tsdbtest.DataPoint, agg string) {
-	for i, dataPoint := range data {
-		currentExpected, ok := expected[agg]
-		suite.Require().Equal(true, ok, "got unexpected aggregate result")
-		suite.Require().True(dataPoint.Equals(currentExpected[i]), "queried data does not match expected")
-	}
-}

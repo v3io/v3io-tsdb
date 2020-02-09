@@ -157,7 +157,7 @@ func TestIngestData(t *testing.T) {
 				tsdbtest.TestOption{
 					// Example: condition "NOT exists(_enc) OR (exists(_enc) AND _enc == '2')" was evaluated to 'False' for item xxx
 					Key:   "expected_error_contains_string",
-					Value: "was evaluated to 'False' for item"}),
+					Value: "trying to ingest string values to a numeric metric"}),
 		},
 	}
 

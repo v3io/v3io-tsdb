@@ -790,9 +790,3 @@ func (suite *testRawQuerySuite) TestQueryMultiMetricsInconsistentLabels() {
 		suite.NotNil(iter.At(), "Iterator yielded a nil series")
 	}
 }
-
-func (suite *testRawQuerySuite) compareSingleMetric(data []tsdbtest.DataPoint, expected []tsdbtest.DataPoint) {
-	for i, dataPoint := range data {
-		suite.Require().True(dataPoint.Equals(expected[i]), "queried data does not match expected")
-	}
-}

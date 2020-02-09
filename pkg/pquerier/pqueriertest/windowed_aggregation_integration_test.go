@@ -476,9 +476,3 @@ func (suite *testWindowAggregationSuite) TestServerWindowedAggregationWindowEqua
 
 	assert.Equal(suite.T(), 1, seriesCount, "series count didn't match expected")
 }
-
-func (suite *testWindowAggregationSuite) compareSingleMetricWithAggregator(data []tsdbtest.DataPoint, expected map[string][]tsdbtest.DataPoint, agg string) {
-	for i, dataPoint := range data {
-		suite.Require().True(dataPoint.Equals(expected[agg][i]), "queried data does not match expected")
-	}
-}

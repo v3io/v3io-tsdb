@@ -379,9 +379,3 @@ func (suite *testSQLSyntaxQuerySuite) TestAggregateSeriesWildcardOnPartOfTheColu
 
 	suite.Require().Equal(len(expectedResult), seriesCount, "series count didn't match expected")
 }
-
-func (suite *testSQLSyntaxQuerySuite) compareMultipleMetrics(data []tsdbtest.DataPoint, expected map[string]map[string][]tsdbtest.DataPoint, metricName string, aggr string) {
-	for i, dataPoint := range data {
-		suite.Require().True(dataPoint.Equals(expected[metricName][aggr][i]), "queried data does not match expected")
-	}
-}
