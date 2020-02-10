@@ -110,7 +110,7 @@ func TestIngestData(t *testing.T) {
 				tsdbtest.TestOption{
 					Key: tsdbtest.OptTimeSeries,
 					Value: tsdbtest.TimeSeries{tsdbtest.Metric{
-						Name:   "IG-13146",
+						Name:   "IG13146",
 						Labels: utils.LabelsFromStringList("test", "IG-13146", "float", "string"),
 						Data: []tsdbtest.DataPoint{
 							{Time: 15, Value: 0.1},                 // first add float value
@@ -128,7 +128,7 @@ func TestIngestData(t *testing.T) {
 				tsdbtest.TestOption{
 					Key: tsdbtest.OptTimeSeries,
 					Value: tsdbtest.TimeSeries{tsdbtest.Metric{
-						Name:   "IG-13146",
+						Name:   "IG13146",
 						Labels: utils.LabelsFromStringList("test", "IG-13146", "float", "string"),
 						Data: []tsdbtest.DataPoint{
 							{Time: 50, Value: "another string value"}, // then attempt to add string value
