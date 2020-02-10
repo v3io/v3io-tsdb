@@ -73,7 +73,7 @@ func (suite *testRawQuerySuite) TestRawDataSinglePartition() {
 			suite.T().Fatal(err)
 		}
 
-		assert.Equal(suite.T(), expectedData, data, "queried data does not match expected")
+		suite.compareSingleMetric(data, expectedData)
 	}
 
 	assert.Equal(suite.T(), 2, seriesCount, "series count didn't match expected")
@@ -129,7 +129,7 @@ func (suite *testRawQuerySuite) TestRawDataMultiplePartitions() {
 			suite.T().Fatal(err)
 		}
 
-		assert.Equal(suite.T(), expectedData, data, "queried data does not match expected")
+		suite.compareSingleMetric(data, expectedData)
 	}
 
 	assert.Equal(suite.T(), 2, seriesCount, "series count didn't match expected")
@@ -186,7 +186,7 @@ func (suite *testRawQuerySuite) TestFilterOnLabel() {
 			suite.T().Fatal(err)
 		}
 
-		assert.Equal(suite.T(), expectedData, data, "queried data does not match expected")
+		suite.compareSingleMetric(data, expectedData)
 	}
 
 	assert.Equal(suite.T(), 1, seriesCount, "series count didn't match expected")
@@ -317,7 +317,9 @@ func (suite *testRawQuerySuite) TestSelectRawDataByRequestedColumns() {
 			suite.T().Fatal(err)
 		}
 
-		assert.Equal(suite.T(), expected, data, "queried data does not match expected")
+		for i, dataPoint := range expected {
+			suite.Require().True(dataPoint.Equals(data[i]), "queried data does not match expected")
+		}
 	}
 
 	assert.Equal(suite.T(), 1, seriesCount, "series count didn't match expected")
@@ -382,7 +384,9 @@ func (suite *testRawQuerySuite) TestRawDataMultipleMetrics() {
 			suite.T().Fatal(err)
 		}
 
-		assert.Equal(suite.T(), expectedData[name], data, "queried data does not match expected")
+		for i, dataPoint := range expectedData[name] {
+			suite.Require().True(dataPoint.Equals(data[i]), "queried data does not match expected")
+		}
 	}
 
 	assert.Equal(suite.T(), 2, seriesCount, "series count didn't match expected")
@@ -528,7 +532,9 @@ func (suite *testRawQuerySuite) TestQueryMultipleMetricsWithMultipleLabelSets() 
 			suite.T().Fatal(err)
 		}
 
-		assert.Equal(suite.T(), expectedData[fmt.Sprintf("%v-%v", name, os)], data, "queried data does not match expected")
+		for i, dataPoint := range expectedData[fmt.Sprintf("%v-%v", name, os)] {
+			suite.Require().True(dataPoint.Equals(data[i]), "queried data does not match expected")
+		}
 	}
 
 	assert.Equal(suite.T(), 3, seriesCount, "series count didn't match expected")
@@ -577,7 +583,7 @@ func (suite *testRawQuerySuite) TestDifferentLabelSetsInDifferentPartitions() {
 			suite.T().Fatal(err)
 		}
 
-		suite.Require().Equal(expected, data, "queried data does not match expected")
+		suite.compareSingleMetric(data, expected)
 	}
 
 	assert.Equal(suite.T(), 1, seriesCount, "series count didn't match expected")
@@ -627,7 +633,9 @@ func (suite *testRawQuerySuite) TestDifferentMetricsInDifferentPartitions() {
 			suite.T().Fatal(err)
 		}
 
-		suite.Require().Equal(expected, data, "queried data does not match expected")
+		for i, dataPoint := range expected {
+			suite.Require().True(dataPoint.Equals(data[i]), "queried data does not match expected")
+		}
 	}
 
 	assert.Equal(suite.T(), 1, seriesCount, "series count didn't match expected")

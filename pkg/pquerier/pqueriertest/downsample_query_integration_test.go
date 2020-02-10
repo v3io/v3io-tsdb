@@ -120,7 +120,7 @@ func (suite *testDownsampleSuite) TestRawDataSinglePartitionWithDownSample() {
 			suite.T().Fatal(err)
 		}
 
-		assert.Equal(suite.T(), expectedData, data, "queried data does not match expected")
+		suite.compareSingleMetric(data, expectedData)
 	}
 
 	assert.Equal(suite.T(), 1, seriesCount, "series count didn't match expected")
@@ -176,7 +176,7 @@ func (suite *testDownsampleSuite) TestRawDataDownSampleMultiPartitions() {
 			suite.T().Fatal(err)
 		}
 
-		assert.Equal(suite.T(), expectedData, data, "queried data does not match expected")
+		suite.compareSingleMetric(data, expectedData)
 	}
 
 	assert.Equal(suite.T(), 1, seriesCount, "series count didn't match expected")

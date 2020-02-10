@@ -50,7 +50,7 @@ func NewLogger(level string) (logger.Logger, error) {
 		logLevel = nucliozap.WarnLevel
 	}
 
-	log, err := nucliozap.NewNuclioZapCmd("v3io-prom", logLevel)
+	log, err := nucliozap.NewNuclioZapCmd("v3io-tsdb", logLevel)
 	if err != nil {
 		return nil, err
 	}

@@ -122,7 +122,9 @@ type MetricsCache struct {
 	updatesComplete chan int
 	newUpdates      chan int
 
-	lastMetric     uint64
+	lastMetric uint64
+
+	// TODO: consider switching to synch.Map (https://golang.org/pkg/sync/#Map)
 	cacheMetricMap map[cacheKey]*MetricState // TODO: maybe use hash as key & combine w ref
 	cacheRefMap    map[uint64]*MetricState   // TODO: maybe turn to list + free list, periodically delete old matrics
 
@@ -217,7 +219,10 @@ func (mc *MetricsCache) Add(lset utils.LabelsIfc, t int64, v interface{}) (uint6
 
 	isValueVariantType := false
 	// If the value is not of Float type assume it's variant type.
-	if _, ok := v.(float64); !ok {
+	switch v.(type) {
+	case int, int64, float64, float32:
+		isValueVariantType = false
+	default:
 		isValueVariantType = true
 	}
 

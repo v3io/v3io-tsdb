@@ -29,6 +29,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/v3io/v3io-go/pkg/dataplane"
 	"github.com/v3io/v3io-go/pkg/errors"
+	"github.com/v3io/v3io-tsdb/pkg/utils"
 )
 
 // Start event loops for handling metric updates (appends and Get/Update DB responses)
@@ -266,7 +267,7 @@ func (mc *MetricsCache) handleResponse(metric *MetricState, resp *v3io.Response,
 
 	if resp.Error != nil && metric.getState() != storeStateGet {
 		req := reqInput.(*v3io.UpdateItemInput)
-		mc.logger.ErrorWith("I/O failure", "id", resp.ID, "err", resp.Error, "key", metric.key,
+		mc.logger.WarnWith("I/O failure", "id", resp.ID, "err", resp.Error, "key", metric.key,
 			"in-flight", mc.updatesInFlight, "mqueue", mc.metricQueue.Length(),
 			"numsamples", metric.store.samplesQueueLength(), "path", req.Path, "update expression", req.Expression)
 	} else {
@@ -300,8 +301,17 @@ func (mc *MetricsCache) handleResponse(metric *MetricState, resp *v3io.Response,
 			// Metrics with too many update errors go into Error state
 			metric.retryCount++
 			if e, hasStatusCode := resp.Error.(v3ioerrors.ErrorWithStatusCode); hasStatusCode && e.StatusCode() != http.StatusServiceUnavailable {
-				mc.logger.ErrorWith(fmt.Sprintf("Chunk update failed with status code %d.", e.StatusCode()))
-				setError(mc, metric, errors.Wrap(resp.Error, fmt.Sprintf("Chunk update failed due to status code %d.", e.StatusCode())))
+				// If condition was evaluated as false log this and report this error upstream.
+				if utils.IsFalseConditionError(resp.Error) {
+					req := reqInput.(*v3io.UpdateItemInput)
+					// This might happen on attempt to add metric value of wrong type, i.e. float <-> string
+					errMsg := fmt.Sprintf("trying to ingest values of incompatible data type. Metric %q has not been updated.", req.Path)
+					mc.logger.ErrorWith(errMsg)
+					setError(mc, metric, errors.Wrap(resp.Error, errMsg))
+				} else {
+					mc.logger.ErrorWith(fmt.Sprintf("Chunk update failed with status code %d.", e.StatusCode()))
+					setError(mc, metric, errors.Wrap(resp.Error, fmt.Sprintf("Chunk update failed due to status code %d.", e.StatusCode())))
+				}
 				clear()
 				return false
 			} else if metric.retryCount == maxRetriesOnWrite {

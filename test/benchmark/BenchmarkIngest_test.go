@@ -157,7 +157,19 @@ func BenchmarkIngest(b *testing.B) {
 }
 
 func isValidDataPoint(prev, current *tsdbtest.DataPoint) bool {
-	return int64(current.Value)-int64(prev.Value) == 1 && current.Time > prev.Time
+	if current.Time > prev.Time {
+		switch cv := current.Value.(type) {
+		case float64:
+			if pv, ok := prev.Value.(float64); ok {
+				return int64(cv)-int64(pv) == 1
+			}
+		case string:
+			return true
+		default:
+			return false
+		}
+	}
+	return false
 }
 
 func runTest(
