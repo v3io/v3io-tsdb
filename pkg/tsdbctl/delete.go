@@ -70,6 +70,9 @@ Notes:
   metric items with older or newer times. Use the info command to view the partitioning interval.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 
+			if len(args) > 0 {
+				return errors.New("delete does not accept unnamed arguments. Did you forget to use a flag?")
+			}
 			// Initialize parameters
 			return commandeer.delete()
 		},
