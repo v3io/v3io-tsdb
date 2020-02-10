@@ -89,26 +89,12 @@ func TestIngestData(t *testing.T) {
 					}}},
 			),
 		},
-		{desc: "Should ingest record with a dash in the metric name (IG-8585)",
-			params: tsdbtest.NewTestParams(t,
-				tsdbtest.TestOption{
-					Key: tsdbtest.OptTimeSeries,
-					Value: tsdbtest.TimeSeries{tsdbtest.Metric{
-						Name:   "cool-cpu",
-						Labels: utils.LabelsFromStringList("os", "linux", "iguaz", "yesplease"),
-						Data: []tsdbtest.DataPoint{
-							{Time: 1532940510, Value: 314.3},
-							{Time: 1532940510 + 5, Value: 300.3},
-							{Time: 1532940510 - 10, Value: 3234.6}},
-					}}},
-			),
-		},
 		{desc: "Should ingest into first partition in epoch without corruption (TSDB-67)",
 			params: tsdbtest.NewTestParams(t,
 				tsdbtest.TestOption{
 					Key: tsdbtest.OptTimeSeries,
 					Value: tsdbtest.TimeSeries{tsdbtest.Metric{
-						Name:   "cool-cpu",
+						Name:   "coolcpu",
 						Labels: utils.LabelsFromStringList("os", "linux", "iguaz", "yesplease"),
 						Data: []tsdbtest.DataPoint{
 							{Time: 10, Value: 314.3},
@@ -214,6 +200,26 @@ func TestIngestDataWithSameTimestamp(t *testing.T) {
 	}
 
 	tsdbtest.ValidateCountOfSamples(t, adapter, "", 2, baseTime-1*tsdbtest.HoursInMillis, baseTime+1*tsdbtest.HoursInMillis, -1)
+}
+
+func (suite *testTsdbSuite)TestWriteMetricWithDashInName(t *testing.T) {
+	testCtx := suite.T()
+	testParams := tsdbtest.NewTestParams(testCtx)
+	defer tsdbtest.SetUp(testCtx, testParams)()
+
+	adapter, err := NewV3ioAdapter(testParams.V3ioConfig(), nil, nil)
+	suite.Require().NoError(err)
+
+	appender, err := adapter.Appender()
+	suite.Require().NoError(err)
+
+	t1 := suite.parseTime("2018-11-01T00:00:00Z")
+
+	_, err = appender.Add(
+		utils.Labels{utils.Label{Name: "metric-1", Value: "AAPL"}, utils.Label{Name: "market", Value: "usa"}},
+		t1,
+		-91.0)
+	suite.Require().Error(err)
 }
 
 func TestQueryData(t *testing.T) {
