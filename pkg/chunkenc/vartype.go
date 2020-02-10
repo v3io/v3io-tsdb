@@ -114,22 +114,6 @@ func (a *varAppender) Append(t int64, v interface{}) {
 	}
 
 	switch val := v.(type) {
-	//case float64:
-	//	if val == 0 {
-	//		a.appendNoValue(t, varTypeFloat64, varValueZero)
-	//		return
-	//	}
-	//	if math.IsNaN(val) {
-	//		a.appendNoValue(t, varTypeFloat64, varValueNone)
-	//		return
-	//	}
-	//	a.appendWithUint(t, varTypeFloat64, math.Float64bits(val))
-	//case int:
-	//	if val == 0 {
-	//		a.appendNoValue(t, varTypeFloat64, varValueZero)
-	//		return
-	//	}
-	//	a.appendWithUint(t, varTypeFloat64, math.Float64bits(float64(val)))
 	case string:
 		a.appendWithValue(t, varTypeString, []byte(val))
 

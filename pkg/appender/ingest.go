@@ -305,7 +305,7 @@ func (mc *MetricsCache) handleResponse(metric *MetricState, resp *v3io.Response,
 				if utils.IsFalseConditionError(resp.Error) {
 					req := reqInput.(*v3io.UpdateItemInput)
 					// This might happen on attempt to add metric value of wrong type, i.e. float <-> string
-					errMsg := fmt.Sprintf("trying to ingest string values to a numeric metric %s", req.Path)
+					errMsg := fmt.Sprintf("trying to ingest values of incompatible data type. Metric %q has not been updated.", req.Path)
 					mc.logger.ErrorWith(errMsg)
 					setError(mc, metric, errors.Wrap(resp.Error, errMsg))
 				} else {
