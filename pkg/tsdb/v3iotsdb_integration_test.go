@@ -155,9 +155,9 @@ func TestIngestData(t *testing.T) {
 					Key:   "override_test_name",
 					Value: fmt.Sprintf("IG-13146-%s", timestamp)},
 				tsdbtest.TestOption{
-					// Example: condition "NOT exists(_enc) OR (exists(_enc) AND _enc == '2')" was evaluated to 'False' for item xxx
-					Key:   "expected_error_contains_string",
-					Value: "trying to ingest string values to a numeric metric"}),
+					Key: "expected_error_contains_string",
+					// Note, the expected error message should align with pkg/appender/ingest.go:308
+					Value: "trying to ingest values of incompatible data type"}),
 		},
 	}
 
