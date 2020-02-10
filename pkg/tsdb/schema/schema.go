@@ -13,7 +13,7 @@ import (
 )
 
 const (
-	Version          = 3
+	Version          = 4
 	MaxV3ioArraySize = 130000
 )
 

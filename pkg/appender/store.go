@@ -232,7 +232,7 @@ func (cs *chunkStore) Append(t int64, v interface{}) {
 
 	cs.pending = append(cs.pending, pendingData{t: t, v: v})
 	// If the new time is older than previous times, sort the list
-	if len(cs.pending) > 1 && cs.pending[len(cs.pending)-2].t < t {
+	if len(cs.pending) > 1 && cs.pending[len(cs.pending)-2].t > t {
 		sort.Sort(cs.pending)
 	}
 }
