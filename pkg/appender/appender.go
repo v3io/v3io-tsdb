@@ -131,7 +131,7 @@ type MetricsCache struct {
 	lastError           error
 	performanceReporter *performance.MetricReporter
 
-	stopChan      chan int
+	stopChan chan int
 }
 
 func NewMetricsCache(container v3io.Container, logger logger.Logger, cfg *config.V3ioConfig,
@@ -219,6 +219,10 @@ func (mc *MetricsCache) Add(lset utils.LabelsIfc, t int64, v interface{}) (uint6
 	}
 
 	name, key, hash := lset.GetKey()
+	err = utils.IsValidMetricName(name)
+	if err != nil {
+		return 0, err
+	}
 	metric, ok := mc.getMetric(name, hash)
 
 	var aggrMetrics []*MetricState
