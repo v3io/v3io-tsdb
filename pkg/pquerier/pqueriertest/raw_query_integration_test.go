@@ -3,6 +3,7 @@
 package pqueriertest
 
 import (
+	"errors"
 	"fmt"
 	"math"
 	"testing"
@@ -771,7 +772,19 @@ func (suite *testRawQuerySuite) TestLoadPartitionsFromAttributes() {
 			suite.T().Fatal(err)
 		}
 
-		assert.Equal(suite.T(), expectedData, data, "queried data does not match expected")
+		for i := 0; i < len(expectedData); i++ {
+			currentExpected := expectedData[i].Value
+			switch val := currentExpected.(type) {
+			case float64:
+				assert.Equal(suite.T(), val, data[i].Value)
+			case int:
+				assert.Equal(suite.T(), float64(val), data[i].Value)
+			case string:
+				assert.Equal(suite.T(), val, data[i].Value)
+			default:
+				assert.Error(suite.T(), errors.New("unsupported data type"))
+			}
+		}
 	}
 
 	assert.Equal(suite.T(), 2, seriesCount, "series count didn't match expected")

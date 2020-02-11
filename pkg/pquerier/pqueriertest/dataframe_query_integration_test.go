@@ -833,11 +833,24 @@ func (suite *testSelectDataframeSuite) TestQueryNonExistingMetric() {
 				currentExpectedData := expectedData[col.Name()]
 				suite.Require().Equal(len(currentExpectedData), col.Len())
 				currentExpected := currentExpectedData[i].Value
-				f, err := col.FloatAt(i)
-				assert.NoError(suite.T(), err)
 
-				if !(math.IsNaN(currentExpected) && math.IsNaN(f)) {
-					suite.Require().Equal(currentExpected, f)
+				switch val := currentExpected.(type) {
+				case float64:
+					f, err := col.FloatAt(i)
+					assert.NoError(suite.T(), err)
+					if !(math.IsNaN(val) && math.IsNaN(f)) {
+						assert.Equal(suite.T(), currentExpected, f)
+					}
+				case int:
+					iv, err := col.FloatAt(i)
+					assert.NoError(suite.T(), err)
+					assert.Equal(suite.T(), float64(val), iv)
+				case string:
+					s, err := col.StringAt(i)
+					assert.NoError(suite.T(), err)
+					assert.Equal(suite.T(), val, s)
+				default:
+					assert.Error(suite.T(), errors.New("unsupported data type"))
 				}
 			}
 		}
