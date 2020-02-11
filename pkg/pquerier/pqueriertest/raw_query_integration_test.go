@@ -233,42 +233,6 @@ func (suite *testRawQuerySuite) TestQueryWithBadTimeParameters() {
 	}
 }
 
-func (suite *testRawQuerySuite) TestQueryMetricWithDashInTheName() { // IG-8585
-	adapter, err := tsdb.NewV3ioAdapter(suite.v3ioConfig, nil, nil)
-	if err != nil {
-		suite.T().Fatalf("failed to create v3io adapter. reason: %s", err)
-	}
-
-	labels1 := utils.LabelsFromStringList("os", "linux")
-	numberOfEvents := 10
-	eventsInterval := 60 * 1000
-
-	expectedData := []tsdbtest.DataPoint{{suite.basicQueryTime, 10},
-		{int64(suite.basicQueryTime + tsdbtest.MinuteInMillis), 20},
-		{suite.basicQueryTime + 2*tsdbtest.MinuteInMillis, 30},
-		{suite.basicQueryTime + 3*tsdbtest.MinuteInMillis, 40}}
-	testParams := tsdbtest.NewTestParams(suite.T(),
-		tsdbtest.TestOption{
-			Key: tsdbtest.OptTimeSeries,
-			Value: tsdbtest.TimeSeries{tsdbtest.Metric{
-				Name:   "cool-cpu",
-				Labels: labels1,
-				Data:   expectedData},
-			}})
-	tsdbtest.InsertData(suite.T(), testParams)
-
-	querierV2, err := adapter.QuerierV2()
-	if err != nil {
-		suite.T().Fatalf("Failed to create querier v2, err: %v", err)
-	}
-
-	params := &pquerier.SelectParams{From: suite.basicQueryTime, To: suite.basicQueryTime + int64(numberOfEvents*eventsInterval)}
-	_, err = querierV2.Select(params)
-	if err == nil {
-		suite.T().Fatalf("expected an error but finish succesfully")
-	}
-}
-
 func (suite *testRawQuerySuite) TestSelectRawDataByRequestedColumns() {
 	adapter, err := tsdb.NewV3ioAdapter(suite.v3ioConfig, nil, nil)
 	if err != nil {

@@ -219,6 +219,10 @@ func (mc *MetricsCache) Add(lset utils.LabelsIfc, t int64, v interface{}) (uint6
 	}
 
 	name, key, hash := lset.GetKey()
+	err = utils.IsValidMetricName(name)
+	if err != nil {
+		return 0, err
+	}
 	metric, ok := mc.getMetric(name, hash)
 
 	var aggrMetrics []*MetricState

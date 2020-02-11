@@ -66,7 +66,11 @@ func mainCollector(ctx *selectQueryContext, responseChannel chan *qryResults) {
 
 	for res := range responseChannel {
 		if res.IsRawQuery() {
-			rawCollector(ctx, res)
+			err := rawCollector(ctx, res)
+			if err != nil {
+				ctx.errorChannel <- err
+				return
+			}
 		} else {
 			err := res.frame.addMetricIfNotExist(res.name, ctx.getResultBucketsSize(), res.IsServerAggregates())
 			if err != nil {
@@ -104,7 +108,7 @@ func mainCollector(ctx *selectQueryContext, responseChannel chan *qryResults) {
 	}
 }
 
-func rawCollector(ctx *selectQueryContext, res *qryResults) {
+func rawCollector(ctx *selectQueryContext, res *qryResults) error {
 	ctx.logger.Debug("using Raw Collector for metric %v", res.name)
 
 	if res.frame.isWildcardSelect {
@@ -114,8 +118,7 @@ func rawCollector(ctx *selectQueryContext, res *qryResults) {
 		} else {
 			series, err := NewRawSeries(res, ctx.logger.GetChild("v3ioRawSeries"))
 			if err != nil {
-				ctx.errorChannel <- err
-				return
+				return err
 			}
 			res.frame.rawColumns = append(res.frame.rawColumns, series)
 			res.frame.columnByName[res.name] = len(res.frame.rawColumns) - 1
@@ -128,12 +131,12 @@ func rawCollector(ctx *selectQueryContext, res *qryResults) {
 		} else {
 			series, err := NewRawSeries(res, ctx.logger.GetChild("v3ioRawSeries"))
 			if err != nil {
-				ctx.errorChannel <- err
-				return
+				return err
 			}
 			res.frame.rawColumns[columnIndex] = series
 		}
 	}
+	return nil
 }
 
 func aggregateClientAggregates(ctx *selectQueryContext, res *qryResults) {
