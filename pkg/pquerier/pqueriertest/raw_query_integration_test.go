@@ -773,6 +773,7 @@ func (suite *testRawQuerySuite) TestLoadPartitionsFromAttributes() {
 		}
 
 		for i := 0; i < len(expectedData); i++ {
+			assert.Equal(suite.T(), expectedData[i].Time, data[i].Time)
 			currentExpected := expectedData[i].Value
 			switch val := currentExpected.(type) {
 			case float64:
