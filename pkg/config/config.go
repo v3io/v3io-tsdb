@@ -170,7 +170,7 @@ type V3ioConfig struct {
 	// Coefficient to decide whether or not to use server aggregates optimization
 	// use server aggregations if ` <requested step> / <rollup interval>  >  UseServerAggregateCoefficient`
 	UseServerAggregateCoefficient int  `json:"useServerAggregateCoefficient,omitempty"`
-	LoadPartitionsFromSchemaFile  bool `json:"loadPartitionsFromSchemaFile,omitempty"`
+	LoadPartitionsFromSchemaAttr  bool `json:"loadPartitionsFromSchemaAttr,omitempty"`
 }
 
 type MetricsReporterConfig struct {

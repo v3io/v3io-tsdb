@@ -92,26 +92,12 @@ func TestIngestData(t *testing.T) {
 					}}},
 			),
 		},
-		{desc: "Should ingest record with a dash in the metric name (IG-8585)",
-			params: tsdbtest.NewTestParams(t,
-				tsdbtest.TestOption{
-					Key: tsdbtest.OptTimeSeries,
-					Value: tsdbtest.TimeSeries{tsdbtest.Metric{
-						Name:   "cool-cpu",
-						Labels: utils.LabelsFromStringList("os", "linux", "iguaz", "yesplease"),
-						Data: []tsdbtest.DataPoint{
-							{Time: 1532940510, Value: 314.3},
-							{Time: 1532940510 + 5, Value: 300.3},
-							{Time: 1532940510 - 10, Value: 3234.6}},
-					}}},
-			),
-		},
 		{desc: "Should ingest into first partition in epoch without corruption (TSDB-67)",
 			params: tsdbtest.NewTestParams(t,
 				tsdbtest.TestOption{
 					Key: tsdbtest.OptTimeSeries,
 					Value: tsdbtest.TimeSeries{tsdbtest.Metric{
-						Name:   "cool-cpu",
+						Name:   "coolcpu",
 						Labels: utils.LabelsFromStringList("os", "linux", "iguaz", "yesplease"),
 						Data: []tsdbtest.DataPoint{
 							{Time: 10, Value: 314.3},
@@ -124,7 +110,7 @@ func TestIngestData(t *testing.T) {
 				tsdbtest.TestOption{
 					Key: tsdbtest.OptTimeSeries,
 					Value: tsdbtest.TimeSeries{tsdbtest.Metric{
-						Name:   "IG-13146",
+						Name:   "IG13146",
 						Labels: utils.LabelsFromStringList("test", "IG-13146", "float", "string"),
 						Data: []tsdbtest.DataPoint{
 							{Time: 15, Value: 0.1},                 // first add float value
@@ -142,7 +128,7 @@ func TestIngestData(t *testing.T) {
 				tsdbtest.TestOption{
 					Key: tsdbtest.OptTimeSeries,
 					Value: tsdbtest.TimeSeries{tsdbtest.Metric{
-						Name:   "IG-13146",
+						Name:   "IG13146",
 						Labels: utils.LabelsFromStringList("test", "IG-13146", "float", "string"),
 						Data: []tsdbtest.DataPoint{
 							{Time: 50, Value: "another string value"}, // then attempt to add string value
@@ -272,6 +258,37 @@ func TestIngestDataWithSameTimestamp(t *testing.T) {
 	tsdbtest.ValidateCountOfSamples(t, adapter, "", 2, baseTime-1*tsdbtest.HoursInMillis, baseTime+1*tsdbtest.HoursInMillis, -1)
 }
 
+func TestWriteMetricWithDashInName(t *testing.T) {
+	testParams := tsdbtest.NewTestParams(t,
+		tsdbtest.TestOption{
+			Key: tsdbtest.OptTimeSeries,
+			Value: tsdbtest.TimeSeries{tsdbtest.Metric{
+				Name:   "cpu-1",
+				Labels: utils.LabelsFromStringList("testLabel", "balbala"),
+				Data:   []tsdbtest.DataPoint{{Time: 1532940510, Value: 314.3}},
+			}}})
+	defer tsdbtest.SetUp(t, testParams)()
+
+	adapter, err := NewV3ioAdapter(testParams.V3ioConfig(), nil, nil)
+	if err != nil {
+		t.Fatalf("Failed to create v3io adapter. reason: %s", err)
+	}
+
+	appender, err := adapter.Appender()
+	if err != nil {
+		t.Fatalf("Failed to get appender. reason: %s", err)
+	}
+	for _, dp := range testParams.TimeSeries() {
+		labels := utils.Labels{utils.Label{Name: "__name__", Value: dp.Name}}
+		labels = append(labels, dp.Labels...)
+
+		_, err := appender.Add(labels, dp.Data[0].Time, dp.Data[0].Value)
+		if err == nil {
+			t.Fatalf("Test should have failed")
+		}
+	}
+}
+
 func TestQueryData(t *testing.T) {
 	testCases := []struct {
 		desc         string
@@ -351,21 +368,6 @@ func TestQueryData(t *testing.T) {
 			to:       1532940510 + 1,
 			step:     defaultStepMs,
 			expected: map[string][]tsdbtest.DataPoint{"": {{Time: 1532940510, Value: 31.3}}}},
-
-		{desc: "Should ingest and query data with '-' in the metric name (IG-8585)",
-			testParams: tsdbtest.NewTestParams(t,
-				tsdbtest.TestOption{
-					Key: tsdbtest.OptTimeSeries,
-					Value: tsdbtest.TimeSeries{tsdbtest.Metric{
-						Name:   "cool-cpu",
-						Labels: utils.LabelsFromStringList("os", "linux", "iguaz", "yesplease"),
-						Data:   []tsdbtest.DataPoint{{Time: 1532940510, Value: 314.3}},
-					}}},
-			),
-			from:     0,
-			to:       1532940510 + 1,
-			step:     defaultStepMs,
-			expected: map[string][]tsdbtest.DataPoint{"": {{Time: 1532940510, Value: 314.3}}}},
 
 		{desc: "Should ingest and query by time",
 			testParams: tsdbtest.NewTestParams(t,

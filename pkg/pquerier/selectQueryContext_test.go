@@ -114,7 +114,7 @@ func TestCreateColumnSpecs(t *testing.T) {
 	}
 	for _, test := range testCases {
 		t.Run(test.desc, func(t *testing.T) {
-			ctx := selectQueryContext{existingMetrics: map[string]bool{"cpu": true, "diskio": true, "disk": true}}
+			ctx := selectQueryContext{}
 			ctx.queryParams = &test.params
 			columnsSpec, columnsSpecByMetric, err := ctx.createColumnSpecs()
 
@@ -151,7 +151,7 @@ func TestNegativeCreateColumnSpecs(t *testing.T) {
 	}
 	for _, test := range testCases {
 		t.Run(test.desc, func(t *testing.T) {
-			ctx := selectQueryContext{existingMetrics: map[string]bool{"cpu": true, "diskio": true}}
+			ctx := selectQueryContext{}
 			ctx.queryParams = &test.params
 			_, _, err := ctx.createColumnSpecs()
 

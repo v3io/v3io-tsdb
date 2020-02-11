@@ -54,6 +54,8 @@ func (mc *MetricsCache) metricFeed(index int) {
 
 		for {
 			select {
+			case _ = <-mc.stopChan:
+				return
 			case inFlight = <-mc.updatesComplete:
 				// Handle completion notifications from the update loop
 				length := mc.metricQueue.Length()
@@ -150,6 +152,8 @@ func (mc *MetricsCache) metricsUpdateLoop(index int) {
 		counter := 0
 		for {
 			select {
+			case _ = <-mc.stopChan:
+				return
 			case _ = <-mc.newUpdates:
 				// Handle new metric notifications (from metricFeed)
 				for mc.updatesInFlight < mc.cfg.Workers*2 { //&& newMetrics > 0{
@@ -357,24 +361,27 @@ func (mc *MetricsCache) nameUpdateRespLoop() {
 
 	go func() {
 		for {
-			resp := <-mc.nameUpdateChan
-			// Handle V3IO PutItem in names table
+			select {
+			case _ = <-mc.stopChan:
+				return
+			case resp := <-mc.nameUpdateChan:
+				// Handle V3IO PutItem in names table
+				metric, ok := resp.Context.(*MetricState)
+				if ok {
+					metric.Lock()
+					if resp.Error != nil {
+						// Count errors
+						mc.performanceReporter.IncrementCounter("UpdateNameError", 1)
 
-			metric, ok := resp.Context.(*MetricState)
-			if ok {
-				metric.Lock()
-				if resp.Error != nil {
-					// Count errors
-					mc.performanceReporter.IncrementCounter("UpdateNameError", 1)
-
-					mc.logger.ErrorWith("Update-name process failed", "id", resp.ID, "name", metric.name)
-				} else {
-					mc.logger.DebugWith("Update-name process response", "id", resp.ID, "name", metric.name)
+						mc.logger.ErrorWith("Update-name process failed", "id", resp.ID, "name", metric.name)
+					} else {
+						mc.logger.DebugWith("Update-name process response", "id", resp.ID, "name", metric.name)
+					}
+					metric.Unlock()
 				}
-				metric.Unlock()
-			}
 
-			resp.Release()
+				resp.Release()
+			}
 		}
 	}()
 }
