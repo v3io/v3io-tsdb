@@ -26,18 +26,18 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
-	"net/http"
 	pathUtil "path"
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/nuclio/logger"
 	"github.com/pkg/errors"
 	"github.com/v3io/v3io-go/pkg/dataplane"
 	"github.com/v3io/v3io-go/pkg/dataplane/http"
-	v3ioerrors "github.com/v3io/v3io-go/pkg/errors"
+	"github.com/v3io/v3io-tsdb/pkg/aggregate"
 	"github.com/v3io/v3io-tsdb/pkg/appender"
 	"github.com/v3io/v3io-tsdb/pkg/chunkenc"
 	"github.com/v3io/v3io-tsdb/pkg/config"
@@ -275,7 +275,7 @@ func (a *V3ioAdapter) DeleteDB(deleteParams DeleteParams) error {
 
 	// Delete Data
 	err := a.DeletePartitionsData(&deleteParams)
-	if err != nil && !deleteParams.IgnoreErrors {
+	if err != nil {
 		return err
 	}
 
@@ -337,8 +337,25 @@ func (a *V3ioAdapter) DeletePartitionsData(deleteParams *DeleteParams) error {
 	systemAttributesToFetch := []string{config.ObjectNameAttrName, config.MtimeSecsAttributeName, config.MtimeNSecsAttributeName, config.EncodingAttrName, config.MaxTimeAttrName}
 	var getItemsWorkers, getItemsTerminated, deletesTerminated int
 
+	var getItemsWG sync.WaitGroup
+	getItemsErrorChan := make(chan error, numOfGetItemsRoutines)
+
+	aggregates := a.GetSchema().PartitionSchemaInfo.Aggregates
+	hasServerSideAggregations := len(aggregates) != 1 || aggregates[0] != ""
+
+	var aggrMask aggregate.AggrType
+	var err error
+	if hasServerSideAggregations {
+		aggrMask, _, err = aggregate.AggregatesFromStringListWithCount(aggregates)
+		if err != nil {
+			return err
+		}
+	}
+
 	for i := 0; i <= a.cfg.Workers; i++ {
-		go deleteObjectWorker(a.container, deleteParams, a.logger, fileToDeleteChan, deleteTerminationChan, onErrorTerminationChannel)
+		go deleteObjectWorker(a.container, deleteParams, a.logger,
+			fileToDeleteChan, deleteTerminationChan, onErrorTerminationChannel,
+			aggrMask)
 	}
 
 	for _, part := range partitions {
@@ -348,24 +365,29 @@ func (a *V3ioAdapter) DeletePartitionsData(deleteParams *DeleteParams) error {
 		// Delete all files in partition folder and then delete the folder itself
 		if deleteEntirePartitionFolder {
 			a.logger.Info("Deleting entire partition '%s'.", part.GetTablePath())
-			err := utils.DeleteTable(a.logger, a.container, part.GetTablePath(), "", a.cfg.QryWorkers)
-			if err != nil {
-				return errors.Wrapf(err, "Failed to delete partition '%s'.", part.GetTablePath())
-			}
-			// Delete the Directory object
-			err = a.container.DeleteObjectSync(&v3io.DeleteObjectInput{Path: part.GetTablePath()})
-			if err != nil {
-				return errors.Wrapf(err, "Failed to delete partition object '%s'.", part.GetTablePath())
-			}
+
+			getItemsWG.Add(1)
+			go deleteEntirePartition(a.logger, a.container, part.GetTablePath(), a.cfg.QryWorkers,
+				&getItemsWG, getItemsErrorChan)
+
 			entirelyDeletedPartitions = append(entirelyDeletedPartitions, part)
 			// First get all items based on filter+metric+time range then delete what is necessary
 		} else {
 			a.logger.Info("Deleting partial partition '%s'.", part.GetTablePath())
+
+			start, end := deleteParams.From, deleteParams.To
+
+			// Round the start and end times to the nearest aggregation buckets - to later on recalculate server side aggregations
+			if hasServerSideAggregations {
+				start = part.GetAggregationBucketStartTime(part.Time2Bucket(deleteParams.From))
+				end = part.GetAggregationBucketEndTime(part.Time2Bucket(deleteParams.To))
+			}
+
 			var chunkAttributesToFetch []string
 
 			// If we don't want to delete the entire object, fetch also the desired chunks to delete.
 			if !partitionEntirelyInRange {
-				chunkAttributesToFetch, _ = part.Range2Attrs("v", deleteParams.From, deleteParams.To)
+				chunkAttributesToFetch, _ = part.Range2Attrs("v", start, end)
 			}
 
 			allAttributes := append(chunkAttributesToFetch, systemAttributesToFetch...)
@@ -389,8 +411,21 @@ func (a *V3ioAdapter) DeletePartitionsData(deleteParams *DeleteParams) error {
 			}
 		}
 	}
-
 	a.logger.Debug("issued %v getItems", getItemsWorkers)
+
+	// Waiting fot deleting of full partitions
+	getItemsWG.Wait()
+	select {
+	case err = <-getItemsErrorChan:
+		fmt.Println("got error", err)
+		// Signal all other goroutines to quite
+		for i := 0; i < goRoutinesNum; i++ {
+			onErrorTerminationChannel <- struct{}{}
+		}
+		return err
+	default:
+	}
+
 	if getItemsWorkers != 0 {
 		for deletesTerminated < a.cfg.Workers {
 			select {
@@ -398,7 +433,7 @@ func (a *V3ioAdapter) DeletePartitionsData(deleteParams *DeleteParams) error {
 				a.logger.Debug("finished getItems worker, total finished: %v, error: %v", getItemsTerminated+1, err)
 				if err != nil {
 					// If requested to ignore non-existing tables do not return error.
-					if errorWithStatusCode, ok := err.(v3ioerrors.ErrorWithStatusCode); !ok || !deleteParams.IgnoreErrors || errorWithStatusCode.StatusCode() != http.StatusNotFound {
+					if !(deleteParams.IgnoreErrors && utils.IsNotExistsOrConflictError(err)) {
 						for i := 0; i < goRoutinesNum; i++ {
 							onErrorTerminationChannel <- struct{}{}
 						}
@@ -426,12 +461,27 @@ func (a *V3ioAdapter) DeletePartitionsData(deleteParams *DeleteParams) error {
 	}
 
 	a.logger.Debug("finished deleting data, removing partitions from schema")
-	err := a.partitionMngr.DeletePartitionsFromSchema(entirelyDeletedPartitions)
+	err = a.partitionMngr.DeletePartitionsFromSchema(entirelyDeletedPartitions)
 	if err != nil {
 		return err
 	}
 
 	return nil
+}
+
+func deleteEntirePartition(logger logger.Logger, container v3io.Container, partitionPath string, workers int,
+	wg *sync.WaitGroup, errChannel chan<- error) {
+	defer wg.Done()
+
+	err := utils.DeleteTable(logger, container, partitionPath, "", workers)
+	if err != nil {
+		errChannel <- errors.Wrapf(err, "Failed to delete partition '%s'.", partitionPath)
+	}
+	// Delete the Directory object
+	err = container.DeleteObjectSync(&v3io.DeleteObjectInput{Path: partitionPath})
+	if err != nil {
+		errChannel <- errors.Wrapf(err, "Failed to delete partition folder '%s'.", partitionPath)
+	}
 }
 
 func getItemsWorker(logger logger.Logger, container v3io.Container, input *v3io.GetItemsInput, partition *partmgr.DBPartition,
@@ -475,7 +525,8 @@ func getItemsWorker(logger logger.Logger, container v3io.Container, input *v3io.
 }
 
 func deleteObjectWorker(container v3io.Container, deleteParams *DeleteParams, logger logger.Logger,
-	filesToDeleteChannel <-chan v3io.Item, terminationChan chan<- error, onErrorTerminationChannel <-chan struct{}) {
+	filesToDeleteChannel <-chan v3io.Item, terminationChan chan<- error, onErrorTerminationChannel <-chan struct{},
+	aggrMask aggregate.AggrType) {
 	for {
 		select {
 		case _ = <-onErrorTerminationChannel:
@@ -501,7 +552,7 @@ func deleteObjectWorker(container v3io.Container, deleteParams *DeleteParams, lo
 				logger.Debug("delete entire item '%v' ", fullFileName)
 				input := &v3io.DeleteObjectInput{Path: fullFileName}
 				err = container.DeleteObjectSync(input)
-				if err != nil {
+				if err != nil && !utils.IsNotExistsOrConflictError(err) {
 					terminationChan <- err
 					return
 				}
@@ -525,6 +576,15 @@ func deleteObjectWorker(container v3io.Container, deleteParams *DeleteParams, lo
 					return
 				}
 
+				var aggregationsByBucket map[int]*aggregate.AggregatesList
+				if aggrMask != 0 {
+					aggregationsByBucket = make(map[int]*aggregate.AggregatesList)
+					aggrBuckets := currentPartition.Times2BucketRange(deleteParams.From, deleteParams.To)
+					for _, bucketId := range aggrBuckets {
+						aggregationsByBucket[bucketId] = aggregate.NewAggregatesList(aggrMask)
+					}
+				}
+
 				for attributeName, value := range itemToDelete {
 					if strings.HasPrefix(attributeName, "_v") {
 						// Check whether the whole chunk attribute needed to be deleted or just part of it.
@@ -534,7 +594,7 @@ func deleteObjectWorker(container v3io.Container, deleteParams *DeleteParams, lo
 							deleteUpdateExpression.WriteString(");")
 						} else {
 							err = generatePartialChunkDeleteExpression(logger, &deleteUpdateExpression, attributeName,
-								value.([]byte), dataEncoding, deleteParams)
+								value.([]byte), dataEncoding, deleteParams, currentPartition, aggregationsByBucket)
 							if err != nil {
 								terminationChan <- err
 								return
@@ -550,6 +610,13 @@ func deleteObjectWorker(container v3io.Container, deleteParams *DeleteParams, lo
 					deleteUpdateExpression.WriteString(fmt.Sprintf("%v=%v;", config.MaxTimeAttrName, deleteParams.From))
 				}
 
+				// If there are server aggregates, update the needed buckets
+				if aggrMask != 0 {
+					for bucket, aggregations := range aggregationsByBucket {
+						deleteUpdateExpression.WriteString(aggregations.SetExpr("v", bucket))
+					}
+				}
+
 				if deleteUpdateExpression.Len() > 0 {
 					exprStr := deleteUpdateExpression.String()
 					condition := fmt.Sprintf("%v == %v and %v == %v",
@@ -562,7 +629,7 @@ func deleteObjectWorker(container v3io.Container, deleteParams *DeleteParams, lo
 					logger.Debug("delete item '%v' with expression '%v'", fullFileName, exprStr)
 
 					err = container.UpdateItemSync(input)
-					if err != nil {
+					if err != nil && !utils.IsNotExistsOrConflictError(err) {
 						returnError := err
 						if isFalseConditionError(err) {
 							returnError = errors.Wrapf(err, "Item '%v' was updated while deleting occurred. Please disable any ingestion and retry.", fullFileName)
@@ -595,7 +662,8 @@ func getEncoding(itemToDelete v3io.Item) (chunkenc.Encoding, error) {
 }
 
 func generatePartialChunkDeleteExpression(logger logger.Logger, expr *strings.Builder,
-	attributeName string, value []byte, encoding chunkenc.Encoding, deleteParams *DeleteParams) error {
+	attributeName string, value []byte, encoding chunkenc.Encoding, deleteParams *DeleteParams,
+	partition *partmgr.DBPartition, aggregationsByBucket map[int]*aggregate.AggregatesList) error {
 	chunk, err := chunkenc.FromData(logger, encoding, value, 0)
 	if err != nil {
 		return err
@@ -620,6 +688,13 @@ func generatePartialChunkDeleteExpression(logger logger.Logger, expr *strings.Bu
 		// Append back only events that are not in the delete range
 		if t < deleteParams.From || t > deleteParams.To {
 			appender.Append(t, v)
+			if aggregationsByBucket != nil {
+				currentAgg, ok := aggregationsByBucket[partition.Time2Bucket(t)]
+				// A chunk may contain more data then needed for the aggregations, if this is the case do not aggregate
+				if ok {
+					currentAgg.Aggregate(t, v)
+				}
+			}
 		}
 	}
 

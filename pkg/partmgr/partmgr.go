@@ -592,6 +592,33 @@ func (p *DBPartition) Time2Bucket(t int64) int {
 	return int((t - p.startTime) / p.rollupTime)
 }
 
+// Return the start time of an aggregation bucket by id
+func (p *DBPartition) GetAggregationBucketStartTime(id int) int64 {
+	return p.startTime + int64(id)*p.rollupTime
+}
+
+// Return the end time of an aggregation bucket by id
+func (p *DBPartition) GetAggregationBucketEndTime(id int) int64 {
+	return p.startTime + int64(id+1)*p.rollupTime - 1
+}
+
+func (p *DBPartition) Times2BucketRange(start, end int64) []int {
+	var buckets []int
+
+	if start > p.GetEndTime() || end < p.startTime {
+		return buckets
+	}
+
+	startingAggrBucket := p.Time2Bucket(start)
+	endAggrBucket := p.Time2Bucket(end)
+
+	for bucketId := startingAggrBucket; bucketId <= endAggrBucket; bucketId++ {
+		buckets = append(buckets, bucketId)
+	}
+
+	return buckets
+}
+
 // Return the nearest chunk start time for the specified time
 func (p *DBPartition) GetChunkMint(t int64) int64 {
 	if t > p.GetEndTime() {

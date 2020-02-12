@@ -1043,7 +1043,7 @@ func testDeleteTSDBCase(test *testing.T, testParams tsdbtest.TestParams, deleteP
 
 	if !deleteParams.DeleteAll {
 		actualPartitions := getCurrentPartitions(test, container, testParams.V3ioConfig().TablePath)
-		assert.ElementsMatch(test, expectedPartitions, actualPartitions, "remainging partitions are not as expected")
+		assert.ElementsMatch(test, expectedPartitions, actualPartitions, "remaining partitions are not as expected")
 
 		qry, err := adapter.QuerierV2()
 		if err != nil {
