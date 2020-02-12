@@ -190,8 +190,5 @@ func (mr *MetricReporter) isEnabled() bool {
 }
 
 func (mr *MetricReporter) isRunning() bool {
-	mr.lock.Lock()
-	defer mr.lock.Unlock()
-
-	return mr.running
+	return false
 }

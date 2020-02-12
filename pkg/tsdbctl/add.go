@@ -181,6 +181,7 @@ func (ac *addCommandeer) add() error {
 		return errors.Wrap(err, "Operation timed out.")
 	}
 
+	appender.Close()
 	ac.rootCommandeer.logger.Info("Done!")
 	return nil
 }
