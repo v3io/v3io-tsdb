@@ -990,6 +990,34 @@ func TestDeleteTable(t *testing.T) {
 				{Time: defaultTimeMillis + 4*tsdbtest.DaysInMillis + 10*tsdbtest.MinuteInMillis, Value: 1.4}}},
 			expectedPartitions: []int64{partitions1StartTime, partitions2StartTime, partitions3StartTime},
 		},
+		{
+			desc: "Should delete whole all samples in chunk but time range is not bigger then chunk",
+			data: tsdbtest.TimeSeries{tsdbtest.Metric{
+				Name: "cpu",
+				Data: generalData,
+			}},
+			deleteParams: DeleteParams{
+				From: partitions1StartTime + 1*tsdbtest.HoursInMillis + 2*tsdbtest.MinuteInMillis,
+				To:   partitions1StartTime + 2*tsdbtest.HoursInMillis + 11*tsdbtest.MinuteInMillis,
+			},
+			expectedData: map[string][]tsdbtest.DataPoint{"cpu": {
+				{Time: defaultTimeMillis, Value: 1.2},
+				{Time: defaultTimeMillis + 5*tsdbtest.MinuteInMillis, Value: 1.3},
+				{Time: defaultTimeMillis + 10*tsdbtest.MinuteInMillis, Value: 1.4},
+
+				{Time: defaultTimeMillis + 2*tsdbtest.DaysInMillis, Value: 1.2},
+				{Time: defaultTimeMillis + 2*tsdbtest.DaysInMillis + 5*tsdbtest.MinuteInMillis, Value: 1.3},
+				{Time: defaultTimeMillis + 2*tsdbtest.DaysInMillis + 10*tsdbtest.MinuteInMillis, Value: 1.4},
+				{Time: defaultTimeMillis + 2*tsdbtest.DaysInMillis + 1*tsdbtest.HoursInMillis + 5*tsdbtest.MinuteInMillis, Value: 1.2},
+				{Time: defaultTimeMillis + 2*tsdbtest.DaysInMillis + 1*tsdbtest.HoursInMillis + 10*tsdbtest.MinuteInMillis, Value: 1.3},
+
+				{Time: defaultTimeMillis + 4*tsdbtest.DaysInMillis, Value: 1.2},
+				{Time: defaultTimeMillis + 4*tsdbtest.DaysInMillis + 5*tsdbtest.MinuteInMillis, Value: 1.3},
+				{Time: defaultTimeMillis + 4*tsdbtest.DaysInMillis + 10*tsdbtest.MinuteInMillis, Value: 1.4},
+				{Time: defaultTimeMillis + 4*tsdbtest.DaysInMillis + 1*tsdbtest.HoursInMillis + 5*tsdbtest.MinuteInMillis, Value: 1.2},
+				{Time: defaultTimeMillis + 4*tsdbtest.DaysInMillis + 1*tsdbtest.HoursInMillis + 10*tsdbtest.MinuteInMillis, Value: 1.3}}},
+			expectedPartitions: []int64{partitions1StartTime, partitions2StartTime, partitions3StartTime},
+		},
 	}
 
 	for _, test := range testCases {

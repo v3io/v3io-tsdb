@@ -685,6 +685,7 @@ func generatePartialChunkDeleteExpression(logger logger.Logger, expr *strings.Bu
 	}
 
 	var currentMaxTime int64
+	var remainingItemsCount int
 	iter := chunk.Iterator()
 	for iter.Next() {
 		var t int64
@@ -697,6 +698,7 @@ func generatePartialChunkDeleteExpression(logger logger.Logger, expr *strings.Bu
 
 		// Append back only events that are not in the delete range
 		if t < deleteParams.From || t > deleteParams.To {
+			remainingItemsCount++
 			appender.Append(t, v)
 
 			// Calculate server-side aggregations
@@ -715,10 +717,17 @@ func generatePartialChunkDeleteExpression(logger logger.Logger, expr *strings.Bu
 		}
 	}
 
-	bytes := appender.Chunk().Bytes()
-	val := base64.StdEncoding.EncodeToString(bytes)
+	if remainingItemsCount == 0 {
+		expr.WriteString("delete(")
+		expr.WriteString(attributeName)
+		expr.WriteString(");")
+		currentMaxTime, _ = partition.GetChunkStartTimeByAttr(attributeName)
+	} else {
+		bytes := appender.Chunk().Bytes()
+		val := base64.StdEncoding.EncodeToString(bytes)
 
-	expr.WriteString(fmt.Sprintf("%s=blob('%s'); ", attributeName, val))
+		expr.WriteString(fmt.Sprintf("%s=blob('%s'); ", attributeName, val))
+	}
 
 	return currentMaxTime, nil
 

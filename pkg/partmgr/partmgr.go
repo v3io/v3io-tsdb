@@ -665,6 +665,21 @@ func (p *DBPartition) IsChunkInRangeByAttr(attr string, mint, maxt int64) bool {
 	return mint <= chunkStartTime && maxt >= chunkEndTime
 }
 
+// Get a chunk's start time by it's attribute name
+func (p *DBPartition) GetChunkStartTimeByAttr(attr string) (int64, error) {
+
+	// Discard '_v' prefix
+	chunkIdStr := attr[2:]
+	chunkId, err := strconv.ParseInt(chunkIdStr, 10, 64)
+	if err != nil {
+		return 0, err
+	}
+
+	chunkStartTime := p.startTime + (chunkId-1)*p.chunkInterval
+
+	return chunkStartTime, nil
+}
+
 // Check whether the specified time is within the range of this partition
 func (p *DBPartition) InRange(t int64) bool {
 	if p.manager.cyclic {
