@@ -585,6 +585,7 @@ func deleteObjectWorker(container v3io.Container, deleteParams *DeleteParams, lo
 					}
 				}
 
+				var newMaxTime int64
 				for attributeName, value := range itemToDelete {
 					if strings.HasPrefix(attributeName, "_v") {
 						// Check whether the whole chunk attribute needed to be deleted or just part of it.
@@ -593,11 +594,15 @@ func deleteObjectWorker(container v3io.Container, deleteParams *DeleteParams, lo
 							deleteUpdateExpression.WriteString(attributeName)
 							deleteUpdateExpression.WriteString(");")
 						} else {
-							err = generatePartialChunkDeleteExpression(logger, &deleteUpdateExpression, attributeName,
+							currentChunksMaxTime, err := generatePartialChunkDeleteExpression(logger, &deleteUpdateExpression, attributeName,
 								value.([]byte), dataEncoding, deleteParams, currentPartition, aggregationsByBucket)
 							if err != nil {
 								terminationChan <- err
 								return
+							}
+
+							if currentChunksMaxTime > newMaxTime {
+								newMaxTime = currentChunksMaxTime
 							}
 						}
 					}
@@ -607,7 +612,11 @@ func deleteObjectWorker(container v3io.Container, deleteParams *DeleteParams, lo
 
 				// Update the partition's max time if needed.
 				if deleteParams.From < dbMaxTime && deleteParams.To >= dbMaxTime {
-					deleteUpdateExpression.WriteString(fmt.Sprintf("%v=%v;", config.MaxTimeAttrName, deleteParams.From))
+					if newMaxTime == 0 {
+						newMaxTime = deleteParams.From
+					}
+
+					deleteUpdateExpression.WriteString(fmt.Sprintf("%v=%v;", config.MaxTimeAttrName, newMaxTime))
 				}
 
 				// If there are server aggregates, update the needed buckets
@@ -663,18 +672,19 @@ func getEncoding(itemToDelete v3io.Item) (chunkenc.Encoding, error) {
 
 func generatePartialChunkDeleteExpression(logger logger.Logger, expr *strings.Builder,
 	attributeName string, value []byte, encoding chunkenc.Encoding, deleteParams *DeleteParams,
-	partition *partmgr.DBPartition, aggregationsByBucket map[int]*aggregate.AggregatesList) error {
+	partition *partmgr.DBPartition, aggregationsByBucket map[int]*aggregate.AggregatesList) (int64, error) {
 	chunk, err := chunkenc.FromData(logger, encoding, value, 0)
 	if err != nil {
-		return err
+		return 0, err
 	}
 
 	newChunk := chunkenc.NewChunk(logger, encoding == chunkenc.EncVariant)
 	appender, err := newChunk.Appender()
 	if err != nil {
-		return err
+		return 0, err
 	}
 
+	var currentMaxTime int64
 	iter := chunk.Iterator()
 	for iter.Next() {
 		var t int64
@@ -688,12 +698,19 @@ func generatePartialChunkDeleteExpression(logger logger.Logger, expr *strings.Bu
 		// Append back only events that are not in the delete range
 		if t < deleteParams.From || t > deleteParams.To {
 			appender.Append(t, v)
+
+			// Calculate server-side aggregations
 			if aggregationsByBucket != nil {
 				currentAgg, ok := aggregationsByBucket[partition.Time2Bucket(t)]
 				// A chunk may contain more data then needed for the aggregations, if this is the case do not aggregate
 				if ok {
 					currentAgg.Aggregate(t, v)
 				}
+			}
+
+			// Update current chunk's new max time
+			if t > currentMaxTime {
+				currentMaxTime = t
 			}
 		}
 	}
@@ -703,7 +720,7 @@ func generatePartialChunkDeleteExpression(logger logger.Logger, expr *strings.Bu
 
 	expr.WriteString(fmt.Sprintf("%s=blob('%s'); ", attributeName, val))
 
-	return nil
+	return currentMaxTime, nil
 
 }
 
