@@ -612,8 +612,8 @@ func (p *DBPartition) Times2BucketRange(start, end int64) []int {
 	startingAggrBucket := p.Time2Bucket(start)
 	endAggrBucket := p.Time2Bucket(end)
 
-	for bucketId := startingAggrBucket; bucketId <= endAggrBucket; bucketId++ {
-		buckets = append(buckets, bucketId)
+	for bucketID := startingAggrBucket; bucketID <= endAggrBucket; bucketID++ {
+		buckets = append(buckets, bucketID)
 	}
 
 	return buckets
@@ -653,13 +653,13 @@ func (p *DBPartition) TimeToChunkId(tmilli int64) (int, error) {
 func (p *DBPartition) IsChunkInRangeByAttr(attr string, mint, maxt int64) bool {
 
 	// Discard '_v' prefix
-	chunkIdStr := attr[2:]
-	chunkId, err := strconv.ParseInt(chunkIdStr, 10, 64)
+	chunkIDStr := attr[2:]
+	chunkID, err := strconv.ParseInt(chunkIDStr, 10, 64)
 	if err != nil {
 		return false
 	}
 
-	chunkStartTime := p.startTime + (chunkId-1)*p.chunkInterval
+	chunkStartTime := p.startTime + (chunkID-1)*p.chunkInterval
 	chunkEndTime := chunkStartTime + p.chunkInterval - 1
 
 	return mint <= chunkStartTime && maxt >= chunkEndTime
@@ -669,13 +669,13 @@ func (p *DBPartition) IsChunkInRangeByAttr(attr string, mint, maxt int64) bool {
 func (p *DBPartition) GetChunkStartTimeByAttr(attr string) (int64, error) {
 
 	// Discard '_v' prefix
-	chunkIdStr := attr[2:]
-	chunkId, err := strconv.ParseInt(chunkIdStr, 10, 64)
+	chunkIDStr := attr[2:]
+	chunkID, err := strconv.ParseInt(chunkIDStr, 10, 64)
 	if err != nil {
 		return 0, err
 	}
 
-	chunkStartTime := p.startTime + (chunkId-1)*p.chunkInterval
+	chunkStartTime := p.startTime + (chunkID-1)*p.chunkInterval
 
 	return chunkStartTime, nil
 }

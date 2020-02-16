@@ -581,8 +581,8 @@ func deleteObjectWorker(container v3io.Container, deleteParams *DeleteParams, lo
 				if aggrMask != 0 {
 					aggregationsByBucket = make(map[int]*aggregate.AggregatesList)
 					aggrBuckets := currentPartition.Times2BucketRange(deleteParams.From, deleteParams.To)
-					for _, bucketId := range aggrBuckets {
-						aggregationsByBucket[bucketId] = aggregate.NewAggregatesList(aggrMask)
+					for _, bucketID := range aggrBuckets {
+						aggregationsByBucket[bucketID] = aggregate.NewAggregatesList(aggrMask)
 					}
 				}
 
