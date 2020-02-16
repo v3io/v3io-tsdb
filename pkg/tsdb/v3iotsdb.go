@@ -54,6 +54,7 @@ const (
 	errorCodeString              = "ErrorCode"
 	falseConditionOuterErrorCode = "184549378" // todo: change codes
 	falseConditionInnerErrorCode = "385876025"
+	maxExpressionsInUpdateItem   = 1500 // max is 2000, we're taking a buffer since it doesn't work with 2000
 )
 
 type V3ioAdapter struct {
@@ -586,6 +587,7 @@ func deleteObjectWorker(container v3io.Container, deleteParams *DeleteParams, lo
 				}
 
 				var newMaxTime int64
+				var numberOfExpressionsInUpdate int
 				for attributeName, value := range itemToDelete {
 					if strings.HasPrefix(attributeName, "_v") {
 						// Check whether the whole chunk attribute needed to be deleted or just part of it.
@@ -605,6 +607,7 @@ func deleteObjectWorker(container v3io.Container, deleteParams *DeleteParams, lo
 								newMaxTime = currentChunksMaxTime
 							}
 						}
+						numberOfExpressionsInUpdate++
 					}
 				}
 
@@ -619,37 +622,71 @@ func deleteObjectWorker(container v3io.Container, deleteParams *DeleteParams, lo
 					deleteUpdateExpression.WriteString(fmt.Sprintf("%v=%v;", config.MaxTimeAttrName, newMaxTime))
 				}
 
-				// If there are server aggregates, update the needed buckets
-				if aggrMask != 0 {
-					for bucket, aggregations := range aggregationsByBucket {
-						deleteUpdateExpression.WriteString(aggregations.SetExpr("v", bucket))
-					}
-				}
-
 				if deleteUpdateExpression.Len() > 0 {
-					exprStr := deleteUpdateExpression.String()
-					condition := fmt.Sprintf("%v == %v and %v == %v",
-						config.MtimeSecsAttributeName, mtimeSecs,
-						config.MtimeNSecsAttributeName, mtimeNSecs)
-					input := &v3io.UpdateItemInput{Path: fullFileName,
-						Expression: &exprStr,
-						Condition:  condition}
+					// If there are server aggregates, update the needed buckets
+					if aggrMask != 0 {
+						for bucket, aggregations := range aggregationsByBucket {
+							numberOfExpressionsInUpdate = numberOfExpressionsInUpdate + len(*aggregations)
 
-					logger.Debug("delete item '%v' with expression '%v'", fullFileName, exprStr)
+							// Due to engine limitation, If we reached maximum number of expressions in an UpdateItem
+							// we need to break the update into chunks
+							// TODO: refactor in 2.8:
+							// in 2.8 there is a better way of doing it by uniting multiple update expressions into
+							// one expression by range in a form similar to `_v_sum[15...100]=0`
+							if numberOfExpressionsInUpdate < maxExpressionsInUpdateItem {
+								deleteUpdateExpression.WriteString(aggregations.SetExpr("v", bucket))
+							} else {
+								exprStr := deleteUpdateExpression.String()
+								logger.Debug("delete item '%v' with expression '%v'", fullFileName, exprStr)
+								mtimeSecs, mtimeNSecs, err = sendUpdateItem(fullFileName, exprStr, mtimeSecs, mtimeNSecs, container)
+								if err != nil {
+									terminationChan <- err
+									return
+								}
 
-					err = container.UpdateItemSync(input)
-					if err != nil && !utils.IsNotExistsOrConflictError(err) {
-						returnError := err
-						if isFalseConditionError(err) {
-							returnError = errors.Wrapf(err, "Item '%v' was updated while deleting occurred. Please disable any ingestion and retry.", fullFileName)
+								// Reset stuff for next update iteration
+								numberOfExpressionsInUpdate = 0
+								deleteUpdateExpression.Reset()
+							}
 						}
-						terminationChan <- returnError
-						return
+					}
+
+					// If any expressions are left, save them
+					if deleteUpdateExpression.Len() > 0 {
+						exprStr := deleteUpdateExpression.String()
+						logger.Debug("delete item '%v' with expression '%v'", fullFileName, exprStr)
+						_, _, err = sendUpdateItem(fullFileName, exprStr, mtimeSecs, mtimeNSecs, container)
+						if err != nil {
+							terminationChan <- err
+							return
+						}
 					}
 				}
 			}
 		}
 	}
+}
+
+func sendUpdateItem(path, expr string, mtimeSecs, mtimeNSecs int, container v3io.Container) (int, int, error) {
+	condition := fmt.Sprintf("%v == %v and %v == %v",
+		config.MtimeSecsAttributeName, mtimeSecs,
+		config.MtimeNSecsAttributeName, mtimeNSecs)
+
+	input := &v3io.UpdateItemInput{Path: path,
+		Expression: &expr,
+		Condition:  condition}
+
+	response, err := container.UpdateItemSync(input)
+	if err != nil && !utils.IsNotExistsOrConflictError(err) {
+		returnError := err
+		if isFalseConditionError(err) {
+			returnError = errors.Wrapf(err, "Item '%v' was updated while deleting occurred. Please disable any ingestion and retry.", path)
+		}
+		return 0, 0, returnError
+	}
+
+	output := response.Output.(*v3io.UpdateItemOutput)
+	return output.MtimeSecs, output.MtimeNSecs, nil
 }
 
 func getEncoding(itemToDelete v3io.Item) (chunkenc.Encoding, error) {

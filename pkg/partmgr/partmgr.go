@@ -198,7 +198,7 @@ func (p *PartitionManager) updateSchema() error {
 			}
 
 			input := &v3io.PutItemInput{Path: schemaFilePath, Attributes: attributes}
-			err := p.container.PutItemSync(input)
+			_, err := p.container.PutItemSync(input)
 
 			if err != nil {
 				outerError = errors.Wrap(err, "failed to update partitions table.")
@@ -238,7 +238,7 @@ func (p *PartitionManager) DeletePartitionsFromSchema(partitionsToDelete []*DBPa
 			deletePartitionExpression.WriteString(");")
 		}
 		expression := deletePartitionExpression.String()
-		err := p.container.UpdateItemSync(&v3io.UpdateItemInput{Path: p.GetSchemaFilePath(), Expression: &expression})
+		_, err := p.container.UpdateItemSync(&v3io.UpdateItemInput{Path: p.GetSchemaFilePath(), Expression: &expression})
 		if err != nil {
 			return err
 		}
