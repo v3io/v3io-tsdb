@@ -856,3 +856,106 @@ func (suite *testSelectDataframeSuite) TestQueryNonExistingMetric() {
 		}
 	}
 }
+
+func (suite *testSelectDataframeSuite) TestSparseStringAndNumericColumnsDataframe() {
+	adapter, err := tsdb.NewV3ioAdapter(suite.v3ioConfig, nil, nil)
+	suite.NoError(err, "failed to create v3io adapter")
+
+	metricCpu := "cpu"
+	metricLog := "log"
+	labels := utils.LabelsFromStringList("os", "linux")
+	labelsWithNameLog := append(labels, utils.LabelsFromStringList("__name__", metricLog)...)
+
+	expectedTimeColumn := []int64{
+		suite.basicQueryTime,
+		suite.basicQueryTime + tsdbtest.MinuteInMillis,
+		suite.basicQueryTime + 2*tsdbtest.MinuteInMillis,
+		suite.basicQueryTime + 3*tsdbtest.MinuteInMillis,
+		suite.basicQueryTime + 4*tsdbtest.MinuteInMillis}
+
+	expectedTimeColumnLog := []int64{
+		suite.basicQueryTime,
+		suite.basicQueryTime + 2*tsdbtest.MinuteInMillis,
+		suite.basicQueryTime + 3*tsdbtest.MinuteInMillis,
+		suite.basicQueryTime + 4*tsdbtest.MinuteInMillis}
+
+	dataLog := []interface{}{"a", "c", "d", "e"}
+	expectedColumns := map[string][]interface{}{
+		metricCpu: {10.0, 20.0, 30.0, math.NaN(), 50.0},
+		metricLog: {"a", "", "c", "d", "e"}}
+	appender, err := adapter.Appender()
+	suite.NoError(err, "failed to create v3io appender")
+
+	refLog, err := appender.Add(labelsWithNameLog, expectedTimeColumnLog[0], dataLog[0])
+	suite.NoError(err, "failed to add data to the TSDB appender")
+	for i := 1; i < len(expectedTimeColumnLog); i++ {
+		appender.AddFast(labels, refLog, expectedTimeColumnLog[i], dataLog[i])
+	}
+
+	_, err = appender.WaitForCompletion(0)
+	suite.NoError(err, "failed to wait for TSDB append completion")
+
+	testParams := tsdbtest.NewTestParams(suite.T(),
+		tsdbtest.TestOption{
+			Key: tsdbtest.OptTimeSeries,
+			Value: tsdbtest.TimeSeries{tsdbtest.Metric{
+				Name:   metricCpu,
+				Labels: labels,
+				Data: []tsdbtest.DataPoint{
+					{suite.basicQueryTime, 10.0},
+					{int64(suite.basicQueryTime + tsdbtest.MinuteInMillis), 20.0},
+					{suite.basicQueryTime + 2*tsdbtest.MinuteInMillis, 30.0},
+					{suite.basicQueryTime + 4*tsdbtest.MinuteInMillis, 50.0}}},
+			}})
+
+	tsdbtest.InsertData(suite.T(), testParams)
+
+	querierV2, err := adapter.QuerierV2()
+	suite.NoError(err, "failed to create querier")
+
+	params := &pquerier.SelectParams{RequestedColumns: []pquerier.RequestedColumn{{Metric: metricCpu}, {Metric: metricLog}},
+		From: suite.basicQueryTime, To: suite.basicQueryTime + 5*tsdbtest.MinuteInMillis}
+	iter, err := querierV2.SelectDataFrame(params)
+	suite.NoError(err, "failed to execute query")
+
+	var seriesCount int
+	for iter.NextFrame() {
+		seriesCount++
+		frame, err := iter.GetFrame()
+		suite.NoError(err)
+		indexCol := frame.Indices()[0]
+
+		nullValuesMap := frame.NullValuesMap()
+		suite.NotNil(nullValuesMap, "null value map should not be empty")
+
+		for i := 0; i < indexCol.Len(); i++ {
+			t, _ := indexCol.TimeAt(i)
+			timeMillis := t.UnixNano() / int64(time.Millisecond)
+			suite.Require().Equal(expectedTimeColumn[i], timeMillis, "time column does not match at index %v", i)
+			for _, columnName := range frame.Names() {
+				var v interface{}
+				column, err := frame.Column(columnName)
+				suite.NoError(err)
+				if column.DType() == frames.FloatType {
+					v, _ = column.FloatAt(i)
+					if v == math.NaN() {
+						suite.True(i == 3, "null value is expected")
+						suite.True(nullValuesMap[i].NullColumns[columnName])
+					}
+					bothNaN := math.IsNaN(expectedColumns[column.Name()][i].(float64)) && math.IsNaN(v.(float64))
+					if bothNaN {
+						continue
+					}
+				} else if column.DType() == frames.StringType {
+					v, _ = column.StringAt(i)
+					if v == "" {
+						suite.True(nullValuesMap[i].NullColumns[columnName])
+					}
+				} else {
+					suite.Fail(fmt.Sprintf("column type is not as expected: %v", column.DType()))
+				}
+				suite.Require().Equal(expectedColumns[column.Name()][i], v, "column %v does not match at index %v", column.Name(), i)
+			}
+		}
+	}
+}
