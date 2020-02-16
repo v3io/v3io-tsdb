@@ -586,7 +586,7 @@ func deleteObjectWorker(container v3io.Container, deleteParams *DeleteParams, lo
 					}
 				}
 
-				var newMaxTime int64
+				var newMaxTime int64 = math.MaxInt64
 				var numberOfExpressionsInUpdate int
 				for attributeName, value := range itemToDelete {
 					if strings.HasPrefix(attributeName, "_v") {
@@ -603,7 +603,8 @@ func deleteObjectWorker(container v3io.Container, deleteParams *DeleteParams, lo
 								return
 							}
 
-							if currentChunksMaxTime > newMaxTime {
+							// We want to save the earliest max time possible
+							if currentChunksMaxTime < newMaxTime {
 								newMaxTime = currentChunksMaxTime
 							}
 						}
@@ -615,7 +616,7 @@ func deleteObjectWorker(container v3io.Container, deleteParams *DeleteParams, lo
 
 				// Update the partition's max time if needed.
 				if deleteParams.From < dbMaxTime && deleteParams.To >= dbMaxTime {
-					if newMaxTime == 0 {
+					if deleteParams.From < newMaxTime {
 						newMaxTime = deleteParams.From
 					}
 
