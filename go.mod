@@ -12,6 +12,7 @@ require (
 	github.com/nuclio/nuclio-sdk-go v0.0.0-20190205170814-3b507fbd0324
 	github.com/nuclio/nuclio-test-go v0.0.0-20180704132150-0ce6587f8e37
 	github.com/nuclio/zap v0.0.2
+	github.com/pavius/impi v0.0.0-20200212064320-5db7efa5f87b // indirect
 	github.com/pkg/errors v0.8.1
 	github.com/rcrowley/go-metrics v0.0.0-20181016184325-3113b8401b8a
 	github.com/spf13/cobra v0.0.3
@@ -24,7 +25,6 @@ require (
 	github.com/xwb1989/sqlparser v0.0.0-20180606152119-120387863bf2
 	google.golang.org/genproto v0.0.0-20181026194446-8b5d7a19e2d9 // indirect
 	gopkg.in/check.v1 v1.0.0-20180628173108-788fd7840127 // indirect
-	require github.com/nicksnyder/go-i18n v2.0.3
 )
 
 replace (
