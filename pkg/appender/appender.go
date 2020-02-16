@@ -122,7 +122,9 @@ type MetricsCache struct {
 	updatesComplete chan int
 	newUpdates      chan int
 
-	lastMetric     uint64
+	lastMetric uint64
+
+	// TODO: consider switching to synch.Map (https://golang.org/pkg/sync/#Map)
 	cacheMetricMap map[cacheKey]*MetricState // TODO: maybe use hash as key & combine w ref
 	cacheRefMap    map[uint64]*MetricState   // TODO: maybe turn to list + free list, periodically delete old matrics
 
@@ -130,6 +132,8 @@ type MetricsCache struct {
 
 	lastError           error
 	performanceReporter *performance.MetricReporter
+
+	stopChan chan int
 }
 
 func NewMetricsCache(container v3io.Container, logger logger.Logger, cfg *config.V3ioConfig,
@@ -146,6 +150,7 @@ func NewMetricsCache(container v3io.Container, logger logger.Logger, cfg *config
 	newCache.metricQueue = NewElasticQueue()
 	newCache.updatesComplete = make(chan int, 100)
 	newCache.newUpdates = make(chan int, 1000)
+	newCache.stopChan = make(chan int, 3)
 
 	newCache.NameLabelMap = map[string]bool{}
 	newCache.performanceReporter = performance.ReporterInstanceFromConfig(cfg)
@@ -217,11 +222,18 @@ func (mc *MetricsCache) Add(lset utils.LabelsIfc, t int64, v interface{}) (uint6
 
 	isValueVariantType := false
 	// If the value is not of Float type assume it's variant type.
-	if _, ok := v.(float64); !ok {
+	switch v.(type) {
+	case int, int64, float64, float32:
+		isValueVariantType = false
+	default:
 		isValueVariantType = true
 	}
 
 	name, key, hash := lset.GetKey()
+	err = utils.IsValidMetricName(name)
+	if err != nil {
+		return 0, err
+	}
 	metric, ok := mc.getMetric(name, hash)
 
 	var aggrMetrics []*MetricState
@@ -300,6 +312,12 @@ func verifyTimeValid(t int64) error {
 		return fmt.Errorf("Time '%d' doesn't seem to be a valid Unix timesamp in milliseconds. The time must be in the years range 1970-2400.", t)
 	}
 	return nil
+}
+func (mc *MetricsCache) Close() {
+	//for 3 go funcs
+	mc.stopChan <- 0
+	mc.stopChan <- 0
+	mc.stopChan <- 0
 }
 
 func (mc *MetricsCache) WaitForCompletion(timeout time.Duration) (int, error) {

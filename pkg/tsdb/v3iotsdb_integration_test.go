@@ -24,9 +24,11 @@ package tsdb_test
 
 import (
 	"encoding/json"
+	"fmt"
 	"math"
 	"path"
 	"sort"
+	"strings"
 	"testing"
 	"time"
 
@@ -45,6 +47,7 @@ import (
 const defaultStepMs = 5 * tsdbtest.MinuteInMillis // 5 minutes
 
 func TestIngestData(t *testing.T) {
+	timestamp := fmt.Sprintf("%d", time.Now().Unix()) //time.Now().Format(time.RFC3339)
 	testCases := []struct {
 		desc   string
 		params tsdbtest.TestParams
@@ -89,32 +92,58 @@ func TestIngestData(t *testing.T) {
 					}}},
 			),
 		},
-		{desc: "Should ingest record with a dash in the metric name (IG-8585)",
-			params: tsdbtest.NewTestParams(t,
-				tsdbtest.TestOption{
-					Key: tsdbtest.OptTimeSeries,
-					Value: tsdbtest.TimeSeries{tsdbtest.Metric{
-						Name:   "cool-cpu",
-						Labels: utils.LabelsFromStringList("os", "linux", "iguaz", "yesplease"),
-						Data: []tsdbtest.DataPoint{
-							{Time: 1532940510, Value: 314.3},
-							{Time: 1532940510 + 5, Value: 300.3},
-							{Time: 1532940510 - 10, Value: 3234.6}},
-					}}},
-			),
-		},
 		{desc: "Should ingest into first partition in epoch without corruption (TSDB-67)",
 			params: tsdbtest.NewTestParams(t,
 				tsdbtest.TestOption{
 					Key: tsdbtest.OptTimeSeries,
 					Value: tsdbtest.TimeSeries{tsdbtest.Metric{
-						Name:   "cool-cpu",
+						Name:   "coolcpu",
 						Labels: utils.LabelsFromStringList("os", "linux", "iguaz", "yesplease"),
 						Data: []tsdbtest.DataPoint{
 							{Time: 10, Value: 314.3},
 						},
 					}}},
 			),
+		},
+		{desc: "Should drop values of incompatible data types (prepare data for: IG-13146)",
+			params: tsdbtest.NewTestParams(t,
+				tsdbtest.TestOption{
+					Key: tsdbtest.OptTimeSeries,
+					Value: tsdbtest.TimeSeries{tsdbtest.Metric{
+						Name:   "IG13146",
+						Labels: utils.LabelsFromStringList("test", "IG-13146", "float", "string"),
+						Data: []tsdbtest.DataPoint{
+							{Time: 15, Value: 0.1},                 // first add float value
+							{Time: 20, Value: "some string value"}, // then attempt to add string value
+							{Time: 30, Value: 0.2},                 // and finally add another float value
+						},
+						ExpectedCount: func() *int { var expectedCount = 2; return &expectedCount }(),
+					}}},
+				tsdbtest.TestOption{
+					Key:   "override_test_name",
+					Value: fmt.Sprintf("IG-13146-%s", timestamp)}),
+		},
+		{desc: "IG-13146: Should reject values of incompatible data types without data corruption",
+			params: tsdbtest.NewTestParams(t,
+				tsdbtest.TestOption{
+					Key: tsdbtest.OptTimeSeries,
+					Value: tsdbtest.TimeSeries{tsdbtest.Metric{
+						Name:   "IG13146",
+						Labels: utils.LabelsFromStringList("test", "IG-13146", "float", "string"),
+						Data: []tsdbtest.DataPoint{
+							{Time: 50, Value: "another string value"}, // then attempt to add string value
+							{Time: 60, Value: 0.4},                    // valid values from this batch will be dropped
+							{Time: 70, Value: 0.3},                    // because processing of entire batch will stop
+						},
+						ExpectedCount: func() *int { var expectedCount = 2; return &expectedCount }(),
+					}}},
+				tsdbtest.TestOption{
+					Key:   "override_test_name",
+					Value: fmt.Sprintf("IG-13146-%s", timestamp)},
+				tsdbtest.TestOption{
+					Key: "expected_error_contains_string",
+					// Note, the expected error message should align with pkg/appender/ingest.go:308
+					Value: "trying to ingest values of incompatible data type"}),
 		},
 	}
 
@@ -158,11 +187,24 @@ func testIngestDataCase(t *testing.T, testParams tsdbtest.TestParams) {
 		}
 
 		if _, err := appender.WaitForCompletion(0); err != nil {
-			t.Fatalf("Failed to wait for appender completion. reason: %s", err)
+			if !isExpected(testParams, err) {
+				t.Fatalf("Failed to wait for appender completion. reason: %s", err)
+			}
 		}
 
-		tsdbtest.ValidateCountOfSamples(t, adapter, dp.Name, len(dp.Data), from, to, -1)
+		expectedCount := len(dp.Data)
+		if dp.ExpectedCount != nil {
+			expectedCount = *dp.ExpectedCount
+		}
+		tsdbtest.ValidateCountOfSamples(t, adapter, dp.Name, expectedCount, from, to, -1)
 	}
+}
+
+func isExpected(testParams tsdbtest.TestParams, actualErr error) bool {
+	if errMsg, ok := testParams["expected_error_contains_string"]; ok {
+		return strings.Contains(actualErr.Error(), fmt.Sprintf("%v", errMsg))
+	}
+	return false
 }
 
 func TestIngestDataWithSameTimestamp(t *testing.T) {
@@ -214,6 +256,37 @@ func TestIngestDataWithSameTimestamp(t *testing.T) {
 	}
 
 	tsdbtest.ValidateCountOfSamples(t, adapter, "", 2, baseTime-1*tsdbtest.HoursInMillis, baseTime+1*tsdbtest.HoursInMillis, -1)
+}
+
+func TestWriteMetricWithDashInName(t *testing.T) {
+	testParams := tsdbtest.NewTestParams(t,
+		tsdbtest.TestOption{
+			Key: tsdbtest.OptTimeSeries,
+			Value: tsdbtest.TimeSeries{tsdbtest.Metric{
+				Name:   "cpu-1",
+				Labels: utils.LabelsFromStringList("testLabel", "balbala"),
+				Data:   []tsdbtest.DataPoint{{Time: 1532940510, Value: 314.3}},
+			}}})
+	defer tsdbtest.SetUp(t, testParams)()
+
+	adapter, err := NewV3ioAdapter(testParams.V3ioConfig(), nil, nil)
+	if err != nil {
+		t.Fatalf("Failed to create v3io adapter. reason: %s", err)
+	}
+
+	appender, err := adapter.Appender()
+	if err != nil {
+		t.Fatalf("Failed to get appender. reason: %s", err)
+	}
+	for _, dp := range testParams.TimeSeries() {
+		labels := utils.Labels{utils.Label{Name: "__name__", Value: dp.Name}}
+		labels = append(labels, dp.Labels...)
+
+		_, err := appender.Add(labels, dp.Data[0].Time, dp.Data[0].Value)
+		if err == nil {
+			t.Fatalf("Test should have failed")
+		}
+	}
 }
 
 func TestQueryData(t *testing.T) {
@@ -295,21 +368,6 @@ func TestQueryData(t *testing.T) {
 			to:       1532940510 + 1,
 			step:     defaultStepMs,
 			expected: map[string][]tsdbtest.DataPoint{"": {{Time: 1532940510, Value: 31.3}}}},
-
-		{desc: "Should ingest and query data with '-' in the metric name (IG-8585)",
-			testParams: tsdbtest.NewTestParams(t,
-				tsdbtest.TestOption{
-					Key: tsdbtest.OptTimeSeries,
-					Value: tsdbtest.TimeSeries{tsdbtest.Metric{
-						Name:   "cool-cpu",
-						Labels: utils.LabelsFromStringList("os", "linux", "iguaz", "yesplease"),
-						Data:   []tsdbtest.DataPoint{{Time: 1532940510, Value: 314.3}},
-					}}},
-			),
-			from:     0,
-			to:       1532940510 + 1,
-			step:     defaultStepMs,
-			expected: map[string][]tsdbtest.DataPoint{"": {{Time: 1532940510, Value: 314.3}}}},
 
 		{desc: "Should ingest and query by time",
 			testParams: tsdbtest.NewTestParams(t,
@@ -557,8 +615,18 @@ func testQueryDataCase(test *testing.T, testParams tsdbtest.TestParams, filter s
 			if err != nil {
 				test.Fatal(err)
 			}
-			assert.ElementsMatch(test, expected[currentAggregate], actual,
-				"Check failed for aggregate='%s'. Query aggregates: %s", currentAggregate, queryAggregates)
+
+			for _, data := range expected[currentAggregate] {
+				var equalCount = 0
+				for _, dp := range actual {
+					if dp.Equals(data) {
+						equalCount++
+						continue
+					}
+				}
+				assert.Equal(test, equalCount, len(expected[currentAggregate]),
+					"Check failed for aggregate='%s'. Query aggregates: %s", currentAggregate, queryAggregates)
+			}
 		}
 
 		if set.Err() != nil {
@@ -684,7 +752,14 @@ func testQueryDataOverlappingWindowCase(test *testing.T, v3ioConfig *config.V3io
 		}
 		assert.EqualValues(test, len(windows), len(actual))
 		for _, data := range expected[agg] {
-			assert.Contains(test, actual, data)
+			var equalCount = 0
+			for _, dp := range actual {
+				if dp.Equals(data) {
+					equalCount++
+					continue
+				}
+			}
+			assert.Equal(test, equalCount, len(expected[agg]))
 		}
 	}
 
@@ -765,7 +840,17 @@ func TestIgnoreNaNWhenSeekingAggSeries(t *testing.T) {
 			}
 			actual = append(actual, tsdbtest.DataPoint{Time: t1, Value: v1})
 		}
-		assert.ElementsMatch(t, expected[agg], actual)
+
+		for _, data := range expected[agg] {
+			var equalCount = 0
+			for _, dp := range actual {
+				if dp.Equals(data) {
+					equalCount++
+					continue
+				}
+			}
+			assert.Equal(t, equalCount, len(expected[agg]))
+		}
 	}
 
 	if set.Err() != nil {

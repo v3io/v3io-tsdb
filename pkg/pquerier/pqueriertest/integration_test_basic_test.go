@@ -66,3 +66,21 @@ func (suite *basicQueryTestSuite) TearDownTest() {
 		tsdbtest.DeleteTSDB(suite.T(), suite.v3ioConfig)
 	}
 }
+
+func (suite *basicQueryTestSuite) compareSingleMetric(data []tsdbtest.DataPoint, expected []tsdbtest.DataPoint) {
+	for i, dataPoint := range data {
+		suite.Require().True(dataPoint.Equals(expected[i]), "queried data does not match expected")
+	}
+}
+
+func (suite *basicQueryTestSuite) compareSingleMetricWithAggregator(data []tsdbtest.DataPoint, expected map[string][]tsdbtest.DataPoint, agg string) {
+	for i, dataPoint := range data {
+		suite.Require().True(dataPoint.Equals(expected[agg][i]), "queried data does not match expected")
+	}
+}
+
+func (suite *basicQueryTestSuite) compareMultipleMetrics(data []tsdbtest.DataPoint, expected map[string]map[string][]tsdbtest.DataPoint, metricName string, aggr string) {
+	for i, dataPoint := range data {
+		suite.Require().True(dataPoint.Equals(expected[metricName][aggr][i]), "queried data does not match expected")
+	}
+}

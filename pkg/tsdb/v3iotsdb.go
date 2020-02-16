@@ -170,7 +170,6 @@ func (a *V3ioAdapter) connect() error {
 		} else {
 			return errors.Wrapf(err, "Failed to read a TSDB schema from '%s'.", fullpath)
 		}
-
 	}
 
 	tableSchema := config.Schema{}
@@ -180,7 +179,7 @@ func (a *V3ioAdapter) connect() error {
 	}
 
 	// in order to support backward compatibility we do not fail on version mismatch and only logging warning
-	if tableSchema.TableSchemaInfo.Version != schema.Version {
+	if a.cfg.LoadPartitionsFromSchemaAttr && tableSchema.TableSchemaInfo.Version != schema.Version {
 		a.logger.Warn("Table Schema version mismatch - existing table schema version is %d while the tsdb library version is %d! Make sure to create the table with same library version",
 			tableSchema.TableSchemaInfo.Version, schema.Version)
 	}
@@ -290,15 +289,6 @@ func (a *V3ioAdapter) DeleteDB(deleteAll bool, ignoreErrors bool, fromTime int64
 			return errors.New("The configuration at '" + schemaPath + "' cannot be deleted or doesn't exist.")
 		}
 
-		// Delete Partitions directory
-		partitionsKvPath := a.partitionMngr.GetPartitionsTablePath() + "/"
-		err = a.container.DeleteObjectSync(&v3io.DeleteObjectInput{Path: partitionsKvPath})
-		if err != nil && !ignoreErrors {
-			if !utils.IsNotExistsError(err) {
-				return errors.Wrapf(err, "Failed to delete partitions kv table '%s'.", partitionsKvPath)
-			}
-		}
-
 		// Delete the Directory object
 		path := a.cfg.TablePath + "/"
 		err = a.container.DeleteObjectSync(&v3io.DeleteObjectInput{Path: path})
@@ -353,6 +343,10 @@ func (a v3ioAppender) WaitForCompletion(timeout time.Duration) (int, error) {
 	return a.metricsCache.WaitForCompletion(timeout)
 }
 
+func (a v3ioAppender) Close() {
+	a.metricsCache.Close()
+}
+
 // In V3IO, all operations are committed (no client cache)
 func (a v3ioAppender) Commit() error   { return nil }
 func (a v3ioAppender) Rollback() error { return nil }
@@ -364,4 +358,5 @@ type Appender interface {
 	WaitForCompletion(timeout time.Duration) (int, error)
 	Commit() error
 	Rollback() error
+	Close()
 }

@@ -25,12 +25,59 @@ const DaysInMillis = 24 * HoursInMillis
 
 type DataPoint struct {
 	Time  int64
-	Value float64
+	Value interface{}
 }
+
+func (dp DataPoint) Equals(other DataPoint) bool {
+	if &dp.Time != &other.Time {
+		return true
+	}
+	if dp.Time != other.Time {
+		return false
+	}
+
+	switch dpVal := dp.Value.(type) {
+	case float64:
+		switch oVal := other.Value.(type) {
+		case float64:
+			return dpVal == oVal
+		case int:
+			return dpVal == float64(oVal)
+		default:
+			return false
+		}
+	case int:
+		switch oVal := other.Value.(type) {
+		case float64:
+			return float64(dpVal) == oVal
+		case int:
+			return dpVal == oVal
+		default:
+			return false
+		}
+	case string:
+		switch oVal := other.Value.(type) {
+		case string:
+			return oVal == dpVal
+		case float64:
+			soVal := fmt.Sprintf("%f", oVal)
+			return dpVal == soVal
+		case int:
+			soVal := fmt.Sprintf("%d", oVal)
+			return dpVal == soVal
+		default:
+			return false
+		}
+	default:
+		return false
+	}
+}
+
 type Metric struct {
-	Name   string
-	Labels utils.Labels
-	Data   []DataPoint
+	Name          string
+	Labels        utils.Labels
+	Data          []DataPoint
+	ExpectedCount *int
 }
 type TimeSeries []Metric
 
@@ -128,7 +175,13 @@ func tearDown(t testing.TB, v3ioConfig *config.V3ioConfig, testParams TestParams
 
 func SetUp(t testing.TB, testParams TestParams) func() {
 	v3ioConfig := testParams.V3ioConfig()
-	v3ioConfig.TablePath = PrefixTablePath(fmt.Sprintf("%s-%d", t.Name(), time.Now().Nanosecond()))
+
+	if overrideTableName, ok := testParams["override_test_name"]; ok {
+		v3ioConfig.TablePath = PrefixTablePath(fmt.Sprintf("%v", overrideTableName))
+	} else {
+		v3ioConfig.TablePath = PrefixTablePath(fmt.Sprintf("%s-%d", t.Name(), time.Now().Nanosecond()))
+	}
+
 	CreateTestTSDB(t, v3ioConfig)
 
 	// Measure performance
@@ -269,7 +322,7 @@ func ValidateRawData(t testing.TB, adapter *V3ioAdapter, metricName string, star
 
 	for set.Next() {
 		// Start over for each label set
-		var lastDataPoint = &DataPoint{Time: -1, Value: -1.0}
+		var lastDataPoint *DataPoint = nil
 
 		if set.Err() != nil {
 			t.Fatal(set.Err(), "Failed to get the next element from a result set.")
@@ -284,12 +337,16 @@ func ValidateRawData(t testing.TB, adapter *V3ioAdapter, metricName string, star
 			currentTime, currentValue := iter.At()
 			currentDataPoint := &DataPoint{Time: currentTime, Value: currentValue}
 
-			if lastDataPoint.Value >= 0 {
-				// Note: We cast float to integer to eliminate the risk of a
-				// precision error
-				if !isValid(lastDataPoint, currentDataPoint) {
-					t.Fatalf("The raw-data consistency check failed: metric name='%s'\n\tisValid(%v, %v) == false",
-						metricName, lastDataPoint, currentDataPoint)
+			if lastDataPoint != nil {
+				switch dataType := lastDataPoint.Value.(type) {
+				case string, float64, int, int64:
+					// Note: We cast float to integer to eliminate the risk of a precision error
+					if !isValid(lastDataPoint, currentDataPoint) {
+						t.Fatalf("The raw-data consistency check failed: metric name='%s'\n\tisValid(%v, %v) == false",
+							metricName, lastDataPoint, currentDataPoint)
+					}
+				default:
+					t.Fatalf("Got value of unsupported data type: %T", dataType)
 				}
 			}
 			lastDataPoint = currentDataPoint

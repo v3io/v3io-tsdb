@@ -232,7 +232,7 @@ func (cs *chunkStore) Append(t int64, v interface{}) {
 
 	cs.pending = append(cs.pending, pendingData{t: t, v: v})
 	// If the new time is older than previous times, sort the list
-	if len(cs.pending) > 1 && cs.pending[len(cs.pending)-2].t < t {
+	if len(cs.pending) > 1 && cs.pending[len(cs.pending)-2].t > t {
 		sort.Sort(cs.pending)
 	}
 }
@@ -418,17 +418,20 @@ func (cs *chunkStore) writeChunks(mc *MetricsCache, metric *MetricState) (hasPen
 
 			var encodingExpr string
 			if !cs.isAggr() {
-				encodingExpr = fmt.Sprintf("%v='%d'; ", config.EncodingAttrName, activeChunk.appender.Encoding())
+				encodingExpr = fmt.Sprintf("%s='%d'; ", config.EncodingAttrName, activeChunk.appender.Encoding())
 			}
-			lsetExpr := fmt.Sprintf("%v='%s'; ", config.LabelSetAttrName, metric.key)
+			lsetExpr := fmt.Sprintf("%s='%s'; ", config.LabelSetAttrName, metric.key)
 			expr = lblexpr + encodingExpr + lsetExpr + expr
 		}
 
 		// Call the V3IO async UpdateItem method
+		conditionExpr := fmt.Sprintf("NOT exists(%s) OR (exists(%s) AND %s == '%d')",
+			config.EncodingAttrName, config.EncodingAttrName,
+			config.EncodingAttrName, activeChunk.appender.Encoding())
 		expr += fmt.Sprintf("%v=%d;", config.MaxTimeAttrName, cs.maxTime) // TODO: use max() expr
 		path := partition.GetMetricPath(metric.name, metric.hash, cs.labelNames, cs.isAggr())
 		request, err := mc.container.UpdateItem(
-			&v3io.UpdateItemInput{Path: path, Expression: &expr}, metric, mc.responseChan)
+			&v3io.UpdateItemInput{Path: path, Expression: &expr, Condition: conditionExpr}, metric, mc.responseChan)
 		if err != nil {
 			mc.logger.ErrorWith("UpdateItem failed", "err", err)
 			hasPendingUpdates = false
