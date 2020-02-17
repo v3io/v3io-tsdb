@@ -299,7 +299,7 @@ func strToTV(tarr, varr string) ([]int64, []interface{}, error) {
 		}
 	}
 
-	now := int64(time.Now().Unix() * 1000)
+	now := time.Now().Unix() * 1000
 	if tarr == "" {
 		tarray = append(tarray, now)
 	} else {
@@ -312,7 +312,7 @@ func strToTV(tarr, varr string) ([]int64, []interface{}, error) {
 				if err != nil {
 					return nil, nil, errors.Wrap(err, "Failed to parse the pattern following 'now-'.")
 				}
-				tarray = append(tarray, now-int64(t))
+				tarray = append(tarray, now-t)
 			} else {
 				t, err := strconv.Atoi(tlist[i])
 				if err != nil {

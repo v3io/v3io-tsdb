@@ -413,7 +413,10 @@ func (d *dataFrame) finishAllColumns() error {
 				case *ConcreteColumn, *dataColumn:
 					value, err := col.getBuilder().At(i)
 					if err != nil || value == nil {
-						col.getBuilder().Set(i, math.NaN())
+						err := col.getBuilder().Set(i, math.NaN())
+						if err != nil {
+							return errors.Wrap(err, fmt.Sprintf("could not create new column at index %d", i))
+						}
 					}
 				}
 			}
@@ -541,7 +544,10 @@ func (d *dataFrame) rawSeriesToColumns() error {
 			}
 
 			if t == currentTime {
-				columns[seriesIndex].Append(v)
+				e := columns[seriesIndex].Append(v)
+				if e != nil {
+					return errors.Wrap(e, fmt.Sprintf("could not append value %v", v))
+				}
 				if iter.Next() {
 					t, _ = iter.At()
 				} else {
@@ -549,7 +555,10 @@ func (d *dataFrame) rawSeriesToColumns() error {
 					seriesHasMoreData[seriesIndex] = false
 				}
 			} else {
-				columns[seriesIndex].Append(seriesTodefaultValue[seriesIndex])
+				e := columns[seriesIndex].Append(seriesTodefaultValue[seriesIndex])
+				if e != nil {
+					return errors.Wrap(e, fmt.Sprintf("could not append from default value %v", seriesTodefaultValue[seriesIndex]))
+				}
 			}
 
 			if seriesHasMoreData[seriesIndex] && t < nextTime {
@@ -561,8 +570,10 @@ func (d *dataFrame) rawSeriesToColumns() error {
 	numberOfRows := len(timeData)
 	colSpec := columnMeta{metric: "time"}
 	d.index = NewDataColumn("time", colSpec, numberOfRows, frames.TimeType)
-	d.index.SetData(timeData, numberOfRows)
-
+	e := d.index.SetData(timeData, numberOfRows)
+	if e != nil {
+		return errors.Wrap(e, fmt.Sprintf("could not set data, timeData=%v, numberOfRows=%v", timeData, numberOfRows))
+	}
 	d.columns = make([]Column, len(d.rawColumns))
 	for i, series := range d.rawColumns {
 		if series == nil {

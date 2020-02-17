@@ -286,7 +286,7 @@ func (cc *checkCommandeer) printValues(bytes []byte, encoding chunkenc.Encoding)
 				t, v = iter.AtString()
 			}
 
-			tstr := time.Unix(int64(t/1000), 0).UTC().Format(time.RFC3339)
+			tstr := time.Unix(t/1000, 0).UTC().Format(time.RFC3339)
 			fmt.Printf("\t\tUnix timestamp=%d, t=%s, v=%v\n", t, tstr, v)
 			count++
 		}

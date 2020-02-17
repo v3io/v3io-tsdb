@@ -479,8 +479,12 @@ func (queryCtx *selectQueryContext) generateTimeColumn() Column {
 	timeColumn := NewDataColumn("time", columnMeta, queryCtx.getResultBucketsSize(), frames.TimeType)
 	i := 0
 	for t := queryCtx.queryParams.From; t <= queryCtx.queryParams.To; t += queryCtx.queryParams.Step {
-		timeColumn.SetDataAt(i, time.Unix(t/1000, (t%1000)*1e6))
-		i++
+		err := timeColumn.SetDataAt(i, time.Unix(t/1000, (t%1000)*1e6))
+		if err != nil {
+			queryCtx.logger.ErrorWith(errors.Wrap(err, fmt.Sprintf("could not set data")))
+		} else {
+			i++
+		}
 	}
 	return timeColumn
 }

@@ -148,8 +148,10 @@ func (mr *MetricReporter) registerShutdownHook() {
 
 	go func() {
 		sig := <-gracefulStop
-		mr.logWriter.Write([]byte(fmt.Sprintf("\n**************************\ncaught sig: %+v\n**************************\n", sig)))
-		metrics.WriteOnce(mr.registry, mr.logWriter)
+		_, err := mr.logWriter.Write([]byte(fmt.Sprintf("\n**************************\ncaught sig: %+v\n**************************\n", sig)))
+		if err == nil {
+			metrics.WriteOnce(mr.registry, mr.logWriter)
+		}
 	}()
 }
 

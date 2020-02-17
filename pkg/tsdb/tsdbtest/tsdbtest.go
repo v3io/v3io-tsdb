@@ -189,9 +189,13 @@ func SetUp(t testing.TB, testParams TestParams) func() {
 	if err != nil {
 		t.Fatalf("Unable to initialize the performance metrics reporter. Reason: %v", err)
 	}
-	metricReporter.Start()
+	err = metricReporter.Start()
+	if err != nil {
+		t.Fatalf("Unable to start the performance metrics reporter. Reason: %v", err)
+	}
 
 	return func() {
+		// nolint: errcheck
 		defer metricReporter.Stop()
 		tearDown(t, v3ioConfig, testParams)
 	}
@@ -216,9 +220,13 @@ func SetUpWithDBConfig(t *testing.T, schema *config.Schema, testParams TestParam
 	if err != nil {
 		t.Fatalf("Unable to initialize the performance metrics reporter. Error: %v", err)
 	}
-	metricReporter.Start()
+	err = metricReporter.Start()
+	if err != nil {
+		t.Fatalf("Unable to start the performance metrics reporter. Reason: %v", err)
+	}
 
 	return func() {
+		// nolint: errcheck
 		defer metricReporter.Stop()
 		tearDown(t, v3ioConfig, testParams)
 	}
@@ -247,7 +255,10 @@ func InsertData(t *testing.T, testParams TestParams) *V3ioAdapter {
 			t.Fatalf("Failed to add data to the TSDB appender. Reason: %s", err)
 		}
 		for _, curr := range metric.Data[1:] {
-			appender.AddFast(labels, ref, curr.Time, curr.Value)
+			err := appender.AddFast(labels, ref, curr.Time, curr.Value)
+			if err != nil {
+				t.Fatalf("Failed to AddFast. Reason: %s", err)
+			}
 		}
 
 		if _, err := appender.WaitForCompletion(0); err != nil {

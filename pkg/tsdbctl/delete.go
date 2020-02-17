@@ -145,7 +145,7 @@ func getConfirmation(prompt string) (bool, error) {
 
 		response, err := reader.ReadString('\n')
 		if err != nil {
-			errors.Wrap(err, "Failed to get user input.")
+			return false, errors.Wrap(err, "Failed to get user input.")
 		}
 
 		response = strings.ToLower(strings.TrimSpace(response))

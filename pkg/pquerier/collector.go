@@ -236,7 +236,7 @@ func downsampleRawData(ctx *selectQueryContext, res *qryResults,
 
 					// Check if the interpolation was successful in terms of exceeding tolerance
 					if !(interpolatedT == 0 && interpolatedV == 0) {
-						_ = res.frame.setDataAt(col.Name(), int(currCell), interpolatedV)
+						_ = res.frame.setDataAt(col.Name(), currCell, interpolatedV)
 					}
 				}
 			}
