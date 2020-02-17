@@ -38,10 +38,6 @@ TSDB_BUILD_COMMAND ?= GO111MODULE="on" CGO_ENABLED=0 go build $(BUILD_OPTS) ./cm
 fmt:
 	gofmt -l -s -w .
 
-.PHONY: vet
-vet:
-	go vet ./...
-
 .PHONY: get
 get:
 	GO111MODULE="on" go mod tidy
