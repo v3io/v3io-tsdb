@@ -1051,7 +1051,7 @@ func testDeleteTSDBCase(test *testing.T, testParams tsdbtest.TestParams, deleteF
 	adapter, teardown := tsdbtest.SetUpWithData(test, testParams)
 	defer teardown()
 
-	container, err := utils.CreateContainer(adapter.GetLogger("container"), testParams.V3ioConfig(), adapter.HttpTimeout)
+	container, err := utils.CreateContainer(adapter.GetLogger("container"), testParams.V3ioConfig(), adapter.HTTPTimeout)
 	if err != nil {
 		test.Fatalf("failed to create new container. reason: %s", err)
 	}

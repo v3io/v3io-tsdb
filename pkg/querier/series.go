@@ -53,9 +53,8 @@ func (s *V3ioSeries) GetKey() uint64 {
 		if err != nil {
 			s.set.logger.Error(err)
 			return 0
-		} else {
-			s.hash = val
 		}
+		s.hash = val
 
 	}
 	return s.hash

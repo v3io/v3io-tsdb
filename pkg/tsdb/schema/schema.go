@@ -54,7 +54,7 @@ func newSchema(samplesIngestionRate, aggregationGranularity, aggregatesList stri
 	parsedCrossLabelSets := aggregate.ParseCrossLabelSets(crossLabelSets)
 
 	if len(parsedCrossLabelSets) > 0 && len(aggregates) == 0 {
-		return nil, errors.New("Cross label aggregations must be used in conjunction with aggregations.")
+		return nil, errors.New("Cross label aggregations must be used in conjunction with aggregations")
 	}
 
 	if len(aggregates) == 0 {
@@ -120,13 +120,13 @@ func calculatePartitionAndChunkInterval(rateInHours, minChunkSize, maxChunkSize,
 
 	chunkInterval := maxNumberOfEventsPerChunk / rateInHours
 	if chunkInterval == 0 {
-		return "", "", fmt.Errorf("The samples ingestion rate (%v/h) is too high.", rateInHours)
+		return "", "", fmt.Errorf("the samples ingestion rate (%v/h) is too high", rateInHours)
 	}
 
 	// Make sure the expected chunk size is greater then the supported minimum.
 	if chunkInterval < minNumberOfEventsPerChunk/rateInHours {
 		return "", "", fmt.Errorf(
-			"The calculated chunk size is smaller than the minimum: samples ingestion rate = %v/h, calculated chunk interval = %v, minimum size = %v",
+			"the calculated chunk size is smaller than the minimum: samples ingestion rate = %v/h, calculated chunk interval = %v, minimum size = %v",
 			rateInHours, chunkInterval, minChunkSize)
 	}
 
@@ -137,7 +137,7 @@ func calculatePartitionAndChunkInterval(rateInHours, minChunkSize, maxChunkSize,
 		numberOfChunksInPartition += 24
 	}
 	if numberOfChunksInPartition == 0 {
-		return "", "", errors.Errorf("The samples ingestion rate (%v/h) is too high - cannot fit a partition in a day interval with the calculated chunk size (%v).", rateInHours, chunkInterval)
+		return "", "", errors.Errorf("the samples ingestion rate (%v/h) is too high - cannot fit a partition in a day interval with the calculated chunk size (%v)", rateInHours, chunkInterval)
 	}
 
 	partitionInterval := numberOfChunksInPartition * chunkInterval
@@ -145,7 +145,7 @@ func calculatePartitionAndChunkInterval(rateInHours, minChunkSize, maxChunkSize,
 }
 
 func rateToHours(samplesIngestionRate string) (int, error) {
-	parsingError := errors.New(`Invalid samples ingestion rate. The rate must be of the format "[0-9]+/[smh]". For example, "12/m".`)
+	parsingError := errors.New(`Invalid samples ingestion rate. The rate must be of the format "[0-9]+/[smh]". For example, "12/m"`)
 
 	if len(samplesIngestionRate) < 3 {
 		return 0, parsingError
@@ -162,7 +162,7 @@ func rateToHours(samplesIngestionRate string) (int, error) {
 		return 0, errors.Wrap(err, parsingError.Error())
 	}
 	if i <= 0 {
-		return 0, fmt.Errorf("Invalid samples ingestion rate (%s). The rate cannot have a negative number of samples.", samplesIngestionRate)
+		return 0, fmt.Errorf("invalid samples ingestion rate (%s). The rate cannot have a negative number of samples", samplesIngestionRate)
 	}
 	switch last {
 	case 's':
@@ -184,13 +184,13 @@ func validateAggregatesGranularity(aggregationGranularity string, partitionInter
 	}
 
 	if dayMillis%duration != 0 && duration%dayMillis != 0 {
-		return errors.New("The aggregation granularity should be a divisor or a dividend of 1 day. Examples: \"10m\"; \"30m\"; \"2h\".")
+		return errors.New("the aggregation granularity should be a divisor or a dividend of 1 day. Examples: \"10m\"; \"30m\"; \"2h\"")
 	}
 
 	if hasAggregates {
 		partitionIntervalDuration, _ := utils.Str2duration(partitionInterval) // safe to ignore error since we create 'partitionInterval'
 		if partitionIntervalDuration/duration > MaxV3ioArraySize {
-			return errors.New("The aggregation granularity is too close to the ingestion rate provided. Try increasing the granularity to get an aggregation performance impact.")
+			return errors.New("the aggregation granularity is too close to the ingestion rate provided. Try increasing the granularity to get an aggregation performance impact")
 		}
 	}
 	return nil

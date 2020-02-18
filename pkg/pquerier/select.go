@@ -107,7 +107,7 @@ func (queryCtx *selectQueryContext) start(parts []*partmgr.DBPartition, params *
 		queryCtx.totalColumns = queryCtx.frameList[0].Len()
 	}
 
-	return NewFrameIterator(queryCtx)
+	return newFrameIterator(queryCtx)
 }
 
 func (queryCtx *selectQueryContext) metricsAggregatesToString(metric string) (string, bool) {
@@ -307,9 +307,8 @@ func (queryCtx *selectQueryContext) processQueryResults(query *partQuery) error 
 			intEncoding, err := strconv.Atoi(encodingStr)
 			if err != nil {
 				return fmt.Errorf("error parsing encoding type of chunk, got: %v, error: %v", encodingStr, err)
-			} else {
-				encoding = chunkenc.Encoding(intEncoding)
 			}
+			encoding = chunkenc.Encoding(intEncoding)
 		}
 
 		results := qryResults{name: name, encoding: encoding, query: query, fields: query.GetFields()}
@@ -341,7 +340,7 @@ func (queryCtx *selectQueryContext) processQueryResults(query *partQuery) error 
 		frame, ok := queryCtx.dataFrames[hash]
 		if !ok {
 			var err error
-			frame, err = NewDataFrame(queryCtx.columnsSpec,
+			frame, err = newDataFrame(queryCtx.columnsSpec,
 				queryCtx.getOrCreateTimeColumn(),
 				lset,
 				hash,
@@ -476,7 +475,7 @@ func (queryCtx *selectQueryContext) getOrCreateTimeColumn() Column {
 
 func (queryCtx *selectQueryContext) generateTimeColumn() Column {
 	columnMeta := columnMeta{metric: "time"}
-	timeColumn := NewDataColumn("time", columnMeta, queryCtx.getResultBucketsSize(), frames.TimeType)
+	timeColumn := newDataColumn("time", columnMeta, queryCtx.getResultBucketsSize(), frames.TimeType)
 	i := 0
 	for t := queryCtx.queryParams.From; t <= queryCtx.queryParams.To; t += queryCtx.queryParams.Step {
 		err := timeColumn.SetDataAt(i, time.Unix(t/1000, (t%1000)*1e6))

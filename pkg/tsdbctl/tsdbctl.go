@@ -120,9 +120,8 @@ func (rc *RootCommandeer) initialize() error {
 		// Display an error if we fail to load a configuration file
 		if rc.cfgFilePath == "" {
 			return errors.Wrap(err, "Failed to load the TSDB configuration.")
-		} else {
-			return errors.Wrap(err, fmt.Sprintf("Failed to load the TSDB configuration from '%s'.", rc.cfgFilePath))
 		}
+		return errors.Wrap(err, fmt.Sprintf("Failed to load the TSDB configuration from '%s'.", rc.cfgFilePath))
 	}
 	return rc.populateConfig(cfg)
 }
@@ -145,7 +144,7 @@ func (rc *RootCommandeer) populateConfig(cfg *config.V3ioConfig) error {
 	}
 
 	if rc.v3ioURL != "" {
-		cfg.WebApiEndpoint = rc.v3ioURL
+		cfg.WebAPIEndpoint = rc.v3ioURL
 	}
 	if rc.container != "" {
 		cfg.Container = rc.container
@@ -153,7 +152,7 @@ func (rc *RootCommandeer) populateConfig(cfg *config.V3ioConfig) error {
 	if rc.dbPath != "" {
 		cfg.TablePath = rc.dbPath
 	}
-	if cfg.WebApiEndpoint == "" {
+	if cfg.WebAPIEndpoint == "" {
 		return errors.New("web API endpoint must be set")
 	}
 	if cfg.Container == "" {

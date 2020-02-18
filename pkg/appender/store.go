@@ -41,7 +41,7 @@ import (
 const maxLateArrivalInterval = 59 * 60 * 1000 // Max late arrival of 59min
 
 // Create a chunk store with two chunks (current, previous)
-func NewChunkStore(logger logger.Logger, labelNames []string, aggrsOnly bool) *chunkStore {
+func newChunkStore(logger logger.Logger, labelNames []string, aggrsOnly bool) *chunkStore {
 	store := chunkStore{
 		logger:  logger,
 		lastTid: -1,
@@ -470,7 +470,7 @@ func (cs *chunkStore) appendExpression(chunk *attrAppender) string {
 		chunk.state |= chunkStateWriting
 
 		expr := ""
-		idx, err := chunk.partition.TimeToChunkId(chunk.chunkMint)
+		idx, err := chunk.partition.TimeToChunkID(chunk.chunkMint)
 		if err != nil {
 			return ""
 		}

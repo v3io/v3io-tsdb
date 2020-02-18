@@ -250,9 +250,8 @@ func (ic *AsyncItemsCursor) sendNextGetItemsNew(resp *v3io.Response) error {
 				if getItemsResp.Last {
 					ic.lastShards++
 					return nil
-				} else {
-					input.Marker = getItemsResp.NextMarker
 				}
+				input.Marker = getItemsResp.NextMarker
 			}
 		} else {
 			// set next marker

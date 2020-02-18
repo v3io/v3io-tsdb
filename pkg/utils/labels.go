@@ -294,7 +294,7 @@ func LabelsFromString(lbls string) (Labels, error) {
 		for _, l := range splitLset {
 			splitLbl := strings.Split(l, "=")
 			if len(splitLbl) != 2 {
-				return nil, errors.New("Labels must be in the form 'key1=label1[,key2=label2,...]'.")
+				return nil, errors.New("labels must be in the form 'key1=label1[,key2=label2,...]'")
 			}
 
 			if err := IsValidLabelName(splitLbl[0]); err != nil {

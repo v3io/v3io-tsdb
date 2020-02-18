@@ -22,7 +22,7 @@ type frameIterator struct {
 }
 
 // create new frame set iterator, frame iter has a SeriesSet interface (for Prometheus) plus columnar interfaces
-func NewFrameIterator(ctx *selectQueryContext) (*frameIterator, error) {
+func newFrameIterator(ctx *selectQueryContext) (*frameIterator, error) {
 	if !ctx.isRawQuery() {
 		for _, f := range ctx.frameList {
 			if err := f.finishAllColumns(); err != nil {
@@ -104,7 +104,7 @@ func (fi *frameIterator) Err() error {
 }
 
 // data frame, holds multiple value columns and an index (time) column
-func NewDataFrame(columnsSpec []columnMeta, indexColumn Column, lset utils.Labels, hash uint64, isRawQuery bool, columnSize int, useServerAggregates, showAggregateLabel bool) (*dataFrame, error) {
+func newDataFrame(columnsSpec []columnMeta, indexColumn Column, lset utils.Labels, hash uint64, isRawQuery bool, columnSize int, useServerAggregates, showAggregateLabel bool) (*dataFrame, error) {
 	df := &dataFrame{lset: lset, hash: hash, isRawSeries: isRawQuery, showAggregateLabel: showAggregateLabel}
 	// is raw query
 	if isRawQuery {
@@ -184,7 +184,7 @@ func createColumn(col columnMeta, columnSize int, useServerAggregates bool) (Col
 			column = NewVirtualColumn(col.getColumnName(), col, columnSize, function)
 		}
 	} else {
-		column = NewDataColumn(col.getColumnName(), col, columnSize, frames.FloatType)
+		column = newDataColumn(col.getColumnName(), col, columnSize, frames.FloatType)
 	}
 
 	return column, nil
@@ -193,9 +193,8 @@ func createColumn(col columnMeta, columnSize int, useServerAggregates bool) (Col
 func getAggreagteFunction(aggrType aggregate.AggrType, useServerAggregates bool) (func(interface{}, interface{}) interface{}, error) {
 	if useServerAggregates {
 		return aggregate.GetServerAggregationsFunction(aggrType)
-	} else {
-		return aggregate.GetClientAggregationsFunction(aggrType)
 	}
+	return aggregate.GetClientAggregationsFunction(aggrType)
 }
 
 func fillDependantColumns(wantedColumn Column, df *dataFrame) {
@@ -379,19 +378,18 @@ func (d *dataFrame) Index() (Column, error) {
 func (d *dataFrame) TimeSeries(i int) (utils.Series, error) {
 	if d.isRawSeries {
 		return d.rawColumns[i], nil
-	} else {
-		currentColumn, err := d.ColumnAt(i)
-		if err != nil {
-			return nil, err
-		}
-
-		return NewDataFrameColumnSeries(d.index,
-			currentColumn,
-			d.metricToCountColumn[currentColumn.GetColumnSpec().metric],
-			d.Labels(),
-			d.hash,
-			d.showAggregateLabel), nil
 	}
+	currentColumn, err := d.ColumnAt(i)
+	if err != nil {
+		return nil, err
+	}
+
+	return NewDataFrameColumnSeries(d.index,
+		currentColumn,
+		d.metricToCountColumn[currentColumn.GetColumnSpec().metric],
+		d.Labels(),
+		d.hash,
+		d.showAggregateLabel), nil
 }
 
 // Creates Frames.columns out of tsdb columns.
@@ -568,7 +566,7 @@ func (d *dataFrame) rawSeriesToColumns() error {
 
 	numberOfRows := len(timeData)
 	colSpec := columnMeta{metric: "time"}
-	d.index = NewDataColumn("time", colSpec, numberOfRows, frames.TimeType)
+	d.index = newDataColumn("time", colSpec, numberOfRows, frames.TimeType)
 	e := d.index.SetData(timeData, numberOfRows)
 	if e != nil {
 		return errors.Wrap(e, fmt.Sprintf("could not set data, timeData=%v, numberOfRows=%v", timeData, numberOfRows))
@@ -581,7 +579,7 @@ func (d *dataFrame) rawSeriesToColumns() error {
 
 		name := series.Labels().Get(config.PrometheusMetricNameAttribute)
 		spec := columnMeta{metric: name}
-		col := NewDataColumn(name, spec, numberOfRows, seriesToDataType[i])
+		col := newDataColumn(name, spec, numberOfRows, seriesToDataType[i])
 		col.framesCol = columns[i].Finish()
 		d.columns[i] = col
 	}
@@ -593,7 +591,7 @@ func (d *dataFrame) rawSeriesToColumns() error {
 		}
 		for index, metricName := range emptyMetrics {
 			spec := columnMeta{metric: metricName}
-			col := NewDataColumn(metricName, spec, numberOfRows, frames.FloatType)
+			col := newDataColumn(metricName, spec, numberOfRows, frames.FloatType)
 			framesCol, err := frames.NewSliceColumn(metricName, nullValues)
 			if err != nil {
 				return errors.Wrap(err, fmt.Sprintf("could not create empty column '%v'", metricName))
@@ -712,7 +710,7 @@ func (c *basicColumn) GetInterpolationFunction() InterpolationFunction {
 	return c.interpolationFunction
 }
 
-func NewDataColumn(name string, colSpec columnMeta, size int, datatype frames.DType) *dataColumn {
+func newDataColumn(name string, colSpec columnMeta, size int, datatype frames.DType) *dataColumn {
 	dc := &dataColumn{basicColumn: basicColumn{name: name, spec: colSpec, size: size,
 		interpolationFunction: GetInterpolateFunc(colSpec.interpolationType, colSpec.interpolationTolerance),
 		builder:               frames.NewSliceColumnBuilder(name, datatype, size)}}

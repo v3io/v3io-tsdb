@@ -56,7 +56,7 @@ func (suite *testTsdbctlSuite) TestPopulateConfigWithTenant() {
 		Reporter: metricReporter,
 	}
 	expectedCfg := &config.V3ioConfig{
-		WebApiEndpoint: "localhost:80123",
+		WebAPIEndpoint: "localhost:80123",
 		Container:      "123",
 		TablePath:      "/x/y/z",
 		Username:       "Vel@Odar",
@@ -84,7 +84,7 @@ func (suite *testTsdbctlSuite) TestContainerConfig() {
 
 	err = rc.populateConfig(cfg)
 	expectedCfg := &config.V3ioConfig{
-		WebApiEndpoint: "localhost:80123",
+		WebAPIEndpoint: "localhost:80123",
 		Container:      "test",
 		TablePath:      "/x/y/z",
 		Username:       "Vel@Odar",
@@ -114,7 +114,7 @@ func (suite *testTsdbctlSuite) TestConfigFromEnvVarsAndPassword() {
 
 	expectedCfg := *cfg
 	err = rc.populateConfig(cfg)
-	expectedCfg.WebApiEndpoint = "host-from-env:123"
+	expectedCfg.WebAPIEndpoint = "host-from-env:123"
 	expectedCfg.Container = "test"
 	expectedCfg.TablePath = "/x/y/z"
 	expectedCfg.Username = "Vel@Odar"
@@ -142,7 +142,7 @@ func (suite *testTsdbctlSuite) TestConfigFromEnvVars() {
 
 	expectedCfg := *cfg
 	err = rc.populateConfig(cfg)
-	expectedCfg.WebApiEndpoint = "host-from-env:123"
+	expectedCfg.WebAPIEndpoint = "host-from-env:123"
 	expectedCfg.AccessKey = "key-from-env"
 	expectedCfg.Container = "test"
 	expectedCfg.LogLevel = "info"

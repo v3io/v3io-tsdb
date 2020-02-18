@@ -244,7 +244,7 @@ func (mc *MetricsCache) Add(lset utils.LabelsIfc, t int64, v interface{}) (uint6
 			aggrMetric, ok := mc.getMetric(name, hash)
 			if !ok {
 				aggrMetric = &MetricState{Lset: subLset, key: key, name: name, hash: hash}
-				aggrMetric.store = NewChunkStore(mc.logger, subLset.LabelNames(), true)
+				aggrMetric.store = newChunkStore(mc.logger, subLset.LabelNames(), true)
 				mc.addMetric(hash, name, aggrMetric)
 				aggrMetrics = append(aggrMetrics, aggrMetric)
 			}
@@ -252,7 +252,7 @@ func (mc *MetricsCache) Add(lset utils.LabelsIfc, t int64, v interface{}) (uint6
 		metric = &MetricState{Lset: lset, key: key, name: name, hash: hash,
 			aggrs: aggrMetrics, isVariant: isValueVariantType}
 
-		metric.store = NewChunkStore(mc.logger, lset.LabelNames(), false)
+		metric.store = newChunkStore(mc.logger, lset.LabelNames(), false)
 		mc.addMetric(hash, name, metric)
 	} else {
 		aggrMetrics = metric.aggrs

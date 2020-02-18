@@ -70,7 +70,7 @@ Arguments:
 			numArgs := len(args)
 
 			if numArgs == 0 {
-				return errors.New("The check command requires a metric name.")
+				return errors.New("the check command requires a metric name")
 			}
 
 			if strings.Contains(args[0], "/") {
@@ -274,46 +274,44 @@ func (cc *checkCommandeer) printValues(bytes []byte, encoding chunkenc.Encoding)
 	if err != nil {
 		cc.rootCommandeer.logger.ErrorWith("Error reading chunk buffer.", "err", err)
 		return err
-	} else {
-		count := 0
-		iter := chunk.Iterator()
-		for iter.Next() {
-			var v interface{}
-			var t int64
-			if encoding == chunkenc.EncXOR {
-				t, v = iter.At()
-			} else {
-				t, v = iter.AtString()
-			}
-
-			tstr := time.Unix(t/1000, 0).UTC().Format(time.RFC3339)
-			fmt.Printf("\t\tUnix timestamp=%d, t=%s, v=%v\n", t, tstr, v)
-			count++
-		}
-		if iter.Err() != nil {
-			return errors.Wrap(iter.Err(), "Failed to read the iterator.")
-		}
-
-		avgSampleSize := 0.0
-		bytesCount := len(bytes)
-		if count > 0 {
-			avgSampleSize = float64(bytesCount) / float64(count)
-		}
-		fmt.Printf("Total size=%d, Count=%d, Avg sample size=%.2f\n",
-			bytesCount, count, avgSampleSize)
 	}
+	count := 0
+	iter := chunk.Iterator()
+	for iter.Next() {
+		var v interface{}
+		var t int64
+		if encoding == chunkenc.EncXOR {
+			t, v = iter.At()
+		} else {
+			t, v = iter.AtString()
+		}
+
+		tstr := time.Unix(t/1000, 0).UTC().Format(time.RFC3339)
+		fmt.Printf("\t\tUnix timestamp=%d, t=%s, v=%v\n", t, tstr, v)
+		count++
+	}
+	if iter.Err() != nil {
+		return errors.Wrap(iter.Err(), "Failed to read the iterator.")
+	}
+
+	avgSampleSize := 0.0
+	bytesCount := len(bytes)
+	if count > 0 {
+		avgSampleSize = float64(bytesCount) / float64(count)
+	}
+	fmt.Printf("Total size=%d, Count=%d, Avg sample size=%.2f\n",
+		bytesCount, count, avgSampleSize)
 	return nil
 }
 
 func getSchema(cfg *config.V3ioConfig, container v3io.Container) (*config.Schema, error) {
-	fullpath := fmt.Sprintf("%s/%s/%s", cfg.WebApiEndpoint, cfg.Container, cfg.TablePath)
+	fullpath := fmt.Sprintf("%s/%s/%s", cfg.WebAPIEndpoint, cfg.Container, cfg.TablePath)
 	resp, err := container.GetObjectSync(&v3io.GetObjectInput{Path: path.Join(cfg.TablePath, config.SchemaConfigFileName)})
 	if err != nil {
 		if utils.IsNotExistsError(err) {
 			return nil, errors.Errorf("No TSDB schema file found at '%s'.", fullpath)
-		} else {
-			return nil, errors.Wrapf(err, "Failed to read a TSDB schema from '%s'.", fullpath)
 		}
+		return nil, errors.Wrapf(err, "Failed to read a TSDB schema from '%s'.", fullpath)
 
 	}
 
@@ -329,7 +327,6 @@ func getEncoding(enc string) (chunkenc.Encoding, error) {
 	intEncoding, err := strconv.Atoi(enc)
 	if err != nil {
 		return 0, fmt.Errorf("error parsing encoding type, encoding type should be numberic, got: %v", enc)
-	} else {
-		return chunkenc.Encoding(intEncoding), nil
 	}
+	return chunkenc.Encoding(intEncoding), nil
 }

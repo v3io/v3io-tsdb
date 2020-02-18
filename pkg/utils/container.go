@@ -58,7 +58,7 @@ func NewLogger(level string) (logger.Logger, error) {
 }
 
 func CreateContainer(logger logger.Logger, cfg *config.V3ioConfig, httpTimeout time.Duration) (v3io.Container, error) {
-	endpointURL, err := buildURL(cfg.WebApiEndpoint)
+	endpointURL, err := buildURL(cfg.WebAPIEndpoint)
 	if err != nil {
 		return nil, err
 	}
@@ -90,11 +90,11 @@ func CreateContainer(logger logger.Logger, cfg *config.V3ioConfig, httpTimeout t
 	return container, nil
 }
 
-func buildURL(webApiEndpoint string) (string, error) {
-	if !strings.HasPrefix(webApiEndpoint, "http://") && !strings.HasPrefix(webApiEndpoint, "https://") {
-		webApiEndpoint = "http://" + webApiEndpoint
+func buildURL(webAPIEndpoint string) (string, error) {
+	if !strings.HasPrefix(webAPIEndpoint, "http://") && !strings.HasPrefix(webAPIEndpoint, "https://") {
+		webAPIEndpoint = "http://" + webAPIEndpoint
 	}
-	endpointURL, err := url.Parse(webApiEndpoint)
+	endpointURL, err := url.Parse(webAPIEndpoint)
 	if err != nil {
 		return "", err
 	}
@@ -181,9 +181,8 @@ func respWaitLoop(comm chan int, responseChan chan *v3io.Response, timeout time.
 					fmt.Println("\nResponse loop timed out.", requests, responses)
 					done <- true
 					return
-				} else {
-					active = false
 				}
+				active = false
 			}
 		}
 	}()

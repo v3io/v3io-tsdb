@@ -121,14 +121,14 @@ type V3ioConfig struct {
 	// V3IO TSDB connection information - web-gateway service endpoint,
 	// TSDB data container, relative TSDB table path within the container, and
 	// authentication credentials for the web-gateway service
-	WebApiEndpoint string `json:"webApiEndpoint"`
+	WebAPIEndpoint string `json:"webApiEndpoint"`
 	Container      string `json:"container"`
 	TablePath      string `json:"tablePath"`
 	Username       string `json:"username,omitempty"`
 	Password       string `json:"password,omitempty"`
 	AccessKey      string `json:"accessKey,omitempty"`
 
-	HttpTimeout string `json:"httpTimeout,omitempty"`
+	HTTPTimeout string `json:"httpTimeout,omitempty"`
 
 	// Disabled = true disables the V3IO TSDB configuration in Prometheus and
 	// enables the internal Prometheus TSDB instead
@@ -313,12 +313,11 @@ func (config V3ioConfig) String() string {
 		config.AccessKey = "SANITIZED"
 	}
 
-	sanitizedConfigJson, err := json.Marshal(&config)
+	sanitizedConfigJSON, err := json.Marshal(&config)
 	if err == nil {
-		return string(sanitizedConfigJson)
-	} else {
-		return fmt.Sprintf("Unable to read config: %v", err)
+		return string(sanitizedConfigJSON)
 	}
+	return fmt.Sprintf("Unable to read config: %v", err)
 }
 
 func (*V3ioConfig) merge(cfg *V3ioConfig) (*V3ioConfig, error) {
@@ -438,8 +437,8 @@ func initDefaults(cfg *V3ioConfig) {
 		cfg.DisableNginxMitigation = &defaultDisableNginxMitigation
 	}
 
-	if cfg.WebApiEndpoint == "" {
-		cfg.WebApiEndpoint = os.Getenv("V3IO_API")
+	if cfg.WebAPIEndpoint == "" {
+		cfg.WebAPIEndpoint = os.Getenv("V3IO_API")
 	}
 
 	if cfg.AccessKey == "" {
