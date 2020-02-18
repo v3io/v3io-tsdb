@@ -939,7 +939,6 @@ func (suite *testSelectDataframeSuite) TestSparseStringAndNumericColumnsDatafram
 				if column.DType() == frames.FloatType {
 					v, _ = column.FloatAt(i)
 					if v == math.NaN() {
-						suite.True(i == 3, "null value is expected")
 						suite.True(nullValuesMap[i].NullColumns[columnName])
 					}
 					bothNaN := math.IsNaN(expectedColumns[column.Name()][i].(float64)) && math.IsNaN(v.(float64))
@@ -1056,7 +1055,6 @@ func (suite *testSelectDataframeSuite) TestSparseNumericColumnsWithEmptyColumnsD
 				if column.DType() == frames.FloatType {
 					v, _ = column.FloatAt(i)
 					if v == math.NaN() {
-						suite.True(i == 3, "null value is expected")
 						suite.True(nullValuesMap[i].NullColumns[columnName])
 					}
 					bothNaN := math.IsNaN(expectedColumns[column.Name()][i].(float64)) && math.IsNaN(v.(float64))
@@ -1170,7 +1168,6 @@ func (suite *testSelectDataframeSuite) TestSparseNumericColumnsWithPartialLabels
 				if column.DType() == frames.FloatType {
 					v, _ = column.FloatAt(i)
 					if v == math.NaN() {
-						suite.True(i == 3, "null value is expected")
 						suite.True(nullValuesMap[i].NullColumns[columnName])
 					}
 					bothNaN := math.IsNaN(expectedColumns[column.Name()][i].(float64)) && math.IsNaN(v.(float64))
@@ -1285,7 +1282,6 @@ func (suite *testSelectDataframeSuite) TestSparseNumericColumnsWithNotExistingMe
 				if column.DType() == frames.FloatType {
 					v, _ = column.FloatAt(i)
 					if v == math.NaN() {
-						suite.True(i == 3, "null value is expected")
 						suite.True(nullValuesMap[i].NullColumns[columnName])
 					}
 					bothNaN := math.IsNaN(expectedColumns[column.Name()][i].(float64)) && math.IsNaN(v.(float64))
