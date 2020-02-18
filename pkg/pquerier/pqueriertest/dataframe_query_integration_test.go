@@ -873,7 +873,7 @@ func (suite *testSelectDataframeSuite) TestSparseStringAndNumericColumnsDatafram
 		suite.basicQueryTime + 3*tsdbtest.MinuteInMillis,
 		suite.basicQueryTime + 4*tsdbtest.MinuteInMillis}
 
-	expectedTimeColumnLog := []int64{
+	timeColumnLog := []int64{
 		suite.basicQueryTime,
 		suite.basicQueryTime + 2*tsdbtest.MinuteInMillis,
 		suite.basicQueryTime + 3*tsdbtest.MinuteInMillis,
@@ -886,10 +886,10 @@ func (suite *testSelectDataframeSuite) TestSparseStringAndNumericColumnsDatafram
 	appender, err := adapter.Appender()
 	suite.NoError(err, "failed to create v3io appender")
 
-	refLog, err := appender.Add(labelsWithNameLog, expectedTimeColumnLog[0], dataLog[0])
+	refLog, err := appender.Add(labelsWithNameLog, timeColumnLog[0], dataLog[0])
 	suite.NoError(err, "failed to add data to the TSDB appender")
-	for i := 1; i < len(expectedTimeColumnLog); i++ {
-		appender.AddFast(labels, refLog, expectedTimeColumnLog[i], dataLog[i])
+	for i := 1; i < len(timeColumnLog); i++ {
+		appender.AddFast(labels, refLog, timeColumnLog[i], dataLog[i])
 	}
 
 	_, err = appender.WaitForCompletion(0)
@@ -955,6 +955,356 @@ func (suite *testSelectDataframeSuite) TestSparseStringAndNumericColumnsDatafram
 					suite.Fail(fmt.Sprintf("column type is not as expected: %v", column.DType()))
 				}
 				suite.Require().Equal(expectedColumns[column.Name()][i], v, "column %v does not match at index %v", column.Name(), i)
+			}
+		}
+	}
+}
+
+func (suite *testSelectDataframeSuite) TestSparseNumericColumnsWithEmptyColumnsDataframe() {
+	labelSetLinux := utils.LabelsFromStringList("os", "linux")
+	labelSetWindows := utils.LabelsFromStringList("os", "windows")
+	expectedTimeColumn := []int64{
+		suite.basicQueryTime,
+		suite.basicQueryTime + tsdbtest.MinuteInMillis,
+		suite.basicQueryTime + 2*tsdbtest.MinuteInMillis,
+		suite.basicQueryTime + 3*tsdbtest.MinuteInMillis,
+		suite.basicQueryTime + 4*tsdbtest.MinuteInMillis}
+	expectedColumns := map[string][]interface{}{
+		"cpu_0": {math.NaN(), math.NaN(), math.NaN(), math.NaN(), math.NaN(), math.NaN(), math.NaN(), math.NaN(), math.NaN(), math.NaN()},
+		"cpu_1": {10.0, 20.0, 30.0, math.NaN(), 50.0, math.NaN(), 22.0, 33.0, math.NaN(), 55.0},
+		"cpu_2": {math.NaN(), math.NaN(), math.NaN(), 40.4, 50.5, 10.0, 20.0, math.NaN(), 40.0, 50.0},
+	}
+
+	testParams := tsdbtest.NewTestParams(suite.T(),
+		tsdbtest.TestOption{
+			Key: tsdbtest.OptTimeSeries,
+			Value: tsdbtest.TimeSeries{
+				tsdbtest.Metric{
+					Name:   "cpu_0",
+					Labels: labelSetWindows,
+					Data: []tsdbtest.DataPoint{ // out of test's time frame
+						{expectedTimeColumn[0] - 68*tsdbtest.HoursInMillis, 10.0},
+						{expectedTimeColumn[1] - 69*tsdbtest.HoursInMillis, 20.0},
+						{expectedTimeColumn[2] - 70*tsdbtest.HoursInMillis, 30.0},
+						{expectedTimeColumn[3] - 71*tsdbtest.HoursInMillis, 40.0},
+						{expectedTimeColumn[4] - 72*tsdbtest.HoursInMillis, 50.0}}},
+				tsdbtest.Metric{
+					Name:   "cpu_1",
+					Labels: labelSetLinux,
+					Data: []tsdbtest.DataPoint{
+						{expectedTimeColumn[0], 10.0},
+						{expectedTimeColumn[1], 20.0},
+						{expectedTimeColumn[2], 30.0},
+						{expectedTimeColumn[4], 50.0}}},
+				tsdbtest.Metric{
+					Name:   "cpu_2",
+					Labels: labelSetLinux,
+					Data: []tsdbtest.DataPoint{
+						// NA
+						// NA
+						{expectedTimeColumn[3], 40.4},
+						{expectedTimeColumn[4], 50.5}}},
+				tsdbtest.Metric{
+					Name:   "cpu_2",
+					Labels: labelSetWindows,
+					Data: []tsdbtest.DataPoint{ // out of test's time frame
+						{expectedTimeColumn[0], 10.0},
+						{expectedTimeColumn[1], 20.0},
+						// NA
+						{expectedTimeColumn[3], 40.0},
+						{expectedTimeColumn[4], 50.0}}},
+				tsdbtest.Metric{
+					Name:   "cpu_1",
+					Labels: labelSetWindows,
+					Data: []tsdbtest.DataPoint{ // out of test's time frame
+						// NA
+						{expectedTimeColumn[1], 22.0},
+						{expectedTimeColumn[2], 33.0},
+						// NA
+						{expectedTimeColumn[4], 55.0}}},
+			}})
+
+	adapter := tsdbtest.InsertData(suite.T(), testParams)
+	querierV2, err := adapter.QuerierV2()
+	suite.NoError(err, "failed to create querier")
+
+	params := &pquerier.SelectParams{RequestedColumns: []pquerier.RequestedColumn{{Metric: "cpu_0"}, {Metric: "cpu_1"}, {Metric: "cpu_2"}},
+		From: suite.basicQueryTime, To: suite.basicQueryTime + 10*tsdbtest.MinuteInMillis}
+	iter, err := querierV2.SelectDataFrame(params)
+	suite.NoError(err, "failed to execute query")
+
+	rowId := -1
+	var seriesCount int
+	for iter.NextFrame() {
+		seriesCount++
+		frame, err := iter.GetFrame()
+		suite.NoError(err)
+		indexCol := frame.Indices()[0]
+
+		nullValuesMap := frame.NullValuesMap()
+		suite.NotNil(nullValuesMap, "null value map should not be empty")
+
+		for i := 0; i < indexCol.Len(); i++ {
+			rowId++
+			t, _ := indexCol.TimeAt(i)
+			timeMillis := t.UnixNano() / int64(time.Millisecond)
+			suite.Require().Equal(expectedTimeColumn[i], timeMillis, "time column does not match at index %v", i)
+			for _, columnName := range frame.Names() {
+				var v interface{}
+				column, err := frame.Column(columnName)
+				suite.NoError(err)
+				if column.DType() == frames.FloatType {
+					v, _ = column.FloatAt(i)
+					if v == math.NaN() {
+						suite.True(i == 3, "null value is expected")
+						suite.True(nullValuesMap[i].NullColumns[columnName])
+					}
+					bothNaN := math.IsNaN(expectedColumns[column.Name()][i].(float64)) && math.IsNaN(v.(float64))
+					if bothNaN {
+						continue
+					}
+				} else if column.DType() == frames.StringType {
+					v, _ = column.StringAt(i)
+					if v == "" {
+						suite.True(nullValuesMap[i].NullColumns[columnName])
+					}
+				} else {
+					suite.Fail(fmt.Sprintf("column type is not as expected: %v", column.DType()))
+				}
+
+				expectedValue := expectedColumns[columnName][rowId]
+				if !math.IsNaN(expectedValue.(float64)) || !math.IsNaN(v.(float64)) {
+					suite.Require().Equal(expectedValue, v, "column %v does not match at index %v", columnName, rowId)
+				}
+			}
+		}
+	}
+}
+
+func (suite *testSelectDataframeSuite) TestSparseNumericColumnsWithPartialLabelsDataframe() {
+	labelSetLinux := utils.LabelsFromStringList("os", "linux")
+	labelSetWindows := utils.LabelsFromStringList("os", "windows")
+	expectedTimeColumn := []int64{
+		suite.basicQueryTime,
+		suite.basicQueryTime + tsdbtest.MinuteInMillis,
+		suite.basicQueryTime + 2*tsdbtest.MinuteInMillis,
+		suite.basicQueryTime + 3*tsdbtest.MinuteInMillis,
+		suite.basicQueryTime + 4*tsdbtest.MinuteInMillis}
+	expectedColumns := map[string][]interface{}{
+		"cpu_0": {math.NaN(), math.NaN(), math.NaN(), math.NaN(), math.NaN(), math.NaN(), math.NaN(), math.NaN(), math.NaN(), math.NaN()},
+		"cpu_1": {10.0, 20.0, 30.0, 40.0, 50.0, math.NaN(), 22.0, 33.0, math.NaN(), 55.0},
+		"cpu_2": {math.NaN(), math.NaN(), math.NaN(), math.NaN(), math.NaN(), 10.0, 20.0, math.NaN(), 40.0, 50.0},
+	}
+
+	testParams := tsdbtest.NewTestParams(suite.T(),
+		tsdbtest.TestOption{
+			Key: tsdbtest.OptTimeSeries,
+			Value: tsdbtest.TimeSeries{
+				tsdbtest.Metric{
+					Name:   "cpu_0",
+					Labels: labelSetWindows,
+					Data: []tsdbtest.DataPoint{ // out of test's time frame
+						{expectedTimeColumn[0] - 68*tsdbtest.HoursInMillis, 10.0},
+						{expectedTimeColumn[1] - 69*tsdbtest.HoursInMillis, 20.0},
+						{expectedTimeColumn[2] - 70*tsdbtest.HoursInMillis, 30.0},
+						{expectedTimeColumn[3] - 71*tsdbtest.HoursInMillis, 40.0},
+						{expectedTimeColumn[4] - 72*tsdbtest.HoursInMillis, 50.0}}},
+				tsdbtest.Metric{
+					Name:   "cpu_1",
+					Labels: labelSetLinux,
+					Data: []tsdbtest.DataPoint{
+						{expectedTimeColumn[0], 10.0},
+						{expectedTimeColumn[1], 20.0},
+						{expectedTimeColumn[2], 30.0},
+						{expectedTimeColumn[3], 40.0},
+						{expectedTimeColumn[4], 50.0}}},
+				tsdbtest.Metric{
+					Name:   "cpu_2",
+					Labels: labelSetWindows,
+					Data: []tsdbtest.DataPoint{ // out of test's time frame
+						{expectedTimeColumn[0], 10.0},
+						{expectedTimeColumn[1], 20.0},
+						// NA
+						{expectedTimeColumn[3], 40.0},
+						{expectedTimeColumn[4], 50.0}}},
+				tsdbtest.Metric{
+					Name:   "cpu_1",
+					Labels: labelSetWindows,
+					Data: []tsdbtest.DataPoint{ // out of test's time frame
+						// NA
+						{expectedTimeColumn[1], 22.0},
+						{expectedTimeColumn[2], 33.0},
+						// NA
+						{expectedTimeColumn[4], 55.0}}},
+			}})
+
+	adapter := tsdbtest.InsertData(suite.T(), testParams)
+	querierV2, err := adapter.QuerierV2()
+	suite.NoError(err, "failed to create querier")
+
+	params := &pquerier.SelectParams{RequestedColumns: []pquerier.RequestedColumn{{Metric: "cpu_0"}, {Metric: "cpu_1"}, {Metric: "cpu_2"}},
+		From: suite.basicQueryTime, To: suite.basicQueryTime + 10*tsdbtest.MinuteInMillis}
+	iter, err := querierV2.SelectDataFrame(params)
+	suite.NoError(err, "failed to execute query")
+
+	rowId := -1
+	var seriesCount int
+	for iter.NextFrame() {
+		seriesCount++
+		frame, err := iter.GetFrame()
+		suite.NoError(err)
+		indexCol := frame.Indices()[0]
+
+		nullValuesMap := frame.NullValuesMap()
+		suite.NotNil(nullValuesMap, "null value map should not be empty")
+
+		for i := 0; i < indexCol.Len(); i++ {
+			rowId++
+			t, _ := indexCol.TimeAt(i)
+			timeMillis := t.UnixNano() / int64(time.Millisecond)
+			suite.Require().Equal(expectedTimeColumn[i], timeMillis, "time column does not match at index %v", i)
+			for _, columnName := range frame.Names() {
+				var v interface{}
+				column, err := frame.Column(columnName)
+				suite.NoError(err)
+				if column.DType() == frames.FloatType {
+					v, _ = column.FloatAt(i)
+					if v == math.NaN() {
+						suite.True(i == 3, "null value is expected")
+						suite.True(nullValuesMap[i].NullColumns[columnName])
+					}
+					bothNaN := math.IsNaN(expectedColumns[column.Name()][i].(float64)) && math.IsNaN(v.(float64))
+					if bothNaN {
+						continue
+					}
+				} else if column.DType() == frames.StringType {
+					v, _ = column.StringAt(i)
+					if v == "" {
+						suite.True(nullValuesMap[i].NullColumns[columnName])
+					}
+				} else {
+					suite.Fail(fmt.Sprintf("column type is not as expected: %v", column.DType()))
+				}
+
+				expectedValue := expectedColumns[columnName][rowId]
+				if !math.IsNaN(expectedValue.(float64)) || !math.IsNaN(v.(float64)) {
+					suite.Require().Equal(expectedValue, v, "column %v does not match at index %v", columnName, rowId)
+				}
+			}
+		}
+	}
+}
+
+func (suite *testSelectDataframeSuite) TestSparseNumericColumnsWithNotExistingMetricDataframe() {
+	labelSetLinux := utils.LabelsFromStringList("os", "linux")
+	labelSetWindows := utils.LabelsFromStringList("os", "windows")
+	expectedTimeColumn := []int64{
+		suite.basicQueryTime,
+		suite.basicQueryTime + tsdbtest.MinuteInMillis,
+		suite.basicQueryTime + 2*tsdbtest.MinuteInMillis,
+		suite.basicQueryTime + 3*tsdbtest.MinuteInMillis,
+		suite.basicQueryTime + 4*tsdbtest.MinuteInMillis}
+	expectedColumns := map[string][]interface{}{
+		"cpu_0": {math.NaN(), math.NaN(), math.NaN(), math.NaN(), math.NaN(), math.NaN(), math.NaN(), math.NaN(), math.NaN(), math.NaN()},
+		"cpu_1": {10.0, 20.0, 30.0, 40.0, 50.0, math.NaN(), 22.0, 33.0, math.NaN(), 55.0},
+		"cpu_2": {math.NaN(), math.NaN(), math.NaN(), math.NaN(), math.NaN(), 10.0, 20.0, math.NaN(), 40.0, 50.0},
+		"fake":  {math.NaN(), math.NaN(), math.NaN(), math.NaN(), math.NaN(), math.NaN(), math.NaN(), math.NaN(), math.NaN(), math.NaN()},
+	}
+
+	testParams := tsdbtest.NewTestParams(suite.T(),
+		tsdbtest.TestOption{
+			Key: tsdbtest.OptTimeSeries,
+			Value: tsdbtest.TimeSeries{
+				tsdbtest.Metric{
+					Name:   "cpu_0",
+					Labels: labelSetWindows,
+					Data: []tsdbtest.DataPoint{ // out of test's time frame
+						{expectedTimeColumn[0] - 68*tsdbtest.HoursInMillis, 10.0},
+						{expectedTimeColumn[1] - 69*tsdbtest.HoursInMillis, 20.0},
+						{expectedTimeColumn[2] - 70*tsdbtest.HoursInMillis, 30.0},
+						{expectedTimeColumn[3] - 71*tsdbtest.HoursInMillis, 40.0},
+						{expectedTimeColumn[4] - 72*tsdbtest.HoursInMillis, 50.0}}},
+				tsdbtest.Metric{
+					Name:   "cpu_1",
+					Labels: labelSetLinux,
+					Data: []tsdbtest.DataPoint{
+						{expectedTimeColumn[0], 10.0},
+						{expectedTimeColumn[1], 20.0},
+						{expectedTimeColumn[2], 30.0},
+						{expectedTimeColumn[3], 40.0},
+						{expectedTimeColumn[4], 50.0}}},
+				tsdbtest.Metric{
+					Name:   "cpu_2",
+					Labels: labelSetWindows,
+					Data: []tsdbtest.DataPoint{ // out of test's time frame
+						{expectedTimeColumn[0], 10.0},
+						{expectedTimeColumn[1], 20.0},
+						// NA
+						{expectedTimeColumn[3], 40.0},
+						{expectedTimeColumn[4], 50.0}}},
+				tsdbtest.Metric{
+					Name:   "cpu_1",
+					Labels: labelSetWindows,
+					Data: []tsdbtest.DataPoint{ // out of test's time frame
+						// NA
+						{expectedTimeColumn[1], 22.0},
+						{expectedTimeColumn[2], 33.0},
+						// NA
+						{expectedTimeColumn[4], 55.0}}},
+			}})
+
+	adapter := tsdbtest.InsertData(suite.T(), testParams)
+	querierV2, err := adapter.QuerierV2()
+	suite.NoError(err, "failed to create querier")
+
+	params := &pquerier.SelectParams{RequestedColumns: []pquerier.RequestedColumn{{Metric: "cpu_0"}, {Metric: "cpu_1"}, {Metric: "cpu_2"}, {Metric: "fake"}},
+		From: suite.basicQueryTime, To: suite.basicQueryTime + 10*tsdbtest.MinuteInMillis}
+	iter, err := querierV2.SelectDataFrame(params)
+	suite.NoError(err, "failed to execute query")
+
+	rowId := -1
+	var seriesCount int
+	for iter.NextFrame() {
+		seriesCount++
+		frame, err := iter.GetFrame()
+		suite.NoError(err)
+		indexCol := frame.Indices()[0]
+
+		nullValuesMap := frame.NullValuesMap()
+		suite.NotNil(nullValuesMap, "null value map should not be empty")
+
+		for i := 0; i < indexCol.Len(); i++ {
+			rowId++
+			t, _ := indexCol.TimeAt(i)
+			timeMillis := t.UnixNano() / int64(time.Millisecond)
+			suite.Require().Equal(expectedTimeColumn[i], timeMillis, "time column does not match at index %d", i)
+			for _, columnName := range frame.Names() {
+				var v interface{}
+				column, err := frame.Column(columnName)
+				suite.NoError(err)
+				if column.DType() == frames.FloatType {
+					v, _ = column.FloatAt(i)
+					if v == math.NaN() {
+						suite.True(i == 3, "null value is expected")
+						suite.True(nullValuesMap[i].NullColumns[columnName])
+					}
+					bothNaN := math.IsNaN(expectedColumns[column.Name()][i].(float64)) && math.IsNaN(v.(float64))
+					if bothNaN {
+						continue
+					}
+				} else if column.DType() == frames.StringType {
+					v, _ = column.StringAt(i)
+					if v == "" {
+						suite.True(nullValuesMap[i].NullColumns[columnName])
+					}
+				} else {
+					suite.Fail(fmt.Sprintf("column type is not as expected: %v", column.DType()))
+				}
+
+				expectedValue := expectedColumns[columnName][rowId]
+				if !math.IsNaN(expectedValue.(float64)) || !math.IsNaN(v.(float64)) {
+					suite.Require().Equal(expectedValue, v, "column %v does not match at index %d", columnName, rowId)
+				}
 			}
 		}
 	}

@@ -482,6 +482,7 @@ func (d *dataFrame) rawSeriesToColumns() error {
 	emptyMetrics := make(map[int]string)
 
 	d.nullValuesMaps = make([]*pb.NullValuesMap, 0)
+	nullValuesRowIndex := -1
 
 	for i, rawSeries := range d.rawColumns {
 		if rawSeries == nil {
@@ -525,14 +526,13 @@ func (d *dataFrame) rawSeriesToColumns() error {
 	}
 
 	for nonExhaustedIterators > 0 {
-		rowIndex := 0
 		currentTime = nextTime
 		nextTime = int64(math.MaxInt64)
 		timeData = append(timeData, time.Unix(currentTime/1000, (currentTime%1000)*1e6))
 
 		// add new row to null values map
 		d.nullValuesMaps = append(d.nullValuesMaps, &pb.NullValuesMap{NullColumns: make(map[string]bool)})
-		nullValuesRowIndex := len(d.nullValuesMaps) - 1
+		nullValuesRowIndex++
 
 		for seriesIndex, rawSeries := range d.rawColumns {
 			if rawSeries == nil {
@@ -549,9 +549,7 @@ func (d *dataFrame) rawSeriesToColumns() error {
 				t, v = iter.At()
 			}
 
-			colName := columns[seriesIndex].Name()
 			if t == currentTime {
-				//d.nullValuesMaps[nullValuesRowIndex].NullColumns[colName] = false
 				columns[seriesIndex].Append(v)
 				if iter.Next() {
 					t, _ = iter.At()
@@ -561,14 +559,13 @@ func (d *dataFrame) rawSeriesToColumns() error {
 				}
 			} else {
 				columns[seriesIndex].Append(seriesToDefaultValue[seriesIndex])
-				d.nullValuesMaps[nullValuesRowIndex].NullColumns[colName] = true
+				d.nullValuesMaps[nullValuesRowIndex].NullColumns[columns[seriesIndex].Name()] = true
 			}
 
 			if seriesHasMoreData[seriesIndex] && t < nextTime {
 				nextTime = t
 			}
 		}
-		rowIndex++
 	}
 
 	numberOfRows := len(timeData)
