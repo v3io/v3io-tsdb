@@ -858,8 +858,9 @@ func (suite *testSelectDataframeSuite) TestQueryNonExistingMetric() {
 }
 
 func (suite *testSelectDataframeSuite) TestSparseStringAndNumericColumnsDataframe() {
+	requireCtx := suite.Require()
 	adapter, err := tsdb.NewV3ioAdapter(suite.v3ioConfig, nil, nil)
-	suite.NoError(err, "failed to create v3io adapter")
+	requireCtx.NoError(err, "failed to create v3io adapter")
 
 	metricCpu := "cpu"
 	metricLog := "log"
@@ -884,7 +885,7 @@ func (suite *testSelectDataframeSuite) TestSparseStringAndNumericColumnsDatafram
 		metricCpu: {10.0, 20.0, 30.0, math.NaN(), 50.0},
 		metricLog: {"a", "", "c", "d", "e"}}
 	appender, err := adapter.Appender()
-	suite.NoError(err, "failed to create v3io appender")
+	requireCtx.NoError(err, "failed to create v3io appender")
 
 	refLog, err := appender.Add(labelsWithNameLog, timeColumnLog[0], dataLog[0])
 	suite.NoError(err, "failed to add data to the TSDB appender")
@@ -893,7 +894,7 @@ func (suite *testSelectDataframeSuite) TestSparseStringAndNumericColumnsDatafram
 	}
 
 	_, err = appender.WaitForCompletion(0)
-	suite.NoError(err, "failed to wait for TSDB append completion")
+	requireCtx.NoError(err, "failed to wait for TSDB append completion")
 
 	testParams := tsdbtest.NewTestParams(suite.T(),
 		tsdbtest.TestOption{
@@ -911,35 +912,35 @@ func (suite *testSelectDataframeSuite) TestSparseStringAndNumericColumnsDatafram
 	tsdbtest.InsertData(suite.T(), testParams)
 
 	querierV2, err := adapter.QuerierV2()
-	suite.NoError(err, "failed to create querier")
+	requireCtx.NoError(err, "failed to create querier")
 
 	params := &pquerier.SelectParams{RequestedColumns: []pquerier.RequestedColumn{{Metric: metricCpu}, {Metric: metricLog}},
 		From: suite.basicQueryTime, To: suite.basicQueryTime + 5*tsdbtest.MinuteInMillis}
 	iter, err := querierV2.SelectDataFrame(params)
-	suite.NoError(err, "failed to execute query")
+	requireCtx.NoError(err, "failed to execute query")
 
 	var seriesCount int
 	for iter.NextFrame() {
 		seriesCount++
 		frame, err := iter.GetFrame()
-		suite.NoError(err)
+		requireCtx.NoError(err)
 		indexCol := frame.Indices()[0]
 
 		nullValuesMap := frame.NullValuesMap()
-		suite.NotNil(nullValuesMap, "null value map should not be empty")
+		requireCtx.NotNil(nullValuesMap, "null value map should not be empty")
 
 		for i := 0; i < indexCol.Len(); i++ {
 			t, _ := indexCol.TimeAt(i)
 			timeMillis := t.UnixNano() / int64(time.Millisecond)
-			suite.Require().Equal(expectedTimeColumn[i], timeMillis, "time column does not match at index %v", i)
+			requireCtx.Equal(expectedTimeColumn[i], timeMillis, "time column does not match at index %v", i)
 			for _, columnName := range frame.Names() {
 				var v interface{}
 				column, err := frame.Column(columnName)
-				suite.NoError(err)
+				requireCtx.NoError(err)
 				if column.DType() == frames.FloatType {
 					v, _ = column.FloatAt(i)
 					if v == math.NaN() {
-						suite.True(nullValuesMap[i].NullColumns[columnName])
+						requireCtx.True(nullValuesMap[i].NullColumns[columnName])
 					}
 					bothNaN := math.IsNaN(expectedColumns[column.Name()][i].(float64)) && math.IsNaN(v.(float64))
 					if bothNaN {
@@ -948,18 +949,19 @@ func (suite *testSelectDataframeSuite) TestSparseStringAndNumericColumnsDatafram
 				} else if column.DType() == frames.StringType {
 					v, _ = column.StringAt(i)
 					if v == "" {
-						suite.True(nullValuesMap[i].NullColumns[columnName])
+						requireCtx.True(nullValuesMap[i].NullColumns[columnName])
 					}
 				} else {
 					suite.Fail(fmt.Sprintf("column type is not as expected: %v", column.DType()))
 				}
-				suite.Require().Equal(expectedColumns[column.Name()][i], v, "column %v does not match at index %v", column.Name(), i)
+				requireCtx.Equal(expectedColumns[column.Name()][i], v, "column %v does not match at index %v", column.Name(), i)
 			}
 		}
 	}
 }
 
 func (suite *testSelectDataframeSuite) TestSparseNumericColumnsWithEmptyColumnsDataframe() {
+	requireCtx := suite.Require()
 	labelSetLinux := utils.LabelsFromStringList("os", "linux")
 	labelSetWindows := utils.LabelsFromStringList("os", "windows")
 	expectedTimeColumn := []int64{
@@ -1025,37 +1027,37 @@ func (suite *testSelectDataframeSuite) TestSparseNumericColumnsWithEmptyColumnsD
 
 	adapter := tsdbtest.InsertData(suite.T(), testParams)
 	querierV2, err := adapter.QuerierV2()
-	suite.NoError(err, "failed to create querier")
+	requireCtx.NoError(err, "failed to create querier")
 
 	params := &pquerier.SelectParams{RequestedColumns: []pquerier.RequestedColumn{{Metric: "cpu_0"}, {Metric: "cpu_1"}, {Metric: "cpu_2"}},
 		From: suite.basicQueryTime, To: suite.basicQueryTime + 10*tsdbtest.MinuteInMillis}
 	iter, err := querierV2.SelectDataFrame(params)
-	suite.NoError(err, "failed to execute query")
+	requireCtx.NoError(err, "failed to execute query")
 
 	rowId := -1
 	var seriesCount int
 	for iter.NextFrame() {
 		seriesCount++
 		frame, err := iter.GetFrame()
-		suite.NoError(err)
+		requireCtx.NoError(err)
 		indexCol := frame.Indices()[0]
 
 		nullValuesMap := frame.NullValuesMap()
-		suite.NotNil(nullValuesMap, "null value map should not be empty")
+		requireCtx.NotNil(nullValuesMap, "null value map should not be empty")
 
 		for i := 0; i < indexCol.Len(); i++ {
 			rowId++
 			t, _ := indexCol.TimeAt(i)
 			timeMillis := t.UnixNano() / int64(time.Millisecond)
-			suite.Require().Equal(expectedTimeColumn[i], timeMillis, "time column does not match at index %v", i)
+			requireCtx.Equal(expectedTimeColumn[i], timeMillis, "time column does not match at index %v", i)
 			for _, columnName := range frame.Names() {
 				var v interface{}
 				column, err := frame.Column(columnName)
-				suite.NoError(err)
+				requireCtx.NoError(err)
 				if column.DType() == frames.FloatType {
 					v, _ = column.FloatAt(i)
 					if v == math.NaN() {
-						suite.True(nullValuesMap[i].NullColumns[columnName])
+						requireCtx.True(nullValuesMap[i].NullColumns[columnName])
 					}
 					bothNaN := math.IsNaN(expectedColumns[column.Name()][i].(float64)) && math.IsNaN(v.(float64))
 					if bothNaN {
@@ -1064,7 +1066,7 @@ func (suite *testSelectDataframeSuite) TestSparseNumericColumnsWithEmptyColumnsD
 				} else if column.DType() == frames.StringType {
 					v, _ = column.StringAt(i)
 					if v == "" {
-						suite.True(nullValuesMap[i].NullColumns[columnName])
+						requireCtx.True(nullValuesMap[i].NullColumns[columnName])
 					}
 				} else {
 					suite.Fail(fmt.Sprintf("column type is not as expected: %v", column.DType()))
@@ -1072,7 +1074,7 @@ func (suite *testSelectDataframeSuite) TestSparseNumericColumnsWithEmptyColumnsD
 
 				expectedValue := expectedColumns[columnName][rowId]
 				if !math.IsNaN(expectedValue.(float64)) || !math.IsNaN(v.(float64)) {
-					suite.Require().Equal(expectedValue, v, "column %v does not match at index %v", columnName, rowId)
+					requireCtx.Equal(expectedValue, v, "column %v does not match at index %v", columnName, rowId)
 				}
 			}
 		}
@@ -1080,6 +1082,7 @@ func (suite *testSelectDataframeSuite) TestSparseNumericColumnsWithEmptyColumnsD
 }
 
 func (suite *testSelectDataframeSuite) TestSparseNumericColumnsWithPartialLabelsDataframe() {
+	requireCtx := suite.Require()
 	labelSetLinux := utils.LabelsFromStringList("os", "linux")
 	labelSetWindows := utils.LabelsFromStringList("os", "windows")
 	expectedTimeColumn := []int64{
@@ -1138,37 +1141,37 @@ func (suite *testSelectDataframeSuite) TestSparseNumericColumnsWithPartialLabels
 
 	adapter := tsdbtest.InsertData(suite.T(), testParams)
 	querierV2, err := adapter.QuerierV2()
-	suite.NoError(err, "failed to create querier")
+	requireCtx.NoError(err, "failed to create querier")
 
 	params := &pquerier.SelectParams{RequestedColumns: []pquerier.RequestedColumn{{Metric: "cpu_0"}, {Metric: "cpu_1"}, {Metric: "cpu_2"}},
 		From: suite.basicQueryTime, To: suite.basicQueryTime + 10*tsdbtest.MinuteInMillis}
 	iter, err := querierV2.SelectDataFrame(params)
-	suite.NoError(err, "failed to execute query")
+	requireCtx.NoError(err, "failed to execute query")
 
 	rowId := -1
 	var seriesCount int
 	for iter.NextFrame() {
 		seriesCount++
 		frame, err := iter.GetFrame()
-		suite.NoError(err)
+		requireCtx.NoError(err)
 		indexCol := frame.Indices()[0]
 
 		nullValuesMap := frame.NullValuesMap()
-		suite.NotNil(nullValuesMap, "null value map should not be empty")
+		requireCtx.NotNil(nullValuesMap, "null value map should not be empty")
 
 		for i := 0; i < indexCol.Len(); i++ {
 			rowId++
 			t, _ := indexCol.TimeAt(i)
 			timeMillis := t.UnixNano() / int64(time.Millisecond)
-			suite.Require().Equal(expectedTimeColumn[i], timeMillis, "time column does not match at index %v", i)
+			requireCtx.Equal(expectedTimeColumn[i], timeMillis, "time column does not match at index %v", i)
 			for _, columnName := range frame.Names() {
 				var v interface{}
 				column, err := frame.Column(columnName)
-				suite.NoError(err)
+				requireCtx.NoError(err)
 				if column.DType() == frames.FloatType {
 					v, _ = column.FloatAt(i)
 					if v == math.NaN() {
-						suite.True(nullValuesMap[i].NullColumns[columnName])
+						requireCtx.True(nullValuesMap[i].NullColumns[columnName])
 					}
 					bothNaN := math.IsNaN(expectedColumns[column.Name()][i].(float64)) && math.IsNaN(v.(float64))
 					if bothNaN {
@@ -1177,7 +1180,7 @@ func (suite *testSelectDataframeSuite) TestSparseNumericColumnsWithPartialLabels
 				} else if column.DType() == frames.StringType {
 					v, _ = column.StringAt(i)
 					if v == "" {
-						suite.True(nullValuesMap[i].NullColumns[columnName])
+						requireCtx.True(nullValuesMap[i].NullColumns[columnName])
 					}
 				} else {
 					suite.Fail(fmt.Sprintf("column type is not as expected: %v", column.DType()))
@@ -1185,7 +1188,7 @@ func (suite *testSelectDataframeSuite) TestSparseNumericColumnsWithPartialLabels
 
 				expectedValue := expectedColumns[columnName][rowId]
 				if !math.IsNaN(expectedValue.(float64)) || !math.IsNaN(v.(float64)) {
-					suite.Require().Equal(expectedValue, v, "column %v does not match at index %v", columnName, rowId)
+					requireCtx.Equal(expectedValue, v, "column %v does not match at index %v", columnName, rowId)
 				}
 			}
 		}
@@ -1193,6 +1196,7 @@ func (suite *testSelectDataframeSuite) TestSparseNumericColumnsWithPartialLabels
 }
 
 func (suite *testSelectDataframeSuite) TestSparseNumericColumnsWithNotExistingMetricDataframe() {
+	requireCtx := suite.Require()
 	labelSetLinux := utils.LabelsFromStringList("os", "linux")
 	labelSetWindows := utils.LabelsFromStringList("os", "windows")
 	expectedTimeColumn := []int64{
@@ -1252,37 +1256,37 @@ func (suite *testSelectDataframeSuite) TestSparseNumericColumnsWithNotExistingMe
 
 	adapter := tsdbtest.InsertData(suite.T(), testParams)
 	querierV2, err := adapter.QuerierV2()
-	suite.NoError(err, "failed to create querier")
+	requireCtx.NoError(err, "failed to create querier")
 
 	params := &pquerier.SelectParams{RequestedColumns: []pquerier.RequestedColumn{{Metric: "cpu_0"}, {Metric: "cpu_1"}, {Metric: "cpu_2"}, {Metric: "fake"}},
 		From: suite.basicQueryTime, To: suite.basicQueryTime + 10*tsdbtest.MinuteInMillis}
 	iter, err := querierV2.SelectDataFrame(params)
-	suite.NoError(err, "failed to execute query")
+	requireCtx.NoError(err, "failed to execute query")
 
 	rowId := -1
 	var seriesCount int
 	for iter.NextFrame() {
 		seriesCount++
 		frame, err := iter.GetFrame()
-		suite.NoError(err)
+		requireCtx.NoError(err)
 		indexCol := frame.Indices()[0]
 
 		nullValuesMap := frame.NullValuesMap()
-		suite.NotNil(nullValuesMap, "null value map should not be empty")
+		requireCtx.NotNil(nullValuesMap, "null value map should not be empty")
 
 		for i := 0; i < indexCol.Len(); i++ {
 			rowId++
 			t, _ := indexCol.TimeAt(i)
 			timeMillis := t.UnixNano() / int64(time.Millisecond)
-			suite.Require().Equal(expectedTimeColumn[i], timeMillis, "time column does not match at index %d", i)
+			requireCtx.Equal(expectedTimeColumn[i], timeMillis, "time column does not match at index %d", i)
 			for _, columnName := range frame.Names() {
 				var v interface{}
 				column, err := frame.Column(columnName)
-				suite.NoError(err)
+				requireCtx.NoError(err)
 				if column.DType() == frames.FloatType {
 					v, _ = column.FloatAt(i)
 					if v == math.NaN() {
-						suite.True(nullValuesMap[i].NullColumns[columnName])
+						requireCtx.True(nullValuesMap[i].NullColumns[columnName])
 					}
 					bothNaN := math.IsNaN(expectedColumns[column.Name()][i].(float64)) && math.IsNaN(v.(float64))
 					if bothNaN {
@@ -1291,7 +1295,7 @@ func (suite *testSelectDataframeSuite) TestSparseNumericColumnsWithNotExistingMe
 				} else if column.DType() == frames.StringType {
 					v, _ = column.StringAt(i)
 					if v == "" {
-						suite.True(nullValuesMap[i].NullColumns[columnName])
+						requireCtx.True(nullValuesMap[i].NullColumns[columnName])
 					}
 				} else {
 					suite.Fail(fmt.Sprintf("column type is not as expected: %v", column.DType()))
@@ -1299,7 +1303,7 @@ func (suite *testSelectDataframeSuite) TestSparseNumericColumnsWithNotExistingMe
 
 				expectedValue := expectedColumns[columnName][rowId]
 				if !math.IsNaN(expectedValue.(float64)) || !math.IsNaN(v.(float64)) {
-					suite.Require().Equal(expectedValue, v, "column %v does not match at index %d", columnName, rowId)
+					requireCtx.Equal(expectedValue, v, "column %v does not match at index %d", columnName, rowId)
 				}
 			}
 		}
