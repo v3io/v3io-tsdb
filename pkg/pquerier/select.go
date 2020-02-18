@@ -400,7 +400,7 @@ func (queryCtx *selectQueryContext) createColumnSpecs() ([]columnMeta, map[strin
 			} else if queryCtx.isCrossSeriesAggregate {
 				return nil, nil, fmt.Errorf("can not aggregate both over time and across series aggregates")
 			}
-			aggr, err := aggregate.AggregateFromString(col.GetFunction())
+			aggr, err := aggregate.FromString(col.GetFunction())
 			if err != nil {
 				return nil, nil, err
 			}

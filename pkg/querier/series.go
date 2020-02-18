@@ -264,7 +264,7 @@ func NewAggrSeries(set *V3ioSeriesSet, aggr aggregate.AggrType) *V3ioSeries {
 
 type aggrSeriesIterator struct {
 	set      *V3ioSeriesSet
-	aggrSet  *aggregate.AggregateSet
+	aggrSet  *aggregate.Set
 	aggrType aggregate.AggrType
 	index    int
 	err      error

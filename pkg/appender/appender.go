@@ -50,7 +50,7 @@ type MetricState struct {
 	key   string
 	name  string
 	hash  uint64
-	refId uint64
+	refID uint64
 
 	aggrs []*MetricState
 
@@ -189,7 +189,7 @@ func (mc *MetricsCache) addMetric(hash uint64, name string, metric *MetricState)
 	defer mc.mtx.Unlock()
 
 	mc.lastMetric++
-	metric.refId = mc.lastMetric
+	metric.refID = mc.lastMetric
 	mc.cacheRefMap[mc.lastMetric] = metric
 	mc.cacheMetricMap[cacheKey{name, hash}] = metric
 	if _, ok := mc.NameLabelMap[name]; !ok {
@@ -220,7 +220,7 @@ func (mc *MetricsCache) Add(lset utils.LabelsIfc, t int64, v interface{}) (uint6
 		return 0, err
 	}
 
-	isValueVariantType := false
+	var isValueVariantType bool
 	// If the value is not of Float type assume it's variant type.
 	switch v.(type) {
 	case int, int64, float64, float32:
@@ -278,10 +278,10 @@ func (mc *MetricsCache) Add(lset utils.LabelsIfc, t int64, v interface{}) (uint6
 		mc.appendTV(aggrMetric, t, v)
 	}
 
-	return metric.refId, err
+	return metric.refID, err
 }
 
-// fast Add to metric (by refId)
+// fast Add to metric (by refID)
 func (mc *MetricsCache) AddFast(ref uint64, t int64, v interface{}) error {
 
 	err := verifyTimeValid(t)
@@ -309,7 +309,7 @@ func (mc *MetricsCache) AddFast(ref uint64, t int64, v interface{}) error {
 
 func verifyTimeValid(t int64) error {
 	if t > maxUnixTimeMs || t < minimalUnixTimeMs {
-		return fmt.Errorf("Time '%d' doesn't seem to be a valid Unix timesamp in milliseconds. The time must be in the years range 1970-2400.", t)
+		return fmt.Errorf("time '%d' doesn't seem to be a valid Unix timesamp in milliseconds. The time must be in the years range 1970-2400", t)
 	}
 	return nil
 }
@@ -324,7 +324,7 @@ func (mc *MetricsCache) WaitForCompletion(timeout time.Duration) (int, error) {
 	waitChan := make(chan int, 2)
 	mc.asyncAppendChan <- &asyncAppend{metric: nil, t: 0, v: 0, resp: waitChan}
 
-	var maxWaitTime time.Duration = 0
+	var maxWaitTime time.Duration
 
 	if timeout == 0 {
 		maxWaitTime = 24 * time.Hour // Almost-infinite time

@@ -37,7 +37,7 @@ type testTsdbctlSuite struct {
 }
 
 func (suite *testTsdbctlSuite) TestPopulateConfigWithTenant() {
-	rc := RootCommandeer{v3ioUrl: "localhost:80123"}
+	rc := RootCommandeer{v3ioURL: "localhost:80123"}
 	cfg := &config.V3ioConfig{Username: "Vel@Odar", Password: "p455w0rd", Container: "123", TablePath: "/x/y/z"}
 
 	err := rc.populateConfig(cfg)
@@ -52,7 +52,7 @@ func (suite *testTsdbctlSuite) TestPopulateConfigWithTenant() {
 
 	expectedRc := RootCommandeer{
 		v3iocfg:  cfg,
-		v3ioUrl:  "localhost:80123",
+		v3ioURL:  "localhost:80123",
 		Reporter: metricReporter,
 	}
 	expectedCfg := &config.V3ioConfig{
@@ -79,7 +79,7 @@ func (suite *testTsdbctlSuite) TestContainerConfig() {
 	suite.Require().NoError(err)
 	defer os.Setenv("V3IO_ACCESS_KEY", oldAccessKey)
 
-	rc := RootCommandeer{v3ioUrl: "localhost:80123", container: "test", accessKey: "acce55-key"}
+	rc := RootCommandeer{v3ioURL: "localhost:80123", container: "test", accessKey: "acce55-key"}
 	cfg := &config.V3ioConfig{Username: "Vel@Odar", Password: "p455w0rd", TablePath: "/x/y/z"}
 
 	err = rc.populateConfig(cfg)

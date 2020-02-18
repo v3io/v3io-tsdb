@@ -404,7 +404,7 @@ func (cs *chunkStore) writeChunks(mc *MetricsCache, metric *MetricState) (hasPen
 			if len(cs.pending) > 0 {
 				mc.metricQueue.Push(metric)
 			}
-			hasPendingUpdates, err = false, nil
+			hasPendingUpdates = false
 			return
 		}
 
@@ -441,7 +441,7 @@ func (cs *chunkStore) writeChunks(mc *MetricsCache, metric *MetricState) (hasPen
 		// will add user data in request)
 		mc.logger.DebugWith("Update-metric expression", "name", metric.name, "key", metric.key, "expr", expr, "reqid", request.ID)
 
-		hasPendingUpdates, err = true, nil
+		hasPendingUpdates = true
 		cs.performanceReporter.UpdateHistogram("WriteChunksSizeHistogram", int64(pendingSamplesCount))
 		return
 	})

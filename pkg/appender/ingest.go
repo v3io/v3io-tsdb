@@ -224,7 +224,7 @@ func (mc *MetricsCache) postMetricUpdates(metric *MetricState) {
 
 	metric.Lock()
 	defer metric.Unlock()
-	sent := false
+	var sent bool
 	var err error
 
 	if metric.getState() == storeStatePreGet {

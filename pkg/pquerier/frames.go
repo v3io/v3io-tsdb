@@ -476,7 +476,6 @@ func (d *dataFrame) rawSeriesToColumns() error {
 	nonExhaustedIterators := len(d.rawColumns)
 	seriesToDataType := make([]frames.DType, len(d.rawColumns))
 	seriesTodefaultValue := make([]interface{}, len(d.rawColumns))
-	currentTime := int64(math.MaxInt64)
 	nextTime := int64(math.MaxInt64)
 	seriesHasMoreData := make([]bool, len(d.rawColumns))
 
@@ -524,7 +523,7 @@ func (d *dataFrame) rawSeriesToColumns() error {
 	}
 
 	for nonExhaustedIterators > 0 {
-		currentTime = nextTime
+		currentTime := nextTime
 		nextTime = int64(math.MaxInt64)
 		timeData = append(timeData, time.Unix(currentTime/1000, (currentTime%1000)*1e6))
 

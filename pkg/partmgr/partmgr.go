@@ -682,7 +682,7 @@ func (p *DBPartition) GetHashingBuckets() int {
 
 func (p *DBPartition) ToMap() map[string]interface{} {
 	attributes := make(map[string]interface{}, 5)
-	attributes["aggregates"] = aggregate.AggregateMaskToString(p.AggrType())
+	attributes["aggregates"] = aggregate.MaskToString(p.AggrType())
 	attributes["rollupTime"] = p.rollupTime
 	attributes["chunkInterval"] = p.chunkInterval
 	attributes["partitionInterval"] = p.partitionInterval

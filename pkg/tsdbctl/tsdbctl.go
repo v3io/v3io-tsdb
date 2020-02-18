@@ -37,7 +37,7 @@ type RootCommandeer struct {
 	logger      logger.Logger
 	v3iocfg     *config.V3ioConfig
 	cmd         *cobra.Command
-	v3ioUrl     string
+	v3ioURL     string
 	dbPath      string
 	cfgFilePath string
 	logLevel    string
@@ -69,7 +69,7 @@ func NewRootCommandeer() *RootCommandeer {
 	// although it's documented as Required, because this flag isn't required
 	// for the hidden `time` command + during internal tests we might want to
 	// configure the table path in a configuration file.
-	cmd.PersistentFlags().StringVarP(&commandeer.v3ioUrl, "server", "s", "",
+	cmd.PersistentFlags().StringVarP(&commandeer.v3ioURL, "server", "s", "",
 		"Web-gateway (web-APIs) service endpoint of an instance of\nthe Iguazio Data Science Platform, of the format\n\"<IP address>:<port number=8081>\". Examples: \"localhost:8081\"\n(when running on the target platform); \"192.168.1.100:8081\".")
 	cmd.PersistentFlags().StringVarP(&commandeer.cfgFilePath, "config", "g", "",
 		"Path to a YAML TSDB configuration file. When this flag isn't\nset, the CLI checks for a "+config.DefaultConfigurationFileName+" configuration\nfile in the current directory. CLI flags override file\nconfigurations. Example: \"~/cfg/my_v3io_tsdb_cfg.yaml\".")
@@ -144,8 +144,8 @@ func (rc *RootCommandeer) populateConfig(cfg *config.V3ioConfig) error {
 		cfg.AccessKey = rc.accessKey
 	}
 
-	if rc.v3ioUrl != "" {
-		cfg.WebApiEndpoint = rc.v3ioUrl
+	if rc.v3ioURL != "" {
+		cfg.WebApiEndpoint = rc.v3ioURL
 	}
 	if rc.container != "" {
 		cfg.Container = rc.container

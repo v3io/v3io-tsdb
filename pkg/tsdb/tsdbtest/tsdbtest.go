@@ -161,8 +161,8 @@ func CreateTestTSDB(t testing.TB, v3ioConfig *config.V3ioConfig) {
 func CreateTestTSDBWithAggregates(t testing.TB, v3ioConfig *config.V3ioConfig, aggregates string) {
 	schema := testutils.CreateSchema(t, aggregates)
 	if err := CreateTSDB(v3ioConfig, schema); err != nil {
-		v3ioConfigAsJson, _ := json2.MarshalIndent(v3ioConfig, "", "  ")
-		t.Fatalf("Failed to create a TSDB instance (table). Reason: %v\nConfiguration:\n%s", err, string(v3ioConfigAsJson))
+		v3ioConfigAsJSON, _ := json2.MarshalIndent(v3ioConfig, "", "  ")
+		t.Fatalf("Failed to create a TSDB instance (table). Reason: %v\nConfiguration:\n%s", err, string(v3ioConfigAsJSON))
 	}
 }
 
@@ -211,8 +211,8 @@ func SetUpWithDBConfig(t *testing.T, schema *config.Schema, testParams TestParam
 	v3ioConfig := testParams.V3ioConfig()
 	v3ioConfig.TablePath = PrefixTablePath(fmt.Sprintf("%s-%d", t.Name(), time.Now().Nanosecond()))
 	if err := CreateTSDB(v3ioConfig, schema); err != nil {
-		v3ioConfigAsJson, _ := json2.MarshalIndent(v3ioConfig, "", "  ")
-		t.Fatalf("Failed to create a TSDB instance (table). Reason: %s\nConfiguration:\n%s", err, string(v3ioConfigAsJson))
+		v3ioConfigAsJSON, _ := json2.MarshalIndent(v3ioConfig, "", "  ")
+		t.Fatalf("Failed to create a TSDB instance (table). Reason: %s\nConfiguration:\n%s", err, string(v3ioConfigAsJSON))
 	}
 
 	// Measure performance
@@ -292,7 +292,7 @@ func ValidateCountOfSamples(t testing.TB, adapter *V3ioAdapter, metricName strin
 		Functions: "count",
 		Step:      stepSize,
 		Filter:    fmt.Sprintf("starts(__name__, '%v')", metricName)}
-	set, err := qry.Select(selectParams)
+	set, _ := qry.Select(selectParams)
 
 	var actualCount int
 	for set.Next() {
@@ -329,11 +329,11 @@ func ValidateRawData(t testing.TB, adapter *V3ioAdapter, metricName string, star
 		t.Fatal(err, "Failed to create a Querier instance.")
 	}
 
-	set, err := qry.Select(metricName, "", 0, "")
+	set, _ := qry.Select(metricName, "", 0, "")
 
 	for set.Next() {
 		// Start over for each label set
-		var lastDataPoint *DataPoint = nil
+		var lastDataPoint *DataPoint
 
 		if set.Err() != nil {
 			t.Fatal(set.Err(), "Failed to get the next element from a result set.")
