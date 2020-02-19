@@ -223,7 +223,7 @@ func downsampleRawData(ctx *selectQueryContext, res *qryResults,
 			if it.Seek(currCellTime) {
 				t, v := it.At()
 				if t == currCellTime {
-					_ = res.frame.setDataAt(col.Name(), int(currCell), v)
+					_ = res.frame.setDataAt(col.Name(), currCell, v)
 				} else {
 					prevT, prevV := it.PeakBack()
 
@@ -236,7 +236,7 @@ func downsampleRawData(ctx *selectQueryContext, res *qryResults,
 
 					// Check if the interpolation was successful in terms of exceeding tolerance
 					if !(interpolatedT == 0 && interpolatedV == 0) {
-						_ = res.frame.setDataAt(col.Name(), int(currCell), interpolatedV)
+						_ = res.frame.setDataAt(col.Name(), currCell, interpolatedV)
 					}
 				}
 			}
@@ -271,7 +271,7 @@ func aggregateClientAggregatesCrossSeries(ctx *selectQueryContext, res *qryResul
 			if t == currBucketTime {
 				for _, col := range res.frame.columns {
 					if col.GetColumnSpec().metric == res.name {
-						_ = res.frame.setDataAt(col.Name(), int(currBucket), v)
+						_ = res.frame.setDataAt(col.Name(), currBucket, v)
 					}
 				}
 			} else {
@@ -287,7 +287,7 @@ func aggregateClientAggregatesCrossSeries(ctx *selectQueryContext, res *qryResul
 					if col.GetColumnSpec().metric == res.name {
 						interpolatedT, interpolatedV := col.GetInterpolationFunction()(prevT, t, currBucketTime, prevV, v)
 						if !(interpolatedT == 0 && interpolatedV == 0) {
-							_ = res.frame.setDataAt(col.Name(), int(currBucket), interpolatedV)
+							_ = res.frame.setDataAt(col.Name(), currBucket, interpolatedV)
 						}
 					}
 				}

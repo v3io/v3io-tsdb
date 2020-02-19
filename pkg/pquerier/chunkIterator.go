@@ -49,10 +49,9 @@ func newRawChunkIterator(queryResult *qryResults, log logger.Logger) utils.Serie
 	if len(newIterator.chunks) == 0 {
 		// If there's no data, create a null iterator
 		return &utils.NullSeriesIterator{}
-	} else {
-		newIterator.iter = newIterator.chunks[0].Iterator()
-		return &newIterator
 	}
+	newIterator.iter = newIterator.chunks[0].Iterator()
+	return &newIterator
 }
 
 // Advance the iterator to the specified chunk and time

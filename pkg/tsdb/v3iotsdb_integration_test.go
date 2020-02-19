@@ -944,7 +944,7 @@ func TestDeleteTable(t *testing.T) {
 	t2 := tb.Unix() * 1000
 	tc, _ := time.Parse(time.RFC3339, "2018-10-11T05:00:00Z")
 	t3 := tc.Unix() * 1000
-	td, _ := time.Parse(time.RFC3339, "now + 1w")
+	td, _ := time.Parse(time.RFC3339, "2025-10-11T05:00:00Z")
 	futurePoint := td.Unix() * 1000
 
 	testCases := []struct {
@@ -1051,7 +1051,7 @@ func testDeleteTSDBCase(test *testing.T, testParams tsdbtest.TestParams, deleteF
 	adapter, teardown := tsdbtest.SetUpWithData(test, testParams)
 	defer teardown()
 
-	container, err := utils.CreateContainer(adapter.GetLogger("container"), testParams.V3ioConfig(), adapter.HttpTimeout)
+	container, err := utils.CreateContainer(adapter.GetLogger("container"), testParams.V3ioConfig(), adapter.HTTPTimeout)
 	if err != nil {
 		test.Fatalf("failed to create new container. reason: %s", err)
 	}

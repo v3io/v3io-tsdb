@@ -10,6 +10,8 @@ import (
 )
 
 const TsdbDefaultTestConfigPath = "testdata"
+
+// nolint: deadcode,varcheck
 const relativeProjectPath = "src/github.com/v3io/v3io-tsdb"
 
 /*

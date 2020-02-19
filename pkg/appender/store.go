@@ -41,7 +41,7 @@ import (
 const maxLateArrivalInterval = 59 * 60 * 1000 // Max late arrival of 59min
 
 // Create a chunk store with two chunks (current, previous)
-func NewChunkStore(logger logger.Logger, labelNames []string, aggrsOnly bool) *chunkStore {
+func newChunkStore(logger logger.Logger, labelNames []string, aggrsOnly bool) *chunkStore {
 	store := chunkStore{
 		logger:  logger,
 		lastTid: -1,
@@ -404,7 +404,7 @@ func (cs *chunkStore) writeChunks(mc *MetricsCache, metric *MetricState) (hasPen
 			if len(cs.pending) > 0 {
 				mc.metricQueue.Push(metric)
 			}
-			hasPendingUpdates, err = false, nil
+			hasPendingUpdates = false
 			return
 		}
 
@@ -441,7 +441,7 @@ func (cs *chunkStore) writeChunks(mc *MetricsCache, metric *MetricState) (hasPen
 		// will add user data in request)
 		mc.logger.DebugWith("Update-metric expression", "name", metric.name, "key", metric.key, "expr", expr, "reqid", request.ID)
 
-		hasPendingUpdates, err = true, nil
+		hasPendingUpdates = true
 		cs.performanceReporter.UpdateHistogram("WriteChunksSizeHistogram", int64(pendingSamplesCount))
 		return
 	})
@@ -470,7 +470,7 @@ func (cs *chunkStore) appendExpression(chunk *attrAppender) string {
 		chunk.state |= chunkStateWriting
 
 		expr := ""
-		idx, err := chunk.partition.TimeToChunkId(chunk.chunkMint)
+		idx, err := chunk.partition.TimeToChunkID(chunk.chunkMint)
 		if err != nil {
 			return ""
 		}
