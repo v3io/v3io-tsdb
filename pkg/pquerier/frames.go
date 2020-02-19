@@ -7,6 +7,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/v3io/frames"
+	"github.com/v3io/frames/pb"
 	"github.com/v3io/v3io-tsdb/pkg/aggregate"
 	"github.com/v3io/v3io-tsdb/pkg/chunkenc"
 	"github.com/v3io/v3io-tsdb/pkg/config"
@@ -246,6 +247,7 @@ type dataFrame struct {
 	index                  Column
 	columnByName           map[string]int // name -> index in columns
 	nonEmptyRowsIndicators []bool
+	nullValuesMaps         []*pb.NullValuesMap
 
 	metrics             map[string]struct{}
 	metricToCountColumn map[string]Column
@@ -469,15 +471,18 @@ func (d *dataFrame) finishAllColumns() error {
 //
 func (d *dataFrame) rawSeriesToColumns() error {
 	var timeData []time.Time
-
-	columns := make([]frames.ColumnBuilder, len(d.rawColumns))
-	nonExhaustedIterators := len(d.rawColumns)
-	seriesToDataType := make([]frames.DType, len(d.rawColumns))
-	seriesTodefaultValue := make([]interface{}, len(d.rawColumns))
+	var currentTime int64
+	numberOfRawColumns := len(d.rawColumns)
+	columns := make([]frames.ColumnBuilder, numberOfRawColumns)
+	nonExhaustedIterators := numberOfRawColumns
+	seriesToDataType := make([]frames.DType, numberOfRawColumns)
+	seriesToDefaultValue := make([]interface{}, numberOfRawColumns)
 	nextTime := int64(math.MaxInt64)
-	seriesHasMoreData := make([]bool, len(d.rawColumns))
-
+	seriesHasMoreData := make([]bool, numberOfRawColumns)
 	emptyMetrics := make(map[int]string)
+
+	d.nullValuesMaps = make([]*pb.NullValuesMap, 0)
+	nullValuesRowIndex := -1
 
 	for i, rawSeries := range d.rawColumns {
 		if rawSeries == nil {
@@ -511,19 +516,23 @@ func (d *dataFrame) rawSeriesToColumns() error {
 			columns[i] = frames.NewSliceColumnBuilder(rawSeries.Labels().Get(config.PrometheusMetricNameAttribute),
 				frames.StringType, 0)
 			seriesToDataType[i] = frames.StringType
-			seriesTodefaultValue[i] = ""
+			seriesToDefaultValue[i] = ""
 		} else {
 			columns[i] = frames.NewSliceColumnBuilder(rawSeries.Labels().Get(config.PrometheusMetricNameAttribute),
 				frames.FloatType, 0)
 			seriesToDataType[i] = frames.FloatType
-			seriesTodefaultValue[i] = math.NaN()
+			seriesToDefaultValue[i] = math.NaN()
 		}
 	}
 
 	for nonExhaustedIterators > 0 {
-		currentTime := nextTime
+		currentTime = nextTime
 		nextTime = int64(math.MaxInt64)
 		timeData = append(timeData, time.Unix(currentTime/1000, (currentTime%1000)*1e6))
+
+		// add new row to null values map
+		d.nullValuesMaps = append(d.nullValuesMaps, &pb.NullValuesMap{NullColumns: make(map[string]bool)})
+		nullValuesRowIndex++
 
 		for seriesIndex, rawSeries := range d.rawColumns {
 			if rawSeries == nil {
@@ -552,10 +561,11 @@ func (d *dataFrame) rawSeriesToColumns() error {
 					seriesHasMoreData[seriesIndex] = false
 				}
 			} else {
-				e := columns[seriesIndex].Append(seriesTodefaultValue[seriesIndex])
+				e := columns[seriesIndex].Append(seriesToDefaultValue[seriesIndex])
 				if e != nil {
-					return errors.Wrap(e, fmt.Sprintf("could not append from default value %v", seriesTodefaultValue[seriesIndex]))
+					return errors.Wrap(e, fmt.Sprintf("could not append from default value %v", seriesToDefaultValue[seriesIndex]))
 				}
+				d.nullValuesMaps[nullValuesRowIndex].NullColumns[columns[seriesIndex].Name()] = true
 			}
 
 			if seriesHasMoreData[seriesIndex] && t < nextTime {
@@ -571,7 +581,9 @@ func (d *dataFrame) rawSeriesToColumns() error {
 	if e != nil {
 		return errors.Wrap(e, fmt.Sprintf("could not set data, timeData=%v, numberOfRows=%v", timeData, numberOfRows))
 	}
-	d.columns = make([]Column, len(d.rawColumns))
+
+	d.columns = make([]Column, numberOfRawColumns)
+
 	for i, series := range d.rawColumns {
 		if series == nil {
 			continue
@@ -598,6 +610,11 @@ func (d *dataFrame) rawSeriesToColumns() error {
 			}
 			col.framesCol = framesCol
 			d.columns[index] = col
+
+			// mark empty columns
+			for i := 0; i < numberOfRows; i++ {
+				d.nullValuesMaps[i].NullColumns[col.name] = true
+			}
 		}
 	}
 
@@ -622,7 +639,7 @@ func (d *dataFrame) GetFrame() (frames.Frame, error) {
 		}
 	}
 
-	return frames.NewFrame(framesColumns, []frames.Column{d.index.FramesColumn()}, d.Labels().Map())
+	return frames.NewFrameWithNullValues(framesColumns, []frames.Column{d.index.FramesColumn()}, d.Labels().Map(), d.nullValuesMaps)
 }
 
 // Column object, store a single value or index column/array

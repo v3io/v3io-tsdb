@@ -220,7 +220,7 @@ func SetUpWithDBConfig(t *testing.T, schema *config.Schema, testParams TestParam
 		t.Fatalf("Unable to initialize the performance metrics reporter. Error: %v", err)
 	}
 	// nolint: errcheck
-	 metricReporter.Start()
+	metricReporter.Start()
 
 	return func() {
 		// nolint: errcheck
