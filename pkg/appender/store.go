@@ -427,7 +427,7 @@ func (cs *chunkStore) writeChunks(mc *MetricsCache, metric *MetricState) (hasPen
 		conditionExpr := ""
 
 		// Only add the condition when adding to a data chunk, not when writing data to label pre-aggregated
-		if activeChunk != nil{
+		if activeChunk != nil {
 			// Call the V3IO async UpdateItem method
 			conditionExpr = fmt.Sprintf("NOT exists(%s) OR (exists(%s) AND %s == '%d')",
 				config.EncodingAttrName, config.EncodingAttrName,
