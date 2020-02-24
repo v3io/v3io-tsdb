@@ -557,6 +557,7 @@ podTemplate(label: "${git_project}-${label}", inheritFrom: "jnlp-docker-golang")
                                     echo "Triggered prometheus development will be builded with last tsdb stable version"
                                     github.delete_release("prometheus", git_project_user, "unstable", GIT_TOKEN)
                                     github.create_prerelease("prometheus", git_project_user, "unstable", GIT_TOKEN, "development")
+
                                     echo "Trigger prometheus ${NEXT_VERSION} with tsdb ${MAIN_TAG_VERSION}"
                                     github.create_prerelease("prometheus", git_project_user, NEXT_VERSION, GIT_TOKEN)
                                 }
