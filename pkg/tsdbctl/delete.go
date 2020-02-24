@@ -124,13 +124,13 @@ func (dc *delCommandeer) delete() error {
 		}
 
 		if !confirmedByUser {
-			return errors.New("Delete cancelled by the user.")
+			return errors.New("delete cancelled by the user")
 		}
 	}
 
 	err = dc.rootCommandeer.adapter.DeleteDB(dc.deleteAll, dc.ignoreErrors, from, to)
 	if err != nil {
-		return errors.Wrapf(err, "Failed to delete %s TSDB table '%s' in container '%s'.", partialMsg, dc.rootCommandeer.v3iocfg.TablePath, dc.rootCommandeer.v3iocfg.Container)
+		return errors.Wrapf(err, "failed to delete %s TSDB table '%s' in container '%s'", partialMsg, dc.rootCommandeer.v3iocfg.TablePath, dc.rootCommandeer.v3iocfg.Container)
 	}
 	fmt.Printf("Successfully deleted %s TSDB table '%s' from container '%s'.\n", partialMsg, dc.rootCommandeer.v3iocfg.TablePath, dc.rootCommandeer.v3iocfg.Container)
 
@@ -145,7 +145,7 @@ func getConfirmation(prompt string) (bool, error) {
 
 		response, err := reader.ReadString('\n')
 		if err != nil {
-			errors.Wrap(err, "Failed to get user input.")
+			return false, errors.Wrap(err, "failed to get user input")
 		}
 
 		response = strings.ToLower(strings.TrimSpace(response))

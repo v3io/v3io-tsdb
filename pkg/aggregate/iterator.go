@@ -31,7 +31,7 @@ import (
 // Local cache of init arrays per aggregate type. Used to mimic memcopy and initialize data arrays with specific values
 var initDataArrayCache = map[AggrType][]float64{}
 
-type AggregateSeries struct {
+type Series struct {
 	colName        string     // column name ("v" in timeseries)
 	functions      []AggrType // list of aggregation functions to return (count, avg, sum, ..)
 	aggrMask       AggrType   // the sum of aggregates (or between all aggregates)
@@ -41,7 +41,7 @@ type AggregateSeries struct {
 	overlapWindows []int      // a list of overlapping windows (* interval), e.g. last 1hr, 6hr, 12hr, 24hr
 }
 
-func NewAggregateSeries(functions, col string, buckets int, interval, rollupTime int64, windows []int) (*AggregateSeries, error) {
+func NewAggregateSeries(functions, col string, buckets int, interval, rollupTime int64, windows []int) (*Series, error) {
 
 	split := strings.Split(functions, ",")
 	var aggrMask AggrType
@@ -61,7 +61,7 @@ func NewAggregateSeries(functions, col string, buckets int, interval, rollupTime
 		aggrMask |= aggrTypeCount
 	}
 
-	newAggregateSeries := AggregateSeries{
+	newAggregateSeries := Series{
 		aggrMask:       aggrMask,
 		functions:      aggrList,
 		colName:        col,
@@ -74,7 +74,7 @@ func NewAggregateSeries(functions, col string, buckets int, interval, rollupTime
 	return &newAggregateSeries, nil
 }
 
-func (as *AggregateSeries) CanAggregate(partitionAggr AggrType) bool {
+func (as *Series) CanAggregate(partitionAggr AggrType) bool {
 	// keep only real aggregates
 	aggrMask := 0x7f & as.aggrMask
 	// make sure the DB has all the aggregates we need (on bits in the mask)
@@ -85,23 +85,23 @@ func (as *AggregateSeries) CanAggregate(partitionAggr AggrType) bool {
 		as.interval >= as.rollupTime && (as.interval%as.rollupTime == 0 || as.interval/as.rollupTime > 3)
 }
 
-func (as *AggregateSeries) GetAggrMask() AggrType {
+func (as *Series) GetAggrMask() AggrType {
 	return as.aggrMask
 }
 
-func (as *AggregateSeries) GetFunctions() []AggrType {
+func (as *Series) GetFunctions() []AggrType {
 	return as.functions
 }
 
-func (as *AggregateSeries) NumFunctions() int {
+func (as *Series) NumFunctions() int {
 	return len(as.functions)
 }
 
-func (as *AggregateSeries) toAttrName(aggr AggrType) string {
+func (as *Series) toAttrName(aggr AggrType) string {
 	return "_" + as.colName + "_" + aggr.String()
 }
 
-func (as *AggregateSeries) GetAttrNames() []string {
+func (as *Series) GetAttrNames() []string {
 	var names []string
 
 	for _, aggr := range rawAggregates {
@@ -114,8 +114,8 @@ func (as *AggregateSeries) GetAttrNames() []string {
 }
 
 // create new aggregation set from v3io aggregation array attributes
-func (as *AggregateSeries) NewSetFromAttrs(
-	length, start, end int, mint, maxt int64, attrs *map[string]interface{}) (*AggregateSet, error) {
+func (as *Series) NewSetFromAttrs(
+	length, start, end int, mint, maxt int64, attrs *map[string]interface{}) (*Set, error) {
 
 	aggrArrays := map[AggrType][]uint64{}
 	dataArrays := map[AggrType][]float64{}
@@ -139,7 +139,7 @@ func (as *AggregateSeries) NewSetFromAttrs(
 		}
 	}
 
-	aggrSet := AggregateSet{length: length, interval: as.interval, overlapWin: as.overlapWindows}
+	aggrSet := Set{length: length, interval: as.interval, overlapWin: as.overlapWindows}
 	aggrSet.dataArrays = dataArrays
 
 	arrayIndex := start
@@ -178,13 +178,13 @@ func (as *AggregateSeries) NewSetFromAttrs(
 }
 
 // prepare new aggregation set from v3io raw chunk attributes (in case there are no aggregation arrays)
-func (as *AggregateSeries) NewSetFromChunks(length int) *AggregateSet {
+func (as *Series) NewSetFromChunks(length int) *Set {
 
 	if as.overlapWindows != nil {
 		length = len(as.overlapWindows)
 	}
 
-	newAggregateSet := AggregateSet{length: length, interval: as.interval, overlapWin: as.overlapWindows}
+	newAggregateSet := Set{length: length, interval: as.interval, overlapWin: as.overlapWindows}
 	dataArrays := map[AggrType][]float64{}
 
 	for _, aggr := range rawAggregates {
@@ -199,7 +199,7 @@ func (as *AggregateSeries) NewSetFromChunks(length int) *AggregateSet {
 	return &newAggregateSet
 }
 
-type AggregateSet struct {
+type Set struct {
 	dataArrays map[AggrType][]float64
 	length     int
 	maxCell    int
@@ -208,12 +208,12 @@ type AggregateSet struct {
 	overlapWin []int
 }
 
-func (as *AggregateSet) GetMaxCell() int {
+func (as *Set) GetMaxCell() int {
 	return as.maxCell
 }
 
 // append the value to a cell in all relevant aggregation arrays
-func (as *AggregateSet) AppendAllCells(cell int, val float64) {
+func (as *Set) AppendAllCells(cell int, val float64) {
 
 	if !isValidCell(cell, as) {
 		return
@@ -230,7 +230,7 @@ func (as *AggregateSet) AppendAllCells(cell int, val float64) {
 
 // append/merge server aggregation values into aggregation per requested interval/step
 // if the requested step interval is higher than stored interval we need to collapse multiple cells to one
-func (as *AggregateSet) mergeArrayCell(aggr AggrType, cell int, val uint64) {
+func (as *Set) mergeArrayCell(aggr AggrType, cell int, val uint64) {
 
 	if cell >= as.length {
 		return
@@ -253,13 +253,13 @@ func (as *AggregateSet) mergeArrayCell(aggr AggrType, cell int, val uint64) {
 	}
 }
 
-func isValidCell(cellIndex int, aSet *AggregateSet) bool {
+func isValidCell(cellIndex int, aSet *Set) bool {
 	return cellIndex >= 0 &&
 		cellIndex < aSet.length
 }
 
 // function specific aggregation
-func (as *AggregateSet) updateCell(aggr AggrType, cell int, val float64) {
+func (as *Set) updateCell(aggr AggrType, cell int, val float64) {
 
 	if !isValidCell(cell, as) {
 		return
@@ -268,7 +268,7 @@ func (as *AggregateSet) updateCell(aggr AggrType, cell int, val float64) {
 	cellValue := as.dataArrays[aggr][cell]
 	switch aggr {
 	case aggrTypeCount:
-		as.dataArrays[aggr][cell] += 1
+		as.dataArrays[aggr][cell]++
 	case aggrTypeSum:
 		as.dataArrays[aggr][cell] += val
 	case aggrTypeSqr:
@@ -287,7 +287,7 @@ func (as *AggregateSet) updateCell(aggr AggrType, cell int, val float64) {
 }
 
 // return the value per aggregate or complex function
-func (as *AggregateSet) GetCellValue(aggr AggrType, cell int) (float64, bool) {
+func (as *Set) GetCellValue(aggr AggrType, cell int) (float64, bool) {
 
 	if !isValidCell(cell, as) {
 		return math.NaN(), false
@@ -338,7 +338,7 @@ func (as *AggregateSet) GetCellValue(aggr AggrType, cell int) (float64, bool) {
 }
 
 // get the time per aggregate cell
-func (as *AggregateSet) GetCellTime(base int64, index int) int64 {
+func (as *Set) GetCellTime(base int64, index int) int64 {
 	if as.overlapWin == nil {
 		return base + int64(index)*as.interval
 	}
@@ -350,7 +350,7 @@ func (as *AggregateSet) GetCellTime(base int64, index int) int64 {
 	return base - int64(as.overlapWin[index])*as.interval
 }
 
-func (as *AggregateSet) Clear() {
+func (as *Set) Clear() {
 	as.maxCell = 0
 	for aggr := range as.dataArrays {
 		initArray := getOrCreateInitDataArray(aggr, len(as.dataArrays[0]))
@@ -359,7 +359,7 @@ func (as *AggregateSet) Clear() {
 }
 
 // Check if cell has data. Assumes that count is always present
-func (as *AggregateSet) HasData(cell int) bool {
+func (as *Set) HasData(cell int) bool {
 	return as.dataArrays[aggrTypeCount][cell] > 0
 }
 

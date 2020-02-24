@@ -78,6 +78,8 @@ else
 endif
 	@echo Installing linters...
 	go get -u github.com/pavius/impi/cmd/impi
+	curl -sfL https://install.goreleaser.com/github.com/golangci/golangci-lint.sh | sh -s v1.10.2
+	cp ./bin/golangci-lint $(GOPATH)/bin/
 
 	@echo Verifying imports...
 	$(GOPATH)/bin/impi \
@@ -86,4 +88,12 @@ endif
 		--skip pkg/controller/client \
 		--scheme stdLocalThirdParty \
 		./...
-	# Imports OK
+
+	@echo Linting...
+	@$(GOPATH)/bin/golangci-lint run \
+     --disable-all --enable=deadcode --enable=goconst --enable=golint --enable=ineffassign \
+     --enable=interfacer --enable=unconvert --enable=varcheck --enable=errcheck --enable=gofmt --enable=misspell \
+     --enable=staticcheck --enable=gosimple --enable=govet --enable=goconst \
+    cmd/... pkg/... internal/...
+	@echo done linting
+

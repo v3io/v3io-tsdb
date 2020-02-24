@@ -68,7 +68,7 @@ func (ls Labels) GetKey() (string, string, uint64) {
 	key := ""
 	name := ""
 	for _, lbl := range ls {
-		if lbl.Name == "__name__" {
+		if lbl.Name == MetricName {
 			name = lbl.Value
 		} else {
 			key = key + lbl.Name + "=" + lbl.Value + ","
@@ -85,7 +85,7 @@ func (ls Labels) GetKey() (string, string, uint64) {
 func (ls Labels) GetExpr() string {
 	lblexpr := ""
 	for _, lbl := range ls {
-		if lbl.Name != "__name__" {
+		if lbl.Name != MetricName {
 			lblexpr = lblexpr + fmt.Sprintf("%s='%s'; ", lbl.Name, lbl.Value)
 		} else {
 			lblexpr = lblexpr + fmt.Sprintf("_name='%s'; ", lbl.Value)
@@ -143,7 +143,7 @@ func (ls *Labels) UnmarshalJSON(b []byte) error {
 }
 
 // Hash returns a hash value for the label set.
-func (ls Labels) HashWithMetricName() uint64 {
+func (ls Labels) HashWithMetricName() (uint64, error) {
 	b := make([]byte, 0, 1024)
 
 	for _, v := range ls {
@@ -154,8 +154,11 @@ func (ls Labels) HashWithMetricName() uint64 {
 	}
 
 	hash := xxhash.New()
-	hash.Write(b)
-	return hash.Sum64()
+	_, err := hash.Write(b)
+	if err != nil {
+		return 0, err
+	}
+	return hash.Sum64(), nil
 }
 
 // Hash returns a hash value for the label set.
@@ -163,7 +166,7 @@ func (ls Labels) Hash() uint64 {
 	b := make([]byte, 0, 1024)
 
 	for _, v := range ls {
-		if v.Name == "__name__" {
+		if v.Name == MetricName {
 			continue
 		}
 		b = append(b, v.Name...)
@@ -173,7 +176,10 @@ func (ls Labels) Hash() uint64 {
 	}
 
 	hash := xxhash.New()
-	hash.Write(b)
+	_, err := hash.Write(b)
+	if err != nil {
+		return 0
+	}
 	return hash.Sum64()
 }
 
@@ -288,7 +294,7 @@ func LabelsFromString(lbls string) (Labels, error) {
 		for _, l := range splitLset {
 			splitLbl := strings.Split(l, "=")
 			if len(splitLbl) != 2 {
-				return nil, errors.New("Labels must be in the form 'key1=label1[,key2=label2,...]'.")
+				return nil, errors.New("labels must be in the form 'key1=label1[,key2=label2,...]'")
 			}
 
 			if err := IsValidLabelName(splitLbl[0]); err != nil {

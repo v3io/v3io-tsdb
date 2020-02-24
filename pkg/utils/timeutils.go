@@ -85,9 +85,9 @@ func Str2unixTime(timeString string) (int64, error) {
 				return 0, errors.Wrap(err, "Could not parse the pattern following 'now-'.")
 			}
 			if sign == "-" {
-				return CurrentTimeInMillis() - int64(t), nil
+				return CurrentTimeInMillis() - t, nil
 			} else if sign == "+" {
-				return CurrentTimeInMillis() + int64(t), nil
+				return CurrentTimeInMillis() + t, nil
 			} else {
 				return 0, errors.Wrapf(err, "Unsupported time format: %s", timeString)
 			}
