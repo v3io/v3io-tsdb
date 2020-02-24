@@ -93,6 +93,7 @@ def build_nuclio(V3IO_TSDB_VERSION, internal_status="stable") {
                                     GO111MODULE=on go mod vendor
                                     rm -rf .git vendor/github.com/nuclio vendor/github.com/${git_project_upstream_user}/frames/vendor/golang.org/x/net vendor/golang.org/x/net
                                 """
+                                sh("chown 1000:1000 ./ -R")
                             }
                         }
                     },
@@ -113,6 +114,7 @@ def build_nuclio(V3IO_TSDB_VERSION, internal_status="stable") {
                                     GO111MODULE=on go mod vendor
                                     rm -rf .git vendor/github.com/nuclio vendor/github.com/${git_project_upstream_user}/frames/vendor/golang.org/x/net vendor/golang.org/x/net
                                 """
+                                sh("chown 1000:1000 ./ -R")
                             }
                         }
                     }
