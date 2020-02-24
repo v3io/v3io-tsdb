@@ -153,7 +153,7 @@ def build_nuclio(V3IO_TSDB_VERSION, internal_status="stable") {
     }
 }
 
-def build_prometheus(V3IO_TSDB_VERSION, internal_status="stable") {
+def build_prometheus(V3IO_TSDB_VERSION, FRAMES_VERSION, internal_status="stable") {
     withCredentials([
             usernamePassword(credentialsId: git_deploy_user, passwordVariable: 'GIT_PASSWORD', usernameVariable: 'GIT_USERNAME'),
             string(credentialsId: git_deploy_user_token, variable: 'GIT_TOKEN')
@@ -181,9 +181,11 @@ def build_prometheus(V3IO_TSDB_VERSION, internal_status="stable") {
                 dir("${BUILD_FOLDER}/src/github.com/${git_project_upstream_user}/${git_project}") {
                     if("${git_project_user}" != "${git_project_upstream_user}") {
                         sh("GO111MODULE=on go mod edit -replace github.com/${git_project_upstream_user}/v3io-tsdb=github.com/${git_project_user}/v3io-tsdb@${V3IO_TSDB_VERSION}")
+                        sh("GO111MODULE=on go mod edit -replace github.com/${git_project_upstream_user}/frames=github.com/${git_project_user}/frames@${FRAMES_VERSION}")
                         sh("GO111MODULE=on go get")
                     } else {
                         sh("GO111MODULE=on go mod edit -replace github.com/${git_project_upstream_user}/v3io-tsdb=github.com/${git_project_upstream_user}/v3io-tsdb@${V3IO_TSDB_VERSION}")
+                        sh("GO111MODULE=on go mod edit -replace github.com/${git_project_upstream_user}/frames=github.com/${git_project_upstream_user}/frames@${FRAMES_VERSION}")
                     }
                     sh("GO111MODULE=on go mod vendor")
                     sh("chown 1000:1000 ./ -R")
@@ -297,8 +299,94 @@ def build_frames(V3IO_TSDB_VERSION, internal_status="stable") {
     }
 }
 
+def wait_for_release(V3IO_TSDB_VERSION, tasks_list) {
+    withCredentials([
+            string(credentialsId: git_deploy_user_token, variable: 'GIT_TOKEN')
+    ]) {
+        if (V3IO_TSDB_VERSION != "unstable") {
+            stage('waiting for prereleases moved to releases') {
+                container('jnlp') {
+                    i = 0
+                    def success_count = 0
+
+                    while (true) {
+                        def done_count = 0
+
+                        echo "attempt #${i}"
+                        tasks_list.each { project, status ->
+                            if (status == null) {
+                                def RELEASE_SUCCESS = sh(
+                                        script: "curl --silent -H \"Content-Type: application/json\" -H \"Authorization: token ${GIT_TOKEN}\" -X GET https://api.github.com/repos/${git_project_user}/${project}/releases/tags/${next_versions[project]} | python -c 'import json,sys;obj=json.load(sys.stdin);print obj[\"prerelease\"]' | if grep -iq false; then echo 'release'; else echo 'prerelease'; fi",
+                                        returnStdout: true
+                                ).trim()
+
+                                echo "${project} is ${RELEASE_SUCCESS}"
+                                if (RELEASE_SUCCESS != null && RELEASE_SUCCESS == 'release') {
+                                    tasks_list.putAt(project, true)
+                                    done_count++
+                                    success_count++
+                                } else {
+                                    def TAG_SHA = sh(
+                                            script: "curl --silent -H \"Content-Type: application/json\" -H \"Authorization: token ${GIT_TOKEN}\" -X GET https://api.github.com/repos/${git_project_user}/${project}/git/refs/tags/${next_versions[project]} | python -c 'import json,sys;obj=json.load(sys.stdin);print obj[\"object\"][\"sha\"]'",
+                                            returnStdout: true
+                                    ).trim()
+
+                                    if (TAG_SHA != null) {
+                                        def COMMIT_STATUS = sh(
+                                                script: "curl --silent -H \"Content-Type: application/json\" -H \"Authorization: token ${GIT_TOKEN}\" -X GET https://api.github.com/repos/${git_project_user}/${project}/commits/${TAG_SHA}/statuses | python -c 'import json,sys;obj=json.load(sys.stdin);print obj[0][\"state\"]' | if grep -iq error; then echo 'error'; else echo 'ok'; fi",
+                                                returnStdout: true
+                                        ).trim()
+                                        if (COMMIT_STATUS != null && COMMIT_STATUS == 'error') {
+                                            tasks_list.putAt(project, false)
+                                            done_count++
+                                        }
+                                    }
+                                }
+                            } else {
+                                done_count++
+                            }
+                        }
+                        if (success_count >= tasks_list.size()) {
+                            echo "all releases have been successfully completed"
+                            break
+                        }
+
+                        if (done_count >= tasks_list.size() || i++ > attempts) {
+                            def failed = []
+                            def notcompleted = []
+                            def error_string = ''
+                            tasks_list.each { project, status ->
+                                if (status == null) {
+                                    notcompleted += project
+                                } else if (status == false) {
+                                    failed += project
+                                }
+                            }
+                            if (failed.size()) {
+                                error_string += failed.join(',') + ' have been failed :_(. '
+                            }
+                            if (notcompleted.size()) {
+                                error_string += notcompleted.join(',') + ' have been not completed :(. '
+                            }
+                            error(error_string)
+                            break
+                        }
+
+                        sleep(60)
+                    }
+                }
+            }
+        } else {
+            stage('info') {
+                echo("Unstable tsdb doesn't trigger tsdb-nuclio and prometheus")
+            }
+        }
+    }
+}
+
 podTemplate(label: "${git_project}-${label}", inheritFrom: "jnlp-docker-golang") {
     def MAIN_TAG_VERSION
+    def FRAMES_NEXT_VERSION
     def next_versions = ['prometheus':null, 'tsdb-nuclio':null]
 
     pipelinex = library(identifier: 'pipelinex@refs', retriever: modernSCM(
@@ -386,6 +474,7 @@ podTemplate(label: "${git_project}-${label}", inheritFrom: "jnlp-docker-golang")
                                                         CURRENT_VERSION = github.get_short_tag_version("frames", git_project_user, GIT_TOKEN)
                                                         echo "$CURRENT_VERSION"
                                                         NEXT_VERSION = "${CURRENT_VERSION}-${MAIN_TAG_VERSION}"
+                                                        FRAMES_NEXT_VERSION = NEXT_VERSION
                                                         next_versions.putAt("frames", NEXT_VERSION)
                                                     }
                                                 }
@@ -411,65 +500,6 @@ podTemplate(label: "${git_project}-${label}", inheritFrom: "jnlp-docker-golang")
                                         }
                                     }
                                 }
-                            },
-                            'prometheus': {
-                                podTemplate(label: "v3io-tsdb-prometheus-${label}", inheritFrom: "jnlp-docker-golang") {
-                                    node("v3io-tsdb-prometheus-${label}") {
-                                        withCredentials([
-                                                string(credentialsId: git_deploy_user_token, variable: 'GIT_TOKEN')
-                                        ]) {
-                                            def TAG_VERSION
-                                            def NEXT_VERSION
-
-                                            if (MAIN_TAG_VERSION != "unstable") {
-                                                stage('get current version') {
-                                                    container('jnlp') {
-                                                        sh """
-                                                            cd ${BUILD_FOLDER}
-                                                            git clone https://${GIT_TOKEN}@github.com/${git_project_user}/prometheus.git src/github.com/prometheus/prometheus
-                                                        """
-
-                                                        TAG_VERSION = sh(
-                                                                script: "cat ${BUILD_FOLDER}/src/github.com/prometheus/prometheus/VERSION",
-                                                                returnStdout: true
-                                                        ).trim()
-                                                    }
-                                                }
-
-                                                if (TAG_VERSION) {
-                                                    stage('get previous release version') {
-                                                        container('jnlp') {
-                                                            CURRENT_VERSION = github.get_current_tag_version("prometheus", git_project_user, GIT_TOKEN)
-                                                            echo "$CURRENT_VERSION"
-                                                            version_list=CURRENT_VERSION.split('-')
-                                                            NEXT_VERSION = "v${TAG_VERSION}-${version_list[1]}-${MAIN_TAG_VERSION}"
-                                                            echo "$NEXT_VERSION"
-                                                            next_versions.putAt('prometheus', NEXT_VERSION)
-                                                        }
-                                                    }
-
-                                                    build_prometheus(MAIN_TAG_VERSION, "unstable")
-                                                    build_prometheus(MAIN_TAG_VERSION)
-
-                                                    stage('create prometheus prerelease') {
-                                                        container('jnlp') {
-                                                            echo "Triggered prometheus development will be builded with last tsdb stable version"
-                                                            github.delete_release("prometheus", git_project_user, "unstable", GIT_TOKEN)
-                                                            github.create_prerelease("prometheus", git_project_user, "unstable", GIT_TOKEN, "development")
-
-                                                            echo "Trigger prometheus ${NEXT_VERSION} with tsdb ${MAIN_TAG_VERSION}"
-                                                            github.create_prerelease("prometheus", git_project_user, NEXT_VERSION, GIT_TOKEN)
-                                                        }
-                                                    }
-                                                }
-                                            } else {
-                                                stage('info') {
-                                                    echo("Unstable tsdb doesn't trigger prometheus")
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
                             }
                     )
                 }
@@ -477,89 +507,76 @@ podTemplate(label: "${git_project}-${label}", inheritFrom: "jnlp-docker-golang")
         }
 
         node("${git_project}-${label}") {
+            wait_for_release(MAIN_TAG_VERSION, ['tsdb-nuclio': null])
+        }
+
+        // prometheus moved last cos need frames version to build
+        podTemplate(label: "v3io-tsdb-prometheus-${label}", inheritFrom: "jnlp-docker-golang") {
+            node("v3io-tsdb-prometheus-${label}") {
+                withCredentials([
+                        string(credentialsId: git_deploy_user_token, variable: 'GIT_TOKEN')
+                ]) {
+                    def TAG_VERSION
+                    def NEXT_VERSION
+
+                    if (MAIN_TAG_VERSION != "unstable") {
+                        stage('get current version') {
+                            container('jnlp') {
+                                sh """
+                                    cd ${BUILD_FOLDER}
+                                    git clone https://${GIT_TOKEN}@github.com/${git_project_user}/prometheus.git src/github.com/prometheus/prometheus
+                                """
+
+                                TAG_VERSION = sh(
+                                        script: "cat ${BUILD_FOLDER}/src/github.com/prometheus/prometheus/VERSION",
+                                        returnStdout: true
+                                ).trim()
+                            }
+                        }
+
+                        if (TAG_VERSION) {
+                            stage('get previous release version') {
+                                container('jnlp') {
+                                    CURRENT_VERSION = github.get_current_tag_version("prometheus", git_project_user, GIT_TOKEN)
+                                    echo "$CURRENT_VERSION"
+                                    version_list=CURRENT_VERSION.split('-')
+                                    NEXT_VERSION = "v${TAG_VERSION}-${version_list[1]}-${MAIN_TAG_VERSION}"
+                                    echo "$NEXT_VERSION"
+                                    next_versions.putAt('prometheus', NEXT_VERSION)
+                                }
+                            }
+
+                            build_prometheus(MAIN_TAG_VERSION, FRAMES_NEXT_VERSION, "unstable")
+                            build_prometheus(MAIN_TAG_VERSION, FRAMES_NEXT_VERSION)
+
+                            stage('create prometheus prerelease') {
+                                container('jnlp') {
+                                    echo "Triggered prometheus development will be builded with last tsdb stable version"
+                                    github.delete_release("prometheus", git_project_user, "unstable", GIT_TOKEN)
+                                    github.create_prerelease("prometheus", git_project_user, "unstable", GIT_TOKEN, "development")
+
+                                    echo "Trigger prometheus ${NEXT_VERSION} with tsdb ${MAIN_TAG_VERSION}"
+                                    github.create_prerelease("prometheus", git_project_user, NEXT_VERSION, GIT_TOKEN)
+                                }
+                            }
+                        }
+                    } else {
+                        stage('info') {
+                            echo("Unstable tsdb doesn't trigger prometheus")
+                        }
+                    }
+                }
+            }
+        }
+
+        node("${git_project}-${label}") {
+            wait_for_release(MAIN_TAG_VERSION, ['prometheus': null])
+        }
+
+        node("${git_project}-${label}") {
             withCredentials([
                     string(credentialsId: git_deploy_user_token, variable: 'GIT_TOKEN')
             ]) {
-                if (MAIN_TAG_VERSION != "unstable") {
-                    stage('waiting for prereleases moved to releases') {
-                        container('jnlp') {
-                            i = 0
-                            def tasks_list = ['prometheus': null, 'tsdb-nuclio': null]
-                            def success_count = 0
-
-                            while (true) {
-                                def done_count = 0
-
-                                echo "attempt #${i}"
-                                tasks_list.each { project, status ->
-                                    if (status == null) {
-                                        def RELEASE_SUCCESS = sh(
-                                                script: "curl --silent -H \"Content-Type: application/json\" -H \"Authorization: token ${GIT_TOKEN}\" -X GET https://api.github.com/repos/${git_project_user}/${project}/releases/tags/${next_versions[project]} | python -c 'import json,sys;obj=json.load(sys.stdin);print obj[\"prerelease\"]' | if grep -iq false; then echo 'release'; else echo 'prerelease'; fi",
-                                                returnStdout: true
-                                        ).trim()
-
-                                        echo "${project} is ${RELEASE_SUCCESS}"
-                                        if (RELEASE_SUCCESS != null && RELEASE_SUCCESS == 'release') {
-                                            tasks_list.putAt(project, true)
-                                            done_count++
-                                            success_count++
-                                        } else {
-                                            def TAG_SHA = sh(
-                                                    script: "curl --silent -H \"Content-Type: application/json\" -H \"Authorization: token ${GIT_TOKEN}\" -X GET https://api.github.com/repos/${git_project_user}/${project}/git/refs/tags/${next_versions[project]} | python -c 'import json,sys;obj=json.load(sys.stdin);print obj[\"object\"][\"sha\"]'",
-                                                    returnStdout: true
-                                            ).trim()
-
-                                            if (TAG_SHA != null) {
-                                                def COMMIT_STATUS = sh(
-                                                        script: "curl --silent -H \"Content-Type: application/json\" -H \"Authorization: token ${GIT_TOKEN}\" -X GET https://api.github.com/repos/${git_project_user}/${project}/commits/${TAG_SHA}/statuses | python -c 'import json,sys;obj=json.load(sys.stdin);print obj[0][\"state\"]' | if grep -iq error; then echo 'error'; else echo 'ok'; fi",
-                                                        returnStdout: true
-                                                ).trim()
-                                                if (COMMIT_STATUS != null && COMMIT_STATUS == 'error') {
-                                                    tasks_list.putAt(project, false)
-                                                    done_count++
-                                                }
-                                            }
-                                        }
-                                    } else {
-                                        done_count++
-                                    }
-                                }
-                                if (success_count >= tasks_list.size()) {
-                                    echo "all releases have been successfully completed"
-                                    break
-                                }
-
-                                if (done_count >= tasks_list.size() || i++ > attempts) {
-                                    def failed = []
-                                    def notcompleted = []
-                                    def error_string = ''
-                                    tasks_list.each { project, status ->
-                                        if (status == null) {
-                                            notcompleted += project
-                                        } else if (status == false) {
-                                            failed += project
-                                        }
-                                    }
-                                    if (failed.size()) {
-                                        error_string += failed.join(',') + ' have been failed :_(. '
-                                    }
-                                    if (notcompleted.size()) {
-                                        error_string += notcompleted.join(',') + ' have been not completed :(. '
-                                    }
-                                    error(error_string)
-                                    break
-                                }
-
-                                sleep(60)
-                            }
-                        }
-                    }
-                } else {
-                    stage('info') {
-                        echo("Unstable tsdb doesn't trigger tsdb-nuclio and prometheus")
-                    }
-                }
-
                 stage('update release status') {
                     container('jnlp') {
                         github.update_release_status(git_project, git_project_user, "${MAIN_TAG_VERSION}", GIT_TOKEN)
