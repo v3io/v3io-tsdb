@@ -135,7 +135,6 @@ def build_nuclio(V3IO_TSDB_VERSION, internal_status="stable") {
                         common.shellc("git commit -m 'Updated TSDB to ${V3IO_TSDB_VERSION}'")
                     } catch (err) {
                         echo "Can not commit"
-                        echo err
                     }
                     try {
                         if ( "${internal_status}" == "unstable" ) {
@@ -145,7 +144,6 @@ def build_nuclio(V3IO_TSDB_VERSION, internal_status="stable") {
                         }
                     } catch (err) {
                         echo "Can not push code"
-                        echo err
                     }
                 }
             }
@@ -210,7 +208,6 @@ def build_prometheus(V3IO_TSDB_VERSION, FRAMES_VERSION, internal_status="stable"
                         common.shellc("git commit -m 'Updated TSDB to ${V3IO_TSDB_VERSION}'")
                     } catch (err) {
                         echo "Can not commit"
-                        echo err
                     }
                     try {
                         if ( "${internal_status}" == "unstable" ) {
@@ -220,7 +217,6 @@ def build_prometheus(V3IO_TSDB_VERSION, FRAMES_VERSION, internal_status="stable"
                         }
                     } catch (err) {
                         echo "Can not push code"
-                        echo err
                     }
                 }
             }
@@ -283,7 +279,6 @@ def build_frames(V3IO_TSDB_VERSION, internal_status="stable") {
                         common.shellc("git commit -m 'Updated TSDB to ${V3IO_TSDB_VERSION}'")
                     } catch (err) {
                         echo "Can not commit"
-                        echo err
                     }
                     try {
                         if ( "${internal_status}" == "unstable" ) {
@@ -293,7 +288,6 @@ def build_frames(V3IO_TSDB_VERSION, internal_status="stable") {
                         }
                     } catch (err) {
                         echo "Can not push code"
-                        echo err
                     }
                 }
             }
