@@ -130,15 +130,16 @@ def build_nuclio(V3IO_TSDB_VERSION, internal_status="stable") {
                         git add functions/ingest/vendor/github.com functions/query/vendor/github.com;
                     """
                     try {
-                        sh("git commit -m 'Updated TSDB to ${V3IO_TSDB_VERSION}'")
+                        common.shellc("git commit -m 'Updated TSDB to ${V3IO_TSDB_VERSION}'")
                     } catch (err) {
                         echo "Can not commit"
+                        echo err
                     }
                     try {
                         if ( "${internal_status}" == "unstable" ) {
-                            sh("git push origin development")
+                            common.shellc("git push origin development")
                         } else {
-                            sh("git push origin master")
+                            common.shellc("git push origin master")
                         }
                     } catch (err) {
                         echo "Can not push code"
@@ -204,15 +205,16 @@ def build_prometheus(V3IO_TSDB_VERSION, FRAMES_VERSION, internal_status="stable"
                         git add go.mod go.sum vendor/modules.txt vendor;
                     """
                     try {
-                        sh("git commit -m 'Updated TSDB to ${V3IO_TSDB_VERSION}'")
+                        common.shellc("git commit -m 'Updated TSDB to ${V3IO_TSDB_VERSION}'")
                     } catch (err) {
                         echo "Can not commit"
+                        echo err
                     }
                     try {
                         if ( "${internal_status}" == "unstable" ) {
-                            sh("git push origin development")
+                            common.shellc("git push origin development")
                         } else {
-                            sh("git push origin master")
+                            common.shellc("git push origin master")
                         }
                     } catch (err) {
                         echo "Can not push code"
@@ -276,15 +278,16 @@ def build_frames(V3IO_TSDB_VERSION, internal_status="stable") {
                         git add go.mod go.sum vendor/modules.txt;
                     """
                     try {
-                        sh("git commit -m 'Updated TSDB to ${V3IO_TSDB_VERSION}'")
+                        common.shellc("git commit -m 'Updated TSDB to ${V3IO_TSDB_VERSION}'")
                     } catch (err) {
                         echo "Can not commit"
+                        echo err
                     }
                     try {
                         if ( "${internal_status}" == "unstable" ) {
-                            sh("git push origin development")
+                            common.shellc("git push origin development")
                         } else {
-                            sh("git push origin master")
+                            common.shellc("git push origin master")
                         }
                     } catch (err) {
                         echo "Can not push code"
@@ -554,7 +557,6 @@ podTemplate(label: "${git_project}-${label}", inheritFrom: "jnlp-docker-golang")
                                     echo "Triggered prometheus development will be builded with last tsdb stable version"
                                     github.delete_release("prometheus", git_project_user, "unstable", GIT_TOKEN)
                                     github.create_prerelease("prometheus", git_project_user, "unstable", GIT_TOKEN, "development")
-
                                     echo "Trigger prometheus ${NEXT_VERSION} with tsdb ${MAIN_TAG_VERSION}"
                                     github.create_prerelease("prometheus", git_project_user, NEXT_VERSION, GIT_TOKEN)
                                 }
