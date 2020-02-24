@@ -298,7 +298,7 @@ def build_frames(V3IO_TSDB_VERSION, internal_status="stable") {
     }
 }
 
-def wait_for_release(V3IO_TSDB_VERSION, tasks_list) {
+def wait_for_release(V3IO_TSDB_VERSION, next_versions, tasks_list) {
     withCredentials([
             string(credentialsId: git_deploy_user_token, variable: 'GIT_TOKEN')
     ]) {
@@ -506,7 +506,7 @@ podTemplate(label: "${git_project}-${label}", inheritFrom: "jnlp-docker-golang")
         }
 
         node("${git_project}-${label}") {
-            wait_for_release(MAIN_TAG_VERSION, ['tsdb-nuclio': null, 'frames': null])
+            wait_for_release(MAIN_TAG_VERSION, next_versions, ['tsdb-nuclio': null, 'frames': null])
         }
 
         // prometheus moved last cos need frames version to build
@@ -569,7 +569,7 @@ podTemplate(label: "${git_project}-${label}", inheritFrom: "jnlp-docker-golang")
         }
 
         node("${git_project}-${label}") {
-            wait_for_release(MAIN_TAG_VERSION, ['prometheus': null])
+            wait_for_release(MAIN_TAG_VERSION, next_versions, ['prometheus': null])
         }
 
         node("${git_project}-${label}") {
