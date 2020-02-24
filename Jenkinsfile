@@ -386,7 +386,7 @@ def wait_for_release(V3IO_TSDB_VERSION, tasks_list) {
 podTemplate(label: "${git_project}-${label}", inheritFrom: "jnlp-docker-golang") {
     def MAIN_TAG_VERSION
     def FRAMES_NEXT_VERSION
-    def next_versions = ['prometheus':null, 'tsdb-nuclio':null]
+    def next_versions = ['prometheus':null, 'tsdb-nuclio':null, 'frames':null]
 
     pipelinex = library(identifier: 'pipelinex@_exc', retriever: modernSCM(
             [$class:        'GitSCMSource',
@@ -506,7 +506,7 @@ podTemplate(label: "${git_project}-${label}", inheritFrom: "jnlp-docker-golang")
         }
 
         node("${git_project}-${label}") {
-            wait_for_release(MAIN_TAG_VERSION, ['tsdb-nuclio': null])
+            wait_for_release(MAIN_TAG_VERSION, ['tsdb-nuclio': null, 'frames': null])
         }
 
         // prometheus moved last cos need frames version to build
