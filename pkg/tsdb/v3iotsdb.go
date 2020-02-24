@@ -130,7 +130,7 @@ func NewV3ioAdapter(cfg *config.V3ioConfig, container v3io.Container, logger log
 
 func NewContainer(v3ioURL string, numWorkers int, accessKey string, username string, password string, containerName string, logger logger.Logger) (v3io.Container, error) {
 	newContextInput := &v3iohttp.NewContextInput{
-		NumWorkers:numWorkers,
+		NumWorkers: numWorkers,
 	}
 	ctx, err := v3iohttp.NewContext(logger, newContextInput)
 	if err != nil {
