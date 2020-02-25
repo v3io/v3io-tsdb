@@ -69,26 +69,34 @@ build:
 bin:
 	${TSDB_BUILD_COMMAND}
 
-.PHONY: lint
-lint:
+PHONY: gofmt
+gofmt:
 ifeq ($(shell gofmt -l .),)
 	# gofmt OK
 else
 	$(error Please run `go fmt ./...` to format the code)
 endif
-	@echo Installing linters...
-	go get -u github.com/pavius/impi/cmd/impi
-	curl -sfL https://install.goreleaser.com/github.com/golangci/golangci-lint.sh | sh -s v1.10.2
-	cp ./bin/golangci-lint $(GOPATH)/bin/
 
+.PHONY: impi
+impi:
+	@echo Installing impi...
+	go get -u github.com/pavius/impi/cmd/impi
 	@echo Verifying imports...
 	$(GOPATH)/bin/impi \
 		--local github.com/iguazio/provazio \
 		--skip pkg/controller/apis \
 		--skip pkg/controller/client \
+		--ignore-generated \
 		--scheme stdLocalThirdParty \
 		./...
 
+$(GOPATH)/bin/golangci-lint:
+	@echo Installing golangci-lint...
+	curl -sfL https://install.goreleaser.com/github.com/golangci/golangci-lint.sh | sh -s v1.10.2
+	cp ./bin/golangci-lint $(GOPATH)/bin/
+
+.PHONY: lint
+lint: gofmt impi $(GOPATH)/bin/golangci-lint
 	@echo Linting...
 	@$(GOPATH)/bin/golangci-lint run \
      --disable-all --enable=deadcode --enable=goconst --enable=golint --enable=ineffassign \
@@ -96,4 +104,3 @@ endif
      --enable=staticcheck --enable=gosimple --enable=govet --enable=goconst \
     cmd/... pkg/... internal/...
 	@echo done linting
-
