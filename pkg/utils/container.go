@@ -63,11 +63,13 @@ func CreateContainer(logger logger.Logger, cfg *config.V3ioConfig, httpTimeout t
 		return nil, err
 	}
 
-	newClient := v3iohttp.NewClient(nil, httpTimeout)
-	newContextInput := &v3io.NewContextInput{
-		NumWorkers: cfg.Workers,
+	newClient := v3iohttp.NewClient(&v3iohttp.NewClientInput{DialTimeout: httpTimeout})
+	newContextInput := &v3iohttp.NewContextInput{
+		HTTPClient:     newClient,
+		NumWorkers:     cfg.Workers,
+		RequestChanLen: cfg.RequestChanLength,
 	}
-	context, err := v3iohttp.NewContext(logger, newClient, newContextInput)
+	context, err := v3iohttp.NewContext(logger, newContextInput)
 	if err != nil {
 		return nil, errors.Wrap(err, "Failed to create a V3IO TSDB client.")
 	}
