@@ -424,10 +424,15 @@ func (cs *chunkStore) writeChunks(mc *MetricsCache, metric *MetricState) (hasPen
 			expr = lblexpr + encodingExpr + lsetExpr + expr
 		}
 
-		// Call the V3IO async UpdateItem method
-		conditionExpr := fmt.Sprintf("NOT exists(%s) OR (exists(%s) AND %s == '%d')",
-			config.EncodingAttrName, config.EncodingAttrName,
-			config.EncodingAttrName, activeChunk.appender.Encoding())
+		conditionExpr := ""
+
+		// Only add the condition when adding to a data chunk, not when writing data to label pre-aggregated
+		if activeChunk != nil {
+			// Call the V3IO async UpdateItem method
+			conditionExpr = fmt.Sprintf("NOT exists(%s) OR (exists(%s) AND %s == '%d')",
+				config.EncodingAttrName, config.EncodingAttrName,
+				config.EncodingAttrName, activeChunk.appender.Encoding())
+		}
 		expr += fmt.Sprintf("%v=%d;", config.MaxTimeAttrName, cs.maxTime) // TODO: use max() expr
 		path := partition.GetMetricPath(metric.name, metric.hash, cs.labelNames, cs.isAggr())
 		request, err := mc.container.UpdateItem(

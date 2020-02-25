@@ -171,6 +171,7 @@ type V3ioConfig struct {
 	// use server aggregations if ` <requested step> / <rollup interval>  >  UseServerAggregateCoefficient`
 	UseServerAggregateCoefficient int  `json:"useServerAggregateCoefficient,omitempty"`
 	LoadPartitionsFromSchemaAttr  bool `json:"loadPartitionsFromSchemaAttr,omitempty"`
+	RequestChanLength             int  `json:"RequestChanLength,omitempty"`
 }
 
 type MetricsReporterConfig struct {
