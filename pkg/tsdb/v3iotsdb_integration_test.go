@@ -38,7 +38,9 @@ import (
 	"github.com/v3io/v3io-tsdb/pkg/chunkenc"
 	"github.com/v3io/v3io-tsdb/pkg/config"
 	"github.com/v3io/v3io-tsdb/pkg/partmgr"
+	"github.com/v3io/v3io-tsdb/pkg/pquerier"
 	. "github.com/v3io/v3io-tsdb/pkg/tsdb"
+	"github.com/v3io/v3io-tsdb/pkg/tsdb/schema"
 	"github.com/v3io/v3io-tsdb/pkg/tsdb/tsdbtest"
 	"github.com/v3io/v3io-tsdb/pkg/tsdb/tsdbtest/testutils"
 	"github.com/v3io/v3io-tsdb/pkg/utils"
@@ -256,6 +258,125 @@ func TestIngestDataWithSameTimestamp(t *testing.T) {
 	}
 
 	tsdbtest.ValidateCountOfSamples(t, adapter, "", 2, baseTime-1*tsdbtest.HoursInMillis, baseTime+1*tsdbtest.HoursInMillis, -1)
+}
+
+// test for http://jira.iguazeng.com:8080/browse/IG-14978
+func TestIngestWithTimeDeltaBiggerThen32Bit(t *testing.T) {
+	data := []tsdbtest.DataPoint{
+		{Time: 1384786967945, Value: 1},
+		{Time: 1392818567945, Value: 2}}
+	testParams := tsdbtest.NewTestParams(t,
+		tsdbtest.TestOption{
+			Key: tsdbtest.OptTimeSeries,
+			Value: tsdbtest.TimeSeries{tsdbtest.Metric{
+				Name:   "cpu",
+				Labels: utils.LabelsFromStringList("os", "linux"),
+				Data:   data},
+			}})
+
+	schema, err := schema.NewSchema(testParams.V3ioConfig(), "1/h", "1h", "", "")
+	defer tsdbtest.SetUpWithDBConfig(t, schema, testParams)()
+
+	adapter, err := NewV3ioAdapter(testParams.V3ioConfig(), nil, nil)
+	if err != nil {
+		t.Fatalf("Failed to create v3io adapter. reason: %s", err)
+	}
+
+	appender, err := adapter.Appender()
+	if err != nil {
+		t.Fatalf("Failed to get appender. reason: %s", err)
+	}
+
+	for _, dp := range testParams.TimeSeries() {
+		labels := utils.Labels{utils.Label{Name: "__name__", Value: dp.Name}}
+		labels = append(labels, dp.Labels...)
+
+		ref, err := appender.Add(labels, dp.Data[0].Time, dp.Data[0].Value)
+		if err != nil {
+			t.Fatalf("Failed to add data to appender. reason: %s", err)
+		}
+
+		for _, curr := range dp.Data[1:] {
+			appender.AddFast(labels, ref, curr.Time, curr.Value)
+		}
+
+		if _, err := appender.WaitForCompletion(0); err != nil {
+			t.Fatalf("Failed to wait for appender completion. reason: %s", err)
+		}
+	}
+
+	querier, _ := adapter.QuerierV2()
+	iter, _ := querier.Select(&pquerier.SelectParams{From: 0,
+		To: time.Now().Unix() * 1000})
+	for iter.Next() {
+		dataIter := iter.At().Iterator()
+		actual, err := iteratorToSlice(dataIter)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		assert.ElementsMatch(t, data, actual,
+			"result data didn't match. \nExpected: %v\n Actual: %v", data, actual)
+	}
+
+	if iter.Err() != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestIngestVarTypeWithTimeDeltaBiggerThen32Bit(t *testing.T) {
+	data := []string{"a", "b"}
+	times := []int64{1384786967945, 1392818567945}
+
+	testParams := tsdbtest.NewTestParams(t)
+
+	schema, err := schema.NewSchema(testParams.V3ioConfig(), "1/h", "1h", "", "")
+	defer tsdbtest.SetUpWithDBConfig(t, schema, testParams)()
+
+	adapter, err := NewV3ioAdapter(testParams.V3ioConfig(), nil, nil)
+	if err != nil {
+		t.Fatalf("Failed to create v3io adapter. reason: %s", err)
+	}
+
+	appender, err := adapter.Appender()
+	if err != nil {
+		t.Fatalf("Failed to get appender. reason: %s", err)
+	}
+
+	labels := utils.Labels{utils.Label{Name: "__name__", Value: "metric_1"}}
+	for i, v := range data {
+		_, err := appender.Add(labels, times[i], v)
+		if err != nil {
+			t.Fatalf("Failed to add data to appender. reason: %s", err)
+		}
+
+	}
+
+	if _, err := appender.WaitForCompletion(0); err != nil {
+		t.Fatalf("Failed to wait for appender completion. reason: %s", err)
+	}
+
+	querier, _ := adapter.QuerierV2()
+	iter, _ := querier.Select(&pquerier.SelectParams{From: 0,
+		To: time.Now().Unix() * 1000})
+	var seriesCount int
+	for iter.Next() {
+		seriesCount++
+		iter := iter.At().Iterator()
+		var i int
+		for iter.Next() {
+			time, value := iter.AtString()
+			assert.Equal(t, times[i], time, "time does not match at index %v", i)
+			assert.Equal(t, data[i], value, "value does not match at index %v", i)
+			i++
+		}
+	}
+
+	assert.Equal(t, 1, seriesCount, "series count didn't match expected")
+
+	if iter.Err() != nil {
+		t.Fatal(err)
+	}
 }
 
 func TestWriteMetricWithDashInName(t *testing.T) {
