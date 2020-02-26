@@ -353,7 +353,7 @@ func (a *V3ioAdapter) DeletePartitionsData(deleteParams *DeleteParams) error {
 		}
 	}
 
-	for i := 0; i <= a.cfg.Workers; i++ {
+	for i := 0; i < a.cfg.Workers; i++ {
 		go deleteObjectWorker(a.container, deleteParams, a.logger,
 			fileToDeleteChan, deleteTerminationChan, onErrorTerminationChannel,
 			aggrMask)
@@ -418,7 +418,6 @@ func (a *V3ioAdapter) DeletePartitionsData(deleteParams *DeleteParams) error {
 	getItemsWG.Wait()
 	select {
 	case err = <-getItemsErrorChan:
-		fmt.Println("got error", err)
 		// Signal all other goroutines to quite
 		for i := 0; i < goRoutinesNum; i++ {
 			onErrorTerminationChannel <- struct{}{}
