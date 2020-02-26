@@ -93,6 +93,7 @@ def build_nuclio(V3IO_TSDB_VERSION, internal_status="stable") {
                                     GO111MODULE=on go mod vendor
                                     rm -rf .git vendor/github.com/nuclio vendor/github.com/${git_project_upstream_user}/frames/vendor/golang.org/x/net vendor/golang.org/x/net
                                 """
+                                sh("chown 1000:1000 ./ -R")
                             }
                         }
                     },
@@ -113,6 +114,7 @@ def build_nuclio(V3IO_TSDB_VERSION, internal_status="stable") {
                                     GO111MODULE=on go mod vendor
                                     rm -rf .git vendor/github.com/nuclio vendor/github.com/${git_project_upstream_user}/frames/vendor/golang.org/x/net vendor/golang.org/x/net
                                 """
+                                sh("chown 1000:1000 ./ -R")
                             }
                         }
                     }
@@ -143,7 +145,6 @@ def build_nuclio(V3IO_TSDB_VERSION, internal_status="stable") {
                         }
                     } catch (err) {
                         echo "Can not push code"
-                        echo err
                     }
                 }
             }
@@ -218,7 +219,6 @@ def build_prometheus(V3IO_TSDB_VERSION, FRAMES_VERSION, internal_status="stable"
                         }
                     } catch (err) {
                         echo "Can not push code"
-                        echo err
                     }
                 }
             }
@@ -291,7 +291,6 @@ def build_frames(V3IO_TSDB_VERSION, internal_status="stable") {
                         }
                     } catch (err) {
                         echo "Can not push code"
-                        echo err
                     }
                 }
             }
@@ -302,7 +301,7 @@ def build_frames(V3IO_TSDB_VERSION, internal_status="stable") {
     }
 }
 
-def wait_for_release(V3IO_TSDB_VERSION, tasks_list) {
+def wait_for_release(V3IO_TSDB_VERSION, next_versions, tasks_list) {
     withCredentials([
             string(credentialsId: git_deploy_user_token, variable: 'GIT_TOKEN')
     ]) {
@@ -390,9 +389,9 @@ def wait_for_release(V3IO_TSDB_VERSION, tasks_list) {
 podTemplate(label: "${git_project}-${label}", inheritFrom: "jnlp-docker-golang") {
     def MAIN_TAG_VERSION
     def FRAMES_NEXT_VERSION
-    def next_versions = ['prometheus':null, 'tsdb-nuclio':null]
+    def next_versions = ['prometheus':null, 'tsdb-nuclio':null, 'frames':null]
 
-    pipelinex = library(identifier: 'pipelinex@refs', retriever: modernSCM(
+    pipelinex = library(identifier: 'pipelinex@_exc', retriever: modernSCM(
             [$class:        'GitSCMSource',
              credentialsId: git_deploy_user_private_key,
              remote:        "git@github.com:iguazio/pipelinex.git"])).com.iguazio.pipelinex
@@ -510,7 +509,7 @@ podTemplate(label: "${git_project}-${label}", inheritFrom: "jnlp-docker-golang")
         }
 
         node("${git_project}-${label}") {
-            wait_for_release(MAIN_TAG_VERSION, ['tsdb-nuclio': null])
+            wait_for_release(MAIN_TAG_VERSION, next_versions, ['tsdb-nuclio': null, 'frames': null])
         }
 
         // prometheus moved last cos need frames version to build
@@ -573,7 +572,7 @@ podTemplate(label: "${git_project}-${label}", inheritFrom: "jnlp-docker-golang")
         }
 
         node("${git_project}-${label}") {
-            wait_for_release(MAIN_TAG_VERSION, ['prometheus': null])
+            wait_for_release(MAIN_TAG_VERSION, next_versions, ['prometheus': null])
         }
 
         node("${git_project}-${label}") {
