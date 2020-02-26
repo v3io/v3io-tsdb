@@ -388,7 +388,7 @@ podTemplate(label: "${git_project}-${label}", inheritFrom: "jnlp-docker-golang")
     def FRAMES_NEXT_VERSION
     def next_versions = ['prometheus':null, 'tsdb-nuclio':null, 'frames':null]
 
-    pipelinex = library(identifier: 'pipelinex@_exc', retriever: modernSCM(
+    pipelinex = library(identifier: 'pipelinex@development', retriever: modernSCM(
             [$class:        'GitSCMSource',
              credentialsId: git_deploy_user_private_key,
              remote:        "git@github.com:iguazio/pipelinex.git"])).com.iguazio.pipelinex
