@@ -160,6 +160,8 @@ type xorAppender struct {
 
 	leading  uint8
 	trailing uint8
+
+	isPreviousNewSeries bool
 }
 
 func (a *xorAppender) Encoding() Encoding {
@@ -186,37 +188,44 @@ func (a *xorAppender) Append(t int64, vvar interface{}) {
 		a.b.writeBits(0x1f, 5)
 		a.b.writeBits(uint64(t), 51)
 		a.b.writeBits(math.Float64bits(v), 64)
-
-	} else if num == 1 {
-		tDelta = uint64(t - a.t)
-
-		a.b.writeBits(tDelta, 32)
-		a.writeVDelta(v)
-
+		a.isPreviousNewSeries = true
 	} else {
 		tDelta = uint64(t - a.t)
-		dod := int64(tDelta - a.tDelta)
 
-		// Gorilla has a max resolution of seconds, Prometheus milliseconds.
-		// Thus we use higher value range steps with larger bit size.
-		switch {
-		case dod == 0:
-			a.b.writeBit(zero)
-		case bitRange(dod, 14):
-			a.b.writeBits(0x02, 2) // '10'
-			a.b.writeBits(uint64(dod), 14)
-		case bitRange(dod, 17):
-			a.b.writeBits(0x06, 3) // '110'
-			a.b.writeBits(uint64(dod), 17)
-		case bitRange(dod, 20):
-			a.b.writeBits(0x0e, 4) // '1110'
-			a.b.writeBits(uint64(dod), 20)
-		default:
-			a.b.writeBits(0x1e, 5) // '11110'
-			a.b.writeBits(uint64(dod), 32)
+		// We write time deltas as 32 bits (for compression) if the delta is too large we'll start a new series
+		if bits.Len64(tDelta) >= 32 {
+			a.b.writeBits(0x1f, 5)
+			a.b.writeBits(uint64(t), 51)
+			a.b.writeBits(math.Float64bits(v), 64)
+			a.isPreviousNewSeries = true
+		} else if a.isPreviousNewSeries {
+			a.b.writeBits(tDelta, 32)
+			a.writeVDelta(v)
+			a.isPreviousNewSeries = false
+		} else {
+			dod := int64(tDelta - a.tDelta)
+
+			// Gorilla has a max resolution of seconds, Prometheus milliseconds.
+			// Thus we use higher value range steps with larger bit size.
+			switch {
+			case dod == 0:
+				a.b.writeBit(zero)
+			case bitRange(dod, 14):
+				a.b.writeBits(0x02, 2) // '10'
+				a.b.writeBits(uint64(dod), 14)
+			case bitRange(dod, 17):
+				a.b.writeBits(0x06, 3) // '110'
+				a.b.writeBits(uint64(dod), 17)
+			case bitRange(dod, 20):
+				a.b.writeBits(0x0e, 4) // '1110'
+				a.b.writeBits(uint64(dod), 20)
+			default:
+				a.b.writeBits(0x1e, 5) // '11110'
+				a.b.writeBits(uint64(dod), 32)
+			}
+
+			a.writeVDelta(v)
 		}
-
-		a.writeVDelta(v)
 	}
 
 	a.t = t
