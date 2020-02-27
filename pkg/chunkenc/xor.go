@@ -244,7 +244,7 @@ func (a *xorAppender) Append(t int64, vvar interface{}) {
 }
 
 func bitRange(x int64, nbits uint8) bool {
-	return -((1 << (nbits - 1)) - 1) <= x && x <= 1<<(nbits-1)
+	return -((1<<(nbits-1))-1) <= x && x <= 1<<(nbits-1)
 }
 
 func (a *xorAppender) writeVDelta(v float64) {
