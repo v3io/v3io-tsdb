@@ -1206,10 +1206,14 @@ func (suite *testSelectDataframeSuite) TestSparseNumericColumnsWithNotExistingMe
 		suite.basicQueryTime + 3*tsdbtest.MinuteInMillis,
 		suite.basicQueryTime + 4*tsdbtest.MinuteInMillis}
 	expectedColumns := map[string][]interface{}{
-		"cpu_0": {math.NaN(), math.NaN(), math.NaN(), math.NaN(), math.NaN(), math.NaN(), math.NaN(), math.NaN(), math.NaN(), math.NaN()},
-		"cpu_1": {10.0, 20.0, 30.0, 40.0, 50.0, math.NaN(), 22.0, 33.0, math.NaN(), 55.0},
-		"cpu_2": {math.NaN(), math.NaN(), math.NaN(), math.NaN(), math.NaN(), 10.0, 20.0, math.NaN(), 40.0, 50.0},
-		"fake":  {math.NaN(), math.NaN(), math.NaN(), math.NaN(), math.NaN(), math.NaN(), math.NaN(), math.NaN(), math.NaN(), math.NaN()},
+		"cpu_0-linux":   {math.NaN(), math.NaN(), math.NaN(), math.NaN(), math.NaN()},
+		"cpu_1-linux":   {10.0, 20.0, 30.0, 40.0, 50.0},
+		"cpu_2-linux":   {math.NaN(), math.NaN(), math.NaN(), math.NaN(), math.NaN()},
+		"fake-linux":    {math.NaN(), math.NaN(), math.NaN(), math.NaN(), math.NaN()},
+		"cpu_0-windows": {math.NaN(), math.NaN(), math.NaN(), math.NaN(), math.NaN()},
+		"cpu_1-windows": {math.NaN(), 22.0, 33.0, math.NaN(), 55.0},
+		"cpu_2-windows": {10.0, 20.0, math.NaN(), 40.0, 50.0},
+		"fake-windows":  {math.NaN(), math.NaN(), math.NaN(), math.NaN(), math.NaN()},
 	}
 
 	testParams := tsdbtest.NewTestParams(suite.T(),
@@ -1263,23 +1267,22 @@ func (suite *testSelectDataframeSuite) TestSparseNumericColumnsWithNotExistingMe
 	iter, err := querierV2.SelectDataFrame(params)
 	requireCtx.NoError(err, "failed to execute query")
 
-	rowId := -1
 	var seriesCount int
 	for iter.NextFrame() {
 		seriesCount++
 		frame, err := iter.GetFrame()
 		requireCtx.NoError(err)
 		indexCol := frame.Indices()[0]
-
+		osLabel := frame.Labels()["os"]
 		nullValuesMap := frame.NullValuesMap()
 		requireCtx.NotNil(nullValuesMap, "null value map should not be empty")
 
 		for i := 0; i < indexCol.Len(); i++ {
-			rowId++
 			t, _ := indexCol.TimeAt(i)
 			timeMillis := t.UnixNano() / int64(time.Millisecond)
 			requireCtx.Equal(expectedTimeColumn[i], timeMillis, "time column does not match at index %d", i)
 			for _, columnName := range frame.Names() {
+				key := fmt.Sprintf("%v-%v", columnName, osLabel)
 				var v interface{}
 				column, err := frame.Column(columnName)
 				requireCtx.NoError(err)
@@ -1288,7 +1291,8 @@ func (suite *testSelectDataframeSuite) TestSparseNumericColumnsWithNotExistingMe
 					if v == math.NaN() {
 						requireCtx.True(nullValuesMap[i].NullColumns[columnName])
 					}
-					bothNaN := math.IsNaN(expectedColumns[column.Name()][i].(float64)) && math.IsNaN(v.(float64))
+
+					bothNaN := math.IsNaN(expectedColumns[key][i].(float64)) && math.IsNaN(v.(float64))
 					if bothNaN {
 						continue
 					}
@@ -1301,9 +1305,9 @@ func (suite *testSelectDataframeSuite) TestSparseNumericColumnsWithNotExistingMe
 					suite.Fail(fmt.Sprintf("column type is not as expected: %v", column.DType()))
 				}
 
-				expectedValue := expectedColumns[columnName][rowId]
+				expectedValue := expectedColumns[key][i]
 				if !math.IsNaN(expectedValue.(float64)) || !math.IsNaN(v.(float64)) {
-					requireCtx.Equal(expectedValue, v, "column %v does not match at index %d", columnName, rowId)
+					requireCtx.Equal(expectedValue, v, "column %v does not match at index %d", columnName, i)
 				}
 			}
 		}
