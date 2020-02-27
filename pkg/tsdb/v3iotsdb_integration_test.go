@@ -263,8 +263,8 @@ func TestIngestDataWithSameTimestamp(t *testing.T) {
 // test for http://jira.iguazeng.com:8080/browse/IG-14978
 func TestIngestWithTimeDeltaBiggerThen32Bit(t *testing.T) {
 	data := []tsdbtest.DataPoint{
-		{Time: 1384786967945, Value: 1},
-		{Time: 1392818567945, Value: 2}}
+		{Time: 1384786967945, Value: 1.0},
+		{Time: 1392818567945, Value: 2.0}}
 	testParams := tsdbtest.NewTestParams(t,
 		tsdbtest.TestOption{
 			Key: tsdbtest.OptTimeSeries,

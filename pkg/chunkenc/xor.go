@@ -194,49 +194,45 @@ func (a *xorAppender) Append(t int64, vvar interface{}) {
 		return
 	}
 
-	if num == 0 {
+	// We write time deltas as 32 bits (for compression) if the delta is too large we'll start a new series
+	tDelta = uint64(t - a.t)
+	shouldStartNewSeries := num == 0 || bits.Len64(tDelta) >= 32
+
+	if shouldStartNewSeries {
 		// add a signature 11111 to indicate start of cseries in case we put few in the same chunk (append to existing)
 		a.b.writeBits(0x1f, 5)
 		a.b.writeBits(uint64(t), 51)
 		a.b.writeBits(math.Float64bits(v), 64)
 		a.isPreviousNewSeries = true
+		tDelta = 0 // saving time delta for the first element is redundant
+	} else if a.isPreviousNewSeries {
+		a.b.writeBits(tDelta, 32)
+		a.writeVDelta(v)
+		a.isPreviousNewSeries = false
 	} else {
-		tDelta = uint64(t - a.t)
+		dod := int64(tDelta - a.tDelta)
 
-		// We write time deltas as 32 bits (for compression) if the delta is too large we'll start a new series
-		if bits.Len64(tDelta) >= 32 {
-			a.b.writeBits(0x1f, 5)
-			a.b.writeBits(uint64(t), 51)
-			a.b.writeBits(math.Float64bits(v), 64)
-			a.isPreviousNewSeries = true
-		} else if a.isPreviousNewSeries {
-			a.b.writeBits(tDelta, 32)
-			a.writeVDelta(v)
-			a.isPreviousNewSeries = false
-		} else {
-			dod := int64(tDelta - a.tDelta)
-
-			// Gorilla has a max resolution of seconds, Prometheus milliseconds.
-			// Thus we use higher value range steps with larger bit size.
-			switch {
-			case dod == 0:
-				a.b.writeBit(zero)
-			case bitRange(dod, 14):
-				a.b.writeBits(0x02, 2) // '10'
-				a.b.writeBits(uint64(dod), 14)
-			case bitRange(dod, 17):
-				a.b.writeBits(0x06, 3) // '110'
-				a.b.writeBits(uint64(dod), 17)
-			case bitRange(dod, 20):
-				a.b.writeBits(0x0e, 4) // '1110'
-				a.b.writeBits(uint64(dod), 20)
-			default:
-				a.b.writeBits(0x1e, 5) // '11110'
-				a.b.writeBits(uint64(dod), 32)
-			}
-
-			a.writeVDelta(v)
+		// Gorilla has a max resolution of seconds, Prometheus milliseconds.
+		// Thus we use higher value range steps with larger bit size.
+		switch {
+		case dod == 0:
+			a.b.writeBit(zero)
+		case bitRange(dod, 14):
+			a.b.writeBits(0x02, 2) // '10'
+			a.b.writeBits(uint64(dod), 14)
+		case bitRange(dod, 17):
+			a.b.writeBits(0x06, 3) // '110'
+			a.b.writeBits(uint64(dod), 17)
+		case bitRange(dod, 20):
+			a.b.writeBits(0x0e, 4) // '1110'
+			a.b.writeBits(uint64(dod), 20)
+		default:
+			a.b.writeBits(0x1e, 5) // '11110'
+			a.b.writeBits(uint64(dod), 32)
 		}
+
+		a.writeVDelta(v)
+
 	}
 
 	a.t = t
@@ -248,7 +244,7 @@ func (a *xorAppender) Append(t int64, vvar interface{}) {
 }
 
 func bitRange(x int64, nbits uint8) bool {
-	return -((1<<(nbits-1))-1) <= x && x <= 1<<(nbits-1)
+	return -((1 << (nbits - 1)) - 1) <= x && x <= 1<<(nbits-1)
 }
 
 func (a *xorAppender) writeVDelta(v float64) {
