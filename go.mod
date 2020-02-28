@@ -27,7 +27,7 @@ require (
 )
 
 replace (
-	github.com/v3io/v3io-go => github.com/v3io/v3io-go v0.0.7-0.20200225114129-c94b36fd5895
+	github.com/v3io/v3io-go => github.com/v3io/v3io-go v0.0.6-0.20200228104949-c1aa65089012
 	github.com/xwb1989/sqlparser => github.com/v3io/sqlparser v0.0.0-20190306105200-4d7273501871
 	labix.org/v2/mgo => github.com/go-mgo/mgo v0.0.0-20180705113738-7446a0344b7872c067b3d6e1b7642571eafbae17
 	launchpad.net/gocheck => github.com/go-check/check v0.0.0-20180628173108-788fd78401277ebd861206a03c884797c6ec5541
