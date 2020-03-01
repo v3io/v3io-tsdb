@@ -55,3 +55,17 @@ func IsFalseConditionError(err error) bool {
 
 	return false
 }
+
+func IsNotExistsOrConflictError(err error) bool {
+	errorWithStatusCode, ok := err.(v3ioerrors.ErrorWithStatusCode)
+	if !ok {
+		// error of different type
+		return false
+	}
+	statusCode := errorWithStatusCode.StatusCode()
+	// Ignore 404s and 409s
+	if statusCode == http.StatusNotFound || statusCode == http.StatusConflict {
+		return true
+	}
+	return false
+}
