@@ -104,7 +104,7 @@ func TestIngestData(t *testing.T) {
 					}}},
 			),
 		},
-		{desc: "Should drop values of incompatible data types (prepare data for: IG-13146)",
+		{desc: "Should drop values of incompatible data types ",
 			params: tsdbtest.NewTestParams(t,
 				tsdbtest.TestOption{
 					Key: tsdbtest.OptTimeSeries,
@@ -134,7 +134,7 @@ func TestIngestData(t *testing.T) {
 							{Time: 60, Value: 0.4},                    // valid values from this batch will be dropped
 							{Time: 70, Value: 0.3},                    // because processing of entire batch will stop
 						},
-						ExpectedCount: func() *int { var expectedCount = 2; return &expectedCount }(),
+						ExpectedCount: func() *int { var expectedCount = 1; return &expectedCount }(),
 					}}},
 				tsdbtest.TestOption{
 					Key:   "override_test_name",
@@ -1052,6 +1052,72 @@ func TestDeleteTSDB(t *testing.T) {
 	if res := <-responseChan; res.Error == nil {
 		t.Fatal("Did not delete TSDB properly")
 	}
+}
+
+func TestIngestDataFloatThenString(t *testing.T) {
+	testParams := tsdbtest.NewTestParams(t)
+
+	defer tsdbtest.SetUp(t, testParams)()
+
+	adapter, err := NewV3ioAdapter(testParams.V3ioConfig(), nil, nil)
+	if err != nil {
+		t.Fatalf("Failed to create v3io adapter. reason: %s", err)
+	}
+
+	appender, err := adapter.Appender()
+	if err != nil {
+		t.Fatalf("Failed to get appender. reason: %s", err)
+	}
+
+	labels := utils.Labels{utils.Label{Name: "__name__", Value: "cpu"}}
+	_, err = appender.Add(labels, 1532940510000, 12.0)
+	if err != nil {
+		t.Fatalf("Failed to add data to appender. reason: %s", err)
+	}
+
+	_, err = appender.Add(labels, 1532940610000, "tal")
+	if err == nil {
+		t.Fatal("expected failure but finished successfully")
+	}
+
+	if _, err := appender.WaitForCompletion(0); err != nil {
+		t.Fatalf("Failed to wait for appender completion. reason: %s", err)
+	}
+
+	tsdbtest.ValidateCountOfSamples(t, adapter, "cpu", 1, 0, 1532950510000, -1)
+}
+
+func TestIngestDataStringThenFloat(t *testing.T) {
+	testParams := tsdbtest.NewTestParams(t)
+
+	defer tsdbtest.SetUp(t, testParams)()
+
+	adapter, err := NewV3ioAdapter(testParams.V3ioConfig(), nil, nil)
+	if err != nil {
+		t.Fatalf("Failed to create v3io adapter. reason: %s", err)
+	}
+
+	appender, err := adapter.Appender()
+	if err != nil {
+		t.Fatalf("Failed to get appender. reason: %s", err)
+	}
+
+	labels := utils.Labels{utils.Label{Name: "__name__", Value: "cpu"}}
+	_, err = appender.Add(labels, 1532940510000, "tal")
+	if err != nil {
+		t.Fatalf("Failed to add data to appender. reason: %s", err)
+	}
+
+	_, err = appender.Add(labels, 1532940610000, 666.0)
+	if err == nil {
+		t.Fatal("expected failure but finished successfully")
+	}
+
+	if _, err := appender.WaitForCompletion(0); err != nil {
+		t.Fatalf("Failed to wait for appender completion. reason: %s", err)
+	}
+
+	tsdbtest.ValidateCountOfSamples(t, adapter, "cpu", 1, 0, 1532950510000, -1)
 }
 
 func iteratorToSlice(it chunkenc.Iterator) ([]tsdbtest.DataPoint, error) {
