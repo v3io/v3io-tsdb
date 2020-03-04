@@ -109,6 +109,7 @@ github.com/v3io/frames v0.6.8-v0.9.11 h1:oHcw32SbgW/pva6xdGwLXlTZJ+hS8i8AVPeGydh
 github.com/v3io/frames v0.6.8-v0.9.11/go.mod h1:V3j8yjzhNNGXjosCBn7Qf8C8jo25Y+7Ge/SkTK9ya9Q=
 github.com/v3io/frames v0.6.9-v0.9.12.0.20200219120609-981ffb872c73 h1:pV7ZuJuPQFdROJAJy+0OBYephwyB14FRFWmBffy53dE=
 github.com/v3io/frames v0.6.9-v0.9.12.0.20200219120609-981ffb872c73/go.mod h1:gO8xPhCF8O7Ya2lGrvnDfG/Z7BtY6pzhW3Fd+Mgk7Gs=
+github.com/v3io/frames v0.6.11-v0.9.15.0.20200301102651-c1e7acf2c501/go.mod h1:GopJ5LtMyFx/yV3OeQ+/rDZIwXHw0tIOq1JevW5HzNM=
 github.com/v3io/sqlparser v0.0.0-20190306105200-4d7273501871 h1:myF4tU/HdFWU1UzMdf16cHRbownzsyvL7VKIHqkrSvo=
 github.com/v3io/sqlparser v0.0.0-20190306105200-4d7273501871/go.mod h1:QD2Bo64oyTWzeV8RFehXS0hZEDFgOK99/h2a6ErRu6E=
 github.com/v3io/v3io-go v0.0.0-20191024084247-042df6b5ee40eb60996ab7f4e74ec9aa07d996c4/go.mod h1:IFb6dJiyvJnOjXUoCoPJ5UViaYjgVYmqJb4fD1qDeLk=
@@ -128,6 +129,7 @@ github.com/v3io/v3io-go-http v0.0.0-20190415143924-cc2fbcde6663 h1:WZcM/GRBAasta
 github.com/v3io/v3io-go-http v0.0.0-20190415143924-cc2fbcde6663/go.mod h1:GXYcR9MxgfbE3BJdkXki5EclvtS8Nxu2RQNLA8hMMog=
 github.com/v3io/v3io-tsdb v0.0.0-20190328071546-4e85f3df2d205fc7368d54184bb2ceff949ab4bd/go.mod h1:A+5yKC16QxLf+Fy5v7VvIxSw+jwsKHLhUS7dCYFDLAA=
 github.com/v3io/v3io-tsdb v0.9.11/go.mod h1:K5jxlyxnb/HGyFlPrJQtIbMWQBY6USFBsHYI/vzMKVo=
+github.com/v3io/v3io-tsdb v0.9.12-8/go.mod h1:pQfD7w6Ej5PXPvCpZZvn3xbGgz3WOCkiJkX7mF6KP3k=
 github.com/v3io/v3io-tsdb v0.9.14/go.mod h1:Oqvn2Y3EDvz4eX5LW+YfHhv4ho30E2pg+4vebjqEJYE=
 github.com/valyala/bytebufferpool v1.0.0 h1:GqA5TC/0021Y/b9FG4Oi9Mr3q7XYx6KllzawFIhcdPw=
 github.com/valyala/bytebufferpool v1.0.0/go.mod h1:6bBcMArwyJ5K/AmCkWv1jt77kVWyCJ6HpOuEn7z0Csc=
