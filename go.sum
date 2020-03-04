@@ -82,10 +82,10 @@ github.com/prometheus/prometheus v2.5.0+incompatible/go.mod h1:oAIUtOny2rjMX0OWN
 github.com/rcrowley/go-metrics v0.0.0-20181016184325-3113b8401b8a h1:9ZKAASQSHhDYGoxY8uLVpewe1GDZ2vu2Tr/vTdVAkFQ=
 github.com/rcrowley/go-metrics v0.0.0-20181016184325-3113b8401b8a/go.mod h1:bCqnVzQkZxMG4s8nGwiZ5l3QUCyqpo9Y+/ZMZ9VjZe4=
 github.com/rs/xid v1.1.0/go.mod h1:+uKXf+4Djp6Md1KODXJxgGQPKngRmWyn10oCKFzNHOQ=
-github.com/russross/blackfriday v1.5.2+incompatible h1:/YIL6L1Deczl4O/cQ7ZVdrdKwuB6y7EWpw9LkD8xofE=
+github.com/russross/blackfriday v1.5.2/go.mod h1:JO/DiYxRf+HjHt06OyowR9PTA263kcR/rfWxYHBV53g=
 github.com/russross/blackfriday v1.5.2+incompatible/go.mod h1:JO/DiYxRf+HjHt06OyowR9PTA263kcR/rfWxYHBV53g=
 github.com/russross/blackfriday v1.5.2 h1:HyvC0ARfnZBqnXwABFeSZHpKvJHJJfPz81GNueLj0oo=
-github.com/russross/blackfriday v1.5.2/go.mod h1:JO/DiYxRf+HjHt06OyowR9PTA263kcR/rfWxYHBV53g=
+github.com/russross/blackfriday v1.5.2+incompatible h1:/YIL6L1Deczl4O/cQ7ZVdrdKwuB6y7EWpw9LkD8xofE=
 github.com/spaolacci/murmur3 v0.0.0-20180118202830-f09979ecbc72 h1:qLC7fQah7D6K1B0ujays3HV9gkFtllcxhzImRR7ArPQ=
 github.com/spaolacci/murmur3 v0.0.0-20180118202830-f09979ecbc72/go.mod h1:JwIasOWyU6f++ZhiEuf87xNszmSA2myDM2Kzu9HwQUA=
 github.com/spf13/cobra v0.0.3 h1:ZlrZ4XsMRm04Fr5pSFxBgfND2EBVa1nLpiy1stUsX/8=
@@ -109,6 +109,7 @@ github.com/v3io/frames v0.6.8-v0.9.11 h1:oHcw32SbgW/pva6xdGwLXlTZJ+hS8i8AVPeGydh
 github.com/v3io/frames v0.6.8-v0.9.11/go.mod h1:V3j8yjzhNNGXjosCBn7Qf8C8jo25Y+7Ge/SkTK9ya9Q=
 github.com/v3io/frames v0.6.9-v0.9.12.0.20200219120609-981ffb872c73 h1:pV7ZuJuPQFdROJAJy+0OBYephwyB14FRFWmBffy53dE=
 github.com/v3io/frames v0.6.9-v0.9.12.0.20200219120609-981ffb872c73/go.mod h1:gO8xPhCF8O7Ya2lGrvnDfG/Z7BtY6pzhW3Fd+Mgk7Gs=
+github.com/v3io/frames v0.6.11-v0.9.15.0.20200301102651-c1e7acf2c501 h1:Qi/b0ADlOO7HJwcle96W0uX9aduZ3b5ZP03Ezq2kB04=
 github.com/v3io/frames v0.6.11-v0.9.15.0.20200301102651-c1e7acf2c501/go.mod h1:GopJ5LtMyFx/yV3OeQ+/rDZIwXHw0tIOq1JevW5HzNM=
 github.com/v3io/sqlparser v0.0.0-20190306105200-4d7273501871 h1:myF4tU/HdFWU1UzMdf16cHRbownzsyvL7VKIHqkrSvo=
 github.com/v3io/sqlparser v0.0.0-20190306105200-4d7273501871/go.mod h1:QD2Bo64oyTWzeV8RFehXS0hZEDFgOK99/h2a6ErRu6E=
