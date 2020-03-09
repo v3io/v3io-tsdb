@@ -21,12 +21,10 @@ such restriction.
 package utils
 
 import (
-	"fmt"
 	"net/http"
 	"strings"
 
 	"github.com/nuclio/logger"
-	"github.com/pkg/errors"
 	"github.com/v3io/v3io-go/pkg/dataplane"
 	"github.com/v3io/v3io-go/pkg/errors"
 	"github.com/v3io/v3io-tsdb/pkg/config"
@@ -173,7 +171,7 @@ func (ic *AsyncItemsCursor) processResponse() error {
 	}
 	if resp.Error != nil {
 		ic.logger.Warn("error reading from response channel: %v, error: %v, request: %v", resp, resp.Error, resp.Request().Input)
-		return errors.Wrap(resp.Error, "Failed to get next items")
+		return resp.Error
 	}
 
 	getItemsResp := resp.Output.(*v3io.GetItemsOutput)
@@ -215,7 +213,7 @@ func (ic *AsyncItemsCursor) sendNextGetItemsOld(resp *v3io.Response) error {
 
 		_, err := ic.container.GetItems(input, input, ic.responseChan)
 		if err != nil {
-			return errors.Wrap(err, "Failed to request next items")
+			return err
 		}
 
 	} else {
@@ -261,7 +259,7 @@ func (ic *AsyncItemsCursor) sendNextGetItemsNew(resp *v3io.Response) error {
 
 		_, err := ic.container.GetItems(input, input, ic.responseChan)
 		if err != nil {
-			return errors.Wrap(err, fmt.Sprintf("Failed to request next items for input=%v", input))
+			return err
 		}
 
 	} else {
