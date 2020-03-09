@@ -103,36 +103,33 @@ func (p *PartitionManager) TimeToPart(t int64) (*DBPartition, error) {
 		// Rounding t to the nearest PartitionInterval multiple
 		_, err := p.createAndUpdatePartition(p.currentPartitionInterval * (t / p.currentPartitionInterval))
 		return p.headPartition, err
-	} else {
-		if t >= p.headPartition.startTime {
-			if (t - p.headPartition.startTime) >= p.currentPartitionInterval {
-				_, err := p.createAndUpdatePartition(p.currentPartitionInterval * (t / p.currentPartitionInterval))
-				if err != nil {
-					return nil, err
-				}
+	}
+	if t >= p.headPartition.startTime {
+		if (t - p.headPartition.startTime) >= p.currentPartitionInterval {
+			_, err := p.createAndUpdatePartition(p.currentPartitionInterval * (t / p.currentPartitionInterval))
+			if err != nil {
+				return nil, err
 			}
-			return p.headPartition, nil
-		} else {
-			// Iterate backwards; ignore the last element as it's the head partition
-			for i := len(p.partitions) - 2; i >= 0; i-- {
-				if t >= p.partitions[i].startTime {
-					if t < p.partitions[i].GetEndTime() {
-						return p.partitions[i], nil
-					} else {
-						part, err := p.createAndUpdatePartition(p.currentPartitionInterval * (t / p.currentPartitionInterval))
-						if err != nil {
-							return nil, err
-						}
-						return part, nil
-					}
-				}
+		}
+		return p.headPartition, nil
+	}
+	// Iterate backwards; ignore the last element as it's the head partition
+	for i := len(p.partitions) - 2; i >= 0; i-- {
+		if t >= p.partitions[i].startTime {
+			if t < p.partitions[i].GetEndTime() {
+				return p.partitions[i], nil
 			}
-			head := p.headPartition
-			part, _ := p.createAndUpdatePartition(p.currentPartitionInterval * (t / p.currentPartitionInterval))
-			p.headPartition = head
+			part, err := p.createAndUpdatePartition(p.currentPartitionInterval * (t / p.currentPartitionInterval))
+			if err != nil {
+				return nil, err
+			}
 			return part, nil
 		}
 	}
+	head := p.headPartition
+	part, _ := p.createAndUpdatePartition(p.currentPartitionInterval * (t / p.currentPartitionInterval))
+	p.headPartition = head
+	return part, nil
 }
 
 func (p *PartitionManager) createAndUpdatePartition(t int64) (*DBPartition, error) {
@@ -198,7 +195,7 @@ func (p *PartitionManager) updateSchema() error {
 			}
 
 			input := &v3io.PutItemInput{Path: schemaFilePath, Attributes: attributes}
-			err := p.container.PutItemSync(input)
+			_, err := p.container.PutItemSync(input)
 
 			if err != nil {
 				outerError = errors.Wrap(err, "failed to update partitions table.")
@@ -238,7 +235,7 @@ func (p *PartitionManager) DeletePartitionsFromSchema(partitionsToDelete []*DBPa
 			deletePartitionExpression.WriteString(");")
 		}
 		expression := deletePartitionExpression.String()
-		err := p.container.UpdateItemSync(&v3io.UpdateItemInput{Path: p.GetSchemaFilePath(), Expression: &expression})
+		_, err := p.container.UpdateItemSync(&v3io.UpdateItemInput{Path: p.GetSchemaFilePath(), Expression: &expression})
 		if err != nil {
 			return err
 		}
@@ -592,6 +589,33 @@ func (p *DBPartition) Time2Bucket(t int64) int {
 	return int((t - p.startTime) / p.rollupTime)
 }
 
+// Return the start time of an aggregation bucket by id
+func (p *DBPartition) GetAggregationBucketStartTime(id int) int64 {
+	return p.startTime + int64(id)*p.rollupTime
+}
+
+// Return the end time of an aggregation bucket by id
+func (p *DBPartition) GetAggregationBucketEndTime(id int) int64 {
+	return p.startTime + int64(id+1)*p.rollupTime - 1
+}
+
+func (p *DBPartition) Times2BucketRange(start, end int64) []int {
+	var buckets []int
+
+	if start > p.GetEndTime() || end < p.startTime {
+		return buckets
+	}
+
+	startingAggrBucket := p.Time2Bucket(start)
+	endAggrBucket := p.Time2Bucket(end)
+
+	for bucketID := startingAggrBucket; bucketID <= endAggrBucket; bucketID++ {
+		buckets = append(buckets, bucketID)
+	}
+
+	return buckets
+}
+
 // Return the nearest chunk start time for the specified time
 func (p *DBPartition) GetChunkMint(t int64) int64 {
 	if t > p.GetEndTime() {
@@ -614,12 +638,42 @@ func (p *DBPartition) IsAheadOfChunk(mint, t int64) bool {
 }
 
 // Return the ID of the chunk whose range includes the specified time
-func (p *DBPartition) TimeToChunkId(tmilli int64) (int, error) {
+func (p *DBPartition) TimeToChunkID(tmilli int64) (int, error) {
 	if tmilli >= p.startTime && tmilli <= p.GetEndTime() {
 		return int((tmilli-p.startTime)/p.chunkInterval) + 1, nil
-	} else {
-		return -1, errors.Errorf("Time %d isn't within the range of this partition.", tmilli)
 	}
+	return -1, errors.Errorf("Time %d isn't within the range of this partition.", tmilli)
+}
+
+// Check if a chunk (by attribute name) is in the given time range.
+func (p *DBPartition) IsChunkInRangeByAttr(attr string, mint, maxt int64) bool {
+
+	// Discard '_v' prefix
+	chunkIDStr := attr[2:]
+	chunkID, err := strconv.ParseInt(chunkIDStr, 10, 64)
+	if err != nil {
+		return false
+	}
+
+	chunkStartTime := p.startTime + (chunkID-1)*p.chunkInterval
+	chunkEndTime := chunkStartTime + p.chunkInterval - 1
+
+	return mint <= chunkStartTime && maxt >= chunkEndTime
+}
+
+// Get a chunk's start time by it's attribute name
+func (p *DBPartition) GetChunkStartTimeByAttr(attr string) (int64, error) {
+
+	// Discard '_v' prefix
+	chunkIDStr := attr[2:]
+	chunkID, err := strconv.ParseInt(chunkIDStr, 10, 64)
+	if err != nil {
+		return 0, err
+	}
+
+	chunkStartTime := p.startTime + (chunkID-1)*p.chunkInterval
+
+	return chunkStartTime, nil
 }
 
 // Check whether the specified time is within the range of this partition
@@ -662,11 +716,11 @@ func (p *DBPartition) Range2Attrs(col string, mint, maxt int64) ([]string, int64
 // Return a list of all the chunk IDs that match the specified time range
 func (p *DBPartition) Range2Cids(mint, maxt int64) []int {
 	var list []int
-	start, err := p.TimeToChunkId(mint)
+	start, err := p.TimeToChunkID(mint)
 	if err != nil {
 		start = 1
 	}
-	end, err := p.TimeToChunkId(maxt)
+	end, err := p.TimeToChunkID(maxt)
 	if err != nil {
 		end = int(p.partitionInterval / p.chunkInterval)
 	}
@@ -682,7 +736,7 @@ func (p *DBPartition) GetHashingBuckets() int {
 
 func (p *DBPartition) ToMap() map[string]interface{} {
 	attributes := make(map[string]interface{}, 5)
-	attributes["aggregates"] = aggregate.AggregateMaskToString(p.AggrType())
+	attributes["aggregates"] = aggregate.MaskToString(p.AggrType())
 	attributes["rollupTime"] = p.rollupTime
 	attributes["chunkInterval"] = p.chunkInterval
 	attributes["partitionInterval"] = p.partitionInterval

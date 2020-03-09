@@ -30,21 +30,30 @@ import (
 )
 
 const (
-	varTypeNil     byte = 0
-	varTypeBlob    byte = 1
-	varTypeString  byte = 2
-	varTypeBool    byte = 3
+	varTypeNil byte = 0
+	// nolint: deadcode,varcheck
+	varTypeBlob   byte = 1
+	varTypeString byte = 2
+	// nolint: deadcode,varcheck
+	varTypeBool byte = 3
+	// nolint: deadcode,varcheck
 	varTypeFloat32 byte = 4
 	varTypeFloat64 byte = 5
-	varTypeInt8    byte = 8
-	varTypeInt16   byte = 9
-	varTypeInt32   byte = 10
-	varTypeInt64   byte = 11
+	// nolint: deadcode,varcheck
+	varTypeInt8 byte = 8
+	// nolint: deadcode,varcheck
+	varTypeInt16 byte = 9
+	// nolint: deadcode,varcheck
+	varTypeInt32 byte = 10
+	// nolint: deadcode,varcheck
+	varTypeInt64 byte = 11
 )
 
 const (
 	varValueNone byte = 0
+	// nolint: deadcode,varcheck
 	varValueZero byte = 1
+	// nolint: deadcode,varcheck
 	varValueOnes byte = 2
 	varValueAny  byte = 3
 )

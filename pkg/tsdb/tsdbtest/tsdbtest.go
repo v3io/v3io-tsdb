@@ -14,6 +14,7 @@ import (
 	"github.com/v3io/v3io-tsdb/pkg/chunkenc"
 	"github.com/v3io/v3io-tsdb/pkg/config"
 	"github.com/v3io/v3io-tsdb/pkg/pquerier"
+	// nolint: golint
 	. "github.com/v3io/v3io-tsdb/pkg/tsdb"
 	"github.com/v3io/v3io-tsdb/pkg/tsdb/tsdbtest/testutils"
 	"github.com/v3io/v3io-tsdb/pkg/utils"
@@ -148,8 +149,7 @@ func DeleteTSDB(t testing.TB, v3ioConfig *config.V3ioConfig) {
 		t.Fatalf("Failed to create an adapter. Reason: %s", err)
 	}
 
-	now := time.Now().Unix() * 1000 // Current time (now) in milliseconds
-	if err := adapter.DeleteDB(true, true, 0, now); err != nil {
+	if err := adapter.DeleteDB(DeleteParams{DeleteAll: true, IgnoreErrors: true}); err != nil {
 		t.Fatalf("Failed to delete a TSDB instance (table) on teardown. Reason: %s", err)
 	}
 }
@@ -161,8 +161,8 @@ func CreateTestTSDB(t testing.TB, v3ioConfig *config.V3ioConfig) {
 func CreateTestTSDBWithAggregates(t testing.TB, v3ioConfig *config.V3ioConfig, aggregates string) {
 	schema := testutils.CreateSchema(t, aggregates)
 	if err := CreateTSDB(v3ioConfig, schema); err != nil {
-		v3ioConfigAsJson, _ := json2.MarshalIndent(v3ioConfig, "", "  ")
-		t.Fatalf("Failed to create a TSDB instance (table). Reason: %v\nConfiguration:\n%s", err, string(v3ioConfigAsJson))
+		v3ioConfigAsJSON, _ := json2.MarshalIndent(v3ioConfig, "", "  ")
+		t.Fatalf("Failed to create a TSDB instance (table). Reason: %v\nConfiguration:\n%s", err, string(v3ioConfigAsJSON))
 	}
 }
 
@@ -189,9 +189,11 @@ func SetUp(t testing.TB, testParams TestParams) func() {
 	if err != nil {
 		t.Fatalf("Unable to initialize the performance metrics reporter. Reason: %v", err)
 	}
+	// nolint: errcheck
 	metricReporter.Start()
 
 	return func() {
+		// nolint: errcheck
 		defer metricReporter.Stop()
 		tearDown(t, v3ioConfig, testParams)
 	}
@@ -207,8 +209,8 @@ func SetUpWithDBConfig(t *testing.T, schema *config.Schema, testParams TestParam
 	v3ioConfig := testParams.V3ioConfig()
 	v3ioConfig.TablePath = PrefixTablePath(fmt.Sprintf("%s-%d", t.Name(), time.Now().Nanosecond()))
 	if err := CreateTSDB(v3ioConfig, schema); err != nil {
-		v3ioConfigAsJson, _ := json2.MarshalIndent(v3ioConfig, "", "  ")
-		t.Fatalf("Failed to create a TSDB instance (table). Reason: %s\nConfiguration:\n%s", err, string(v3ioConfigAsJson))
+		v3ioConfigAsJSON, _ := json2.MarshalIndent(v3ioConfig, "", "  ")
+		t.Fatalf("Failed to create a TSDB instance (table). Reason: %s\nConfiguration:\n%s", err, string(v3ioConfigAsJSON))
 	}
 
 	// Measure performance
@@ -216,9 +218,11 @@ func SetUpWithDBConfig(t *testing.T, schema *config.Schema, testParams TestParam
 	if err != nil {
 		t.Fatalf("Unable to initialize the performance metrics reporter. Error: %v", err)
 	}
+	// nolint: errcheck
 	metricReporter.Start()
 
 	return func() {
+		// nolint: errcheck
 		defer metricReporter.Stop()
 		tearDown(t, v3ioConfig, testParams)
 	}
@@ -247,7 +251,10 @@ func InsertData(t *testing.T, testParams TestParams) *V3ioAdapter {
 			t.Fatalf("Failed to add data to the TSDB appender. Reason: %s", err)
 		}
 		for _, curr := range metric.Data[1:] {
-			appender.AddFast(labels, ref, curr.Time, curr.Value)
+			err := appender.AddFast(labels, ref, curr.Time, curr.Value)
+			if err != nil {
+				t.Fatalf("Failed to AddFast. Reason: %s", err)
+			}
 		}
 
 		if _, err := appender.WaitForCompletion(0); err != nil {
@@ -281,7 +288,7 @@ func ValidateCountOfSamples(t testing.TB, adapter *V3ioAdapter, metricName strin
 		Functions: "count",
 		Step:      stepSize,
 		Filter:    fmt.Sprintf("starts(__name__, '%v')", metricName)}
-	set, err := qry.Select(selectParams)
+	set, _ := qry.Select(selectParams)
 
 	var actualCount int
 	for set.Next() {
@@ -318,11 +325,11 @@ func ValidateRawData(t testing.TB, adapter *V3ioAdapter, metricName string, star
 		t.Fatal(err, "Failed to create a Querier instance.")
 	}
 
-	set, err := qry.Select(metricName, "", 0, "")
+	set, _ := qry.Select(metricName, "", 0, "")
 
 	for set.Next() {
 		// Start over for each label set
-		var lastDataPoint *DataPoint = nil
+		var lastDataPoint *DataPoint
 
 		if set.Err() != nil {
 			t.Fatal(set.Err(), "Failed to get the next element from a result set.")

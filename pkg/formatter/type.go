@@ -11,9 +11,9 @@ import (
 
 const DefaultOutputFormat = "text"
 
-func NewFormatter(format string, cfg *FormatterConfig) (Formatter, error) {
+func NewFormatter(format string, cfg *Config) (Formatter, error) {
 	if cfg == nil {
-		cfg = &FormatterConfig{TimeFormat: time.RFC3339}
+		cfg = &Config{TimeFormat: time.RFC3339}
 	}
 	switch format {
 	case "", DefaultOutputFormat:
@@ -21,7 +21,7 @@ func NewFormatter(format string, cfg *FormatterConfig) (Formatter, error) {
 	case "csv":
 		return csvFormatter{baseFormatter{cfg: cfg}}, nil
 	case "json":
-		return simpleJsonFormatter{baseFormatter{cfg: cfg}}, nil
+		return simpleJSONFormatter{baseFormatter{cfg: cfg}}, nil
 	case "none":
 		return testFormatter{baseFormatter{cfg: cfg}}, nil
 
@@ -34,12 +34,12 @@ type Formatter interface {
 	Write(out io.Writer, set utils.SeriesSet) error
 }
 
-type FormatterConfig struct {
+type Config struct {
 	TimeFormat string
 }
 
 type baseFormatter struct {
-	cfg *FormatterConfig
+	cfg *Config
 }
 
 func labelsToStr(labels utils.Labels) (string, string) {

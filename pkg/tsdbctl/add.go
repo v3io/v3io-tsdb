@@ -87,7 +87,7 @@ Arguments:
 		RunE: func(cmd *cobra.Command, args []string) error {
 
 			if commandeer.inFile != "" && commandeer.stdin {
-				return errors.New("-f|--file and --stdin are mutually exclusive.")
+				return errors.New("-f|--file and --stdin are mutually exclusive")
 			}
 
 			if commandeer.inFile == "" && !commandeer.stdin {
@@ -153,7 +153,7 @@ func (ac *addCommandeer) add() error {
 		}
 
 		if ac.vArr == "" {
-			return errors.New("The metric-samples array must have at least one value (currently empty).")
+			return errors.New("the metric-samples array must have at least one value (currently empty)")
 		}
 
 		tarray, varray, err := strToTV(ac.tArr, ac.vArr)
@@ -275,11 +275,11 @@ func strToTV(tarr, varr string) ([]int64, []interface{}, error) {
 	vlist := strings.Split(varr, ArraySeparator)
 
 	if tarr == "" && len(vlist) > 1 {
-		return nil, nil, errors.New("A times array must be provided when providing a values array.")
+		return nil, nil, errors.New("a times array must be provided when providing a values array")
 	}
 
 	if tarr != "" && len(tlist) != len(vlist) {
-		return nil, nil, errors.New("The times and values arrays don't have the same amount of elements.")
+		return nil, nil, errors.New("the times and values arrays don't have the same amount of elements")
 	}
 
 	var tarray []int64
@@ -299,7 +299,7 @@ func strToTV(tarr, varr string) ([]int64, []interface{}, error) {
 		}
 	}
 
-	now := int64(time.Now().Unix() * 1000)
+	now := time.Now().Unix() * 1000
 	if tarr == "" {
 		tarray = append(tarray, now)
 	} else {
@@ -312,7 +312,7 @@ func strToTV(tarr, varr string) ([]int64, []interface{}, error) {
 				if err != nil {
 					return nil, nil, errors.Wrap(err, "Failed to parse the pattern following 'now-'.")
 				}
-				tarray = append(tarray, now-int64(t))
+				tarray = append(tarray, now-t)
 			} else {
 				t, err := strconv.Atoi(tlist[i])
 				if err != nil {

@@ -58,22 +58,24 @@ func NewLogger(level string) (logger.Logger, error) {
 }
 
 func CreateContainer(logger logger.Logger, cfg *config.V3ioConfig, httpTimeout time.Duration) (v3io.Container, error) {
-	endpointUrl, err := buildUrl(cfg.WebApiEndpoint)
+	endpointURL, err := buildURL(cfg.WebAPIEndpoint)
 	if err != nil {
 		return nil, err
 	}
 
-	newClient := v3iohttp.NewClient(nil, httpTimeout)
-	newContextInput := &v3io.NewContextInput{
-		NumWorkers: cfg.Workers,
+	newClient := v3iohttp.NewClient(&v3iohttp.NewClientInput{DialTimeout: httpTimeout})
+	newContextInput := &v3iohttp.NewContextInput{
+		HTTPClient:     newClient,
+		NumWorkers:     cfg.Workers,
+		RequestChanLen: cfg.RequestChanLength,
 	}
-	context, err := v3iohttp.NewContext(logger, newClient, newContextInput)
+	context, err := v3iohttp.NewContext(logger, newContextInput)
 	if err != nil {
 		return nil, errors.Wrap(err, "Failed to create a V3IO TSDB client.")
 	}
 
 	session, err := context.NewSession(&v3io.NewSessionInput{
-		URL:       endpointUrl,
+		URL:       endpointURL,
 		Username:  cfg.Username,
 		Password:  cfg.Password,
 		AccessKey: cfg.AccessKey,
@@ -90,16 +92,16 @@ func CreateContainer(logger logger.Logger, cfg *config.V3ioConfig, httpTimeout t
 	return container, nil
 }
 
-func buildUrl(webApiEndpoint string) (string, error) {
-	if !strings.HasPrefix(webApiEndpoint, "http://") && !strings.HasPrefix(webApiEndpoint, "https://") {
-		webApiEndpoint = "http://" + webApiEndpoint
+func buildURL(webAPIEndpoint string) (string, error) {
+	if !strings.HasPrefix(webAPIEndpoint, "http://") && !strings.HasPrefix(webAPIEndpoint, "https://") {
+		webAPIEndpoint = "http://" + webAPIEndpoint
 	}
-	endpointUrl, err := url.Parse(webApiEndpoint)
+	endpointURL, err := url.Parse(webAPIEndpoint)
 	if err != nil {
 		return "", err
 	}
-	endpointUrl.Path = ""
-	return endpointUrl.String(), nil
+	endpointURL.Path = ""
+	return endpointURL.String(), nil
 }
 
 // Convert a V3IO blob to an integers array
@@ -181,9 +183,8 @@ func respWaitLoop(comm chan int, responseChan chan *v3io.Response, timeout time.
 					fmt.Println("\nResponse loop timed out.", requests, responses)
 					done <- true
 					return
-				} else {
-					active = false
 				}
+				active = false
 			}
 		}
 	}()
