@@ -443,9 +443,10 @@ podTemplate(label: "${git_project}-${label}", inheritFrom: "jnlp-docker-golang")
 
                                                 stage('create tsdb-nuclio prerelease') {
                                                     container('jnlp') {
-                                                        echo "Triggered tsdb-nuclio development will be builded with last tsdb stable version"
-                                                        github.delete_release("tsdb-nuclio", git_project_user, "unstable", GIT_TOKEN)
-                                                        github.create_prerelease("tsdb-nuclio", git_project_user, "unstable", GIT_TOKEN, "development")
+                                                        // development has been triggered when committed to it in github-webhook nuclio function
+                                                        // echo "Triggered tsdb-nuclio development will be builded with last tsdb stable version"
+                                                        // github.delete_release("tsdb-nuclio", git_project_user, "unstable", GIT_TOKEN)
+                                                        // github.create_prerelease("tsdb-nuclio", git_project_user, "unstable", GIT_TOKEN, "development")
 
                                                         echo "Trigger tsdb-nuclio ${NEXT_VERSION} with tsdb ${MAIN_TAG_VERSION}"
                                                         github.create_prerelease("tsdb-nuclio", git_project_user, NEXT_VERSION, GIT_TOKEN)
@@ -484,9 +485,10 @@ podTemplate(label: "${git_project}-${label}", inheritFrom: "jnlp-docker-golang")
 
                                                 stage('create frames prerelease') {
                                                     container('jnlp') {
-                                                        echo "Triggered frames development will be builded with last tsdb stable version"
-                                                        github.delete_release("frames", git_project_user, "unstable", GIT_TOKEN)
-                                                        github.create_prerelease("frames", git_project_user, "unstable", GIT_TOKEN, "development")
+                                                        // development has been triggered when committed to it in github-webhook nuclio function
+                                                        // echo "Triggered frames development will be builded with last tsdb stable version"
+                                                        // github.delete_release("frames", git_project_user, "unstable", GIT_TOKEN)
+                                                        // github.create_prerelease("frames", git_project_user, "unstable", GIT_TOKEN, "development")
 
                                                         echo "Trigger frames ${NEXT_VERSION} with tsdb ${MAIN_TAG_VERSION}"
                                                         github.create_prerelease("frames", git_project_user, NEXT_VERSION, GIT_TOKEN)
@@ -551,9 +553,10 @@ podTemplate(label: "${git_project}-${label}", inheritFrom: "jnlp-docker-golang")
 
                             stage('create prometheus prerelease') {
                                 container('jnlp') {
-                                    echo "Triggered prometheus development will be builded with last tsdb stable version"
-                                    github.delete_release("prometheus", git_project_user, "unstable", GIT_TOKEN)
-                                    github.create_prerelease("prometheus", git_project_user, "unstable", GIT_TOKEN, "development")
+                                    // development has been triggered when committed to it in github-webhook nuclio function
+                                    // echo "Triggered prometheus development will be builded with last tsdb stable version"
+                                    // github.delete_release("prometheus", git_project_user, "unstable", GIT_TOKEN)
+                                    // github.create_prerelease("prometheus", git_project_user, "unstable", GIT_TOKEN, "development")
 
                                     echo "Trigger prometheus ${NEXT_VERSION} with tsdb ${MAIN_TAG_VERSION}"
                                     github.create_prerelease("prometheus", git_project_user, NEXT_VERSION, GIT_TOKEN)
