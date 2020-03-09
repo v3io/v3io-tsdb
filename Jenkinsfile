@@ -8,7 +8,6 @@ git_deploy_user = "iguazio-prod-git-user"
 git_deploy_user_token = "iguazio-prod-git-user-token"
 git_deploy_user_private_key = "iguazio-prod-git-user-private-key"
 
-
 def build_v3io_tsdb(TAG_VERSION) {
     withCredentials([
             string(credentialsId: git_deploy_user_token, variable: 'GIT_TOKEN')
