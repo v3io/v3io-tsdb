@@ -3,6 +3,7 @@
 package pqueriertest
 
 import (
+	"github.com/v3io/v3io-tsdb/pkg/aggregate"
 	"testing"
 	"time"
 
@@ -147,6 +148,75 @@ func (suite *testVariantTypeSuite) TestVariantTypeQueryWithSeries() {
 			assert.Equal(suite.T(), dataToIngest[i], v, "value does not match at index %v", i)
 			i++
 		}
+	}
+
+	assert.Equal(suite.T(), 1, seriesCount, "series count didn't match expected")
+}
+
+func (suite *testVariantTypeSuite) TestCountAggregationForVariantTypeQueryWithSeries() {
+	adapter, err := tsdb.NewV3ioAdapter(suite.v3ioConfig, nil, nil)
+	if err != nil {
+		suite.T().Fatalf("failed to create v3io adapter. reason: %s", err)
+	}
+
+	metricName := "log"
+	labels := utils.LabelsFromStringList("os", "linux", "__name__", metricName)
+
+	dataToIngest := []string{"a", "b", "c", "d", "e", "f"}
+	numberOfEvents := len(dataToIngest)
+	var expectedTimeColumn []int64
+	for i := 0; i < numberOfEvents; i++ {
+		expectedTimeColumn = append(expectedTimeColumn, suite.basicQueryTime+int64(i)*tsdbtest.MinuteInMillis)
+	}
+
+	expected := map[string][]tsdbtest.DataPoint{"count": {{Time: suite.basicQueryTime - 5*tsdbtest.MinuteInMillis, Value: numberOfEvents}}}
+
+	appender, err := adapter.Appender()
+	if err != nil {
+		suite.T().Fatalf("failed to create v3io appender. reason: %s", err)
+	}
+
+	ref, err := appender.Add(labels, expectedTimeColumn[0], dataToIngest[0])
+	if err != nil {
+		suite.T().Fatalf("Failed to add data to the TSDB appender. Reason: %s", err)
+	}
+	for i := 1; i < numberOfEvents; i++ {
+		appender.AddFast(labels, ref, expectedTimeColumn[i], dataToIngest[i])
+	}
+
+	if _, err := appender.WaitForCompletion(0); err != nil {
+		suite.T().Fatalf("Failed to wait for TSDB append completion. Reason: %s", err)
+	}
+
+	querierV2, err := adapter.QuerierV2()
+	if err != nil {
+		suite.T().Fatalf("Failed to create querier v2, err: %v", err)
+	}
+
+	params := &pquerier.SelectParams{
+		From:      suite.basicQueryTime - tsdbtest.DaysInMillis,
+		To:        suite.basicQueryTime + tsdbtest.DaysInMillis,
+		Functions: "count",
+		Step:      10 * tsdbtest.MinuteInMillis}
+
+	set, err := querierV2.Select(params)
+	if err != nil {
+		suite.T().Fatalf("Failed to exeute query, err: %v", err)
+	}
+
+	var seriesCount int
+	for set.Next() {
+		seriesCount++
+		iter := set.At().Iterator()
+
+		data, err := tsdbtest.IteratorToSlice(iter)
+		if err != nil {
+			suite.T().Fatal(err)
+		}
+		labels := set.At().Labels()
+		agg := labels.Get(aggregate.AggregateLabel)
+
+		suite.compareSingleMetricWithAggregator(data, expected, agg)
 	}
 
 	assert.Equal(suite.T(), 1, seriesCount, "series count didn't match expected")

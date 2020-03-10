@@ -98,5 +98,5 @@ func (cc *createCommandeer) create() error {
 		return errors.Wrap(err, "Failed to create a TSDB schema.")
 	}
 
-	return tsdb.CreateTSDB(cc.rootCommandeer.v3iocfg, dbSchema)
+	return tsdb.CreateTSDB(cc.rootCommandeer.v3iocfg, dbSchema, nil)
 }
