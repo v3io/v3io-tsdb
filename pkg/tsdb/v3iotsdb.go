@@ -22,18 +22,24 @@ package tsdb
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"math"
 	pathUtil "path"
 	"path/filepath"
+	"strconv"
+	"strings"
+	"sync"
 	"time"
 
 	"github.com/nuclio/logger"
 	"github.com/pkg/errors"
 	"github.com/v3io/v3io-go/pkg/dataplane"
 	"github.com/v3io/v3io-go/pkg/dataplane/http"
+	"github.com/v3io/v3io-tsdb/pkg/aggregate"
 	"github.com/v3io/v3io-tsdb/pkg/appender"
+	"github.com/v3io/v3io-tsdb/pkg/chunkenc"
 	"github.com/v3io/v3io-tsdb/pkg/config"
 	"github.com/v3io/v3io-tsdb/pkg/partmgr"
 	"github.com/v3io/v3io-tsdb/pkg/pquerier"
@@ -42,7 +48,14 @@ import (
 	"github.com/v3io/v3io-tsdb/pkg/utils"
 )
 
-const defaultHTTPTimeout = 30 * time.Second
+const (
+	defaultHTTPTimeout = 30 * time.Second
+
+	errorCodeString              = "ErrorCode"
+	falseConditionOuterErrorCode = "184549378" // todo: change codes
+	falseConditionInnerErrorCode = "385876025"
+	maxExpressionsInUpdateItem   = 1500 // max is 2000, we're taking a buffer since it doesn't work with 2000
+)
 
 type V3ioAdapter struct {
 	startTimeMargin int64
@@ -54,15 +67,26 @@ type V3ioAdapter struct {
 	partitionMngr   *partmgr.PartitionManager
 }
 
-func CreateTSDB(cfg *config.V3ioConfig, schema *config.Schema) error {
+type DeleteParams struct {
+	Metrics   []string
+	Filter    string
+	From, To  int64
+	DeleteAll bool
+
+	IgnoreErrors bool
+}
+
+func CreateTSDB(cfg *config.V3ioConfig, schema *config.Schema, container v3io.Container) error {
 
 	lgr, _ := utils.NewLogger(cfg.LogLevel)
 	httpTimeout := parseHTTPTimeout(cfg, lgr)
-	container, err := utils.CreateContainer(lgr, cfg, httpTimeout)
-	if err != nil {
-		return errors.Wrap(err, "Failed to create a data container.")
+	var err error
+	if container == nil {
+		container, err = utils.CreateContainer(lgr, cfg, httpTimeout)
+		if err != nil {
+			return errors.Wrap(err, "Failed to create a data container.")
+		}
 	}
-
 	data, err := json.Marshal(schema)
 	if err != nil {
 		return errors.Wrap(err, "Failed to marshal the TSDB schema file.")
@@ -240,59 +264,55 @@ func (a *V3ioAdapter) QuerierV2() (*pquerier.V3ioQuerier, error) {
 	return pquerier.NewV3ioQuerier(a.container, a.logger, a.cfg, a.partitionMngr), nil
 }
 
-func (a *V3ioAdapter) DeleteDB(deleteAll bool, ignoreErrors bool, fromTime int64, toTime int64) error {
-	if deleteAll {
+// Delete by time range can optionally specify metrics and filter by labels
+func (a *V3ioAdapter) DeleteDB(deleteParams DeleteParams) error {
+	if deleteParams.DeleteAll {
 		// Ignore time boundaries
-		fromTime = 0
-		toTime = math.MaxInt64
+		deleteParams.From = 0
+		deleteParams.To = math.MaxInt64
+	} else {
+		if deleteParams.To == 0 {
+			deleteParams.To = time.Now().Unix() * 1000
+		}
 	}
 
-	partitions := a.partitionMngr.PartsForRange(fromTime, toTime, false)
-	for _, part := range partitions {
-		a.logger.Info("Deleting partition '%s'.", part.GetTablePath())
-		err := utils.DeleteTable(a.logger, a.container, part.GetTablePath(), "", a.cfg.QryWorkers)
-		if err != nil && !ignoreErrors {
-			return errors.Wrapf(err, "Failed to delete partition '%s'.", part.GetTablePath())
-		}
-		// Delete the Directory object
-		err = a.container.DeleteObjectSync(&v3io.DeleteObjectInput{Path: part.GetTablePath()})
-		if err != nil && !ignoreErrors {
-			return errors.Wrapf(err, "Failed to delete partition object '%s'.", part.GetTablePath())
-		}
-	}
-	err := a.partitionMngr.DeletePartitionsFromSchema(partitions)
+	// Delete Data
+	err := a.DeletePartitionsData(&deleteParams)
 	if err != nil {
 		return err
 	}
 
+	// If no data is left, delete Names folder
 	if len(a.partitionMngr.GetPartitionsPaths()) == 0 {
 		path := filepath.Join(a.cfg.TablePath, config.NamesDirectory) + "/" // Need a trailing slash
 		a.logger.Info("Delete metric names at path '%s'.", path)
 		err := utils.DeleteTable(a.logger, a.container, path, "", a.cfg.QryWorkers)
-		if err != nil && !ignoreErrors {
+		if err != nil && !deleteParams.IgnoreErrors {
 			return errors.Wrap(err, "Failed to delete the metric-names table.")
 		}
 		// Delete the Directory object
 		err = a.container.DeleteObjectSync(&v3io.DeleteObjectInput{Path: path})
-		if err != nil && !ignoreErrors {
+		if err != nil && !deleteParams.IgnoreErrors {
 			if !utils.IsNotExistsError(err) {
 				return errors.Wrapf(err, "Failed to delete table object '%s'.", path)
 			}
 		}
 	}
-	if deleteAll {
+
+	// If need to 'deleteAll', delete schema + TSDB table folder
+	if deleteParams.DeleteAll {
 		// Delete Schema file
 		schemaPath := pathUtil.Join(a.cfg.TablePath, config.SchemaConfigFileName)
 		a.logger.Info("Delete the TSDB configuration at '%s'.", schemaPath)
 		err := a.container.DeleteObjectSync(&v3io.DeleteObjectInput{Path: schemaPath})
-		if err != nil && !ignoreErrors {
+		if err != nil && !deleteParams.IgnoreErrors {
 			return errors.New("The configuration at '" + schemaPath + "' cannot be deleted or doesn't exist.")
 		}
 
 		// Delete the Directory object
 		path := a.cfg.TablePath + "/"
 		err = a.container.DeleteObjectSync(&v3io.DeleteObjectInput{Path: path})
-		if err != nil && !ignoreErrors {
+		if err != nil && !deleteParams.IgnoreErrors {
 			if !utils.IsNotExistsError(err) {
 				return errors.Wrapf(err, "Failed to delete table object '%s'.", path)
 			}
@@ -300,6 +320,455 @@ func (a *V3ioAdapter) DeleteDB(deleteAll bool, ignoreErrors bool, fromTime int64
 	}
 
 	return nil
+}
+
+func (a *V3ioAdapter) DeletePartitionsData(deleteParams *DeleteParams) error {
+	partitions := a.partitionMngr.PartsForRange(deleteParams.From, deleteParams.To, true)
+	var entirelyDeletedPartitions []*partmgr.DBPartition
+
+	deleteWholePartition := deleteParams.DeleteAll || (deleteParams.Filter == "" && len(deleteParams.Metrics) == 0)
+
+	fileToDeleteChan := make(chan v3io.Item, 1024)
+	getItemsTerminationChan := make(chan error, len(partitions))
+	deleteTerminationChan := make(chan error, a.cfg.Workers)
+	numOfGetItemsRoutines := len(partitions)
+	if len(deleteParams.Metrics) > 0 {
+		numOfGetItemsRoutines = numOfGetItemsRoutines * len(deleteParams.Metrics)
+	}
+	goRoutinesNum := numOfGetItemsRoutines + a.cfg.Workers
+	onErrorTerminationChannel := make(chan struct{}, goRoutinesNum)
+	systemAttributesToFetch := []string{config.ObjectNameAttrName, config.MtimeSecsAttributeName, config.MtimeNSecsAttributeName, config.EncodingAttrName, config.MaxTimeAttrName}
+	var getItemsWorkers, getItemsTerminated, deletesTerminated int
+
+	var getItemsWG sync.WaitGroup
+	getItemsErrorChan := make(chan error, numOfGetItemsRoutines)
+
+	aggregates := a.GetSchema().PartitionSchemaInfo.Aggregates
+	hasServerSideAggregations := len(aggregates) != 1 || aggregates[0] != ""
+
+	var aggrMask aggregate.AggrType
+	var err error
+	if hasServerSideAggregations {
+		aggrMask, _, err = aggregate.AggregatesFromStringListWithCount(aggregates)
+		if err != nil {
+			return err
+		}
+	}
+
+	for i := 0; i < a.cfg.Workers; i++ {
+		go deleteObjectWorker(a.container, deleteParams, a.logger,
+			fileToDeleteChan, deleteTerminationChan, onErrorTerminationChannel,
+			aggrMask)
+	}
+
+	for _, part := range partitions {
+		partitionEntirelyInRange := deleteParams.From <= part.GetStartTime() && deleteParams.To >= part.GetEndTime()
+		deleteEntirePartitionFolder := partitionEntirelyInRange && deleteWholePartition
+
+		// Delete all files in partition folder and then delete the folder itself
+		if deleteEntirePartitionFolder {
+			a.logger.Info("Deleting entire partition '%s'.", part.GetTablePath())
+
+			getItemsWG.Add(1)
+			go deleteEntirePartition(a.logger, a.container, part.GetTablePath(), a.cfg.QryWorkers,
+				&getItemsWG, getItemsErrorChan)
+
+			entirelyDeletedPartitions = append(entirelyDeletedPartitions, part)
+			// First get all items based on filter+metric+time range then delete what is necessary
+		} else {
+			a.logger.Info("Deleting partial partition '%s'.", part.GetTablePath())
+
+			start, end := deleteParams.From, deleteParams.To
+
+			// Round the start and end times to the nearest aggregation buckets - to later on recalculate server side aggregations
+			if hasServerSideAggregations {
+				start = part.GetAggregationBucketStartTime(part.Time2Bucket(deleteParams.From))
+				end = part.GetAggregationBucketEndTime(part.Time2Bucket(deleteParams.To))
+			}
+
+			var chunkAttributesToFetch []string
+
+			// If we don't want to delete the entire object, fetch also the desired chunks to delete.
+			if !partitionEntirelyInRange {
+				chunkAttributesToFetch, _ = part.Range2Attrs("v", start, end)
+			}
+
+			allAttributes := append(chunkAttributesToFetch, systemAttributesToFetch...)
+			if len(deleteParams.Metrics) == 0 {
+				getItemsWorkers++
+				input := &v3io.GetItemsInput{Path: part.GetTablePath(),
+					AttributeNames: allAttributes,
+					Filter:         deleteParams.Filter}
+				go getItemsWorker(a.logger, a.container, input, part, fileToDeleteChan, getItemsTerminationChan, onErrorTerminationChannel)
+			} else {
+				for _, metric := range deleteParams.Metrics {
+					for _, shardingKey := range part.GetShardingKeys(metric) {
+						getItemsWorkers++
+						input := &v3io.GetItemsInput{Path: part.GetTablePath(),
+							AttributeNames: allAttributes,
+							Filter:         deleteParams.Filter,
+							ShardingKey:    shardingKey}
+						go getItemsWorker(a.logger, a.container, input, part, fileToDeleteChan, getItemsTerminationChan, onErrorTerminationChannel)
+					}
+				}
+			}
+		}
+	}
+	a.logger.Debug("issued %v getItems", getItemsWorkers)
+
+	// Waiting fot deleting of full partitions
+	getItemsWG.Wait()
+	select {
+	case err = <-getItemsErrorChan:
+		// Signal all other goroutines to quite
+		for i := 0; i < goRoutinesNum; i++ {
+			onErrorTerminationChannel <- struct{}{}
+		}
+		return err
+	default:
+	}
+
+	if getItemsWorkers != 0 {
+		for deletesTerminated < a.cfg.Workers {
+			select {
+			case err := <-getItemsTerminationChan:
+				a.logger.Debug("finished getItems worker, total finished: %v, error: %v", getItemsTerminated+1, err)
+				if err != nil {
+					// If requested to ignore non-existing tables do not return error.
+					if !(deleteParams.IgnoreErrors && utils.IsNotExistsOrConflictError(err)) {
+						for i := 0; i < goRoutinesNum; i++ {
+							onErrorTerminationChannel <- struct{}{}
+						}
+						return errors.Wrapf(err, "GetItems failed during recursive delete.")
+					}
+				}
+				getItemsTerminated++
+
+				if getItemsTerminated == getItemsWorkers {
+					close(fileToDeleteChan)
+				}
+			case err := <-deleteTerminationChan:
+				a.logger.Debug("finished delete worker, total finished: %v, err: %v", deletesTerminated+1, err)
+				if err != nil {
+					for i := 0; i < goRoutinesNum; i++ {
+						onErrorTerminationChannel <- struct{}{}
+					}
+					return errors.Wrapf(err, "Delete failed during recursive delete.")
+				}
+				deletesTerminated++
+			}
+		}
+	} else {
+		close(fileToDeleteChan)
+	}
+
+	a.logger.Debug("finished deleting data, removing partitions from schema")
+	err = a.partitionMngr.DeletePartitionsFromSchema(entirelyDeletedPartitions)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func deleteEntirePartition(logger logger.Logger, container v3io.Container, partitionPath string, workers int,
+	wg *sync.WaitGroup, errChannel chan<- error) {
+	defer wg.Done()
+
+	err := utils.DeleteTable(logger, container, partitionPath, "", workers)
+	if err != nil {
+		errChannel <- errors.Wrapf(err, "Failed to delete partition '%s'.", partitionPath)
+	}
+	// Delete the Directory object
+	err = container.DeleteObjectSync(&v3io.DeleteObjectInput{Path: partitionPath})
+	if err != nil {
+		errChannel <- errors.Wrapf(err, "Failed to delete partition folder '%s'.", partitionPath)
+	}
+}
+
+func getItemsWorker(logger logger.Logger, container v3io.Container, input *v3io.GetItemsInput, partition *partmgr.DBPartition,
+	filesToDeleteChan chan<- v3io.Item, terminationChan chan<- error, onErrorTerminationChannel <-chan struct{}) {
+	for {
+		select {
+		case _ = <-onErrorTerminationChannel:
+			terminationChan <- nil
+			return
+		default:
+		}
+
+		logger.Debug("going to getItems for partition '%v', input: %v", partition.GetTablePath(), *input)
+		resp, err := container.GetItemsSync(input)
+		if err != nil {
+			terminationChan <- err
+			return
+		}
+		resp.Release()
+		output := resp.Output.(*v3io.GetItemsOutput)
+
+		for _, item := range output.Items {
+			item["partition"] = partition
+
+			// In case we got error on delete while iterating getItems response
+			select {
+			case _ = <-onErrorTerminationChannel:
+				terminationChan <- nil
+				return
+			default:
+			}
+
+			filesToDeleteChan <- item
+		}
+		if output.Last {
+			terminationChan <- nil
+			return
+		}
+		input.Marker = output.NextMarker
+	}
+}
+
+func deleteObjectWorker(container v3io.Container, deleteParams *DeleteParams, logger logger.Logger,
+	filesToDeleteChannel <-chan v3io.Item, terminationChan chan<- error, onErrorTerminationChannel <-chan struct{},
+	aggrMask aggregate.AggrType) {
+	for {
+		select {
+		case _ = <-onErrorTerminationChannel:
+			return
+		case itemToDelete, ok := <-filesToDeleteChannel:
+			if !ok {
+				terminationChan <- nil
+				return
+			}
+
+			currentPartition := itemToDelete.GetField("partition").(*partmgr.DBPartition)
+			fileName, err := itemToDelete.GetFieldString(config.ObjectNameAttrName)
+			if err != nil {
+				terminationChan <- err
+				return
+			}
+			fullFileName := pathUtil.Join(currentPartition.GetTablePath(), fileName)
+
+			// Delete whole object
+			if deleteParams.From <= currentPartition.GetStartTime() &&
+				deleteParams.To >= currentPartition.GetEndTime() {
+
+				logger.Debug("delete entire item '%v' ", fullFileName)
+				input := &v3io.DeleteObjectInput{Path: fullFileName}
+				err = container.DeleteObjectSync(input)
+				if err != nil && !utils.IsNotExistsOrConflictError(err) {
+					terminationChan <- err
+					return
+				}
+				// Delete partial object - specific chunks or sub-parts of chunks
+			} else {
+				mtimeSecs, err := itemToDelete.GetFieldInt(config.MtimeSecsAttributeName)
+				if err != nil {
+					terminationChan <- err
+					return
+				}
+				mtimeNSecs, err := itemToDelete.GetFieldInt(config.MtimeNSecsAttributeName)
+				if err != nil {
+					terminationChan <- err
+					return
+				}
+
+				deleteUpdateExpression := strings.Builder{}
+				dataEncoding, err := getEncoding(itemToDelete)
+				if err != nil {
+					terminationChan <- err
+					return
+				}
+
+				var aggregationsByBucket map[int]*aggregate.AggregatesList
+				if aggrMask != 0 {
+					aggregationsByBucket = make(map[int]*aggregate.AggregatesList)
+					aggrBuckets := currentPartition.Times2BucketRange(deleteParams.From, deleteParams.To)
+					for _, bucketID := range aggrBuckets {
+						aggregationsByBucket[bucketID] = aggregate.NewAggregatesList(aggrMask)
+					}
+				}
+
+				var newMaxTime int64 = math.MaxInt64
+				var numberOfExpressionsInUpdate int
+				for attributeName, value := range itemToDelete {
+					if strings.HasPrefix(attributeName, "_v") {
+						// Check whether the whole chunk attribute needed to be deleted or just part of it.
+						if currentPartition.IsChunkInRangeByAttr(attributeName, deleteParams.From, deleteParams.To) {
+							deleteUpdateExpression.WriteString("delete(")
+							deleteUpdateExpression.WriteString(attributeName)
+							deleteUpdateExpression.WriteString(");")
+						} else {
+							currentChunksMaxTime, err := generatePartialChunkDeleteExpression(logger, &deleteUpdateExpression, attributeName,
+								value.([]byte), dataEncoding, deleteParams, currentPartition, aggregationsByBucket)
+							if err != nil {
+								terminationChan <- err
+								return
+							}
+
+							// We want to save the earliest max time possible
+							if currentChunksMaxTime < newMaxTime {
+								newMaxTime = currentChunksMaxTime
+							}
+						}
+						numberOfExpressionsInUpdate++
+					}
+				}
+
+				dbMaxTime := int64(itemToDelete.GetField(config.MaxTimeAttrName).(int))
+
+				// Update the partition's max time if needed.
+				if deleteParams.From < dbMaxTime && deleteParams.To >= dbMaxTime {
+					if deleteParams.From < newMaxTime {
+						newMaxTime = deleteParams.From
+					}
+
+					deleteUpdateExpression.WriteString(fmt.Sprintf("%v=%v;", config.MaxTimeAttrName, newMaxTime))
+				}
+
+				if deleteUpdateExpression.Len() > 0 {
+					// If there are server aggregates, update the needed buckets
+					if aggrMask != 0 {
+						for bucket, aggregations := range aggregationsByBucket {
+							numberOfExpressionsInUpdate = numberOfExpressionsInUpdate + len(*aggregations)
+
+							// Due to engine limitation, If we reached maximum number of expressions in an UpdateItem
+							// we need to break the update into chunks
+							// TODO: refactor in 2.8:
+							// in 2.8 there is a better way of doing it by uniting multiple update expressions into
+							// one expression by range in a form similar to `_v_sum[15...100]=0`
+							if numberOfExpressionsInUpdate < maxExpressionsInUpdateItem {
+								deleteUpdateExpression.WriteString(aggregations.SetExpr("v", bucket))
+							} else {
+								exprStr := deleteUpdateExpression.String()
+								logger.Debug("delete item '%v' with expression '%v'", fullFileName, exprStr)
+								mtimeSecs, mtimeNSecs, err = sendUpdateItem(fullFileName, exprStr, mtimeSecs, mtimeNSecs, container)
+								if err != nil {
+									terminationChan <- err
+									return
+								}
+
+								// Reset stuff for next update iteration
+								numberOfExpressionsInUpdate = 0
+								deleteUpdateExpression.Reset()
+							}
+						}
+					}
+
+					// If any expressions are left, save them
+					if deleteUpdateExpression.Len() > 0 {
+						exprStr := deleteUpdateExpression.String()
+						logger.Debug("delete item '%v' with expression '%v'", fullFileName, exprStr)
+						_, _, err = sendUpdateItem(fullFileName, exprStr, mtimeSecs, mtimeNSecs, container)
+						if err != nil {
+							terminationChan <- err
+							return
+						}
+					}
+				}
+			}
+		}
+	}
+}
+
+func sendUpdateItem(path, expr string, mtimeSecs, mtimeNSecs int, container v3io.Container) (int, int, error) {
+	condition := fmt.Sprintf("%v == %v and %v == %v",
+		config.MtimeSecsAttributeName, mtimeSecs,
+		config.MtimeNSecsAttributeName, mtimeNSecs)
+
+	input := &v3io.UpdateItemInput{Path: path,
+		Expression: &expr,
+		Condition:  condition}
+
+	response, err := container.UpdateItemSync(input)
+	if err != nil && !utils.IsNotExistsOrConflictError(err) {
+		returnError := err
+		if isFalseConditionError(err) {
+			returnError = errors.Wrapf(err, "Item '%v' was updated while deleting occurred. Please disable any ingestion and retry.", path)
+		}
+		return 0, 0, returnError
+	}
+
+	output := response.Output.(*v3io.UpdateItemOutput)
+	return output.MtimeSecs, output.MtimeNSecs, nil
+}
+
+func getEncoding(itemToDelete v3io.Item) (chunkenc.Encoding, error) {
+	var encoding chunkenc.Encoding
+	encodingStr, ok := itemToDelete.GetField(config.EncodingAttrName).(string)
+	// If we don't have the encoding attribute, use XOR as default. (for backwards compatibility)
+	if !ok {
+		encoding = chunkenc.EncXOR
+	} else {
+		intEncoding, err := strconv.Atoi(encodingStr)
+		if err != nil {
+			return 0, fmt.Errorf("error parsing encoding type of chunk, got: %v, error: %v", encodingStr, err)
+		}
+		encoding = chunkenc.Encoding(intEncoding)
+	}
+
+	return encoding, nil
+}
+
+func generatePartialChunkDeleteExpression(logger logger.Logger, expr *strings.Builder,
+	attributeName string, value []byte, encoding chunkenc.Encoding, deleteParams *DeleteParams,
+	partition *partmgr.DBPartition, aggregationsByBucket map[int]*aggregate.AggregatesList) (int64, error) {
+	chunk, err := chunkenc.FromData(logger, encoding, value, 0)
+	if err != nil {
+		return 0, err
+	}
+
+	newChunk := chunkenc.NewChunk(logger, encoding == chunkenc.EncVariant)
+	appender, err := newChunk.Appender()
+	if err != nil {
+		return 0, err
+	}
+
+	var currentMaxTime int64
+	var remainingItemsCount int
+	iter := chunk.Iterator()
+	for iter.Next() {
+		var t int64
+		var v interface{}
+		if encoding == chunkenc.EncXOR {
+			t, v = iter.At()
+		} else {
+			t, v = iter.AtString()
+		}
+
+		// Append back only events that are not in the delete range
+		if t < deleteParams.From || t > deleteParams.To {
+			remainingItemsCount++
+			appender.Append(t, v)
+
+			// Calculate server-side aggregations
+			if aggregationsByBucket != nil {
+				currentAgg, ok := aggregationsByBucket[partition.Time2Bucket(t)]
+				// A chunk may contain more data then needed for the aggregations, if this is the case do not aggregate
+				if ok {
+					currentAgg.Aggregate(t, v)
+				}
+			}
+
+			// Update current chunk's new max time
+			if t > currentMaxTime {
+				currentMaxTime = t
+			}
+		}
+	}
+
+	if remainingItemsCount == 0 {
+		expr.WriteString("delete(")
+		expr.WriteString(attributeName)
+		expr.WriteString(");")
+		currentMaxTime, _ = partition.GetChunkStartTimeByAttr(attributeName)
+	} else {
+		bytes := appender.Chunk().Bytes()
+		val := base64.StdEncoding.EncodeToString(bytes)
+
+		expr.WriteString(fmt.Sprintf("%s=blob('%s'); ", attributeName, val))
+	}
+
+	return currentMaxTime, nil
+
 }
 
 // Return the number of items in a TSDB table
@@ -359,4 +828,17 @@ type Appender interface {
 	Commit() error
 	Rollback() error
 	Close()
+}
+
+// Check if the current error was caused specifically because the condition was evaluated to false.
+func isFalseConditionError(err error) bool {
+	errString := err.Error()
+
+	if strings.Count(errString, errorCodeString) == 2 &&
+		strings.Contains(errString, falseConditionOuterErrorCode) &&
+		strings.Contains(errString, falseConditionInnerErrorCode) {
+		return true
+	}
+
+	return false
 }

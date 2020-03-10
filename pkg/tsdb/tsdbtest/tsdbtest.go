@@ -149,8 +149,7 @@ func DeleteTSDB(t testing.TB, v3ioConfig *config.V3ioConfig) {
 		t.Fatalf("Failed to create an adapter. Reason: %s", err)
 	}
 
-	now := time.Now().Unix() * 1000 // Current time (now) in milliseconds
-	if err := adapter.DeleteDB(true, true, 0, now); err != nil {
+	if err := adapter.DeleteDB(DeleteParams{DeleteAll: true, IgnoreErrors: true}); err != nil {
 		t.Fatalf("Failed to delete a TSDB instance (table) on teardown. Reason: %s", err)
 	}
 }
@@ -161,7 +160,7 @@ func CreateTestTSDB(t testing.TB, v3ioConfig *config.V3ioConfig) {
 
 func CreateTestTSDBWithAggregates(t testing.TB, v3ioConfig *config.V3ioConfig, aggregates string) {
 	schema := testutils.CreateSchema(t, aggregates)
-	if err := CreateTSDB(v3ioConfig, schema); err != nil {
+	if err := CreateTSDB(v3ioConfig, schema, nil); err != nil {
 		v3ioConfigAsJSON, _ := json2.MarshalIndent(v3ioConfig, "", "  ")
 		t.Fatalf("Failed to create a TSDB instance (table). Reason: %v\nConfiguration:\n%s", err, string(v3ioConfigAsJSON))
 	}
@@ -209,7 +208,7 @@ func SetUpWithData(t *testing.T, testOpts TestParams) (*V3ioAdapter, func()) {
 func SetUpWithDBConfig(t *testing.T, schema *config.Schema, testParams TestParams) func() {
 	v3ioConfig := testParams.V3ioConfig()
 	v3ioConfig.TablePath = PrefixTablePath(fmt.Sprintf("%s-%d", t.Name(), time.Now().Nanosecond()))
-	if err := CreateTSDB(v3ioConfig, schema); err != nil {
+	if err := CreateTSDB(v3ioConfig, schema, nil); err != nil {
 		v3ioConfigAsJSON, _ := json2.MarshalIndent(v3ioConfig, "", "  ")
 		t.Fatalf("Failed to create a TSDB instance (table). Reason: %s\nConfiguration:\n%s", err, string(v3ioConfigAsJSON))
 	}

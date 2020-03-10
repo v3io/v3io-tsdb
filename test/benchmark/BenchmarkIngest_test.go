@@ -52,7 +52,7 @@ func BenchmarkIngest(b *testing.B) {
 	// Update TSDB instance path for this test
 	v3ioConfig.TablePath = tsdbPath
 	schema := testutils.CreateSchema(b, "*")
-	if err := tsdb.CreateTSDB(v3ioConfig, schema); err != nil {
+	if err := tsdb.CreateTSDB(v3ioConfig, schema, nil); err != nil {
 		b.Fatal("Failed to create TSDB", err)
 	}
 

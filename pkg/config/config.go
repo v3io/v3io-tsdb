@@ -62,14 +62,16 @@ const (
 	DefaultUseServerAggregateCoefficient = 3
 
 	// KV attribute names
-	MaxTimeAttrName     = "_maxtime"
-	LabelSetAttrName    = "_lset"
-	EncodingAttrName    = "_enc"
-	OutOfOrderAttrName  = "_ooo"
-	MetricNameAttrName  = "_name"
-	ObjectNameAttrName  = "__name"
-	ChunkAttrPrefix     = "_v"
-	AggregateAttrPrefix = "_v_"
+	MaxTimeAttrName         = "_maxtime"
+	LabelSetAttrName        = "_lset"
+	EncodingAttrName        = "_enc"
+	OutOfOrderAttrName      = "_ooo"
+	MetricNameAttrName      = "_name"
+	ObjectNameAttrName      = "__name"
+	ChunkAttrPrefix         = "_v"
+	AggregateAttrPrefix     = "_v_"
+	MtimeSecsAttributeName  = "__mtime_secs"
+	MtimeNSecsAttributeName = "__mtime_nsecs"
 
 	PrometheusMetricNameAttribute = "__name__"
 

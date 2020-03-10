@@ -62,7 +62,7 @@ func (mc *MetricsCache) metricFeed(index int) {
 				mc.logger.Debug(`Complete update cycle - "in-flight requests"=%d; "metric queue length"=%d\n`, inFlight, length)
 
 				// If data was sent and the queue is empty, mark as completion
-				if length == 0 && gotData {
+				if length == 0 && gotData && len(mc.asyncAppendChan) == 0 {
 					gotCompletion = true
 					if completeChan != nil {
 						completeChan <- 0
@@ -80,7 +80,7 @@ func (mc *MetricsCache) metricFeed(index int) {
 						completeChan = app.resp
 
 						length := mc.metricQueue.Length()
-						if gotCompletion && length == 0 {
+						if gotCompletion && length == 0 && len(mc.asyncAppendChan) == 0 {
 							completeChan <- 0
 							gotCompletion = false
 							gotData = false
@@ -209,7 +209,7 @@ func (mc *MetricsCache) metricsUpdateLoop(index int) {
 				}
 
 				// Notify the metric feeder when all in-flight tasks are done
-				if mc.updatesInFlight == 0 {
+				if mc.updatesInFlight == 0 && len(mc.asyncAppendChan) == 0 {
 					mc.logger.Debug("Return to feed. Metric queue length: %d", mc.metricQueue.Length())
 					mc.updatesComplete <- 0
 				}
