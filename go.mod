@@ -14,7 +14,6 @@ require (
 	github.com/nuclio/zap v0.0.2
 	github.com/pkg/errors v0.8.1
 	github.com/rcrowley/go-metrics v0.0.0-20181016184325-3113b8401b8a
-	github.com/russross/blackfriday v1.5.2+incompatible // indirect
 	github.com/spf13/cobra v0.0.3
 	github.com/stretchr/testify v1.4.0
 	github.com/v3io/frames v0.6.8-v0.9.11
