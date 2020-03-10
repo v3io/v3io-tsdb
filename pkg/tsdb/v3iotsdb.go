@@ -76,15 +76,17 @@ type DeleteParams struct {
 	IgnoreErrors bool
 }
 
-func CreateTSDB(cfg *config.V3ioConfig, schema *config.Schema) error {
+func CreateTSDB(cfg *config.V3ioConfig, schema *config.Schema, container v3io.Container) error {
 
 	lgr, _ := utils.NewLogger(cfg.LogLevel)
 	httpTimeout := parseHTTPTimeout(cfg, lgr)
-	container, err := utils.CreateContainer(lgr, cfg, httpTimeout)
-	if err != nil {
-		return errors.Wrap(err, "Failed to create a data container.")
+	var err error
+	if container == nil {
+		container, err = utils.CreateContainer(lgr, cfg, httpTimeout)
+		if err != nil {
+			return errors.Wrap(err, "Failed to create a data container.")
+		}
 	}
-
 	data, err := json.Marshal(schema)
 	if err != nil {
 		return errors.Wrap(err, "Failed to marshal the TSDB schema file.")
