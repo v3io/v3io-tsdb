@@ -64,7 +64,7 @@ func newCreateCommandeer(rootCommandeer *RootCommandeer) *createCommandeer {
 	cmd.Flags().StringVarP(&commandeer.defaultRollups, "aggregates", "a", "",
 		"Default aggregates to calculate in real time during\nthe samples ingestion, as a comma-separated list of\nsupported aggregation functions - count | avg | sum |\nmin | max | stddev | stdvar | last | rate.\nExample: \"sum,avg,max\".")
 	cmd.Flags().StringVarP(&commandeer.crossLabelSets, "cross-label", "l", "",
-		"Label sets for which cross-label pre-aggregations should be created. Must be used in conjunction with -a.\nExample: \"label1,label2;label3\".")
+		"NOT SUPPORTED - Label sets for which cross-label pre-aggregations should be created. Must be used in conjunction with -a.\nExample: \"label1,label2;label3\".")
 	cmd.Flags().StringVarP(&commandeer.aggregationGranularity, "aggregation-granularity", "i", config.DefaultAggregationGranularity,
 		"Aggregation granularity - a time interval for applying\nthe aggregation functions (if  configured - see the\n-a|--aggregates flag), of the format \"[0-9]+[mhd]\"\n(where 'm' = minutes, 'h' = hours, and 'd' = days).\nExamples: \"2h\"; \"90m\".")
 	cmd.Flags().IntVarP(&commandeer.shardingBucketsCount, "sharding-buckets", "b", config.DefaultShardingBucketsCount,
