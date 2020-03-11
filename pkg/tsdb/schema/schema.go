@@ -190,7 +190,7 @@ func validateAggregatesGranularity(aggregationGranularity string, partitionInter
 	if hasAggregates {
 		partitionIntervalDuration, _ := utils.Str2duration(partitionInterval) // safe to ignore error since we create 'partitionInterval'
 		if partitionIntervalDuration/duration > MaxV3ioArraySize {
-			return errors.New("the aggregation granularity is too close to the ingestion rate provided. Try increasing the granularity to get an aggregation performance impact")
+			return errors.New("the size of the aggregation-granularity interval isn't sufficiently larger than the specified ingestion rate. Try increasing the granularity to get the expected pre-aggregation performance impact")
 		}
 	}
 	return nil
