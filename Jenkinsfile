@@ -102,7 +102,7 @@ def build_nuclio(V3IO_TSDB_VERSION, internal_status="stable") {
                         container('jnlp') {
                             dir("${BUILD_FOLDER}/src/github.com/${git_project_upstream_user}/${git_project}") {
                                 sh """
-                                    rm -rf functions/query/vendor/github.com/${git_project_upstream_user}/v3io-tsdb
+                                    rm -rf functions/query/vendor/github.com/${git_project_upstream_user}/v3io-tsdb functions/query/vendor/github.com/${git_project_upstream_user}/v3io-go
                                     git clone https://${GIT_TOKEN}@github.com/${git_project_user}/v3io-tsdb.git functions/query/vendor/github.com/${git_project_upstream_user}/v3io-tsdb
                                     cd functions/query/vendor/github.com/${git_project_upstream_user}/v3io-tsdb
                                     git checkout ${V3IO_TSDB_VERSION}
@@ -114,6 +114,7 @@ def build_nuclio(V3IO_TSDB_VERSION, internal_status="stable") {
                                 sh """
                                     GO111MODULE=on go mod vendor
                                     rm -rf .git vendor/github.com/nuclio vendor/github.com/${git_project_upstream_user}/frames/vendor/golang.org/x/net vendor/golang.org/x/net
+                                    mv vendor/github.com/v3io/v3io-go ${BUILD_FOLDER}/src/github.com/${git_project_upstream_user}/${git_project}/functions/query/vendor/github.com/${git_project_upstream_user}/v3io-go
                                 """
                                 sh("chown 1000:1000 ./ -R")
                             }
