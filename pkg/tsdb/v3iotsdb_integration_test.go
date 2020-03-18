@@ -1131,3 +1131,36 @@ func iteratorToSlice(it chunkenc.Iterator) ([]tsdbtest.DataPoint, error) {
 	}
 	return result, nil
 }
+
+func TestTal(t *testing.T) {
+	testParams := tsdbtest.NewTestParams(t)
+	//defer tsdbtest.SetUp(t, testParams)()
+
+	testParams.V3ioConfig().TablePath = "abc1"
+	adapter, err := NewV3ioAdapter(testParams.V3ioConfig(), nil, nil)
+	if err != nil {
+		t.Fatalf("Failed to create v3io adapter. reason: %s", err)
+	}
+
+	appender, err := adapter.Appender()
+	if err != nil {
+		t.Fatalf("Failed to get appender. reason: %s", err)
+	}
+
+	baseTime := time.Now().Add(-24 * time.Hour)
+
+	labels := utils.Labels{utils.Label{Name: "__name__", Value: "cpu"}}
+	for i := 0; i < 1; i++ {
+		currT := baseTime.Add(time.Duration(i) * time.Second)
+		currV := float64(i)
+
+		_, err := appender.Add(labels, currT.Unix()*1000, currV)
+		if err != nil {
+			t.Fatalf("Failed to add data to appender. reason: %s", err)
+		}
+	}
+
+	if _, err := appender.WaitForCompletion(0); err != nil {
+		t.Fatalf("Failed to wait for appender completion. reason: %s", err)
+	}
+}

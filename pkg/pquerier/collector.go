@@ -64,44 +64,52 @@ func mainCollector(ctx *selectQueryContext, responseChannel chan *qryResults) {
 	lastTimePerMetric := make(map[uint64]int64, len(ctx.columnsSpecByMetric))
 	lastValuePerMetric := make(map[uint64]float64, len(ctx.columnsSpecByMetric))
 
-	for res := range responseChannel {
-		if res.IsRawQuery() {
-			err := rawCollector(ctx, res)
-			if err != nil {
-				ctx.errorChannel <- err
+	for {
+		select {
+		case _ = <-ctx.stopChan:
+			return
+		case res, ok := <-responseChannel:
+			if !ok {
 				return
 			}
-		} else {
-			err := res.frame.addMetricIfNotExist(res.name, ctx.getResultBucketsSize(), res.IsServerAggregates())
-			if err != nil {
-				ctx.logger.Error("problem adding new metric '%v', lset: %v, err:%v", res.name, res.frame.lset, err)
-				ctx.errorChannel <- err
-				return
-			}
-			lsetAttr, _ := res.fields[config.LabelSetAttrName].(string)
-			lset, _ := utils.LabelsFromString(lsetAttr)
-			lset = append(lset, utils.Label{Name: config.MetricNameAttrName, Value: res.name})
-			currentResultHash := lset.Hash()
-
-			// Aggregating cross series aggregates, only supported over raw data.
-			if ctx.isCrossSeriesAggregate {
-				lastTimePerMetric[currentResultHash], lastValuePerMetric[currentResultHash], _ = aggregateClientAggregatesCrossSeries(ctx, res, lastTimePerMetric[currentResultHash], lastValuePerMetric[currentResultHash])
-			} else {
-				// Aggregating over time aggregates
-				if res.IsServerAggregates() {
-					aggregateServerAggregates(ctx, res)
-				} else if res.IsClientAggregates() {
-					aggregateClientAggregates(ctx, res)
-				}
-			}
-
-			// It is possible to query an aggregate and down sample raw chunks in the same df.
-			if res.IsDownsample() {
-				lastTimePerMetric[currentResultHash], lastValuePerMetric[currentResultHash], err = downsampleRawData(ctx, res, lastTimePerMetric[currentResultHash], lastValuePerMetric[currentResultHash])
+			if res.IsRawQuery() {
+				err := rawCollector(ctx, res)
 				if err != nil {
-					ctx.logger.Error("problem downsampling '%v', lset: %v, err:%v", res.name, res.frame.lset, err)
 					ctx.errorChannel <- err
 					return
+				}
+			} else {
+				err := res.frame.addMetricIfNotExist(res.name, ctx.getResultBucketsSize(), res.IsServerAggregates())
+				if err != nil {
+					ctx.logger.Error("problem adding new metric '%v', lset: %v, err:%v", res.name, res.frame.lset, err)
+					ctx.errorChannel <- err
+					return
+				}
+				lsetAttr, _ := res.fields[config.LabelSetAttrName].(string)
+				lset, _ := utils.LabelsFromString(lsetAttr)
+				lset = append(lset, utils.Label{Name: config.MetricNameAttrName, Value: res.name})
+				currentResultHash := lset.Hash()
+
+				// Aggregating cross series aggregates, only supported over raw data.
+				if ctx.isCrossSeriesAggregate {
+					lastTimePerMetric[currentResultHash], lastValuePerMetric[currentResultHash], _ = aggregateClientAggregatesCrossSeries(ctx, res, lastTimePerMetric[currentResultHash], lastValuePerMetric[currentResultHash])
+				} else {
+					// Aggregating over time aggregates
+					if res.IsServerAggregates() {
+						aggregateServerAggregates(ctx, res)
+					} else if res.IsClientAggregates() {
+						aggregateClientAggregates(ctx, res)
+					}
+				}
+
+				// It is possible to query an aggregate and down sample raw chunks in the same df.
+				if res.IsDownsample() {
+					lastTimePerMetric[currentResultHash], lastValuePerMetric[currentResultHash], err = downsampleRawData(ctx, res, lastTimePerMetric[currentResultHash], lastValuePerMetric[currentResultHash])
+					if err != nil {
+						ctx.logger.Error("problem downsampling '%v', lset: %v, err:%v", res.name, res.frame.lset, err)
+						ctx.errorChannel <- err
+						return
+					}
 				}
 			}
 		}

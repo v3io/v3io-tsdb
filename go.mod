@@ -4,6 +4,7 @@ go 1.12
 
 require (
 	github.com/cespare/xxhash v1.1.0
+	github.com/cpuguy83/go-md2man v1.0.10 // indirect
 	github.com/ghodss/yaml v1.0.0
 	github.com/imdario/mergo v0.3.7
 	github.com/nuclio/logger v0.0.1
@@ -13,9 +14,11 @@ require (
 	github.com/pkg/errors v0.8.1
 	github.com/rcrowley/go-metrics v0.0.0-20181016184325-3113b8401b8a
 	github.com/spf13/cobra v0.0.3
+	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/stretchr/testify v1.4.0
 	github.com/v3io/frames v0.6.14-v0.9.18
 	github.com/v3io/v3io-go v0.1.5-0.20200316155009-cc83de374ff2
+	github.com/v3io/v3io-go-http v0.0.0-20190415143924-cc2fbcde6663 // indirect
 	github.com/xwb1989/sqlparser v0.0.0-20180606152119-120387863bf2
 )
 
