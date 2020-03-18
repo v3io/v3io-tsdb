@@ -290,7 +290,6 @@ func (queryCtx *selectQueryContext) startCollectors() error {
 		}
 
 		close(queryCtx.finalErrorChan)
-		queryCtx.logger.Info("finished watching")
 		return
 	}()
 
