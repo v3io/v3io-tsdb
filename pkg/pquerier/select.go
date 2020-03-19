@@ -83,6 +83,7 @@ func (queryCtx *selectQueryContext) start(parts []*partmgr.DBPartition, params *
 
 	queryCtx.stopChan = make(chan bool, 1)
 	queryCtx.finalErrorChan = make(chan error, 1)
+	queryCtx.errorChannel = make(chan error, queryCtx.workers+len(queries))
 
 	err = queryCtx.startCollectors()
 	if err != nil {
@@ -266,7 +267,6 @@ func (queryCtx *selectQueryContext) parsePreAggregateLabels(partition *partmgr.D
 func (queryCtx *selectQueryContext) startCollectors() error {
 
 	queryCtx.requestChannels = make([]chan *qryResults, queryCtx.workers)
-	queryCtx.errorChannel = make(chan error, queryCtx.workers)
 
 	// Increment the WaitGroup counter.
 	queryCtx.wg.Add(queryCtx.workers)
