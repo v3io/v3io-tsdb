@@ -150,11 +150,6 @@ func (q *V3ioQuerier) baseSelectQry(params *SelectParams, showAggregateLabel boo
 		return nil, errors.Wrap(err, "Failed to read/update the TSDB schema.")
 	}
 
-	// TODO: should be checked in config
-	if q.cfg.QryWorkers == 0 {
-		return nil, errors.New("query workers num must be > 0")
-	}
-
 	// If the config is set to use only client configuration override the query parameter.
 	if q.cfg.UsePreciseAggregations {
 		params.UseOnlyClientAggr = true
