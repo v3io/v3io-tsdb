@@ -151,8 +151,8 @@ func (q *V3ioQuerier) baseSelectQry(params *SelectParams, showAggregateLabel boo
 	}
 
 	// TODO: should be checked in config
-	if !isPowerOfTwo(q.cfg.QryWorkers) {
-		return nil, errors.New("query workers num must be a power of 2 and > 0")
+	if q.cfg.QryWorkers == 0 {
+		return nil, errors.New("query workers num must be > 0")
 	}
 
 	// If the config is set to use only client configuration override the query parameter.
@@ -196,10 +196,6 @@ func (q *V3ioQuerier) baseSelectQry(params *SelectParams, showAggregateLabel boo
 	})
 
 	return
-}
-
-func isPowerOfTwo(x int) bool {
-	return (x != 0) && ((x & (x - 1)) == 0)
 }
 
 // Return the current metric names
