@@ -325,7 +325,7 @@ func (q *V3ioQuerier) GetLabelSets(metric string, filter string) ([]utils.Labels
 		AttributeNames: []string{config.LabelSetAttrName, config.MetricNameAttrName},
 	}
 
-	// because of performance issues we only want to query the first and last partitions
+	// Because of performance issues we only want to query the last two partitions
 	partitionsToQuery := []string{partitionPaths[len(partitionPaths)-1]}
 	if len(partitionPaths) > 1 {
 		partitionsToQuery = append(partitionsToQuery, partitionPaths[len(partitionPaths)-2])
