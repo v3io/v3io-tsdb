@@ -160,7 +160,7 @@ func (ic *AsyncItemsCursor) NextItem() (v3io.Item, error) {
 		}
 
 		// are there any more items up stream? did all the shards complete ?
-		if ic.lastShards == ic.workers {
+		if ic.lastShards == ic.workers*ic.numberOfPartitions {
 			ic.currentError = nil
 			return nil, nil
 		}
