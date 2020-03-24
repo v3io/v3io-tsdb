@@ -48,14 +48,16 @@ type AsyncItemsCursor struct {
 	container    v3io.Container
 	logger       logger.Logger
 
-	responseChan  chan *v3io.Response
-	workers       int
-	totalSegments int
-	lastShards    int
-	Cnt           int
+	responseChan       chan *v3io.Response
+	workers            int
+	totalSegments      int
+	lastShards         int
+	Cnt                int
+	numberOfPartitions int
 }
 
-func NewAsyncItemsCursor(container v3io.Container, input *v3io.GetItemsInput, workers int, shardingKeys []string, logger logger.Logger) (*AsyncItemsCursor, error) {
+func NewAsyncItemsCursorMultiplePartitions(container v3io.Container, input *v3io.GetItemsInput, workers int,
+	shardingKeys []string, logger logger.Logger, partitions []string) (*AsyncItemsCursor, error) {
 
 	// TODO: use workers from Context.numWorkers (if no ShardingKey)
 	if workers == 0 || input.ShardingKey != "" {
@@ -63,51 +65,61 @@ func NewAsyncItemsCursor(container v3io.Container, input *v3io.GetItemsInput, wo
 	}
 
 	newAsyncItemsCursor := &AsyncItemsCursor{
-		container:    container,
-		input:        input,
-		responseChan: make(chan *v3io.Response, 1000),
-		workers:      workers,
-		logger:       logger.GetChild("AsyncItemsCursor"),
+		container:          container,
+		input:              input,
+		responseChan:       make(chan *v3io.Response, 1000),
+		workers:            workers,
+		logger:             logger.GetChild("AsyncItemsCursor"),
+		numberOfPartitions: len(partitions),
 	}
 
 	if len(shardingKeys) > 0 {
 		newAsyncItemsCursor.workers = len(shardingKeys)
 
-		for i := 0; i < newAsyncItemsCursor.workers; i++ {
-			input := v3io.GetItemsInput{
-				Path:           input.Path,
-				AttributeNames: input.AttributeNames,
-				Filter:         input.Filter,
-				ShardingKey:    shardingKeys[i],
-			}
-			_, err := container.GetItems(&input, &input, newAsyncItemsCursor.responseChan)
+		for _, partition := range partitions {
+			for i := 0; i < newAsyncItemsCursor.workers; i++ {
+				input := v3io.GetItemsInput{
+					Path:           partition,
+					AttributeNames: input.AttributeNames,
+					Filter:         input.Filter,
+					ShardingKey:    shardingKeys[i],
+				}
+				_, err := container.GetItems(&input, &input, newAsyncItemsCursor.responseChan)
 
-			if err != nil {
-				return nil, err
+				if err != nil {
+					return nil, err
+				}
 			}
 		}
 
 		return newAsyncItemsCursor, nil
 	}
 
-	for i := 0; i < newAsyncItemsCursor.workers; i++ {
-		newAsyncItemsCursor.totalSegments = workers
-		input := v3io.GetItemsInput{
-			Path:           input.Path,
-			AttributeNames: input.AttributeNames,
-			Filter:         input.Filter,
-			TotalSegments:  newAsyncItemsCursor.totalSegments,
-			Segment:        i,
-		}
-		_, err := container.GetItems(&input, &input, newAsyncItemsCursor.responseChan)
+	for _, partition := range partitions {
+		for i := 0; i < newAsyncItemsCursor.workers; i++ {
+			newAsyncItemsCursor.totalSegments = workers
+			input := v3io.GetItemsInput{
+				Path:           partition,
+				AttributeNames: input.AttributeNames,
+				Filter:         input.Filter,
+				TotalSegments:  newAsyncItemsCursor.totalSegments,
+				Segment:        i,
+			}
+			_, err := container.GetItems(&input, &input, newAsyncItemsCursor.responseChan)
 
-		if err != nil {
-			// TODO: proper exit, release requests which passed
-			return nil, err
+			if err != nil {
+				// TODO: proper exit, release requests which passed
+				return nil, err
+			}
 		}
 	}
 
 	return newAsyncItemsCursor, nil
+}
+
+func NewAsyncItemsCursor(container v3io.Container, input *v3io.GetItemsInput, workers int, shardingKeys []string,
+	logger logger.Logger) (*AsyncItemsCursor, error) {
+	return NewAsyncItemsCursorMultiplePartitions(container, input, workers, shardingKeys, logger, []string{input.Path})
 }
 
 // error returns the last error
@@ -148,7 +160,7 @@ func (ic *AsyncItemsCursor) NextItem() (v3io.Item, error) {
 		}
 
 		// are there any more items up stream? did all the shards complete ?
-		if ic.lastShards == ic.workers {
+		if ic.lastShards == ic.workers*ic.numberOfPartitions {
 			ic.currentError = nil
 			return nil, nil
 		}
