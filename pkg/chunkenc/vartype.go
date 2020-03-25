@@ -77,7 +77,7 @@ func (c *VarChunk) Bytes() []byte {
 }
 
 func (c *VarChunk) Clear() {
-	c.b = c.b[0:]
+	c.b = c.b[:0]
 }
 
 // Appender implements the Chunk interface.
