@@ -3,12 +3,13 @@
 package pqueriertest
 
 import (
-	"github.com/v3io/v3io-tsdb/pkg/aggregate"
+	"fmt"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
+	"github.com/v3io/v3io-tsdb/pkg/aggregate"
 	"github.com/v3io/v3io-tsdb/pkg/pquerier"
 	"github.com/v3io/v3io-tsdb/pkg/tsdb"
 	"github.com/v3io/v3io-tsdb/pkg/tsdb/tsdbtest"
@@ -217,6 +218,66 @@ func (suite *testVariantTypeSuite) TestCountAggregationForVariantTypeQueryWithSe
 		agg := labels.Get(aggregate.AggregateLabel)
 
 		suite.compareSingleMetricWithAggregator(data, expected, agg)
+	}
+
+	assert.Equal(suite.T(), 1, seriesCount, "series count didn't match expected")
+}
+
+func (suite *testVariantTypeSuite) TestVariantTypeQueryWithSeriesAlotOfData() {
+	adapter, err := tsdb.NewV3ioAdapter(suite.v3ioConfig, nil, nil)
+	if err != nil {
+		suite.T().Fatalf("failed to create v3io adapter. reason: %s", err)
+	}
+
+	metricName := "log"
+	labels := utils.LabelsFromStringList("os", "linux", "__name__", metricName)
+
+	numberOfEvents := 1000
+	dataToIngest := make([]tsdbtest.DataPoint, numberOfEvents)
+	for i := 0; i < numberOfEvents; i++ {
+		dataToIngest[i] = tsdbtest.DataPoint{Time: suite.basicQueryTime + int64(i)*tsdbtest.MinuteInMillis,
+			Value: fmt.Sprintf("%v", i)}
+	}
+
+	appender, err := adapter.Appender()
+	if err != nil {
+		suite.T().Fatalf("failed to create v3io appender. reason: %s", err)
+	}
+
+	ref, err := appender.Add(labels, dataToIngest[0].Time, dataToIngest[0].Value)
+	if err != nil {
+		suite.T().Fatalf("Failed to add data to the TSDB appender. Reason: %s", err)
+	}
+	for i := 1; i < numberOfEvents; i++ {
+		appender.AddFast(labels, ref, dataToIngest[i].Time, dataToIngest[i].Value)
+	}
+
+	if _, err := appender.WaitForCompletion(0); err != nil {
+		suite.T().Fatalf("Failed to wait for TSDB append completion. Reason: %s", err)
+	}
+
+	querierV2, err := adapter.QuerierV2()
+	if err != nil {
+		suite.T().Fatalf("Failed to create querier v2, err: %v", err)
+	}
+
+	params := &pquerier.SelectParams{RequestedColumns: []pquerier.RequestedColumn{{Metric: metricName}},
+		From: suite.basicQueryTime - tsdbtest.DaysInMillis, To: suite.basicQueryTime + tsdbtest.DaysInMillis}
+	iter, err := querierV2.Select(params)
+	if err != nil {
+		suite.T().Fatalf("Failed to exeute query, err: %v", err)
+	}
+	var seriesCount int
+	for iter.Next() {
+		seriesCount++
+		iter := iter.At().Iterator()
+		var slice []tsdbtest.DataPoint
+		for iter.Next() {
+			t, v := iter.AtString()
+			slice = append(slice, tsdbtest.DataPoint{Time: t, Value: v})
+		}
+
+		suite.Require().Equal(dataToIngest, slice, "number of events mismatch")
 	}
 
 	assert.Equal(suite.T(), 1, seriesCount, "series count didn't match expected")
