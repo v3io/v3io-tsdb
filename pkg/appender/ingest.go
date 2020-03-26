@@ -78,12 +78,18 @@ func (mc *MetricsCache) metricFeed(index int) {
 					if app.metric == nil {
 						// Handle update completion requests (metric == nil)
 						completeChan = app.resp
-
 						length := mc.metricQueue.Length()
-						if gotCompletion && length == 0 && len(mc.asyncAppendChan) == 0 {
-							completeChan <- 0
-							gotCompletion = false
-							gotData = false
+						if length == 0 && len(mc.asyncAppendChan) == 0 {
+							if gotCompletion {
+								completeChan <- 0
+								gotCompletion = false
+								gotData = false
+							} else {
+								//check again if done in case this was the last update
+								if mc.updatesInFlight == 0 {
+									mc.updatesComplete <- 0
+								}
+							}
 						}
 					} else {
 						// Handle append requests (Add / AddFast)
@@ -250,8 +256,14 @@ func (mc *MetricsCache) postMetricUpdates(metric *MetricState) {
 		} else if sent {
 			metric.setState(storeStateUpdate)
 		}
-		if !sent && metric.store.samplesQueueLength() == 0 {
-			metric.setState(storeStateReady)
+		if !sent {
+			if metric.store.samplesQueueLength() == 0 {
+				metric.setState(storeStateReady)
+			} else {
+				if mc.metricQueue.length() > 0 {
+					mc.newUpdates <- mc.metricQueue.length()
+				}
+			}
 		}
 	}
 
