@@ -86,7 +86,7 @@ func (mc *MetricsCache) metricFeed(index int) {
 								gotData = false
 							} else {
 								//check again if done in case this was the last update
-								if mc.updatesInFlight == 0 {
+								if len(mc.newUpdates) == 0 && gotData {
 									mc.updatesComplete <- 0
 								}
 							}
