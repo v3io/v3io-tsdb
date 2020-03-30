@@ -50,6 +50,7 @@ func (mc *MetricsCache) metricFeed(index int) {
 		inFlight := 0
 		gotData := false
 		gotCompletion := false
+		potentialCompletion := false
 		var completeChan chan int
 
 		for {
@@ -62,11 +63,16 @@ func (mc *MetricsCache) metricFeed(index int) {
 				mc.logger.Debug(`Complete update cycle - "in-flight requests"=%d; "metric queue length"=%d\n`, inFlight, length)
 
 				// If data was sent and the queue is empty, mark as completion
-				if length == 0 && gotData && len(mc.asyncAppendChan) == 0 {
-					gotCompletion = true
-					if completeChan != nil {
-						completeChan <- 0
-						gotData = false
+				if length == 0 && gotData {
+					if len(mc.asyncAppendChan) == 0 {
+						gotCompletion = true
+						if completeChan != nil {
+							completeChan <- 0
+							gotData = false
+							potentialCompletion = false
+						}
+					} else if len(mc.asyncAppendChan) == 1 {
+						potentialCompletion = true
 					}
 				}
 			case app := <-mc.asyncAppendChan:
@@ -80,15 +86,11 @@ func (mc *MetricsCache) metricFeed(index int) {
 						completeChan = app.resp
 						length := mc.metricQueue.Length()
 						if length == 0 && len(mc.asyncAppendChan) == 0 {
-							if gotCompletion {
+							if gotCompletion || (potentialCompletion && gotData) {
 								completeChan <- 0
 								gotCompletion = false
 								gotData = false
-							} else {
-								//check again if done in case this was the last update
-								if len(mc.newUpdates) == 0 && gotData {
-									mc.updatesComplete <- 0
-								}
+								potentialCompletion = false
 							}
 						}
 					} else {
