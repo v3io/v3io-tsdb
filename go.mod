@@ -17,7 +17,6 @@ require (
 	github.com/stretchr/testify v1.4.0
 	github.com/v3io/frames v0.6.14-v0.9.18
 	github.com/v3io/v3io-go v0.1.5-0.20200316155009-cc83de374ff2
-	github.com/v3io/v3io-go-http v0.0.0-20190415143924-cc2fbcde6663 // indirect
 	github.com/xwb1989/sqlparser v0.0.0-20180606152119-120387863bf2
 )
 
