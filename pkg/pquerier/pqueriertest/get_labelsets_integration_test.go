@@ -206,3 +206,43 @@ func (suite *getLabelSetsSuite) TestGetLabelsWithFilter() {
 
 	suite.ElementsMatch(expectedLabels, labelsList, "actual label sets does not match expected")
 }
+
+func (suite *getLabelSetsSuite) TestGetLabelsAllMetricsFrom2Partitions() {
+	adapter, err := tsdb.NewV3ioAdapter(suite.v3ioConfig, nil, nil)
+	suite.Require().NoError(err, "failed to create v3io adapter")
+
+	labels := []utils.Labels{utils.LabelsFromStringList("os", "linux", "region", "europe"),
+		utils.LabelsFromStringList("os", "linux", "region", "asia"),
+		utils.LabelsFromStringList("os", "mac", "region", "europe")}
+	testParams := tsdbtest.NewTestParams(suite.T(),
+		tsdbtest.TestOption{
+			Key: tsdbtest.OptTimeSeries,
+			Value: tsdbtest.TimeSeries{tsdbtest.Metric{
+				Name:   "cpu",
+				Labels: labels[0],
+				Data:   []tsdbtest.DataPoint{{suite.basicQueryTime - 4*tsdbtest.DaysInMillis, 10}}},
+				tsdbtest.Metric{
+					Name:   "cpu",
+					Labels: labels[1],
+					Data: []tsdbtest.DataPoint{{suite.basicQueryTime - 4*tsdbtest.DaysInMillis, 10},
+						{suite.basicQueryTime - 2*tsdbtest.DaysInMillis, 10}}},
+				tsdbtest.Metric{
+					Name:   "cpu",
+					Labels: labels[2],
+					Data:   []tsdbtest.DataPoint{{suite.basicQueryTime, 10}}},
+			}})
+	tsdbtest.InsertData(suite.T(), testParams)
+	expectedLabels := []utils.Labels{
+		utils.LabelsFromStringList("os", "linux", "region", "asia", config.PrometheusMetricNameAttribute, "cpu"),
+		utils.LabelsFromStringList("os", "mac", "region", "europe", config.PrometheusMetricNameAttribute, "cpu")}
+
+	querierV2, err := adapter.QuerierV2()
+	suite.Require().NoError(err, "failed to create querier v2")
+
+	labelsList, err := querierV2.GetLabelSets("", "")
+	if err != nil {
+		suite.T().Fatalf("failed to get label sets, err:%v\n", err)
+	}
+
+	suite.Require().ElementsMatch(expectedLabels, labelsList, "actual label sets does not match expected")
+}

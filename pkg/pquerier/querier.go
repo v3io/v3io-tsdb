@@ -150,11 +150,6 @@ func (q *V3ioQuerier) baseSelectQry(params *SelectParams, showAggregateLabel boo
 		return nil, errors.Wrap(err, "Failed to read/update the TSDB schema.")
 	}
 
-	// TODO: should be checked in config
-	if !isPowerOfTwo(q.cfg.QryWorkers) {
-		return nil, errors.New("query workers num must be a power of 2 and > 0")
-	}
-
 	// If the config is set to use only client configuration override the query parameter.
 	if q.cfg.UsePreciseAggregations {
 		params.UseOnlyClientAggr = true
@@ -196,10 +191,6 @@ func (q *V3ioQuerier) baseSelectQry(params *SelectParams, showAggregateLabel boo
 	})
 
 	return
-}
-
-func isPowerOfTwo(x int) bool {
-	return (x != 0) && ((x & (x - 1)) == 0)
 }
 
 // Return the current metric names
@@ -330,12 +321,16 @@ func (q *V3ioQuerier) GetLabelSets(metric string, filter string) ([]utils.Labels
 
 	// Get all label sets
 	input := v3io.GetItemsInput{
-		Path:           partitionPaths[0],
 		Filter:         filter,
 		AttributeNames: []string{config.LabelSetAttrName, config.MetricNameAttrName},
 	}
 
-	iter, err := utils.NewAsyncItemsCursor(q.container, &input, q.cfg.QryWorkers, shardingKeys, q.logger)
+	// Because of performance issues we only want to query the last two partitions
+	partitionsToQuery := []string{partitionPaths[len(partitionPaths)-1]}
+	if len(partitionPaths) > 1 {
+		partitionsToQuery = append(partitionsToQuery, partitionPaths[len(partitionPaths)-2])
+	}
+	iter, err := utils.NewAsyncItemsCursorMultiplePartitions(q.container, &input, q.cfg.QryWorkers, shardingKeys, q.logger, partitionsToQuery)
 	if err != nil {
 		return nil, err
 	}
