@@ -61,13 +61,10 @@ func newDeleteCommandeer(rootCommandeer *RootCommandeer) *delCommandeer {
 the name of the data container are configured in the default configuration file (` + config.DefaultConfigurationFileName + `)
 instead of using the -s|--server, -u|--username, -p|--password, and -c|--container flags.
 - tsdbctl delete -t metrics_tsdb -a
-- tsdbctl delete -t dbs/perfstats -f
+- tsdbctl delete -t dbs/perfstats --force
 - tsdbctl delete -t my_tsdb -b 0 -e now-7d -i
-
-Notes:
-- When deleting content within a specific time range (see the -b|--begin and -e|--end flags and
-  their default values), all partitions containing data within this range are deleted, including
-  metric items with older or newer times. Use the info command to view the partitioning interval.`,
+- tsdbctl delete -t my_tsdb -b 0 -e now-7d -m "metric_1,metric_2"
+- tsdbctl delete -t my_tsdb -b 0 -e now-7d -f 'my_label=="value1"'`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 
 			if len(args) > 0 {
