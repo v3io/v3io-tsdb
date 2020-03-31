@@ -49,6 +49,7 @@ func (mc *MetricsCache) metricFeed(index int) {
 		inFlight := 0
 		gotData := false
 		gotCompletion := false
+		potentialCompletion := false
 		var completeChan chan int
 
 		for {
@@ -61,11 +62,16 @@ func (mc *MetricsCache) metricFeed(index int) {
 				mc.logger.Debug(`Complete update cycle - "in-flight requests"=%d; "metric queue length"=%d\n`, inFlight, length)
 
 				// If data was sent and the queue is empty, mark as completion
-				if length == 0 && gotData && len(mc.asyncAppendChan) == 0 {
-					gotCompletion = true
-					if completeChan != nil {
-						completeChan <- 0
-						gotData = false
+				if length == 0 && gotData {
+					if len(mc.asyncAppendChan) == 0 {
+						gotCompletion = true
+						if completeChan != nil {
+							completeChan <- 0
+							gotData = false
+							potentialCompletion = false
+						}
+					} else if len(mc.asyncAppendChan) == 1 {
+						potentialCompletion = true
 					}
 				}
 			case app := <-mc.asyncAppendChan:
@@ -77,14 +83,17 @@ func (mc *MetricsCache) metricFeed(index int) {
 					if app.metric == nil {
 						// Handle update completion requests (metric == nil)
 						completeChan = app.resp
-
 						length := mc.metricQueue.Length()
-						if gotCompletion && length == 0 && len(mc.asyncAppendChan) == 0 {
-							completeChan <- 0
-							gotCompletion = false
-							gotData = false
+						if length == 0 && len(mc.asyncAppendChan) == 0 {
+							if gotCompletion || (potentialCompletion && gotData) {
+								completeChan <- 0
+								gotCompletion = false
+								gotData = false
+							}
 						}
+						potentialCompletion = false
 					} else {
+						potentialCompletion = false
 						// Handle append requests (Add / AddFast)
 						gotData = true
 						metric := app.metric
@@ -113,7 +122,6 @@ func (mc *MetricsCache) metricFeed(index int) {
 						}
 						metric.Unlock()
 					}
-
 					// Poll if we have more updates (accelerate the outer select)
 					if i < mc.cfg.BatchSize {
 						select {
@@ -249,8 +257,14 @@ func (mc *MetricsCache) postMetricUpdates(metric *MetricState) {
 		} else if sent {
 			metric.setState(storeStateUpdate)
 		}
-		if !sent && metric.store.samplesQueueLength() == 0 {
-			metric.setState(storeStateReady)
+		if !sent {
+			if metric.store.samplesQueueLength() == 0 {
+				metric.setState(storeStateReady)
+			} else {
+				if mc.metricQueue.length() > 0 {
+					mc.newUpdates <- mc.metricQueue.length()
+				}
+			}
 		}
 	}
 
