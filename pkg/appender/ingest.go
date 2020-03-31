@@ -90,10 +90,11 @@ func (mc *MetricsCache) metricFeed(index int) {
 								completeChan <- 0
 								gotCompletion = false
 								gotData = false
-								potentialCompletion = false
 							}
 						}
+						potentialCompletion = false
 					} else {
+						potentialCompletion = false
 						// Handle append requests (Add / AddFast)
 						gotData = true
 						metric := app.metric
@@ -122,7 +123,6 @@ func (mc *MetricsCache) metricFeed(index int) {
 						}
 						metric.Unlock()
 					}
-
 					// Poll if we have more updates (accelerate the outer select)
 					if i < mc.cfg.BatchSize {
 						select {
