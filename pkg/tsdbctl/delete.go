@@ -61,13 +61,10 @@ func newDeleteCommandeer(rootCommandeer *RootCommandeer) *delCommandeer {
 the name of the data container are configured in the default configuration file (` + config.DefaultConfigurationFileName + `)
 instead of using the -s|--server, -u|--username, -p|--password, and -c|--container flags.
 - tsdbctl delete -t metrics_tsdb -a
-- tsdbctl delete -t dbs/perfstats -f
+- tsdbctl delete -t dbs/perfstats --force
 - tsdbctl delete -t my_tsdb -b 0 -e now-7d -i
-
-Notes:
-- When deleting content within a specific time range (see the -b|--begin and -e|--end flags and
-  their default values), all partitions containing data within this range are deleted, including
-  metric items with older or newer times. Use the info command to view the partitioning interval.`,
+- tsdbctl delete -t my_tsdb -b 0 -e now-7d -m "metric_1,metric_2"
+- tsdbctl delete -t my_tsdb -b 0 -e now-7d -f 'my_label=="value1"'`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 
 			if len(args) > 0 {
@@ -82,13 +79,13 @@ Notes:
 		"Delete the TSDB table, including its configuration and all content.")
 	cmd.Flags().BoolVarP(&commandeer.ignoreErrors, "ignore-errors", "i", true,
 		"Ignore errors - continue deleting even if some steps fail.")
-	cmd.Flags().BoolVarP(&commandeer.force, "force", "f", false,
+	cmd.Flags().BoolVar(&commandeer.force, "force", false,
 		"Forceful deletion - don't display a delete-verification prompt.")
 	cmd.Flags().StringVarP(&commandeer.toTime, "end", "e", "",
 		"End (maximum) time for the delete operation, as a string containing an\nRFC 3339 time string, a Unix timestamp in milliseconds, or a relative\ntime of the format \"now\" or \"now-[0-9]+[mhd]\" (where 'm' = minutes,\n'h' = hours, and 'd' = days). Examples: \"2018-09-26T14:10:20Z\";\n\"1537971006000\"; \"now-3h\"; \"now-7d\". (default \"now\")")
 	cmd.Flags().StringVarP(&commandeer.fromTime, "begin", "b", "",
 		"Start (minimum) time for the delete operation, as a string containing\nan RFC 3339 time, a Unix timestamp in milliseconds, a relative time of\nthe format \"now\" or \"now-[0-9]+[mhd]\" (where 'm' = minutes, 'h' = hours,\nand 'd' = days), or 0 for the earliest time. Examples:\n\"2016-01-02T15:34:26Z\"; \"1451748866\"; \"now-90m\"; \"0\". (default =\n<end time> - 1h)")
-	cmd.Flags().StringVar(&commandeer.filter, "filter", "",
+	cmd.Flags().StringVarP(&commandeer.filter, "filter", "f", "",
 		"Query filter, as an Iguazio Data Science Platform\nfilter expression. \nExamples: \"method=='get'\"; \"method=='get' AND os=='win'\".")
 	cmd.Flags().StringVarP(&commandeer.metrics, "metrics", "m", "",
 		"Comma-separated list of metric names to delete. If you don't set this argument, all metrics will be deleted according to the time range and filter specified.")
