@@ -476,12 +476,13 @@ func deleteEntirePartition(logger logger.Logger, container v3io.Container, parti
 	defer wg.Done()
 
 	err := utils.DeleteTable(logger, container, partitionPath, "", workers)
-	if err != nil {
+	if err != nil && !utils.IsNotExistsError(err) {
 		errChannel <- errors.Wrapf(err, "Failed to delete partition '%s'.", partitionPath)
+		return
 	}
 	// Delete the Directory object
 	err = container.DeleteObjectSync(&v3io.DeleteObjectInput{Path: partitionPath})
-	if err != nil {
+	if err != nil && !utils.IsNotExistsError(err) {
 		errChannel <- errors.Wrapf(err, "Failed to delete partition folder '%s'.", partitionPath)
 	}
 }
