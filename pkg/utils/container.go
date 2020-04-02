@@ -157,7 +157,7 @@ func respWaitLoop(comm <-chan int, responseChan <-chan *v3io.Response, doneChan 
 			responses++
 			active = true
 
-			if resp.Error != nil && IsNotExistsError(resp.Error) {
+			if resp.Error != nil && !IsNotExistsError(resp.Error) {
 				doneChan <- resp.Error
 				return
 			}
