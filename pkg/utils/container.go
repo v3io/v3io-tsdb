@@ -22,7 +22,6 @@ package utils
 
 import (
 	"encoding/binary"
-	"fmt"
 	"net/url"
 	"strings"
 	"time"
@@ -124,18 +123,17 @@ func DeleteTable(logger logger.Logger, container v3io.Container, path, filter st
 
 	responseChan := make(chan *v3io.Response, 1000)
 	commChan := make(chan int, 2)
-	doneChan := respWaitLoop(commChan, responseChan, 10*time.Second)
-	reqMap := map[uint64]bool{}
+	doneChan := make(chan error, 1)
+	go respWaitLoop(commChan, responseChan, doneChan, 10*time.Second)
 
 	i := 0
 	for iter.Next() {
 		name := iter.GetField(config.ObjectNameAttrName).(string)
-		req, err := container.DeleteObject(&v3io.DeleteObjectInput{Path: path + "/" + name}, nil, responseChan)
+		_, err := container.DeleteObject(&v3io.DeleteObjectInput{Path: path + "/" + name}, nil, responseChan)
 		if err != nil {
 			commChan <- i
 			return errors.Wrapf(err, "Failed to delete object '%s'.", name)
 		}
-		reqMap[req.ID] = true
 		i++
 	}
 
@@ -144,50 +142,44 @@ func DeleteTable(logger logger.Logger, container v3io.Container, path, filter st
 		return errors.Wrap(iter.Err(), "Failed to delete object.")
 	}
 
-	<-doneChan
-
-	return nil
+	return <-doneChan
 }
 
-func respWaitLoop(comm chan int, responseChan chan *v3io.Response, timeout time.Duration) chan bool {
+func respWaitLoop(comm <-chan int, responseChan <-chan *v3io.Response, doneChan chan<- error, timeout time.Duration) {
 	responses := 0
 	requests := -1
-	done := make(chan bool)
 
-	go func() {
-		active := false
-		for {
-			select {
+	active := false
+	for {
+		select {
 
-			case resp := <-responseChan:
-				responses++
-				active = true
+		case resp := <-responseChan:
+			responses++
+			active = true
 
-				if resp.Error != nil {
-					fmt.Println(resp.Error, "Failed to receive a response to delete request.")
-				}
-
-				if requests == responses {
-					done <- true
-					return
-				}
-
-			case requests = <-comm:
-				if requests <= responses {
-					done <- true
-					return
-				}
-
-			case <-time.After(timeout):
-				if !active {
-					fmt.Println("\nResponse loop timed out.", requests, responses)
-					done <- true
-					return
-				}
-				active = false
+			if resp.Error != nil && !IsNotExistsError(resp.Error) {
+				doneChan <- resp.Error
+				return
 			}
-		}
-	}()
 
-	return done
+			if requests == responses {
+				doneChan <- nil
+				return
+			}
+
+		case requests = <-comm:
+			if requests <= responses {
+				doneChan <- nil
+				return
+			}
+
+		case <-time.After(timeout):
+			if !active {
+				err := errors.Errorf("\nResponse loop timed out with request=%d, responses=%d", requests, responses)
+				doneChan <- err
+				return
+			}
+			active = false
+		}
+	}
 }
