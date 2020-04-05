@@ -65,40 +65,47 @@ func (ls Labels) Filter(keep []string) LabelsIfc {
 
 // convert Label set to a string in the form key1=v1,key2=v2.. + name + hash
 func (ls Labels) GetKey() (string, string, uint64) {
-	key := ""
+	var keyBuilder strings.Builder
 	name := ""
 	for _, lbl := range ls {
 		if lbl.Name == MetricName {
 			name = lbl.Value
 		} else {
-			key = key + lbl.Name + "=" + lbl.Value + ","
+			keyBuilder.WriteString(lbl.Name)
+			keyBuilder.WriteString("=")
+			keyBuilder.WriteString(lbl.Value)
+			keyBuilder.WriteString(",")
 		}
 	}
-	if len(key) == 0 {
+	if keyBuilder.Len() == 0 {
 		return name, "", ls.Hash()
 	}
-	return name, key[:len(key)-1], ls.Hash()
+
+	// Discard last comma
+	key := keyBuilder.String()[:keyBuilder.Len()-1]
+
+	return name, key, ls.Hash()
 
 }
 
 // create update expression
 func (ls Labels) GetExpr() string {
-	lblexpr := ""
+	var lblExprBuilder strings.Builder
 	for _, lbl := range ls {
 		if lbl.Name != MetricName {
-			lblexpr = lblexpr + fmt.Sprintf("%s='%s'; ", lbl.Name, lbl.Value)
+			fmt.Fprintf(&lblExprBuilder, "%s='%s'; ", lbl.Name, lbl.Value)
 		} else {
-			lblexpr = lblexpr + fmt.Sprintf("_name='%s'; ", lbl.Value)
+			fmt.Fprintf(&lblExprBuilder, "_name='%s'; ", lbl.Value)
 		}
 	}
 
-	return lblexpr
+	return lblExprBuilder.String()
 }
 
 func (ls Labels) LabelNames() []string {
-	var res []string
-	for _, l := range ls {
-		res = append(res, l.Name)
+	res := make([]string, len(ls))
+	for i, l := range ls {
+		res[i] = l.Name
 	}
 	return res
 }
