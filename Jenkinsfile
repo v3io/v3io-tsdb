@@ -536,10 +536,7 @@ podTemplate(label: "${git_project}-${label}", inheritFrom: "jnlp-docker-golang")
                         if (TAG_VERSION) {
                             stage('get previous release version') {
                                 container('jnlp') {
-                                    CURRENT_VERSION = github.get_current_tag_version("prometheus", git_project_user, GIT_TOKEN)
-                                    echo "$CURRENT_VERSION"
-                                    version_list=CURRENT_VERSION.split('-')
-                                    NEXT_VERSION = "v${TAG_VERSION}-${version_list[1]}-${MAIN_TAG_VERSION}"
+                                    NEXT_VERSION = github.get_next_short_tag_version("prometheus", git_project_user, GIT_TOKEN)
                                     echo "$NEXT_VERSION"
                                     next_versions.putAt('prometheus', NEXT_VERSION)
                                 }
