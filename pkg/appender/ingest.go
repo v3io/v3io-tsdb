@@ -285,7 +285,7 @@ func (mc *MetricsCache) handleResponse(metric *MetricState, resp *v3io.Response,
 
 	if resp.Error != nil && metric.getState() != storeStateGet {
 		req := reqInput.(*v3io.UpdateItemInput)
-		mc.logger.WarnWith("I/O failure", "id", resp.ID, "err", resp.Error, "key", metric.key,
+		mc.logger.DebugWith("I/O failure", "id", resp.ID, "err", resp.Error, "key", metric.key,
 			"in-flight", mc.updatesInFlight, "mqueue", mc.metricQueue.Length(),
 			"numsamples", metric.store.samplesQueueLength(), "path", req.Path, "update expression", req.Expression)
 	} else {
@@ -323,9 +323,9 @@ func (mc *MetricsCache) handleResponse(metric *MetricState, resp *v3io.Response,
 				if utils.IsFalseConditionError(resp.Error) {
 					req := reqInput.(*v3io.UpdateItemInput)
 					// This might happen on attempt to add metric value of wrong type, i.e. float <-> string
-					errMsg := fmt.Sprintf("trying to ingest values of incompatible data type. Metric %q has not been updated.", req.Path)
-					mc.logger.ErrorWith(errMsg)
-					setError(mc, metric, errors.Wrap(resp.Error, errMsg))
+					errMsg := fmt.Sprintf("failed to ingest values of incompatible data type into metric %s.", req.Path)
+					mc.logger.DebugWith(errMsg)
+					setError(mc, metric, errors.New(errMsg))
 				} else {
 					mc.logger.ErrorWith(fmt.Sprintf("Chunk update failed with status code %d.", e.StatusCode()))
 					setError(mc, metric, errors.Wrap(resp.Error, fmt.Sprintf("Chunk update failed due to status code %d.", e.StatusCode())))
