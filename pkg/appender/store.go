@@ -255,9 +255,14 @@ func (cs *chunkStore) chunkByTime(t int64, isVariantEncoding bool) *attrAppender
 		chunk := chunkenc.NewChunk(cs.logger, isVariantEncoding) // TODO: init based on schema, use init function
 		app, err := chunk.Appender()
 		if err != nil {
+			cs.logger.Error(err)
 			return nil
 		}
-		nextPart, _ := part.NextPart(t)
+		nextPart, err := part.NextPart(t)
+		if err != nil {
+			cs.logger.Error(err)
+			return nil
+		}
 		cur.initialize(nextPart, t)
 		cs.nextTid = t
 		cur.appender = app
