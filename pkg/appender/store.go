@@ -343,7 +343,8 @@ func (cs *chunkStore) writeChunks(mc *MetricsCache, metric *MetricState) (hasPen
 			if !cs.isAggr() && activeChunk == nil {
 				activeChunk, err = cs.chunkByTime(sampleTime, metric.isVariant)
 				if err != nil {
-					break
+					hasPendingUpdates = false
+					return
 				}
 				if activeChunk == nil {
 					pendingSampleIndex++
@@ -392,7 +393,8 @@ func (cs *chunkStore) writeChunks(mc *MetricsCache, metric *MetricState) (hasPen
 				expr = expr + cs.appendExpression(activeChunk)
 				activeChunk, err = cs.chunkByTime(nextT, metric.isVariant)
 				if err != nil {
-					break
+					hasPendingUpdates = false
+					return
 				}
 			}
 
@@ -408,7 +410,7 @@ func (cs *chunkStore) writeChunks(mc *MetricsCache, metric *MetricState) (hasPen
 			cs.pending = cs.pending[pendingSampleIndex:]
 		}
 
-		if pendingSamplesCount == 0 || expr == "" || err != nil {
+		if pendingSamplesCount == 0 || expr == "" {
 			if len(cs.pending) > 0 {
 				mc.metricQueue.Push(metric)
 			}
