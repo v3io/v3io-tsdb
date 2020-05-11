@@ -238,12 +238,12 @@ func (cs *chunkStore) Append(t int64, v interface{}) {
 }
 
 // Return current, previous, or create new  chunk based on sample time
-func (cs *chunkStore) chunkByTime(t int64, isVariantEncoding bool) *attrAppender {
+func (cs *chunkStore) chunkByTime(t int64, isVariantEncoding bool) (*attrAppender, error) {
 
 	// Sample is in the current chunk
 	cur := cs.chunks[cs.curChunk]
 	if cur.inRange(t) {
-		return cur
+		return cur, nil
 	}
 
 	// Sample is in the next chunk, need to initialize
@@ -255,29 +255,32 @@ func (cs *chunkStore) chunkByTime(t int64, isVariantEncoding bool) *attrAppender
 		chunk := chunkenc.NewChunk(cs.logger, isVariantEncoding) // TODO: init based on schema, use init function
 		app, err := chunk.Appender()
 		if err != nil {
-			return nil
+			return nil, err
 		}
-		nextPart, _ := part.NextPart(t)
+		nextPart, err := part.NextPart(t)
+		if err != nil {
+			return nil, err
+		}
 		cur.initialize(nextPart, t)
 		cs.nextTid = t
 		cur.appender = app
 		cs.curChunk = cs.curChunk ^ 1
 
-		return cur
+		return cur, nil
 	}
 
 	// If it's the first chunk after init we don't allow old updates
 	if (cur.state & chunkStateFirst) != 0 {
-		return nil
+		return nil, nil
 	}
 
 	prev := cs.chunks[cs.curChunk^1]
 	// Delayed appends - only allowed to previous chunk or within allowed window
 	if prev.partition != nil && prev.inRange(t) && t > cs.maxTime-maxLateArrivalInterval {
-		return prev
+		return prev, nil
 	}
 
-	return nil
+	return nil, nil
 }
 
 // Write all pending samples to DB chunks and aggregates
@@ -327,7 +330,6 @@ func (cs *chunkStore) writeChunks(mc *MetricsCache, metric *MetricState) (hasPen
 						expr = expr + cs.aggrList.SetOrUpdateExpr("v", bucket, isNewBucket)
 						expr = expr + cs.appendExpression(activeChunk)
 					}
-
 					pendingSampleIndex++
 					break
 				} else {
@@ -339,7 +341,11 @@ func (cs *chunkStore) writeChunks(mc *MetricsCache, metric *MetricState) (hasPen
 			// Init activeChunk if nil (when samples are too old); if still too
 			// old, skip to next sample
 			if !cs.isAggr() && activeChunk == nil {
-				activeChunk = cs.chunkByTime(sampleTime, metric.isVariant)
+				activeChunk, err = cs.chunkByTime(sampleTime, metric.isVariant)
+				if err != nil {
+					hasPendingUpdates = false
+					return
+				}
 				if activeChunk == nil {
 					pendingSampleIndex++
 					mc.logger.DebugWith("nil active chunk", "T", sampleTime)
@@ -385,7 +391,11 @@ func (cs *chunkStore) writeChunks(mc *MetricsCache, metric *MetricState) (hasPen
 			// initialize the new chunk
 			if activeChunk != nil && !activeChunk.inRange(nextT) {
 				expr = expr + cs.appendExpression(activeChunk)
-				activeChunk = cs.chunkByTime(nextT, metric.isVariant)
+				activeChunk, err = cs.chunkByTime(nextT, metric.isVariant)
+				if err != nil {
+					hasPendingUpdates = false
+					return
+				}
 			}
 
 			pendingSampleIndex++
