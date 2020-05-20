@@ -311,6 +311,8 @@ def wait_for_release(V3IO_TSDB_VERSION, next_versions, tasks_list) {
                     def success_count = 0
 
                     while (true) {
+                        sleep(60)
+                        
                         def done_count = 0
 
                         echo "attempt #${i}"
@@ -372,8 +374,6 @@ def wait_for_release(V3IO_TSDB_VERSION, next_versions, tasks_list) {
                             error(error_string)
                             break
                         }
-
-                        sleep(60)
                     }
                 }
             }
