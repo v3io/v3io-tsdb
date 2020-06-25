@@ -51,6 +51,12 @@ func (suite *testTimeSuite) TestStr2durationZeroDays() {
 	suite.Require().Equal(int64(0), res)
 }
 
+func (suite *testTimeSuite) TestStr2durationSixSeconds() {
+	res, err := Str2duration("6s")
+	suite.Require().Nil(err)
+	suite.Require().Equal(int64(6*time.Second/time.Millisecond), res)
+}
+
 func (suite *testTimeSuite) TestStr2durationZero() {
 	res, err := Str2duration("0")
 	suite.Require().Nil(err)

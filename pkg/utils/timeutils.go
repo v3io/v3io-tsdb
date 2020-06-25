@@ -29,6 +29,7 @@ import (
 )
 
 const (
+	OneSecondMs = 1000
 	OneMinuteMs = 60 * 1000
 	OneHourMs   = 3600 * 1000
 	OneDayMs    = 24 * 3600 * 1000
@@ -41,9 +42,11 @@ func Str2duration(duration string) (int64, error) {
 	multiply := OneHourMs // 1 hour by default
 	if len(duration) > 0 {
 		last := duration[len(duration)-1:]
-		if last == "m" || last == "h" || last == "d" {
+		if last == "s" || last == "m" || last == "h" || last == "d" {
 			duration = duration[0 : len(duration)-1]
 			switch last {
+			case "s":
+				multiply = OneSecondMs
 			case "m":
 				multiply = OneMinuteMs
 			case "h":
