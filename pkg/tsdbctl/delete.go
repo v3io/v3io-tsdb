@@ -70,6 +70,21 @@ instead of using the -s|--server, -u|--username, -p|--password, and -c|--contain
 			if len(args) > 0 {
 				return errors.New("delete does not accept unnamed arguments. Did you forget to use a flag?")
 			}
+
+			if commandeer.deleteAll {
+				forbiddenArgs := map[string]string{
+					"begin":   commandeer.fromTime,
+					"end":     commandeer.toTime,
+					"filter":  commandeer.filter,
+					"metrics": commandeer.metrics,
+				}
+				for name, value := range forbiddenArgs {
+					if len(value) > 0 {
+						return errors.Errorf("delete --all cannot be used in conjunction with --%s", name)
+					}
+				}
+			}
+
 			// Initialize parameters
 			return commandeer.delete()
 		},
