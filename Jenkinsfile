@@ -1,5 +1,5 @@
 label = "${UUID.randomUUID().toString()}"
-BUILD_FOLDER = "/go"
+BUILD_FOLDER = "/home/jenkins/go"
 attempts=15
 git_project = "v3io-tsdb"
 git_project_user = "v3io"
@@ -30,7 +30,7 @@ def build_v3io_tsdb(TAG_VERSION) {
                         GO111MODULE=on GOOS=linux GOARCH=amd64 TRAVIS_TAG=${TAG_VERSION} make bin
                         GO111MODULE=on GOOS=darwin GOARCH=amd64 TRAVIS_TAG=${TAG_VERSION} make bin
                         GO111MODULE=on GOOS=windows GOARCH=amd64 TRAVIS_TAG=${TAG_VERSION} make bin
-                        ls -la /go/bin
+                        ls -la ${BUILD_FOLDER}/bin
                     """
                 }
             }
