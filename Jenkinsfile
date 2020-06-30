@@ -1,5 +1,5 @@
 label = "${UUID.randomUUID().toString()}"
-BUILD_FOLDER = "/go"
+BUILD_FOLDER = "/home/jenkins/go"
 attempts=15
 git_project = "v3io-tsdb"
 git_project_user = "v3io"
