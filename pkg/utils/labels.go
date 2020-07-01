@@ -54,9 +54,14 @@ type LabelsIfc interface {
 func (ls Labels) Filter(keep []string) LabelsIfc {
 	var res Labels
 	for _, l := range ls {
+		if l.Name == MetricName {
+			res = append(res, l)
+			continue
+		}
 		for _, keepLabel := range keep {
-			if l.Name == MetricName || l.Name == keepLabel {
+			if l.Name == keepLabel {
 				res = append(res, l)
+				break
 			}
 		}
 	}
