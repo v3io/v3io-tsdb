@@ -27,10 +27,14 @@ def build_v3io_tsdb(TAG_VERSION) {
             container('golang') {
                 dir("${BUILD_FOLDER}/src/github.com/${git_project_upstream_user}/${git_project}") {
                     sh """
+                        mkdir -p /home/jenkins/go/bin
                         GO111MODULE=on GOOS=linux GOARCH=amd64 TRAVIS_TAG=${TAG_VERSION} make bin
                         GO111MODULE=on GOOS=darwin GOARCH=amd64 TRAVIS_TAG=${TAG_VERSION} make bin
                         GO111MODULE=on GOOS=windows GOARCH=amd64 TRAVIS_TAG=${TAG_VERSION} make bin
                         ls -la /go/bin
+                        mv /go/bin/* /home/jenkins/go/bin/
+                        ls -la /home/jenkins/go/bin/
+
                     """
                 }
             }
