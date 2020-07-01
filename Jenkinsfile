@@ -388,202 +388,202 @@ def build_v3io_tsdb(TAG_VERSION) {
 //         }
 //     }
 // }
-//
-// podTemplate(label: "${git_project}-${label}", inheritFrom: "jnlp-docker-golang") {
-//     def MAIN_TAG_VERSION
-//     def FRAMES_NEXT_VERSION
-//     def next_versions = ['prometheus':null, 'tsdb-nuclio':null, 'frames':null]
-//
-//     pipelinex = library(identifier: 'pipelinex@development', retriever: modernSCM(
-//             [$class:        'GitSCMSource',
-//              credentialsId: git_deploy_user_private_key,
-//              remote:        "git@github.com:iguazio/pipelinex.git"])).com.iguazio.pipelinex
-//
-//     common.notify_slack {
-//         node("${git_project}-${label}") {
-//             withCredentials([
-//                     string(credentialsId: git_deploy_user_token, variable: 'GIT_TOKEN')
-//             ]) {
-//                 stage('get tag data') {
-//                     container('jnlp') {
-//                         MAIN_TAG_VERSION = github.get_tag_version(TAG_NAME)
-//
-//                         echo "$MAIN_TAG_VERSION"
-//                     }
-//                 }
-//
-//                 if (github.check_tag_expiration(git_project, git_project_user, MAIN_TAG_VERSION, GIT_TOKEN)) {
-//                     parallel(
-//                             'v3io-tsdb': {
-//                                 podTemplate(label: "v3io-tsdb-${label}", inheritFrom: "jnlp-docker-golang") {
-//                                     node("v3io-tsdb-${label}") {
-//                                         withCredentials([
-//                                                 string(credentialsId: git_deploy_user_token, variable: 'GIT_TOKEN')
-//                                         ]) {
-//                                             build_v3io_tsdb(MAIN_TAG_VERSION)
-//                                         }
-//                                     }
-//                                 }
-//                             },
-//                             'tsdb-nuclio': {
-//                                 podTemplate(label: "v3io-tsdb-nuclio-${label}", inheritFrom: "jnlp-docker-golang") {
-//                                     node("v3io-tsdb-nuclio-${label}") {
-//                                         withCredentials([
-//                                                 string(credentialsId: git_deploy_user_token, variable: 'GIT_TOKEN')
-//                                         ]) {
-//                                             def NEXT_VERSION
-//
-//                                             if (MAIN_TAG_VERSION != "unstable") {
-//                                                 stage('get previous release version') {
-//                                                     container('jnlp') {
-//                                                         NEXT_VERSION = github.get_next_short_tag_version("tsdb-nuclio", git_project_user, GIT_TOKEN)
-//                                                         next_versions.putAt("tsdb-nuclio", NEXT_VERSION)
-//                                                     }
-//                                                 }
-//
-//                                                 build_nuclio(MAIN_TAG_VERSION, "unstable")
-//                                                 build_nuclio(MAIN_TAG_VERSION)
-//
-//                                                 stage('create tsdb-nuclio prerelease') {
-//                                                     container('jnlp') {
-//                                                         // development has been triggered when committed to it in github-webhook nuclio function
-//                                                         // echo "Triggered tsdb-nuclio development will be builded with last tsdb stable version"
-//                                                         // github.delete_release("tsdb-nuclio", git_project_user, "unstable", GIT_TOKEN)
-//                                                         // github.create_prerelease("tsdb-nuclio", git_project_user, "unstable", GIT_TOKEN, "development")
-//
-//                                                         echo "Trigger tsdb-nuclio ${NEXT_VERSION} with tsdb ${MAIN_TAG_VERSION}"
-//                                                         github.create_prerelease("tsdb-nuclio", git_project_user, NEXT_VERSION, GIT_TOKEN)
-//                                                     }
-//                                                 }
-//                                             } else {
-//                                                 stage('info') {
-//                                                     echo("Unstable tsdb doesn't trigger tsdb-nuclio")
-//                                                 }
-//                                             }
-//                                         }
-//                                     }
-//                                 }
-//                             },
-//                             'frames': {
-//                                 podTemplate(label: "v3io-frames-${label}", inheritFrom: "jnlp-docker-golang") {
-//                                     node("v3io-frames-${label}") {
-//                                         withCredentials([
-//                                                 string(credentialsId: git_deploy_user_token, variable: 'GIT_TOKEN')
-//                                         ]) {
-//                                             def NEXT_VERSION
-//
-//                                             if (MAIN_TAG_VERSION != "unstable") {
-//                                                 stage('get previous release version') {
-//                                                     container('jnlp') {
-//                                                         NEXT_VERSION = github.get_next_short_tag_version("frames", git_project_user, GIT_TOKEN)
-//                                                         FRAMES_NEXT_VERSION = NEXT_VERSION
-//                                                         next_versions.putAt("frames", NEXT_VERSION)
-//                                                     }
-//                                                 }
-//
-//                                                 build_frames(MAIN_TAG_VERSION, "unstable")
-//                                                 build_frames(MAIN_TAG_VERSION)
-//
-//                                                 stage('create frames prerelease') {
-//                                                     container('jnlp') {
-//                                                         // development has been triggered when committed to it in github-webhook nuclio function
-//                                                         // echo "Triggered frames development will be builded with last tsdb stable version"
-//                                                         // github.delete_release("frames", git_project_user, "unstable", GIT_TOKEN)
-//                                                         // github.create_prerelease("frames", git_project_user, "unstable", GIT_TOKEN, "development")
-//
-//                                                         echo "Trigger frames ${NEXT_VERSION} with tsdb ${MAIN_TAG_VERSION}"
-//                                                         github.create_prerelease("frames", git_project_user, NEXT_VERSION, GIT_TOKEN)
-//                                                     }
-//                                                 }
-//                                             } else {
-//                                                 stage('info') {
-//                                                     echo("Unstable tsdb doesn't trigger frames")
-//                                                 }
-//                                             }
-//                                         }
-//                                     }
-//                                 }
-//                             }
-//                     )
-//                 }
-//             }
-//         }
-//
-//         node("${git_project}-${label}") {
-//             wait_for_release(MAIN_TAG_VERSION, next_versions, ['tsdb-nuclio': null, 'frames': null])
-//         }
-//
-//         // prometheus moved last cos need frames version to build
-//         podTemplate(label: "v3io-tsdb-prometheus-${label}", inheritFrom: "jnlp-docker-golang") {
-//             node("v3io-tsdb-prometheus-${label}") {
-//                 withCredentials([
-//                         string(credentialsId: git_deploy_user_token, variable: 'GIT_TOKEN')
-//                 ]) {
-//                     def TAG_VERSION
-//                     def NEXT_VERSION
-//
-//                     if (MAIN_TAG_VERSION != "unstable") {
-//                         stage('get current version') {
-//                             container('jnlp') {
-//                                 sh """
-//                                     cd ${BUILD_FOLDER}
-//                                     git clone https://${GIT_TOKEN}@github.com/${git_project_user}/prometheus.git src/github.com/prometheus/prometheus
-//                                 """
-//
-//                                 TAG_VERSION = sh(
-//                                         script: "cat ${BUILD_FOLDER}/src/github.com/prometheus/prometheus/VERSION",
-//                                         returnStdout: true
-//                                 ).trim()
-//                             }
-//                         }
-//
-//                         if (TAG_VERSION) {
-//                             stage('get previous release version') {
-//                                 container('jnlp') {
-//                                     NEXT_VERSION = github.get_next_short_tag_version("prometheus", git_project_user, GIT_TOKEN)
-//                                     echo "$NEXT_VERSION"
-//                                     next_versions.putAt('prometheus', NEXT_VERSION)
-//                                 }
-//                             }
-//
-//                             build_prometheus(MAIN_TAG_VERSION, FRAMES_NEXT_VERSION, "unstable")
-//                             build_prometheus(MAIN_TAG_VERSION, FRAMES_NEXT_VERSION)
-//
-//                             stage('create prometheus prerelease') {
-//                                 container('jnlp') {
-//                                     // development has been triggered when committed to it in github-webhook nuclio function
-//                                     // echo "Triggered prometheus development will be builded with last tsdb stable version"
-//                                     // github.delete_release("prometheus", git_project_user, "unstable", GIT_TOKEN)
-//                                     // github.create_prerelease("prometheus", git_project_user, "unstable", GIT_TOKEN, "development")
-//
-//                                     echo "Trigger prometheus ${NEXT_VERSION} with tsdb ${MAIN_TAG_VERSION}"
-//                                     github.create_prerelease("prometheus", git_project_user, NEXT_VERSION, GIT_TOKEN)
-//                                 }
-//                             }
-//                         }
-//                     } else {
-//                         stage('info') {
-//                             echo("Unstable tsdb doesn't trigger prometheus")
-//                         }
-//                     }
-//                 }
-//             }
-//         }
-//
-//         node("${git_project}-${label}") {
-//             wait_for_release(MAIN_TAG_VERSION, next_versions, ['prometheus': null])
-//         }
-//
-//         node("${git_project}-${label}") {
-//             withCredentials([
-//                     string(credentialsId: git_deploy_user_token, variable: 'GIT_TOKEN')
-//             ]) {
-//                 stage('update release status') {
-//                     container('jnlp') {
-//                         github.update_release_status(git_project, git_project_user, "${MAIN_TAG_VERSION}", GIT_TOKEN)
-//                     }
-//                 }
-//             }
-//         }
-//     }
-// }
+
+podTemplate(label: "${git_project}-${label}", inheritFrom: "jnlp-docker-golang") {
+    def MAIN_TAG_VERSION
+    def FRAMES_NEXT_VERSION
+    def next_versions = ['prometheus':null, 'tsdb-nuclio':null, 'frames':null]
+
+    pipelinex = library(identifier: 'pipelinex@development', retriever: modernSCM(
+            [$class:        'GitSCMSource',
+             credentialsId: git_deploy_user_private_key,
+             remote:        "git@github.com:iguazio/pipelinex.git"])).com.iguazio.pipelinex
+
+    common.notify_slack {
+        node("${git_project}-${label}") {
+            withCredentials([
+                    string(credentialsId: git_deploy_user_token, variable: 'GIT_TOKEN')
+            ]) {
+                stage('get tag data') {
+                    container('jnlp') {
+                        MAIN_TAG_VERSION = github.get_tag_version(TAG_NAME)
+
+                        echo "$MAIN_TAG_VERSION"
+                    }
+                }
+
+                if (github.check_tag_expiration(git_project, git_project_user, MAIN_TAG_VERSION, GIT_TOKEN)) {
+                    parallel(
+                            'v3io-tsdb': {
+                                podTemplate(label: "v3io-tsdb-${label}", inheritFrom: "jnlp-docker-golang") {
+                                    node("v3io-tsdb-${label}") {
+                                        withCredentials([
+                                                string(credentialsId: git_deploy_user_token, variable: 'GIT_TOKEN')
+                                        ]) {
+                                            build_v3io_tsdb(MAIN_TAG_VERSION)
+                                        }
+                                    }
+                                }
+                            },
+                            // 'tsdb-nuclio': {
+                            //     podTemplate(label: "v3io-tsdb-nuclio-${label}", inheritFrom: "jnlp-docker-golang") {
+                            //         node("v3io-tsdb-nuclio-${label}") {
+                            //             withCredentials([
+                            //                     string(credentialsId: git_deploy_user_token, variable: 'GIT_TOKEN')
+                            //             ]) {
+                            //                 def NEXT_VERSION
+                            //
+                            //                 if (MAIN_TAG_VERSION != "unstable") {
+                            //                     stage('get previous release version') {
+                            //                         container('jnlp') {
+                            //                             NEXT_VERSION = github.get_next_short_tag_version("tsdb-nuclio", git_project_user, GIT_TOKEN)
+                            //                             next_versions.putAt("tsdb-nuclio", NEXT_VERSION)
+                            //                         }
+                            //                     }
+                            //
+                            //                     build_nuclio(MAIN_TAG_VERSION, "unstable")
+                            //                     build_nuclio(MAIN_TAG_VERSION)
+                            //
+                            //                     stage('create tsdb-nuclio prerelease') {
+                            //                         container('jnlp') {
+                            //                             // development has been triggered when committed to it in github-webhook nuclio function
+                            //                             // echo "Triggered tsdb-nuclio development will be builded with last tsdb stable version"
+                            //                             // github.delete_release("tsdb-nuclio", git_project_user, "unstable", GIT_TOKEN)
+                            //                             // github.create_prerelease("tsdb-nuclio", git_project_user, "unstable", GIT_TOKEN, "development")
+                            //
+                            //                             echo "Trigger tsdb-nuclio ${NEXT_VERSION} with tsdb ${MAIN_TAG_VERSION}"
+                            //                             github.create_prerelease("tsdb-nuclio", git_project_user, NEXT_VERSION, GIT_TOKEN)
+                            //                         }
+                            //                     }
+                            //                 } else {
+                            //                     stage('info') {
+                            //                         echo("Unstable tsdb doesn't trigger tsdb-nuclio")
+                            //                     }
+                            //                 }
+                            //             }
+                            //         }
+                            //     }
+                            // },
+                            // 'frames': {
+                            //     podTemplate(label: "v3io-frames-${label}", inheritFrom: "jnlp-docker-golang") {
+                            //         node("v3io-frames-${label}") {
+                            //             withCredentials([
+                            //                     string(credentialsId: git_deploy_user_token, variable: 'GIT_TOKEN')
+                            //             ]) {
+                            //                 def NEXT_VERSION
+                            //
+                            //                 if (MAIN_TAG_VERSION != "unstable") {
+                            //                     stage('get previous release version') {
+                            //                         container('jnlp') {
+                            //                             NEXT_VERSION = github.get_next_short_tag_version("frames", git_project_user, GIT_TOKEN)
+                            //                             FRAMES_NEXT_VERSION = NEXT_VERSION
+                            //                             next_versions.putAt("frames", NEXT_VERSION)
+                            //                         }
+                            //                     }
+                            //
+                            //                     build_frames(MAIN_TAG_VERSION, "unstable")
+                            //                     build_frames(MAIN_TAG_VERSION)
+                            //
+                            //                     stage('create frames prerelease') {
+                            //                         container('jnlp') {
+                            //                             // development has been triggered when committed to it in github-webhook nuclio function
+                            //                             // echo "Triggered frames development will be builded with last tsdb stable version"
+                            //                             // github.delete_release("frames", git_project_user, "unstable", GIT_TOKEN)
+                            //                             // github.create_prerelease("frames", git_project_user, "unstable", GIT_TOKEN, "development")
+                            //
+                            //                             echo "Trigger frames ${NEXT_VERSION} with tsdb ${MAIN_TAG_VERSION}"
+                            //                             github.create_prerelease("frames", git_project_user, NEXT_VERSION, GIT_TOKEN)
+                            //                         }
+                            //                     }
+                            //                 } else {
+                            //                     stage('info') {
+                            //                         echo("Unstable tsdb doesn't trigger frames")
+                            //                     }
+                            //                 }
+                            //             }
+                            //         }
+                            //     }
+                            // }
+                    )
+                }
+            }
+        }
+
+        // node("${git_project}-${label}") {
+        //     wait_for_release(MAIN_TAG_VERSION, next_versions, ['tsdb-nuclio': null, 'frames': null])
+        // }
+        //
+        // // prometheus moved last cos need frames version to build
+        // podTemplate(label: "v3io-tsdb-prometheus-${label}", inheritFrom: "jnlp-docker-golang") {
+        //     node("v3io-tsdb-prometheus-${label}") {
+        //         withCredentials([
+        //                 string(credentialsId: git_deploy_user_token, variable: 'GIT_TOKEN')
+        //         ]) {
+        //             def TAG_VERSION
+        //             def NEXT_VERSION
+        //
+        //             if (MAIN_TAG_VERSION != "unstable") {
+        //                 stage('get current version') {
+        //                     container('jnlp') {
+        //                         sh """
+        //                             cd ${BUILD_FOLDER}
+        //                             git clone https://${GIT_TOKEN}@github.com/${git_project_user}/prometheus.git src/github.com/prometheus/prometheus
+        //                         """
+        //
+        //                         TAG_VERSION = sh(
+        //                                 script: "cat ${BUILD_FOLDER}/src/github.com/prometheus/prometheus/VERSION",
+        //                                 returnStdout: true
+        //                         ).trim()
+        //                     }
+        //                 }
+        //
+        //                 if (TAG_VERSION) {
+        //                     stage('get previous release version') {
+        //                         container('jnlp') {
+        //                             NEXT_VERSION = github.get_next_short_tag_version("prometheus", git_project_user, GIT_TOKEN)
+        //                             echo "$NEXT_VERSION"
+        //                             next_versions.putAt('prometheus', NEXT_VERSION)
+        //                         }
+        //                     }
+        //
+        //                     build_prometheus(MAIN_TAG_VERSION, FRAMES_NEXT_VERSION, "unstable")
+        //                     build_prometheus(MAIN_TAG_VERSION, FRAMES_NEXT_VERSION)
+        //
+        //                     stage('create prometheus prerelease') {
+        //                         container('jnlp') {
+        //                             // development has been triggered when committed to it in github-webhook nuclio function
+        //                             // echo "Triggered prometheus development will be builded with last tsdb stable version"
+        //                             // github.delete_release("prometheus", git_project_user, "unstable", GIT_TOKEN)
+        //                             // github.create_prerelease("prometheus", git_project_user, "unstable", GIT_TOKEN, "development")
+        //
+        //                             echo "Trigger prometheus ${NEXT_VERSION} with tsdb ${MAIN_TAG_VERSION}"
+        //                             github.create_prerelease("prometheus", git_project_user, NEXT_VERSION, GIT_TOKEN)
+        //                         }
+        //                     }
+        //                 }
+        //             } else {
+        //                 stage('info') {
+        //                     echo("Unstable tsdb doesn't trigger prometheus")
+        //                 }
+        //             }
+        //         }
+        //     }
+        // }
+        // 
+        // node("${git_project}-${label}") {
+        //     wait_for_release(MAIN_TAG_VERSION, next_versions, ['prometheus': null])
+        // }
+        //
+        // node("${git_project}-${label}") {
+        //     withCredentials([
+        //             string(credentialsId: git_deploy_user_token, variable: 'GIT_TOKEN')
+        //     ]) {
+        //         stage('update release status') {
+        //             container('jnlp') {
+        //                 github.update_release_status(git_project, git_project_user, "${MAIN_TAG_VERSION}", GIT_TOKEN)
+        //             }
+        //         }
+        //     }
+        // }
+    }
+}
