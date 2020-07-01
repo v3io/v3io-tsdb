@@ -261,7 +261,6 @@ def build_frames(V3IO_TSDB_VERSION, internal_status="stable") {
                     } else {
                         sh("GO111MODULE=on go get github.com/${git_project_user}/v3io-tsdb@${V3IO_TSDB_VERSION}")
                     }
-                    sh("GO111MODULE=on go mod vendor")
                     sh("chown 1000:1000 ./ -R")
                 }
             }
@@ -275,7 +274,7 @@ def build_frames(V3IO_TSDB_VERSION, internal_status="stable") {
                         git config --global user.name '${GIT_USERNAME}'
                         git remote rm origin
                         git remote add origin https://${GIT_USERNAME}:${GIT_TOKEN}@github.com/${git_project_user}/${git_project}.git
-                        git add go.mod go.sum vendor/modules.txt;
+                        git add go.mod go.sum
                     """
                     try {
                         common.shellc("git commit -m 'Updated TSDB to ${V3IO_TSDB_VERSION}'")
