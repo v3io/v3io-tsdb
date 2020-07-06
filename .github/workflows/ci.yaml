@@ -10,7 +10,7 @@ on:
   push:
     branches:
     - master
-    - omesser  # TODO: REMOVE ME
+    - gh_ci  # TODO: REMOVE ME
 
 jobs:
   test_short:
