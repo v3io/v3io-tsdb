@@ -10,7 +10,7 @@ on:
   push:
     branches:
     - master
-    - omesser  # TODO: REMOVEME
+    - omesser  # TODO: REMOVE ME
 
 jobs:
   test_short:
