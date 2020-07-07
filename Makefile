@@ -6,8 +6,6 @@ endif
 
 ifneq ($(TSDB_TAG),)
 	GIT_REVISION := $(TSDB_TAG)
-else ifneq ($(TRAVIS_TAG),)
-	GIT_REVISION := $(TRAVIS_TAG)
 else
 	GIT_REVISION := $(shell git describe --always)
 endif
