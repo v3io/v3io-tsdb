@@ -122,12 +122,12 @@ jobs:
     - name: Build binaries for ${{ matrix.go-os }}
       run: make bin
       env:
-        GOPATH: /home/runner/go
+        GOPATH: ${{ github.workspace }}/go
         GOARCH: amd64
         GOOS: ${{ matrix.go-os }}
 
     - name: Upload binaries
       uses: AButler/upload-release-assets@v2.0
       with:
-        files: '/home/runner/go/tsdbctl-*'
+        files: ${{ github.workspace }}/go/bin/tsdbctl-*
         repo-token: ${{ secrets.GITHUB_TOKEN }}
