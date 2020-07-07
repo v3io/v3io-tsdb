@@ -25,7 +25,7 @@ jobs:
       V3IO_API: ${{ secrets.V3IO_API }}
 
     steps:
-    - name: Dump gitHub context
+    - name: Dump github context
       run: echo "$GITHUB_CONTEXT"
       env:
         GITHUB_CONTEXT: ${{ toJson(github) }}
