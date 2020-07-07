@@ -59,12 +59,12 @@ jobs:
     - name: Test integration
       run: make integration
       env:
-        V3IO_TSDB_CONFIG: ./ci_v3io.yaml
+        V3IO_TSDB_CONFIG: ./test/ci_v3io.yaml
 
     - name: Test bench
       run: make bench
       env:
-        V3IO_TSDB_CONFIG: ./ci_v3io_bench.yaml
+        V3IO_TSDB_CONFIG: ./test/ci_v3io_bench.yaml
         TSDB_BENCH_INGEST_CONFIG: ./test/benchmark/testdata/tsdb-bench-test-config-ci.yaml
 
   release:
