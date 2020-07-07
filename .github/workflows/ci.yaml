@@ -37,6 +37,9 @@ jobs:
     - name: Dump github ref
       run: echo "$GITHUB_REF"
 
+    - name: List workspace contents
+      run: ls -la
+
     - uses: actions/setup-go@v2
       with:
         go-version: "^1.14.0"
@@ -59,13 +62,13 @@ jobs:
     - name: Test integration
       run: make integration
       env:
-        V3IO_TSDB_CONFIG: ./test/ci_v3io.yaml
+        V3IO_TSDB_CONFIG: ${{ github.workspace }}/test/ci_v3io.yaml
 
     - name: Test bench
       run: make bench
       env:
-        V3IO_TSDB_CONFIG: ./test/ci_v3io_bench.yaml
-        TSDB_BENCH_INGEST_CONFIG: ./test/benchmark/testdata/tsdb-bench-test-config-ci.yaml
+        V3IO_TSDB_CONFIG: ${{ github.workspace }}/test/ci_v3io_bench.yaml
+        TSDB_BENCH_INGEST_CONFIG: ${{ github.workspace }}/test/benchmark/testdata/tsdb-bench-test-config-ci.yaml
 
   release:
     name: Release
