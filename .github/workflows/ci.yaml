@@ -73,6 +73,12 @@ jobs:
     if: github.event_name == 'release'
     needs:
     - test
+    strategy:
+      matrix:
+        go-os:
+          - linux
+          - darwin
+          - windows
 
     steps:
     - name: Dump GitHub context
@@ -111,16 +117,15 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-go-
 
-    - name: Build binaries
-      run: |
-        GOOS=linux GOARCH=amd64 make build
-        GOOS=darwin GOARCH=amd64 make build
-        GOOS=windows GOARCH=amd64 make build
+    - name: Build binaries for ${{ matrix.go-os }}
+      run: make bin
       env:
         GOPATH: /home/runner/go
+        GOARCH: amd64
+        GOOS: ${{ matrix.go-os }}
 
     - name: Upload binaries
       uses: AButler/upload-release-assets@v2.0
       with:
-        files: 'tsdbctl-*'
+        files: '/home/runner/go/tsdbctl-*'
         repo-token: ${{ secrets.GITHUB_TOKEN }}
