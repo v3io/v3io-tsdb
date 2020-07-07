@@ -10,7 +10,6 @@ on:
   push:
     branches:
     - master
-    - gh_ci  # TODO: REMOVE ME
 
   release:
     types:
