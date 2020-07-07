@@ -22,6 +22,8 @@ jobs:
     runs-on: ubuntu-latest
     env:
       TSDB_TEST_TABLE_PATH: TSDB_INTEGRATION_TESTS/${{ github.sha }}
+      V3IO_ACCESS_KEY: ${{ secrets.V3IO_ACCESS_KEY }}
+      V3IO_API: ${{ secrets.V3IO_API }}
 
     steps:
     - name: Dump GitHub context
@@ -36,9 +38,6 @@ jobs:
 
     - name: Dump github ref
       run: echo "$GITHUB_REF"
-
-    - name: List workspace contents
-      run: ls -la
 
     - uses: actions/setup-go@v2
       with:
@@ -79,9 +78,9 @@ jobs:
     strategy:
       matrix:
         go-os:
-          - linux
-          - darwin
-          - windows
+        - linux
+        - darwin
+        - windows
 
     steps:
     - name: Dump GitHub context
