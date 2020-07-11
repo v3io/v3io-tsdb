@@ -21,8 +21,6 @@ jobs:
     runs-on: ubuntu-latest
     env:
       TSDB_TEST_TABLE_PATH: TSDB_INTEGRATION_TESTS/${{ github.sha }}
-      V3IO_ACCESS_KEY: ${{ secrets.V3IO_ACCESS_KEY }}
-      V3IO_API: ${{ secrets.V3IO_API }}
 
     steps:
     - name: Dump github context
@@ -37,19 +35,6 @@ jobs:
 
     - name: Dump github ref
       run: echo "$GITHUB_REF"
-
-    - name: Test secrets
-      run: |
-        if [ -z ${{ secrets.V3IO_API }} ];
-          then
-                echo "missing V3IO_API secret";
-                exit 1;
-        fi
-        if [ -z ${{ secrets.V3IO_ACCESS_KEY }} ];
-          then
-                echo "missing V3IO_ACCESS_KEY secret";
-                exit 1;
-        fi
 
     - uses: actions/setup-go@v2
       with:
@@ -70,16 +55,18 @@ jobs:
     - name: Test short
       run: make test
 
-    - name: Test integration
-      run: make integration
-      env:
-        V3IO_TSDB_CONFIG: ${{ github.workspace }}/test/ci_v3io.yaml
-
-    - name: Benchmark
-      run: make bench
-      env:
-        V3IO_TSDB_CONFIG: ${{ github.workspace }}/test/ci_v3io_bench.yaml
-        TSDB_BENCH_INGEST_CONFIG: ${{ github.workspace }}/test/benchmark/testdata/tsdb-bench-test-config-ci.yaml
+# Sisabled until GH actions will have a solution to using secret on PR triggered workflows.
+# Until then, this runs in travis
+#    - name: Test integration
+#      run: make integration
+#      env:
+#        V3IO_TSDB_CONFIG: ${{ github.workspace }}/test/ci_v3io.yaml
+#
+#    - name: Benchmark
+#      run: make bench
+#      env:
+#        V3IO_TSDB_CONFIG: ${{ github.workspace }}/test/ci_v3io_bench.yaml
+#        TSDB_BENCH_INGEST_CONFIG: ${{ github.workspace }}/test/benchmark/testdata/tsdb-bench-test-config-ci.yaml
 
   release:
     name: Release
