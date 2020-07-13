@@ -4,8 +4,8 @@ ifeq ($(GIT_BRANCH),)
 	GIT_BRANCH="N/A"
 endif
 
-ifneq ($(TSDB_TAG),)
-	GIT_REVISION := $(TSDB_TAG)
+ifneq ($(TSDB_LABEL),)
+	GIT_REVISION := $(TSDB_LABEL)
 else
 	GIT_REVISION := $(shell git describe --always)
 endif

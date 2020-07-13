@@ -55,7 +55,7 @@ jobs:
     - name: Test short
       run: make test
 
-# Sisabled until GH actions will have a solution to using secret on PR triggered workflows.
+# Disabled until GH actions will have a solution to using secret on PR triggered workflows.
 # Until then, this runs in travis
 #    - name: Test integration
 #      run: make integration
