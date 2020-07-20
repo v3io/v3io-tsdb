@@ -217,7 +217,7 @@ func (mc *MetricsCache) metricsUpdateLoop(index int) {
 				}
 
 				// Notify the metric feeder when all in-flight tasks are done
-				if mc.updatesInFlight == 0 && len(mc.asyncAppendChan) == 0 {
+				if mc.updatesInFlight == 0 {
 					mc.logger.Debug("Return to feed. Metric queue length: %d", mc.metricQueue.Length())
 					mc.updatesComplete <- 0
 				}
