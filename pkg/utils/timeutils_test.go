@@ -113,6 +113,15 @@ func (suite *testTimeSuite) TestStr2unixTimeWithNowPlusMinus() {
 	suite.Require().Equal(expectedDuration, endTime-startTime)
 }
 
+func (suite *testTimeSuite) TestRFCStr2unixTime() {
+	timeStr := "2020-07-20T14:55:56.770808000Z"
+	realTime, err := time.Parse(time.RFC3339, timeStr)
+	suite.Require().NoError(err)
+	timeInMillis, err := Str2unixTime(timeStr)
+	suite.Require().NoError(err)
+	suite.Require().Equal(realTime.UnixNano()/int64(time.Millisecond), timeInMillis)
+}
+
 func TestTimeSuite(t *testing.T) {
 	suite.Run(t, new(testTimeSuite))
 }
