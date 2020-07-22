@@ -77,10 +77,6 @@ func (m *MetricState) isReady() bool {
 	return m.state == storeStateReady
 }
 
-func (m *MetricState) isTimeInvalid(t int64) bool {
-	return !((m.state == storeStateReady || m.state == storeStateUpdate) && t < m.store.maxTime-maxLateArrivalInterval)
-}
-
 func (m *MetricState) getState() storeState {
 	return m.state
 }
