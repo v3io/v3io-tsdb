@@ -304,7 +304,7 @@ def wait_for_release(V3IO_TSDB_VERSION, next_versions, tasks_list) {
     withCredentials([
             string(credentialsId: git_deploy_user_token, variable: 'GIT_TOKEN')
     ]) {
-        if (V3IO_TSDB_VERSION != "unstable") {
+        if (V3IO_TSDB_VERSION != "unstable" && ! V3IO_TSDB_VERSION.startsWith('v0.9.')) {
             stage('waiting for prereleases moved to releases') {
                 container('jnlp') {
                     i = 0
@@ -379,7 +379,7 @@ def wait_for_release(V3IO_TSDB_VERSION, next_versions, tasks_list) {
             }
         } else {
             stage('info') {
-                echo("Unstable tsdb doesn't trigger tsdb-nuclio and prometheus")
+                echo("Unstable and v0.9.* tsdb doesn't trigger tsdb-nuclio and prometheus")
             }
         }
     }
@@ -429,7 +429,7 @@ podTemplate(label: "${git_project}-${label}", inheritFrom: "jnlp-docker-golang")
                                         ]) {
                                             def NEXT_VERSION
 
-                                            if (MAIN_TAG_VERSION != "unstable") {
+                                            if (MAIN_TAG_VERSION != "unstable" && ! MAIN_TAG_VERSION.startsWith('v0.9.')) {
                                                 stage('get previous release version') {
                                                     container('jnlp') {
                                                         CURRENT_VERSION = github.get_short_tag_version("tsdb-nuclio", git_project_user, GIT_TOKEN)
@@ -455,7 +455,7 @@ podTemplate(label: "${git_project}-${label}", inheritFrom: "jnlp-docker-golang")
                                                 }
                                             } else {
                                                 stage('info') {
-                                                    echo("Unstable tsdb doesn't trigger tsdb-nuclio")
+                                                    echo("Unstable and v0.9.* tsdb doesn't trigger tsdb-nuclio")
                                                 }
                                             }
                                         }
@@ -470,7 +470,7 @@ podTemplate(label: "${git_project}-${label}", inheritFrom: "jnlp-docker-golang")
                                         ]) {
                                             def NEXT_VERSION
 
-                                            if (MAIN_TAG_VERSION != "unstable") {
+                                            if (MAIN_TAG_VERSION != "unstable" && ! MAIN_TAG_VERSION.startsWith('v0.9.')) {
                                                 stage('get previous release version') {
                                                     container('jnlp') {
                                                         CURRENT_VERSION = github.get_short_tag_version("frames", git_project_user, GIT_TOKEN)
@@ -497,7 +497,7 @@ podTemplate(label: "${git_project}-${label}", inheritFrom: "jnlp-docker-golang")
                                                 }
                                             } else {
                                                 stage('info') {
-                                                    echo("Unstable tsdb doesn't trigger frames")
+                                                    echo("Unstable and v0.9.* tsdb doesn't trigger frames")
                                                 }
                                             }
                                         }
@@ -522,7 +522,7 @@ podTemplate(label: "${git_project}-${label}", inheritFrom: "jnlp-docker-golang")
                     def TAG_VERSION
                     def NEXT_VERSION
 
-                    if (MAIN_TAG_VERSION != "unstable") {
+                    if (MAIN_TAG_VERSION != "unstable" && ! MAIN_TAG_VERSION.startsWith('v0.9.')) {
                         stage('get current version') {
                             container('jnlp') {
                                 sh """
@@ -566,7 +566,7 @@ podTemplate(label: "${git_project}-${label}", inheritFrom: "jnlp-docker-golang")
                         }
                     } else {
                         stage('info') {
-                            echo("Unstable tsdb doesn't trigger prometheus")
+                            echo("Unstable and v0.9.* tsdb doesn't trigger prometheus")
                         }
                     }
                 }
