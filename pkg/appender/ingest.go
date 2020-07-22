@@ -49,7 +49,6 @@ func (mc *MetricsCache) metricFeed(index int) {
 	go func() {
 		inFlight := 0
 		gotData := false
-		gotCompletion := false
 		potentialCompletion := false
 		var completeChan chan int
 
@@ -64,14 +63,13 @@ func (mc *MetricsCache) metricFeed(index int) {
 
 				// If data was sent and the queue is empty, mark as completion
 				if length == 0 && gotData {
-					if len(mc.asyncAppendChan) == 0 {
-						gotCompletion = true
+					switch len(mc.asyncAppendChan) {
+					case 0:
+						potentialCompletion = true
 						if completeChan != nil {
 							completeChan <- 0
-							gotData = false
-							potentialCompletion = false
 						}
-					} else if len(mc.asyncAppendChan) == 1 {
+					case 1:
 						potentialCompletion = true
 					}
 				}
@@ -84,15 +82,9 @@ func (mc *MetricsCache) metricFeed(index int) {
 					if app.metric == nil {
 						// Handle update completion requests (metric == nil)
 						completeChan = app.resp
-						length := mc.metricQueue.Length()
-						if length == 0 && len(mc.asyncAppendChan) == 0 {
-							if gotCompletion || (potentialCompletion && gotData) {
-								completeChan <- 0
-								gotCompletion = false
-								gotData = false
-							}
+						if potentialCompletion {
+							completeChan <- 0
 						}
-						potentialCompletion = false
 					} else {
 						potentialCompletion = false
 						// Handle append requests (Add / AddFast)
@@ -100,25 +92,23 @@ func (mc *MetricsCache) metricFeed(index int) {
 						metric := app.metric
 						metric.Lock()
 
-						if metric.isTimeInvalid(app.t) {
-							metric.store.Append(app.t, app.v)
-							numPushed++
-							dataQueued += metric.store.samplesQueueLength()
+						metric.store.Append(app.t, app.v)
+						numPushed++
+						dataQueued += metric.store.samplesQueueLength()
 
-							// If there are no in-flight requests, add the metric to the queue and update state
-							if metric.isReady() || metric.getState() == storeStateInit {
+						// If there are no in-flight requests, add the metric to the queue and update state
+						if metric.isReady() || metric.getState() == storeStateInit {
 
-								if metric.getState() == storeStateInit {
-									metric.setState(storeStatePreGet)
-								}
-								if metric.isReady() {
-									metric.setState(storeStateUpdate)
-								}
+							if metric.getState() == storeStateInit {
+								metric.setState(storeStatePreGet)
+							}
+							if metric.isReady() {
+								metric.setState(storeStateUpdate)
+							}
 
-								length := mc.metricQueue.Push(metric)
-								if length < 2*mc.cfg.Workers {
-									newMetrics++
-								}
+							length := mc.metricQueue.Push(metric)
+							if length < 2*mc.cfg.Workers {
+								newMetrics++
 							}
 						}
 						metric.Unlock()
@@ -217,7 +207,7 @@ func (mc *MetricsCache) metricsUpdateLoop(index int) {
 				}
 
 				// Notify the metric feeder when all in-flight tasks are done
-				if mc.updatesInFlight == 0 && len(mc.asyncAppendChan) == 0 {
+				if mc.updatesInFlight == 0 {
 					mc.logger.Debug("Return to feed. Metric queue length: %d", mc.metricQueue.Length())
 					mc.updatesComplete <- 0
 				}
