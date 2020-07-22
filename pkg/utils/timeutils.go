@@ -108,11 +108,11 @@ func Str2unixTime(timeString string) (int64, error) {
 	if err != nil {
 		return 0, errors.Wrap(err, "Invalid time string - not an RFC 3339 time format.")
 	}
-	return t.Unix() * 1000, nil
+	return t.UnixNano() / int64(time.Millisecond), nil
 }
 
 func CurrentTimeInMillis() int64 {
-	return time.Now().Unix() * 1000
+	return time.Now().UnixNano() / int64(time.Millisecond)
 }
 
 func GetTimeFromRange(from, to, last, step string) (f int64, t int64, s int64, err error) {
