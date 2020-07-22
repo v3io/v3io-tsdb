@@ -80,7 +80,10 @@ func (suite *testTimeSuite) TestStr2unixTime() {
 	suite.Require().Nil(err)
 	startTime, err := Str2unixTime("now-1m")
 	suite.Require().Nil(err)
-	suite.Require().Equal(expectedDuration, endTime-startTime)
+	actualDuration := endTime - startTime
+	// "now" might slightly change from call to call, so we allow a safety range
+	suite.Require().LessOrEqual(expectedDuration-actualDuration, int64(2))
+	suite.Require().GreaterOrEqual(expectedDuration-actualDuration, int64(0))
 }
 
 func (suite *testTimeSuite) TestStr2unixTimeWithNow() {
@@ -90,7 +93,10 @@ func (suite *testTimeSuite) TestStr2unixTimeWithNow() {
 	suite.Require().Nil(err)
 	startTime, err := Str2unixTime("now-1m")
 	suite.Require().Nil(err)
-	suite.Require().Equal(expectedDuration, endTime-startTime)
+	actualDuration := endTime - startTime
+	// "now" might slightly change from call to call, so we allow a safety range
+	suite.Require().LessOrEqual(expectedDuration-actualDuration, int64(2))
+	suite.Require().GreaterOrEqual(expectedDuration-actualDuration, int64(0))
 }
 
 func (suite *testTimeSuite) TestStr2unixTimeWithNowPlus() {
@@ -100,7 +106,10 @@ func (suite *testTimeSuite) TestStr2unixTimeWithNowPlus() {
 	suite.Require().Nil(err)
 	startTime, err := Str2unixTime("now-1m")
 	suite.Require().Nil(err)
-	suite.Require().Equal(expectedDuration, endTime-startTime)
+	actualDuration := endTime - startTime
+	// "now" might slightly change from call to call, so we allow a safety range
+	suite.Require().LessOrEqual(expectedDuration-actualDuration, int64(2))
+	suite.Require().GreaterOrEqual(expectedDuration-actualDuration, int64(0))
 }
 
 func (suite *testTimeSuite) TestStr2unixTimeWithNowPlusMinus() {
@@ -110,7 +119,19 @@ func (suite *testTimeSuite) TestStr2unixTimeWithNowPlusMinus() {
 	suite.Require().Nil(err)
 	startTime, err := Str2unixTime("now-")
 	suite.Require().Nil(err)
-	suite.Require().Equal(expectedDuration, endTime-startTime)
+	actualDuration := endTime - startTime
+	// "now" might slightly change from call to call, so we allow a safety range
+	suite.Require().LessOrEqual(expectedDuration-actualDuration, int64(2))
+	suite.Require().GreaterOrEqual(expectedDuration-actualDuration, int64(0))
+}
+
+func (suite *testTimeSuite) TestRFCStr2unixTime() {
+	timeStr := "2020-07-20T14:55:56.770808000Z"
+	realTime, err := time.Parse(time.RFC3339, timeStr)
+	suite.Require().NoError(err)
+	timeInMillis, err := Str2unixTime(timeStr)
+	suite.Require().NoError(err)
+	suite.Require().Equal(realTime.UnixNano()/int64(time.Millisecond), timeInMillis)
 }
 
 func TestTimeSuite(t *testing.T) {

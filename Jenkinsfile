@@ -9,54 +9,6 @@ git_deploy_user_token = "iguazio-prod-git-user-token"
 git_deploy_user_private_key = "iguazio-prod-git-user-private-key"
 
 
-def build_v3io_tsdb(TAG_VERSION) {
-    withCredentials([
-            string(credentialsId: git_deploy_user_token, variable: 'GIT_TOKEN')
-    ]) {
-        def git_project = 'v3io-tsdb'
-        stage('prepare sources') {
-            container('jnlp') {
-                dir("${BUILD_FOLDER}/src/github.com/${git_project_upstream_user}/${git_project}") {
-                    git(changelog: false, credentialsId: git_deploy_user_private_key, poll: false, url: "git@github.com:${git_project_user}/${git_project}.git")
-                    sh("git checkout ${TAG_VERSION}")
-                }
-            }
-        }
-
-        stage("build ${git_project} binaries in dood") {
-            container('golang') {
-                dir("${BUILD_FOLDER}/src/github.com/${git_project_upstream_user}/${git_project}") {
-                    sh """
-                        mkdir -p /home/jenkins/go/bin
-                        GO111MODULE=on GOOS=linux GOARCH=amd64 TRAVIS_TAG=${TAG_VERSION} make bin
-                        GO111MODULE=on GOOS=darwin GOARCH=amd64 TRAVIS_TAG=${TAG_VERSION} make bin
-                        GO111MODULE=on GOOS=windows GOARCH=amd64 TRAVIS_TAG=${TAG_VERSION} make bin
-                        ls -la /go/bin
-                        mv /go/bin/* /home/jenkins/go/bin/
-                        ls -la /home/jenkins/go/bin/
-
-                    """
-                }
-            }
-        }
-
-        stage('upload release assets') {
-            container('jnlp') {
-                RELEASE_ID = github.get_release_id(git_project, git_project_user, "${TAG_VERSION}", GIT_TOKEN)
-
-                github.upload_asset(git_project, git_project_user, "tsdbctl-${TAG_VERSION}-linux-amd64", RELEASE_ID, GIT_TOKEN)
-                github.upload_asset(git_project, git_project_user, "tsdbctl-${TAG_VERSION}-darwin-amd64", RELEASE_ID, GIT_TOKEN)
-                github.upload_asset(git_project, git_project_user, "tsdbctl-${TAG_VERSION}-windows-amd64", RELEASE_ID, GIT_TOKEN)
-                withCredentials([
-                        string(credentialsId: pipelinex.PackagesRepo.ARTIFACTORY_IGUAZIO[2], variable: 'PACKAGES_ARTIFACTORY_PASSWORD')
-                ]) {
-                    common.upload_file_to_artifactory(pipelinex.PackagesRepo.ARTIFACTORY_IGUAZIO[0], pipelinex.PackagesRepo.ARTIFACTORY_IGUAZIO[1], PACKAGES_ARTIFACTORY_PASSWORD, "iguazio-devops/k8s", "tsdbctl-${TAG_VERSION}-linux-amd64")
-                }
-            }
-        }
-    }
-}
-
 def build_nuclio(V3IO_TSDB_VERSION, internal_status="stable") {
     withCredentials([
             usernamePassword(credentialsId: git_deploy_user, passwordVariable: 'GIT_PASSWORD', usernameVariable: 'GIT_USERNAME'),
@@ -413,17 +365,6 @@ podTemplate(label: "${git_project}-${label}", inheritFrom: "jnlp-docker-golang")
 
                 if (github.check_tag_expiration(git_project, git_project_user, MAIN_TAG_VERSION, GIT_TOKEN)) {
                     parallel(
-                            'v3io-tsdb': {
-                                podTemplate(label: "v3io-tsdb-${label}", inheritFrom: "jnlp-docker-golang") {
-                                    node("v3io-tsdb-${label}") {
-                                        withCredentials([
-                                                string(credentialsId: git_deploy_user_token, variable: 'GIT_TOKEN')
-                                        ]) {
-                                            build_v3io_tsdb(MAIN_TAG_VERSION)
-                                        }
-                                    }
-                                }
-                            },
                             'tsdb-nuclio': {
                                 podTemplate(label: "v3io-tsdb-nuclio-${label}", inheritFrom: "jnlp-docker-golang") {
                                     node("v3io-tsdb-nuclio-${label}") {
