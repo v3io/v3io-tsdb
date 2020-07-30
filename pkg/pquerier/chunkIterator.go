@@ -194,8 +194,27 @@ func (it *RawChunkIterator) AddChunks(item *qryResults) {
 		}
 	}
 
-	it.chunks = append(it.chunks, chunks...)
-	it.chunksMax = append(it.chunksMax, chunksMax...)
+	// Add new chunks sorted
+	if len(chunksMax) != 0 {
+		if len(it.chunksMax) == 0 || it.chunksMax[len(it.chunksMax)-1] < chunksMax[0] {
+			it.chunks = append(it.chunks, chunks...)
+			it.chunksMax = append(it.chunksMax, chunksMax...)
+		} else {
+			for i := 0; i < len(it.chunksMax); i++ {
+				if it.chunksMax[i] > chunksMax[0] {
+					var endChunks []chunkenc.Chunk
+					endChunks = append(chunks, it.chunks[i:]...)
+					it.chunks = append(it.chunks[:i], endChunks...)
+
+					var endMaxChunks []int64
+					endMaxChunks = append(chunksMax, it.chunksMax[i:]...)
+					it.chunksMax = append(it.chunksMax[:i], endMaxChunks...)
+
+					break
+				}
+			}
+		}
+	}
 }
 
 func (it *RawChunkIterator) PeakBack() (t int64, v float64) { return it.prevT, it.prevV }
