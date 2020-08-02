@@ -202,14 +202,16 @@ func (it *RawChunkIterator) AddChunks(item *qryResults) {
 		} else {
 			for i := 0; i < len(it.chunksMax); i++ {
 				if it.chunksMax[i] > chunksMax[0] {
-					var endChunks []chunkenc.Chunk
-					endChunks = append(chunks, it.chunks[i:]...)
+					endChunks := append(chunks, it.chunks[i:]...)
 					it.chunks = append(it.chunks[:i], endChunks...)
 
-					var endMaxChunks []int64
-					endMaxChunks = append(chunksMax, it.chunksMax[i:]...)
+					endMaxChunks := append(chunksMax, it.chunksMax[i:]...)
 					it.chunksMax = append(it.chunksMax[:i], endMaxChunks...)
 
+					// If we are inserting a new chunk to the beginning set the current iterator to the new first chunk
+					if i == 0 {
+						it.iter = it.chunks[0].Iterator()
+					}
 					break
 				}
 			}
