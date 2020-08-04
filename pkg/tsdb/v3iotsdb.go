@@ -44,7 +44,6 @@ import (
 	"github.com/v3io/v3io-tsdb/pkg/partmgr"
 	"github.com/v3io/v3io-tsdb/pkg/pquerier"
 	"github.com/v3io/v3io-tsdb/pkg/querier"
-	"github.com/v3io/v3io-tsdb/pkg/tsdb/schema"
 	"github.com/v3io/v3io-tsdb/pkg/utils"
 )
 
@@ -200,12 +199,6 @@ func (a *V3ioAdapter) connect() error {
 	err = json.Unmarshal(resp.Body(), &tableSchema)
 	if err != nil {
 		return errors.Wrapf(err, "Failed to unmarshal the TSDB schema at '%s', got: %v .", fullpath, string(resp.Body()))
-	}
-
-	// in order to support backward compatibility we do not fail on version mismatch and only logging warning
-	if a.cfg.LoadPartitionsFromSchemaAttr && tableSchema.TableSchemaInfo.Version != schema.Version {
-		a.logger.Warn("Table Schema version mismatch - existing table schema version is %d while the tsdb library version is %d! Make sure to create the table with same library version",
-			tableSchema.TableSchemaInfo.Version, schema.Version)
 	}
 
 	a.partitionMngr, err = partmgr.NewPartitionMngr(&tableSchema, a.container, a.cfg)
