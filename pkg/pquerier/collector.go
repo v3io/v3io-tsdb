@@ -66,7 +66,7 @@ func mainCollector(ctx *selectQueryContext, responseChannel chan *qryResults) {
 
 	for {
 		select {
-		case _ = <-ctx.stopChan:
+		case <-ctx.stopChan:
 			return
 		case res, ok := <-responseChannel:
 			if !ok {

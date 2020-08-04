@@ -169,7 +169,6 @@ func (q *V3ioQuerier) selectQry(params *SelectParams) (set utils.SeriesSet, err 
 		}
 
 		set, err = newIterSortMerger(sets)
-		return
 	})
 
 	return
@@ -284,7 +283,7 @@ func (q *V3ioQuerier) getMetricNames() ([]string, error) {
 		metricNames = append(metricNames, iter.GetField("__name").(string))
 	}
 
-	sort.Sort(sort.StringSlice(metricNames))
+	sort.Strings(metricNames)
 
 	if iter.Err() != nil {
 		q.logger.InfoWith("Failed to read metric names; returning an empty list.", "err", iter.Err().Error())

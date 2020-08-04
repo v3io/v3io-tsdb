@@ -281,7 +281,6 @@ func (p *PartitionManager) ReadAndUpdateSchema() (err error) {
 
 		metricReporter.WithTimer("ReadAndUpdateSchemaTimer", func() {
 			err = p.updatePartitionsFromSchema(nil, schemaGetItemResponse)
-			return
 		})
 	}
 	return

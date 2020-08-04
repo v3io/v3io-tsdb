@@ -260,7 +260,6 @@ func GetOrDefaultConfig() (*V3ioConfig, error) {
 func GetOrLoadFromFile(path string) (*V3ioConfig, error) {
 	once.Do(func() {
 		instance, failure = loadConfig(path)
-		return
 	})
 
 	return instance, failure
@@ -269,7 +268,6 @@ func GetOrLoadFromFile(path string) (*V3ioConfig, error) {
 func GetOrLoadFromData(data []byte) (*V3ioConfig, error) {
 	once.Do(func() {
 		instance, failure = loadFromData(data)
-		return
 	})
 
 	return instance, failure
@@ -280,7 +278,6 @@ func GetOrLoadFromStruct(cfg *V3ioConfig) (*V3ioConfig, error) {
 	once.Do(func() {
 		initDefaults(cfg)
 		instance = cfg
-		return
 	})
 
 	return instance, nil

@@ -117,7 +117,7 @@ func parseFuncExpr(expr *sqlparser.FuncExpr, destCol *RequestedColumn) error {
 			case *sqlparser.FuncExpr:
 				err := parseFuncExpr(innerExpr, destCol)
 				if err != nil {
-					return errors.Wrap(err, fmt.Sprintf("could not parse expr"))
+					return errors.Wrap(err, "could not parse expr")
 				}
 			}
 		}
