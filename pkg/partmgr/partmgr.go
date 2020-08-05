@@ -181,24 +181,6 @@ func (p *PartitionManager) updateSchema() error {
 			err = p.container.PutObjectSync(&v3io.PutObjectInput{Path: schemaFilePath, Body: data})
 			if err != nil {
 				outerError = err
-				return
-			}
-			attributes := make(map[string]interface{}, len(p.partitions))
-			for _, part := range p.partitions {
-				marshalledPartition, err := json.Marshal(part.ToMap())
-				if err != nil {
-					outerError = err
-					return
-				}
-				attributes[part.GetPartitionAttributeName()] = marshalledPartition
-			}
-
-			input := &v3io.PutItemInput{Path: schemaFilePath, Attributes: attributes}
-			_, err := p.container.PutItemSync(input)
-
-			if err != nil {
-				outerError = errors.Wrap(err, "failed to update partitions table.")
-				return
 			}
 		}
 	})
