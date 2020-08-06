@@ -15,8 +15,8 @@ require (
 	github.com/spf13/cobra v0.0.3
 	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/stretchr/testify v1.4.0
-	github.com/v3io/frames v0.7.10
-	github.com/v3io/v3io-go v0.1.5-0.20200416113214-f1b82b9a8e82
+	github.com/v3io/frames v0.7.33
+	github.com/v3io/v3io-go v0.1.9
 	github.com/xwb1989/sqlparser v0.0.0-20180606152119-120387863bf2
 )
 
