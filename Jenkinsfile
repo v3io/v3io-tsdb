@@ -1,5 +1,5 @@
 label = "${UUID.randomUUID().toString()}"
-BUILD_FOLDER = "/go"
+BUILD_FOLDER = "/home/jenkins/go"
 attempts=15
 git_project = "v3io-tsdb"
 git_project_user = "v3io"
@@ -30,7 +30,8 @@ def build_v3io_tsdb(TAG_VERSION) {
                         GO111MODULE=on GOOS=linux GOARCH=amd64 TRAVIS_TAG=${TAG_VERSION} make bin
                         GO111MODULE=on GOOS=darwin GOARCH=amd64 TRAVIS_TAG=${TAG_VERSION} make bin
                         GO111MODULE=on GOOS=windows GOARCH=amd64 TRAVIS_TAG=${TAG_VERSION} make bin
-                        ls -la /go/bin
+                        mv /go/bin/* ${BUILD_FOLDER}/
+                        ls -la ${BUILD_FOLDER}
                     """
                 }
             }
@@ -40,13 +41,13 @@ def build_v3io_tsdb(TAG_VERSION) {
             container('jnlp') {
                 RELEASE_ID = github.get_release_id(git_project, git_project_user, "${TAG_VERSION}", GIT_TOKEN)
 
-                github.upload_asset(git_project, git_project_user, "tsdbctl-${TAG_VERSION}-linux-amd64", RELEASE_ID, GIT_TOKEN)
-                github.upload_asset(git_project, git_project_user, "tsdbctl-${TAG_VERSION}-darwin-amd64", RELEASE_ID, GIT_TOKEN)
-                github.upload_asset(git_project, git_project_user, "tsdbctl-${TAG_VERSION}-windows-amd64", RELEASE_ID, GIT_TOKEN)
+                github.upload_asset(git_project, git_project_user, "tsdbctl-${TAG_VERSION}-linux-amd64", RELEASE_ID, GIT_TOKEN, BUILD_FOLDER)
+                github.upload_asset(git_project, git_project_user, "tsdbctl-${TAG_VERSION}-darwin-amd64", RELEASE_ID, GIT_TOKEN, BUILD_FOLDER)
+                github.upload_asset(git_project, git_project_user, "tsdbctl-${TAG_VERSION}-windows-amd64", RELEASE_ID, GIT_TOKEN, BUILD_FOLDER)
                 withCredentials([
                         string(credentialsId: pipelinex.PackagesRepo.ARTIFACTORY_IGUAZIO[2], variable: 'PACKAGES_ARTIFACTORY_PASSWORD')
                 ]) {
-                    common.upload_file_to_artifactory(pipelinex.PackagesRepo.ARTIFACTORY_IGUAZIO[0], pipelinex.PackagesRepo.ARTIFACTORY_IGUAZIO[1], PACKAGES_ARTIFACTORY_PASSWORD, "iguazio-devops/k8s", "tsdbctl-${TAG_VERSION}-linux-amd64")
+                    common.upload_file_to_artifactory(pipelinex.PackagesRepo.ARTIFACTORY_IGUAZIO[0], pipelinex.PackagesRepo.ARTIFACTORY_IGUAZIO[1], PACKAGES_ARTIFACTORY_PASSWORD, "iguazio-devops/k8s", "tsdbctl-${TAG_VERSION}-linux-amd64", BUILD_FOLDER)
                 }
             }
         }
@@ -304,7 +305,7 @@ def wait_for_release(V3IO_TSDB_VERSION, next_versions, tasks_list) {
     withCredentials([
             string(credentialsId: git_deploy_user_token, variable: 'GIT_TOKEN')
     ]) {
-        if (V3IO_TSDB_VERSION != "unstable") {
+        if (V3IO_TSDB_VERSION != "unstable" && ! V3IO_TSDB_VERSION.startsWith('v0.9.')) {
             stage('waiting for prereleases moved to releases') {
                 container('jnlp') {
                     i = 0
@@ -379,7 +380,7 @@ def wait_for_release(V3IO_TSDB_VERSION, next_versions, tasks_list) {
             }
         } else {
             stage('info') {
-                echo("Unstable tsdb doesn't trigger tsdb-nuclio and prometheus")
+                echo("Unstable and v0.9.* tsdb doesn't trigger tsdb-nuclio and prometheus")
             }
         }
     }
@@ -429,7 +430,7 @@ podTemplate(label: "${git_project}-${label}", inheritFrom: "jnlp-docker-golang")
                                         ]) {
                                             def NEXT_VERSION
 
-                                            if (MAIN_TAG_VERSION != "unstable") {
+                                            if (MAIN_TAG_VERSION != "unstable" && ! MAIN_TAG_VERSION.startsWith('v0.9.')) {
                                                 stage('get previous release version') {
                                                     container('jnlp') {
                                                         CURRENT_VERSION = github.get_short_tag_version("tsdb-nuclio", git_project_user, GIT_TOKEN)
@@ -455,7 +456,7 @@ podTemplate(label: "${git_project}-${label}", inheritFrom: "jnlp-docker-golang")
                                                 }
                                             } else {
                                                 stage('info') {
-                                                    echo("Unstable tsdb doesn't trigger tsdb-nuclio")
+                                                    echo("Unstable and v0.9.* tsdb doesn't trigger tsdb-nuclio")
                                                 }
                                             }
                                         }
@@ -470,7 +471,7 @@ podTemplate(label: "${git_project}-${label}", inheritFrom: "jnlp-docker-golang")
                                         ]) {
                                             def NEXT_VERSION
 
-                                            if (MAIN_TAG_VERSION != "unstable") {
+                                            if (MAIN_TAG_VERSION != "unstable" && ! MAIN_TAG_VERSION.startsWith('v0.9.')) {
                                                 stage('get previous release version') {
                                                     container('jnlp') {
                                                         CURRENT_VERSION = github.get_short_tag_version("frames", git_project_user, GIT_TOKEN)
@@ -497,7 +498,7 @@ podTemplate(label: "${git_project}-${label}", inheritFrom: "jnlp-docker-golang")
                                                 }
                                             } else {
                                                 stage('info') {
-                                                    echo("Unstable tsdb doesn't trigger frames")
+                                                    echo("Unstable and v0.9.* tsdb doesn't trigger frames")
                                                 }
                                             }
                                         }
@@ -522,7 +523,7 @@ podTemplate(label: "${git_project}-${label}", inheritFrom: "jnlp-docker-golang")
                     def TAG_VERSION
                     def NEXT_VERSION
 
-                    if (MAIN_TAG_VERSION != "unstable") {
+                    if (MAIN_TAG_VERSION != "unstable" && ! MAIN_TAG_VERSION.startsWith('v0.9.')) {
                         stage('get current version') {
                             container('jnlp') {
                                 sh """
@@ -566,7 +567,7 @@ podTemplate(label: "${git_project}-${label}", inheritFrom: "jnlp-docker-golang")
                         }
                     } else {
                         stage('info') {
-                            echo("Unstable tsdb doesn't trigger prometheus")
+                            echo("Unstable and v0.9.* tsdb doesn't trigger prometheus")
                         }
                     }
                 }
