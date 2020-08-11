@@ -25,6 +25,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"sort"
+	"sync/atomic"
 	"time"
 
 	"github.com/nuclio/logger"
@@ -158,8 +159,10 @@ func (cs *chunkStore) getChunksState(mc *MetricsCache, metric *MetricState) (boo
 	getInput := v3io.GetItemInput{
 		Path: path, AttributeNames: []string{config.MaxTimeAttrName}}
 
+	atomic.AddInt64(&mc.requestsInFlight, 1)
 	request, err := mc.container.GetItem(&getInput, metric, mc.responseChan)
 	if err != nil {
+		atomic.AddInt64(&mc.requestsInFlight, -1)
 		mc.logger.ErrorWith("Failed to send a GetItem request to the TSDB", "metric", metric.key, "err", err)
 		return false, err
 	}
@@ -188,8 +191,10 @@ func (cs *chunkStore) processGetResp(mc *MetricsCache, metric *MetricState, resp
 				path := filepath.Join(mc.cfg.TablePath, config.NamesDirectory, metric.name)
 				putInput := v3io.PutItemInput{Path: path, Attributes: map[string]interface{}{}}
 
+				atomic.AddInt64(&mc.requestsInFlight, 1)
 				request, err := mc.container.PutItem(&putInput, metric, mc.nameUpdateChan)
 				if err != nil {
+					atomic.AddInt64(&mc.requestsInFlight, -1)
 					cs.performanceReporter.IncrementCounter("PutNameError", 1)
 					mc.logger.ErrorWith("Update-name PutItem failed", "metric", metric.key, "err", err)
 				} else {
@@ -453,9 +458,11 @@ func (cs *chunkStore) writeChunks(mc *MetricsCache, metric *MetricState) (hasPen
 		}
 		expr += fmt.Sprintf("%v=%d;", config.MaxTimeAttrName, cs.maxTime) // TODO: use max() expr
 		path := partition.GetMetricPath(metric.name, metric.hash, cs.labelNames, cs.isAggr())
+		atomic.AddInt64(&mc.requestsInFlight, 1)
 		request, err := mc.container.UpdateItem(
 			&v3io.UpdateItemInput{Path: path, Expression: &expr, Condition: conditionExpr}, metric, mc.responseChan)
 		if err != nil {
+			atomic.AddInt64(&mc.requestsInFlight, -1)
 			mc.logger.ErrorWith("UpdateItem failed", "err", err)
 			hasPendingUpdates = false
 		}

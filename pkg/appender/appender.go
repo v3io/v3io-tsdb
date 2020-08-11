@@ -120,6 +120,9 @@ type MetricsCache struct {
 	updatesComplete chan int
 	newUpdates      chan int
 
+	outstandingUpdates int64
+	requestsInFlight   int64
+
 	lastMetric uint64
 
 	// TODO: consider switching to synch.Map (https://golang.org/pkg/sync/#Map)
