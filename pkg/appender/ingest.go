@@ -150,7 +150,6 @@ func (mc *MetricsCache) metricsUpdateLoop(index int) {
 					freeSlots := mc.cfg.Workers*2 - mc.updatesInFlight
 					metrics := mc.metricQueue.PopN(freeSlots)
 					for _, metric := range metrics {
-						mc.logger.WarnWith("calling post metrics from new updates")
 						mc.postMetricUpdates(metric)
 					}
 					if len(metrics) < freeSlots {
@@ -198,7 +197,6 @@ func (mc *MetricsCache) metricsUpdateLoop(index int) {
 						break
 					}
 					for _, metric := range metrics {
-						mc.logger.WarnWith("calling post metrics")
 						mc.postMetricUpdates(metric)
 					}
 				}
@@ -237,9 +235,8 @@ func (mc *MetricsCache) postMetricUpdates(metric *MetricState) {
 		}
 
 	} else {
-		// Getting the new state for the current partition
+		// In case our data spreads across multiple partitions, get the new state for the current partition
 		if metric.ShouldGetState {
-			mc.logger.WarnWith("handle response - getting chunk again")
 			sent, err = metric.store.getChunksState(mc, metric)
 			if err != nil {
 				// Count errors
@@ -358,9 +355,8 @@ func (mc *MetricsCache) handleResponse(metric *MetricState, resp *v3io.Response,
 	var err error
 
 	if canWrite {
-		// Getting the new state for the current partition
+		// In case our data spreads across multiple partitions, get the new state for the current partition
 		if metric.ShouldGetState {
-			mc.logger.WarnWith("handle response - getting chunk again")
 			sent, err = metric.store.getChunksState(mc, metric)
 			if err != nil {
 				// Count errors
@@ -375,7 +371,6 @@ func (mc *MetricsCache) handleResponse(metric *MetricState, resp *v3io.Response,
 				mc.updatesInFlight++
 			}
 		} else {
-			mc.logger.WarnWith("writing chunks from handleResponse")
 			sent, err = metric.store.writeChunks(mc, metric)
 			if err != nil {
 				// Count errors
