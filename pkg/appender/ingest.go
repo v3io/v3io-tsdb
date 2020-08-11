@@ -56,10 +56,7 @@ func (mc *MetricsCache) metricFeed(index int) {
 			select {
 			case _ = <-mc.stopChan:
 				return
-			case inFlight = <-mc.updatesComplete:
-				// Handle completion notifications from the update loop
-				mc.logger.Debug(`Complete update cycle - "in-flight requests"=%d; "metric queue length"=%d\n`, inFlight)
-
+			case inFlight = <-mc.updatesComplete: // Handle completion notifications from the update loop
 				switch len(mc.asyncAppendChan) {
 				case 0:
 					potentialCompletion = true
@@ -164,7 +161,7 @@ func (mc *MetricsCache) metricsUpdateLoop(index int) {
 				outstandingUpdates := atomic.AddInt64(&mc.outstandingUpdates, -1)
 
 				if atomic.LoadInt64(&mc.requestsInFlight) == 0 && outstandingUpdates == 0 {
-					mc.logger.Debug("Complete new update cycle - in-flight %d.\n", mc.updatesInFlight)
+					mc.logger.Debug("Return to feed after processing newUpdates")
 					mc.updatesComplete <- 0
 				}
 			case resp := <-mc.responseChan:
@@ -209,7 +206,7 @@ func (mc *MetricsCache) metricsUpdateLoop(index int) {
 
 				// Notify the metric feeder when all in-flight tasks are done
 				if requestsInFlight == 0 && atomic.LoadInt64(&mc.outstandingUpdates) == 0 {
-					mc.logger.Debug("Return to feed. Metric queue length: %d", mc.metricQueue.Length())
+					mc.logger.Debug("Return to feed after processing responseChan")
 					mc.updatesComplete <- 0
 				}
 			}
@@ -391,7 +388,7 @@ func (mc *MetricsCache) nameUpdateRespLoop() {
 				requestsInFlight := atomic.AddInt64(&mc.requestsInFlight, -1)
 
 				if requestsInFlight == 0 && atomic.LoadInt64(&mc.outstandingUpdates) == 0 {
-					mc.logger.Debug("Return to feed. Metric queue length: %d", mc.metricQueue.Length())
+					mc.logger.Debug("Return to feed after processing nameUpdateChan")
 					mc.updatesComplete <- 0
 				}
 			}
