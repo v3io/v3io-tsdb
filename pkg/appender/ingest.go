@@ -163,7 +163,7 @@ func (mc *MetricsCache) metricsUpdateLoop(index int) {
 
 				outstandingUpdates := atomic.AddInt64(&mc.outstandingUpdates, -1)
 
-				if mc.requestsInFlight == 0 && outstandingUpdates == 0 {
+				if atomic.LoadInt64(&mc.requestsInFlight) == 0 && outstandingUpdates == 0 {
 					mc.logger.Debug("Complete new update cycle - in-flight %d.\n", mc.updatesInFlight)
 					mc.updatesComplete <- 0
 				}
@@ -388,9 +388,9 @@ func (mc *MetricsCache) nameUpdateRespLoop() {
 
 				resp.Release()
 
-				atomic.AddInt64(&mc.requestsInFlight, -1)
+				requestsInFlight := atomic.AddInt64(&mc.requestsInFlight, -1)
 
-				if atomic.LoadInt64(&mc.requestsInFlight) == 0 && atomic.LoadInt64(&mc.outstandingUpdates) == 0 {
+				if requestsInFlight == 0 && atomic.LoadInt64(&mc.outstandingUpdates) == 0 {
 					mc.logger.Debug("Return to feed. Metric queue length: %d", mc.metricQueue.Length())
 					mc.updatesComplete <- 0
 				}
