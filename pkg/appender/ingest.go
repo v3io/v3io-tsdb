@@ -24,6 +24,7 @@ import (
 	"fmt"
 	"net/http"
 	"reflect"
+	"sync/atomic"
 	"time"
 
 	"github.com/pkg/errors"
@@ -48,7 +49,6 @@ func (mc *MetricsCache) metricFeed(index int) {
 
 	go func() {
 		inFlight := 0
-		gotData := false
 		potentialCompletion := false
 		var completeChan chan int
 
@@ -58,20 +58,17 @@ func (mc *MetricsCache) metricFeed(index int) {
 				return
 			case inFlight = <-mc.updatesComplete:
 				// Handle completion notifications from the update loop
-				length := mc.metricQueue.Length()
-				mc.logger.Debug(`Complete update cycle - "in-flight requests"=%d; "metric queue length"=%d\n`, inFlight, length)
+				mc.logger.Debug(`Complete update cycle - "in-flight requests"=%d; "metric queue length"=%d\n`, inFlight)
 
-				// If data was sent and the queue is empty, mark as completion
-				if length == 0 && gotData {
-					switch len(mc.asyncAppendChan) {
-					case 0:
-						potentialCompletion = true
-						if completeChan != nil {
-							completeChan <- 0
-						}
-					case 1:
-						potentialCompletion = true
+				switch len(mc.asyncAppendChan) {
+				case 0:
+					potentialCompletion = true
+					if completeChan != nil {
+						mc.logger.Info("Terminating after update...")
+						completeChan <- 0
 					}
+				case 1:
+					potentialCompletion = true
 				}
 			case app := <-mc.asyncAppendChan:
 				newMetrics := 0
@@ -83,12 +80,12 @@ func (mc *MetricsCache) metricFeed(index int) {
 						// Handle update completion requests (metric == nil)
 						completeChan = app.resp
 						if potentialCompletion {
+							mc.logger.Info("Terminating after WaitForCompletion...")
 							completeChan <- 0
 						}
 					} else {
 						potentialCompletion = false
 						// Handle append requests (Add / AddFast)
-						gotData = true
 						metric := app.metric
 						metric.Lock()
 
@@ -124,6 +121,7 @@ func (mc *MetricsCache) metricFeed(index int) {
 				}
 				// Notify the update loop that there are new metrics to process
 				if newMetrics > 0 {
+					atomic.AddInt64(&mc.outstandingUpdates, 1)
 					mc.newUpdates <- newMetrics
 				}
 
@@ -154,7 +152,7 @@ func (mc *MetricsCache) metricsUpdateLoop(index int) {
 				return
 			case _ = <-mc.newUpdates:
 				// Handle new metric notifications (from metricFeed)
-				for mc.updatesInFlight < mc.cfg.Workers*2 { //&& newMetrics > 0{
+				for mc.updatesInFlight < mc.cfg.Workers*2 {
 					freeSlots := mc.cfg.Workers*2 - mc.updatesInFlight
 					metrics := mc.metricQueue.PopN(freeSlots)
 					for _, metric := range metrics {
@@ -165,7 +163,9 @@ func (mc *MetricsCache) metricsUpdateLoop(index int) {
 					}
 				}
 
-				if mc.updatesInFlight == 0 {
+				outstandingUpdates := atomic.AddInt64(&mc.outstandingUpdates, -1)
+
+				if mc.requestsInFlight == 0 && outstandingUpdates == 0 {
 					mc.logger.Debug("Complete new update cycle - in-flight %d.\n", mc.updatesInFlight)
 					mc.updatesComplete <- 0
 				}
@@ -188,6 +188,7 @@ func (mc *MetricsCache) metricsUpdateLoop(index int) {
 					if i < mc.cfg.BatchSize {
 						select {
 						case resp = <-mc.responseChan:
+							atomic.AddInt64(&mc.requestsInFlight, -1)
 						default:
 							break inLoop
 						}
@@ -206,8 +207,10 @@ func (mc *MetricsCache) metricsUpdateLoop(index int) {
 					}
 				}
 
+				requestsInFlight := atomic.AddInt64(&mc.requestsInFlight, -1)
+
 				// Notify the metric feeder when all in-flight tasks are done
-				if mc.updatesInFlight == 0 {
+				if requestsInFlight == 0 && atomic.LoadInt64(&mc.outstandingUpdates) == 0 {
 					mc.logger.Debug("Return to feed. Metric queue length: %d", mc.metricQueue.Length())
 					mc.updatesComplete <- 0
 				}
@@ -253,6 +256,7 @@ func (mc *MetricsCache) postMetricUpdates(metric *MetricState) {
 				metric.setState(storeStateReady)
 			} else {
 				if mc.metricQueue.length() > 0 {
+					atomic.AddInt64(&mc.outstandingUpdates, 1)
 					mc.newUpdates <- mc.metricQueue.length()
 				}
 			}
@@ -385,6 +389,13 @@ func (mc *MetricsCache) nameUpdateRespLoop() {
 				}
 
 				resp.Release()
+
+				atomic.AddInt64(&mc.requestsInFlight, -1)
+
+				if atomic.LoadInt64(&mc.requestsInFlight) == 0 && atomic.LoadInt64(&mc.outstandingUpdates) == 0 {
+					mc.logger.Debug("Return to feed. Metric queue length: %d", mc.metricQueue.Length())
+					mc.updatesComplete <- 0
+				}
 			}
 		}
 	}()
