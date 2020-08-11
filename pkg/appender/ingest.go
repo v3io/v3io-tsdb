@@ -48,7 +48,6 @@ func (mc *MetricsCache) start() error {
 func (mc *MetricsCache) metricFeed(index int) {
 
 	go func() {
-		inFlight := 0
 		potentialCompletion := false
 		var completeChan chan int
 
@@ -56,7 +55,7 @@ func (mc *MetricsCache) metricFeed(index int) {
 			select {
 			case _ = <-mc.stopChan:
 				return
-			case inFlight = <-mc.updatesComplete: // Handle completion notifications from the update loop
+			case <-mc.updatesComplete: // Handle completion notifications from the update loop
 				switch len(mc.asyncAppendChan) {
 				case 0:
 					potentialCompletion = true
