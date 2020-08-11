@@ -204,7 +204,7 @@ func (cs *chunkStore) processGetResp(mc *MetricsCache, metric *MetricState, resp
 			cs.performanceReporter.IncrementCounter("UpdateMetricError", 1)
 		}
 
-		metric.ShouldGetState = false
+		metric.shouldGetState = false
 		return
 	}
 
@@ -223,7 +223,7 @@ func (cs *chunkStore) processGetResp(mc *MetricsCache, metric *MetricState, resp
 
 	// Set Last TableId - indicate that there is no need to create metric object
 	cs.lastTid = cs.nextTid
-	metric.ShouldGetState = false
+	metric.shouldGetState = false
 }
 
 // Append data to the right chunk and table based on the time and state
@@ -406,7 +406,7 @@ func (cs *chunkStore) writeChunks(mc *MetricsCache, metric *MetricState) (hasPen
 
 		// In case we advanced to a newer partition mark we need to get state again
 		if pendingSampleIndex < len(cs.pending) && !partition.InRange(cs.pending[pendingSampleIndex].t) {
-			metric.ShouldGetState = true
+			metric.shouldGetState = true
 		}
 
 		cs.aggrList.Clear()

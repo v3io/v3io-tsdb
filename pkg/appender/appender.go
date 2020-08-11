@@ -60,7 +60,7 @@ type MetricState struct {
 	newName    bool
 	isVariant  bool
 
-	ShouldGetState bool
+	shouldGetState bool
 }
 
 // Metric store states

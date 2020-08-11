@@ -222,61 +222,50 @@ func (mc *MetricsCache) postMetricUpdates(metric *MetricState) {
 	var sent bool
 	var err error
 
-	if metric.getState() == storeStatePreGet {
-		sent, err = metric.store.getChunksState(mc, metric)
+	// In case we are in pre get state or our data spreads across multiple partitions, get the new state for the current partition
+	if metric.getState() == storeStatePreGet || metric.shouldGetState {
+		sent = mc.sendGetMetricState(metric)
+	} else {
+		sent, err = metric.store.writeChunks(mc, metric)
 		if err != nil {
 			// Count errors
-			mc.performanceReporter.IncrementCounter("GetChunksStateError", 1)
+			mc.performanceReporter.IncrementCounter("WriteChunksError", 1)
 
-			mc.logger.ErrorWith("Failed to get item state", "metric", metric.Lset, "err", err)
-			setError(mc, metric, err)
-		} else {
-			metric.setState(storeStateGet)
+			mc.logger.ErrorWith("Submit failed", "metric", metric.Lset, "err", err)
+			setError(mc, metric, errors.Wrap(err, "Chunk write submit failed."))
+		} else if sent {
+			metric.setState(storeStateUpdate)
 		}
-
-	} else {
-		// In case our data spreads across multiple partitions, get the new state for the current partition
-		if metric.ShouldGetState {
-			sent, err = metric.store.getChunksState(mc, metric)
-			if err != nil {
-				// Count errors
-				mc.performanceReporter.IncrementCounter("GetChunksStateError", 1)
-
-				mc.logger.ErrorWith("Failed to get item state", "metric", metric.Lset, "err", err)
-				setError(mc, metric, err)
+		if !sent {
+			if metric.store.samplesQueueLength() == 0 {
+				metric.setState(storeStateReady)
 			} else {
-				metric.setState(storeStateGet)
-			}
-			if sent {
-				mc.updatesInFlight++
-			}
-		} else {
-			sent, err = metric.store.writeChunks(mc, metric)
-			if err != nil {
-				// Count errors
-				mc.performanceReporter.IncrementCounter("WriteChunksError", 1)
-
-				mc.logger.ErrorWith("Submit failed", "metric", metric.Lset, "err", err)
-				setError(mc, metric, errors.Wrap(err, "Chunk write submit failed."))
-			} else if sent {
-				metric.setState(storeStateUpdate)
-			}
-			if !sent {
-				if metric.store.samplesQueueLength() == 0 {
-					metric.setState(storeStateReady)
-				} else {
-					if mc.metricQueue.length() > 0 {
-						atomic.AddInt64(&mc.outstandingUpdates, 1)
-						mc.newUpdates <- mc.metricQueue.length()
-					}
+				if mc.metricQueue.length() > 0 {
+					atomic.AddInt64(&mc.outstandingUpdates, 1)
+					mc.newUpdates <- mc.metricQueue.length()
 				}
 			}
 		}
-
-		if sent {
-			mc.updatesInFlight++
-		}
 	}
+
+	if sent {
+		mc.updatesInFlight++
+	}
+}
+
+func (mc *MetricsCache) sendGetMetricState(metric *MetricState) bool {
+	sent, err := metric.store.getChunksState(mc, metric)
+	if err != nil {
+		// Count errors
+		mc.performanceReporter.IncrementCounter("GetChunksStateError", 1)
+
+		mc.logger.ErrorWith("Failed to get item state", "metric", metric.Lset, "err", err)
+		setError(mc, metric, err)
+	} else {
+		metric.setState(storeStateGet)
+	}
+
+	return sent
 }
 
 // Handle DB responses
@@ -356,17 +345,8 @@ func (mc *MetricsCache) handleResponse(metric *MetricState, resp *v3io.Response,
 
 	if canWrite {
 		// In case our data spreads across multiple partitions, get the new state for the current partition
-		if metric.ShouldGetState {
-			sent, err = metric.store.getChunksState(mc, metric)
-			if err != nil {
-				// Count errors
-				mc.performanceReporter.IncrementCounter("GetChunksStateError", 1)
-
-				mc.logger.ErrorWith("Failed to get item state", "metric", metric.Lset, "err", err)
-				setError(mc, metric, err)
-			} else {
-				metric.setState(storeStateGet)
-			}
+		if metric.shouldGetState {
+			sent = mc.sendGetMetricState(metric)
 			if sent {
 				mc.updatesInFlight++
 			}
