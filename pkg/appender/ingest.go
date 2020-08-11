@@ -254,6 +254,11 @@ func (mc *MetricsCache) postMetricUpdates(metric *MetricState) {
 }
 
 func (mc *MetricsCache) sendGetMetricState(metric *MetricState) bool {
+	// If we are already in a get state, discard
+	if metric.getState() == storeStateGet {
+		return false
+	}
+
 	sent, err := metric.store.getChunksState(mc, metric)
 	if err != nil {
 		// Count errors
