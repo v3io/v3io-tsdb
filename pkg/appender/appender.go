@@ -59,6 +59,8 @@ type MetricState struct {
 	retryCount uint8
 	newName    bool
 	isVariant  bool
+
+	ShouldGetState bool
 }
 
 // Metric store states

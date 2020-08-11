@@ -158,6 +158,7 @@ func (mc *MetricsCache) metricsUpdateLoop(index int) {
 					freeSlots := mc.cfg.Workers*2 - mc.updatesInFlight
 					metrics := mc.metricQueue.PopN(freeSlots)
 					for _, metric := range metrics {
+						mc.logger.WarnWith("calling post metrics from new updates")
 						mc.postMetricUpdates(metric)
 					}
 					if len(metrics) < freeSlots {
@@ -202,6 +203,7 @@ func (mc *MetricsCache) metricsUpdateLoop(index int) {
 						break
 					}
 					for _, metric := range metrics {
+						mc.logger.WarnWith("calling post metrics")
 						mc.postMetricUpdates(metric)
 					}
 				}
@@ -238,22 +240,41 @@ func (mc *MetricsCache) postMetricUpdates(metric *MetricState) {
 		}
 
 	} else {
-		sent, err = metric.store.writeChunks(mc, metric)
-		if err != nil {
-			// Count errors
-			mc.performanceReporter.IncrementCounter("WriteChunksError", 1)
+		// Getting the new state for the current partition
+		if metric.ShouldGetState {
+			mc.logger.WarnWith("handle response - getting chunk again")
+			sent, err = metric.store.getChunksState(mc, metric)
+			if err != nil {
+				// Count errors
+				mc.performanceReporter.IncrementCounter("GetChunksStateError", 1)
 
-			mc.logger.ErrorWith("Submit failed", "metric", metric.Lset, "err", err)
-			setError(mc, metric, errors.Wrap(err, "Chunk write submit failed."))
-		} else if sent {
-			metric.setState(storeStateUpdate)
-		}
-		if !sent {
-			if metric.store.samplesQueueLength() == 0 {
-				metric.setState(storeStateReady)
+				mc.logger.ErrorWith("Failed to get item state", "metric", metric.Lset, "err", err)
+				setError(mc, metric, err)
 			} else {
-				if mc.metricQueue.length() > 0 {
-					mc.newUpdates <- mc.metricQueue.length()
+				metric.setState(storeStateGet)
+			}
+			if sent {
+				mc.updatesInFlight++
+			}
+		} else {
+			mc.logger.WarnWith("writing chunks from post metric update")
+			sent, err = metric.store.writeChunks(mc, metric)
+			if err != nil {
+				// Count errors
+				mc.performanceReporter.IncrementCounter("WriteChunksError", 1)
+
+				mc.logger.ErrorWith("Submit failed", "metric", metric.Lset, "err", err)
+				setError(mc, metric, errors.Wrap(err, "Chunk write submit failed."))
+			} else if sent {
+				metric.setState(storeStateUpdate)
+			}
+			if !sent {
+				if metric.store.samplesQueueLength() == 0 {
+					metric.setState(storeStateReady)
+				} else {
+					if mc.metricQueue.length() > 0 {
+						mc.newUpdates <- mc.metricQueue.length()
+					}
 				}
 			}
 		}
@@ -340,18 +361,36 @@ func (mc *MetricsCache) handleResponse(metric *MetricState, resp *v3io.Response,
 	var err error
 
 	if canWrite {
-		sent, err = metric.store.writeChunks(mc, metric)
-		if err != nil {
-			// Count errors
-			mc.performanceReporter.IncrementCounter("WriteChunksError", 1)
+		// Getting the new state for the current partition
+		if metric.ShouldGetState {
+			mc.logger.WarnWith("handle response - getting chunk again")
+			sent, err = metric.store.getChunksState(mc, metric)
+			if err != nil {
+				// Count errors
+				mc.performanceReporter.IncrementCounter("GetChunksStateError", 1)
 
-			mc.logger.ErrorWith("Submit failed", "metric", metric.Lset, "err", err)
-			setError(mc, metric, errors.Wrap(err, "Chunk write submit failed."))
-		} else if sent {
-			metric.setState(storeStateUpdate)
-			mc.updatesInFlight++
+				mc.logger.ErrorWith("Failed to get item state", "metric", metric.Lset, "err", err)
+				setError(mc, metric, err)
+			} else {
+				metric.setState(storeStateGet)
+			}
+			if sent {
+				mc.updatesInFlight++
+			}
+		} else {
+			mc.logger.WarnWith("writing chunks from handleResponse")
+			sent, err = metric.store.writeChunks(mc, metric)
+			if err != nil {
+				// Count errors
+				mc.performanceReporter.IncrementCounter("WriteChunksError", 1)
+
+				mc.logger.ErrorWith("Submit failed", "metric", metric.Lset, "err", err)
+				setError(mc, metric, errors.Wrap(err, "Chunk write submit failed."))
+			} else if sent {
+				metric.setState(storeStateUpdate)
+				mc.updatesInFlight++
+			}
 		}
-
 	} else if metric.store.samplesQueueLength() > 0 {
 		mc.metricQueue.Push(metric)
 		metric.setState(storeStateUpdate)

@@ -133,7 +133,6 @@ func (l pendingList) Swap(i, j int)      { l[i], l[j] = l[j], l[i] }
 
 // Read (async) the current chunk state and data from the storage, used in the first chunk access
 func (cs *chunkStore) getChunksState(mc *MetricsCache, metric *MetricState) (bool, error) {
-
 	if len(cs.pending) == 0 {
 		return false, nil
 	}
@@ -143,6 +142,9 @@ func (cs *chunkStore) getChunksState(mc *MetricsCache, metric *MetricState) (boo
 	if err != nil {
 		return false, err
 	}
+
+	cs.logger.WarnWith("Getting chunk state again", "partition", part.GetStartTime())
+
 	if !cs.isAggr() {
 		cs.chunks[0].initialize(part, t)
 	}
@@ -199,6 +201,7 @@ func (cs *chunkStore) processGetResp(mc *MetricsCache, metric *MetricState, resp
 			cs.performanceReporter.IncrementCounter("UpdateMetricError", 1)
 		}
 
+		metric.ShouldGetState = false
 		return
 	}
 
@@ -217,6 +220,7 @@ func (cs *chunkStore) processGetResp(mc *MetricsCache, metric *MetricState, resp
 
 	// Set Last TableId - indicate that there is no need to create metric object
 	cs.lastTid = cs.nextTid
+	metric.ShouldGetState = false
 }
 
 // Append data to the right chunk and table based on the time and state
@@ -313,10 +317,11 @@ func (cs *chunkStore) writeChunks(mc *MetricsCache, metric *MetricState) (hasPen
 
 		// Loop over pending samples, add to chunks & aggregates (create required update expressions)
 		for pendingSampleIndex < len(cs.pending) && pendingSamplesCount < mc.cfg.BatchSize && partition.InRange(cs.pending[pendingSampleIndex].t) {
+			cs.logger.WarnWith("go pending", "max time", cs.maxTime, "t", cs.pending[pendingSampleIndex].t, "v", cs.pending[pendingSampleIndex].v)
 			sampleTime := cs.pending[pendingSampleIndex].t
 
 			if sampleTime <= cs.maxTime && !mc.cfg.OverrideOld {
-				mc.logger.WarnWith("Omitting the sample - time is earlier than the last sample time for this metric", "metric", metric.Lset, "T", sampleTime)
+				//mc.logger.WarnWith("Omitting the sample - time is earlier than the last sample time for this metric", "metric", metric.Lset, "T", sampleTime)
 
 				// If we have reached the end of the pending events and there are events to update, create an update expression and break from loop,
 				// Otherwise, discard the event and continue normally
@@ -368,6 +373,7 @@ func (cs *chunkStore) writeChunks(mc *MetricsCache, metric *MetricState) (hasPen
 				expr = expr + cs.appendExpression(activeChunk)
 				pendingSampleIndex++
 				pendingSamplesCount++
+
 				break
 			}
 
@@ -395,6 +401,13 @@ func (cs *chunkStore) writeChunks(mc *MetricsCache, metric *MetricState) (hasPen
 
 			pendingSampleIndex++
 			pendingSamplesCount++
+		}
+
+		// In case we advanced a partition get state again
+		//shouldGetState := false
+		if pendingSampleIndex < len(cs.pending) && !partition.InRange(cs.pending[pendingSampleIndex].t) {
+			cs.logger.WarnWith("tall")
+			metric.ShouldGetState = true
 		}
 
 		cs.aggrList.Clear()
@@ -449,7 +462,10 @@ func (cs *chunkStore) writeChunks(mc *MetricsCache, metric *MetricState) (hasPen
 
 		// Add the async request ID to the requests map (can be avoided if V3IO
 		// will add user data in request)
-		mc.logger.DebugWith("Update-metric expression", "name", metric.name, "key", metric.key, "expr", expr, "reqid", request.ID)
+		mc.logger.WarnWith("Update-metric expression", "name", metric.name, "key", metric.key,
+			"partition", path,
+			"pending left", len(cs.pending),
+			"expr", expr, "reqid", request.ID)
 
 		hasPendingUpdates = true
 		cs.performanceReporter.UpdateHistogram("WriteChunksSizeHistogram", int64(pendingSamplesCount))
@@ -487,6 +503,7 @@ func (cs *chunkStore) appendExpression(chunk *attrAppender) string {
 
 		val := base64.StdEncoding.EncodeToString(bytes)
 
+		cs.logger.WarnWith("append", "state", chunk.state)
 		expr = fmt.Sprintf("%s=if_not_exists(%s,blob('')) + blob('%s'); ", attr, attr, val)
 
 		return expr
