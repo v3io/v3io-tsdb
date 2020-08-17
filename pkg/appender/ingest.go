@@ -67,7 +67,7 @@ func (mc *MetricsCache) metricFeed(index int) {
 					case 1:
 						potentialCompletion = true
 					}
-					break
+					continue
 				}
 
 				newMetrics := 0
