@@ -147,7 +147,6 @@ func NewMetricsCache(container v3io.Container, logger logger.Logger, cfg *config
 	newCache.asyncAppendChan = make(chan *asyncAppend, channelSize)
 
 	newCache.metricQueue = NewElasticQueue()
-	newCache.updatesComplete = make(chan int, 100)
 	newCache.newUpdates = make(chan int, 1000)
 	newCache.stopChan = make(chan int, 3)
 
@@ -158,10 +157,11 @@ func NewMetricsCache(container v3io.Container, logger logger.Logger, cfg *config
 }
 
 type asyncAppend struct {
-	metric *MetricState
-	t      int64
-	v      interface{}
-	resp   chan int
+	metric       *MetricState
+	t            int64
+	v            interface{}
+	resp         chan int
+	isCompletion bool
 }
 
 func (mc *MetricsCache) Start() error {
