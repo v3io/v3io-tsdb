@@ -63,14 +63,18 @@ func (mc *MetricsCache) metricFeed(index int) {
 				for i := 0; i <= mc.cfg.BatchSize; i++ {
 					// Handle completion notifications from the update loop
 					if app.isCompletion {
-						switch len(mc.asyncAppendChan) {
-						case 0:
-							potentialCompletion = true
-							if completeChan != nil {
-								completeChan <- 0
+						outstandingUpdates := atomic.LoadInt64(&mc.outstandingUpdates)
+						requestsInFlight := atomic.LoadInt64(&mc.requestsInFlight)
+						if outstandingUpdates == 0 && requestsInFlight == 0 {
+							switch len(mc.asyncAppendChan) {
+							case 0:
+								potentialCompletion = true
+								if completeChan != nil {
+									completeChan <- 0
+								}
+							case 1:
+								potentialCompletion = true
 							}
-						case 1:
-							potentialCompletion = true
 						}
 						if i < mc.cfg.BatchSize {
 							select {
