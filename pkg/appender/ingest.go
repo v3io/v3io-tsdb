@@ -72,6 +72,13 @@ func (mc *MetricsCache) metricFeed(index int) {
 						case 1:
 							potentialCompletion = true
 						}
+						if i < mc.cfg.BatchSize {
+							select {
+							case app = <-mc.asyncAppendChan:
+							default:
+								break inLoop
+							}
+						}
 						continue
 					}
 					if app.metric == nil {
