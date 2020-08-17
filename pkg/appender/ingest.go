@@ -65,9 +65,7 @@ func (mc *MetricsCache) metricFeed(index int) {
 					// Handle completion notifications from the update loop
 					if app.isCompletion {
 						gotCompletion = true
-						continue
-					}
-					if app.metric == nil {
+					} else if app.metric == nil {
 						// Handle update completion requests (metric == nil)
 						completeChan = app.resp
 						if potentialCompletion {
