@@ -24,6 +24,7 @@ import (
 	"fmt"
 	"net/http"
 	"reflect"
+	"sync/atomic"
 	"time"
 
 	"github.com/pkg/errors"
@@ -47,8 +48,6 @@ func (mc *MetricsCache) start() error {
 func (mc *MetricsCache) metricFeed(index int) {
 
 	go func() {
-		inFlight := 0
-		gotData := false
 		potentialCompletion := false
 		var completeChan chan int
 
@@ -56,30 +55,17 @@ func (mc *MetricsCache) metricFeed(index int) {
 			select {
 			case _ = <-mc.stopChan:
 				return
-			case inFlight = <-mc.updatesComplete:
-				// Handle completion notifications from the update loop
-				length := mc.metricQueue.Length()
-				mc.logger.Debug(`Complete update cycle - "in-flight requests"=%d; "metric queue length"=%d\n`, inFlight, length)
-
-				// If data was sent and the queue is empty, mark as completion
-				if length == 0 && gotData {
-					switch len(mc.asyncAppendChan) {
-					case 0:
-						potentialCompletion = true
-						if completeChan != nil {
-							completeChan <- 0
-						}
-					case 1:
-						potentialCompletion = true
-					}
-				}
 			case app := <-mc.asyncAppendChan:
 				newMetrics := 0
 				dataQueued := 0
 				numPushed := 0
+				gotCompletion := false
 			inLoop:
 				for i := 0; i <= mc.cfg.BatchSize; i++ {
-					if app.metric == nil {
+					// Handle completion notifications from the update loop
+					if app.isCompletion {
+						gotCompletion = true
+					} else if app.metric == nil {
 						// Handle update completion requests (metric == nil)
 						completeChan = app.resp
 						if potentialCompletion {
@@ -88,7 +74,6 @@ func (mc *MetricsCache) metricFeed(index int) {
 					} else {
 						potentialCompletion = false
 						// Handle append requests (Add / AddFast)
-						gotData = true
 						metric := app.metric
 						metric.Lock()
 
@@ -103,7 +88,7 @@ func (mc *MetricsCache) metricFeed(index int) {
 								metric.setState(storeStatePreGet)
 							}
 							if metric.isReady() {
-								metric.setState(storeStateUpdate)
+								metric.setState(storeStateAboutToUpdate)
 							}
 
 							length := mc.metricQueue.Push(metric)
@@ -124,7 +109,22 @@ func (mc *MetricsCache) metricFeed(index int) {
 				}
 				// Notify the update loop that there are new metrics to process
 				if newMetrics > 0 {
+					atomic.AddInt64(&mc.outstandingUpdates, 1)
 					mc.newUpdates <- newMetrics
+				} else if gotCompletion {
+					inFlight := atomic.LoadInt64(&mc.requestsInFlight)
+					outstanding := atomic.LoadInt64(&mc.outstandingUpdates)
+					if outstanding == 0 && inFlight == 0 {
+						switch len(mc.asyncAppendChan) {
+						case 0:
+							potentialCompletion = true
+							if completeChan != nil {
+								completeChan <- 0
+							}
+						case 1:
+							potentialCompletion = true
+						}
+					}
 				}
 
 				// If we have too much work, stall the queue for some time
@@ -154,7 +154,7 @@ func (mc *MetricsCache) metricsUpdateLoop(index int) {
 				return
 			case _ = <-mc.newUpdates:
 				// Handle new metric notifications (from metricFeed)
-				for mc.updatesInFlight < mc.cfg.Workers*2 { //&& newMetrics > 0{
+				for mc.updatesInFlight < mc.cfg.Workers*2 {
 					freeSlots := mc.cfg.Workers*2 - mc.updatesInFlight
 					metrics := mc.metricQueue.PopN(freeSlots)
 					for _, metric := range metrics {
@@ -165,9 +165,11 @@ func (mc *MetricsCache) metricsUpdateLoop(index int) {
 					}
 				}
 
-				if mc.updatesInFlight == 0 {
-					mc.logger.Debug("Complete new update cycle - in-flight %d.\n", mc.updatesInFlight)
-					mc.updatesComplete <- 0
+				outstandingUpdates := atomic.AddInt64(&mc.outstandingUpdates, -1)
+
+				if atomic.LoadInt64(&mc.requestsInFlight) == 0 && outstandingUpdates == 0 {
+					mc.logger.Debug("Return to feed after processing newUpdates")
+					mc.asyncAppendChan <- &asyncAppend{isCompletion: true}
 				}
 			case resp := <-mc.responseChan:
 				// Handle V3IO async responses
@@ -188,6 +190,7 @@ func (mc *MetricsCache) metricsUpdateLoop(index int) {
 					if i < mc.cfg.BatchSize {
 						select {
 						case resp = <-mc.responseChan:
+							atomic.AddInt64(&mc.requestsInFlight, -1)
 						default:
 							break inLoop
 						}
@@ -206,10 +209,12 @@ func (mc *MetricsCache) metricsUpdateLoop(index int) {
 					}
 				}
 
+				requestsInFlight := atomic.AddInt64(&mc.requestsInFlight, -1)
+
 				// Notify the metric feeder when all in-flight tasks are done
-				if mc.updatesInFlight == 0 {
-					mc.logger.Debug("Return to feed. Metric queue length: %d", mc.metricQueue.Length())
-					mc.updatesComplete <- 0
+				if requestsInFlight == 0 && atomic.LoadInt64(&mc.outstandingUpdates) == 0 {
+					mc.logger.Debug("Return to feed after processing responseChan")
+					mc.asyncAppendChan <- &asyncAppend{isCompletion: true}
 				}
 			}
 		}
@@ -223,45 +228,70 @@ func (mc *MetricsCache) postMetricUpdates(metric *MetricState) {
 	metric.Lock()
 	defer metric.Unlock()
 	var sent bool
-	var err error
 
-	if metric.getState() == storeStatePreGet {
-		sent, err = metric.store.getChunksState(mc, metric)
-		if err != nil {
-			// Count errors
-			mc.performanceReporter.IncrementCounter("GetChunksStateError", 1)
-
-			mc.logger.ErrorWith("Failed to get item state", "metric", metric.Lset, "err", err)
-			setError(mc, metric, err)
-		} else {
-			metric.setState(storeStateGet)
+	// In case we are in pre get state or our data spreads across multiple partitions, get the new state for the current partition
+	if metric.getState() == storeStatePreGet ||
+		(metric.canSendRequests() && metric.shouldGetState) {
+		sent = mc.sendGetMetricState(metric)
+		if sent {
+			mc.updatesInFlight++
 		}
+	} else if metric.canSendRequests() {
+		sent = mc.writeChunksAndGetState(metric)
 
-	} else {
-		sent, err = metric.store.writeChunks(mc, metric)
-		if err != nil {
-			// Count errors
-			mc.performanceReporter.IncrementCounter("WriteChunksError", 1)
-
-			mc.logger.ErrorWith("Submit failed", "metric", metric.Lset, "err", err)
-			setError(mc, metric, errors.Wrap(err, "Chunk write submit failed."))
-		} else if sent {
-			metric.setState(storeStateUpdate)
-		}
 		if !sent {
 			if metric.store.samplesQueueLength() == 0 {
 				metric.setState(storeStateReady)
 			} else {
 				if mc.metricQueue.length() > 0 {
+					atomic.AddInt64(&mc.outstandingUpdates, 1)
 					mc.newUpdates <- mc.metricQueue.length()
 				}
 			}
 		}
 	}
 
+}
+
+func (mc *MetricsCache) sendGetMetricState(metric *MetricState) bool {
+	// If we are already in a get state, discard
+	if metric.getState() == storeStateGet {
+		return false
+	}
+
+	sent, err := metric.store.getChunksState(mc, metric)
+	if err != nil {
+		// Count errors
+		mc.performanceReporter.IncrementCounter("GetChunksStateError", 1)
+
+		mc.logger.ErrorWith("Failed to get item state", "metric", metric.Lset, "err", err)
+		setError(mc, metric, err)
+	} else {
+		metric.setState(storeStateGet)
+	}
+
+	return sent
+}
+
+func (mc *MetricsCache) writeChunksAndGetState(metric *MetricState) bool {
+	sent, err := metric.store.writeChunks(mc, metric)
+	if err != nil {
+		// Count errors
+		mc.performanceReporter.IncrementCounter("WriteChunksError", 1)
+
+		mc.logger.ErrorWith("Submit failed", "metric", metric.Lset, "err", err)
+		setError(mc, metric, errors.Wrap(err, "Chunk write submit failed."))
+	} else if sent {
+		metric.setState(storeStateUpdate)
+	} else if metric.shouldGetState {
+		// In case we didn't write any data and the metric state needs to be updated, update it straight away
+		sent = mc.sendGetMetricState(metric)
+	}
+
 	if sent {
 		mc.updatesInFlight++
 	}
+	return sent
 }
 
 // Handle DB responses
@@ -337,24 +367,18 @@ func (mc *MetricsCache) handleResponse(metric *MetricState, resp *v3io.Response,
 	metric.setState(storeStateReady)
 
 	var sent bool
-	var err error
 
-	if canWrite {
-		sent, err = metric.store.writeChunks(mc, metric)
-		if err != nil {
-			// Count errors
-			mc.performanceReporter.IncrementCounter("WriteChunksError", 1)
-
-			mc.logger.ErrorWith("Submit failed", "metric", metric.Lset, "err", err)
-			setError(mc, metric, errors.Wrap(err, "Chunk write submit failed."))
-		} else if sent {
-			metric.setState(storeStateUpdate)
+	// In case our data spreads across multiple partitions, get the new state for the current partition
+	if metric.shouldGetState {
+		sent = mc.sendGetMetricState(metric)
+		if sent {
 			mc.updatesInFlight++
 		}
-
+	} else if canWrite {
+		sent = mc.writeChunksAndGetState(metric)
 	} else if metric.store.samplesQueueLength() > 0 {
 		mc.metricQueue.Push(metric)
-		metric.setState(storeStateUpdate)
+		metric.setState(storeStateAboutToUpdate)
 	}
 
 	return sent
@@ -385,6 +409,13 @@ func (mc *MetricsCache) nameUpdateRespLoop() {
 				}
 
 				resp.Release()
+
+				requestsInFlight := atomic.AddInt64(&mc.requestsInFlight, -1)
+
+				if requestsInFlight == 0 && atomic.LoadInt64(&mc.outstandingUpdates) == 0 {
+					mc.logger.Debug("Return to feed after processing nameUpdateChan")
+					mc.asyncAppendChan <- &asyncAppend{isCompletion: true}
+				}
 			}
 		}
 	}()

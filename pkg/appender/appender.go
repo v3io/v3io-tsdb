@@ -59,22 +59,30 @@ type MetricState struct {
 	retryCount uint8
 	newName    bool
 	isVariant  bool
+
+	shouldGetState bool
 }
 
 // Metric store states
 type storeState uint8
 
 const (
-	storeStateInit   storeState = 0
-	storeStatePreGet storeState = 1 // Need to get state
-	storeStateGet    storeState = 2 // Getting old state from storage
-	storeStateReady  storeState = 3 // Ready to update
-	storeStateUpdate storeState = 4 // Update/write in progress
+	storeStateInit          storeState = 0
+	storeStatePreGet        storeState = 1 // Need to get state
+	storeStateGet           storeState = 2 // Getting old state from storage
+	storeStateReady         storeState = 3 // Ready to update
+	storeStateUpdate        storeState = 4 // Update/write in progress
+	storeStateAboutToUpdate storeState = 5 // Like ready state but with updates pending
 )
 
 // store is ready to update samples into the DB
 func (m *MetricState) isReady() bool {
 	return m.state == storeStateReady
+}
+
+// Indicates whether the metric has no inflight requests and can send new ones
+func (m *MetricState) canSendRequests() bool {
+	return m.state == storeStateReady || m.state == storeStateAboutToUpdate
 }
 
 func (m *MetricState) getState() storeState {
@@ -118,6 +126,9 @@ type MetricsCache struct {
 	updatesComplete chan int
 	newUpdates      chan int
 
+	outstandingUpdates int64
+	requestsInFlight   int64
+
 	lastMetric uint64
 
 	// TODO: consider switching to synch.Map (https://golang.org/pkg/sync/#Map)
@@ -144,7 +155,6 @@ func NewMetricsCache(container v3io.Container, logger logger.Logger, cfg *config
 	newCache.asyncAppendChan = make(chan *asyncAppend, channelSize)
 
 	newCache.metricQueue = NewElasticQueue()
-	newCache.updatesComplete = make(chan int, 100)
 	newCache.newUpdates = make(chan int, 1000)
 	newCache.stopChan = make(chan int, 3)
 
@@ -155,10 +165,11 @@ func NewMetricsCache(container v3io.Container, logger logger.Logger, cfg *config
 }
 
 type asyncAppend struct {
-	metric *MetricState
-	t      int64
-	v      interface{}
-	resp   chan int
+	metric       *MetricState
+	t            int64
+	v            interface{}
+	resp         chan int
+	isCompletion bool
 }
 
 func (mc *MetricsCache) Start() error {
