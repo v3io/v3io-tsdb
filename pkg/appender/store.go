@@ -91,10 +91,10 @@ type attrAppender struct {
 type chunkState uint8
 
 const (
-	chunkStateFirst     chunkState = 1
-	chunkStateMerge     chunkState = 2
-	chunkStateCommitted chunkState = 4
-	chunkStateWriting   chunkState = 8
+	// chunkStateMerge     chunkState = 2 - Deprecated
+	// chunkStateCommitted chunkState = 4 - Deprecated
+	chunkStateFirst   chunkState = 1
+	chunkStateWriting chunkState = 8
 )
 
 // Initialize/clear the chunk appender
@@ -215,11 +215,6 @@ func (cs *chunkStore) processGetResp(mc *MetricsCache, metric *MetricState, resp
 		cs.maxTime = maxTime
 	}
 
-	if !cs.isAggr() {
-		if cs.chunks[0].inRange(maxTime) && !mc.cfg.OverrideOld {
-			cs.chunks[0].state |= chunkStateMerge
-		}
-	}
 	// Set Last TableId - indicate that there is no need to create metric object
 	cs.lastTid = cs.nextTid
 }
@@ -470,7 +465,6 @@ func (cs *chunkStore) ProcessWriteResp() {
 	for _, chunk := range cs.chunks {
 		// Update the chunk state (if it was written to)
 		if chunk.state&chunkStateWriting != 0 {
-			chunk.state |= chunkStateCommitted
 			chunk.state &^= chunkStateWriting
 			chunk.appender.Chunk().Clear()
 		}
@@ -493,12 +487,7 @@ func (cs *chunkStore) appendExpression(chunk *attrAppender) string {
 
 		val := base64.StdEncoding.EncodeToString(bytes)
 
-		// Overwrite, merge, or append based on the chunk state
-		if chunk.state&chunkStateCommitted != 0 || chunk.state&chunkStateMerge != 0 {
-			expr = fmt.Sprintf("%s=if_not_exists(%s,blob('')) + blob('%s'); ", attr, attr, val)
-		} else {
-			expr = fmt.Sprintf("%s=blob('%s'); ", attr, val)
-		}
+		expr = fmt.Sprintf("%s=if_not_exists(%s,blob('')) + blob('%s'); ", attr, attr, val)
 
 		return expr
 
