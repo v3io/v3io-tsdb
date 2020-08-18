@@ -619,7 +619,12 @@ func deleteObjectWorker(container v3io.Container, deleteParams *DeleteParams, lo
 				// Update the partition's max time if needed.
 				if deleteParams.From < dbMaxTime && deleteParams.To >= dbMaxTime {
 					if deleteParams.From < newMaxTime {
-						newMaxTime = deleteParams.From
+						// Limit the max time to be in the current partition's range
+						if deleteParams.From < currentPartition.GetStartTime() {
+							newMaxTime = currentPartition.GetStartTime()
+						} else {
+							newMaxTime = deleteParams.From
+						}
 					}
 
 					deleteUpdateExpression.WriteString(fmt.Sprintf("%v=%v;", config.MaxTimeAttrName, newMaxTime))
