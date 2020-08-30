@@ -95,9 +95,9 @@ func MakeNamesRange(prefix string, count, minIndex, maxIndex int) ([]string, err
 
 	for i := range slice {
 		if limit > 1 {
-			slice[i] = fmt.Sprintf("%s%s_%d", normalizedPrefix, string(65+(i/limit)%count), minIndex+i%limit)
+			slice[i] = fmt.Sprintf("%s%s_%d", normalizedPrefix, string(rune(65+(i/limit)%count)), minIndex+i%limit)
 		} else {
-			slice[i] = fmt.Sprintf("%s%s", normalizedPrefix, string(65+(i/limit)%count))
+			slice[i] = fmt.Sprintf("%s%s", normalizedPrefix, string(rune(65+(i/limit)%count)))
 		}
 	}
 	return slice, nil

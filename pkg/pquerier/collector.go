@@ -117,7 +117,9 @@ func mainCollector(ctx *selectQueryContext, responseChannel chan *qryResults) {
 }
 
 func rawCollector(ctx *selectQueryContext, res *qryResults) error {
-	ctx.logger.Debug("using Raw Collector for metric %v", res.name)
+	ctx.logger.DebugWith("using Raw Collector",
+		"metric", res.name,
+		"partition", res.query.partition.GetStartTime())
 
 	if res.frame.isWildcardSelect {
 		columnIndex, ok := res.frame.columnByName[res.name]
@@ -148,7 +150,9 @@ func rawCollector(ctx *selectQueryContext, res *qryResults) error {
 }
 
 func aggregateClientAggregates(ctx *selectQueryContext, res *qryResults) {
-	ctx.logger.Debug("using Client Aggregates Collector for metric %v", res.name)
+	ctx.logger.DebugWith("using Client Aggregates Collector",
+		"metric", res.name,
+		"partition", res.query.partition.GetStartTime())
 	it := newRawChunkIterator(res, ctx.logger)
 	for it.Next() {
 		t, v := it.At()
@@ -212,7 +216,9 @@ func aggregateServerAggregates(ctx *selectQueryContext, res *qryResults) {
 
 func downsampleRawData(ctx *selectQueryContext, res *qryResults,
 	previousPartitionLastTime int64, previousPartitionLastValue float64) (int64, float64, error) {
-	ctx.logger.Debug("using Downsample Collector for metric %v", res.name)
+	ctx.logger.DebugWith("using Downsample Collector",
+		"metric", res.name,
+		"partition", res.query.partition.GetStartTime())
 
 	it, ok := newRawChunkIterator(res, ctx.logger).(*RawChunkIterator)
 	if !ok {
@@ -256,7 +262,10 @@ func downsampleRawData(ctx *selectQueryContext, res *qryResults,
 }
 
 func aggregateClientAggregatesCrossSeries(ctx *selectQueryContext, res *qryResults, previousPartitionLastTime int64, previousPartitionLastValue float64) (int64, float64, error) {
-	ctx.logger.Debug("using Client Aggregates Collector for metric %v", res.name)
+	ctx.logger.DebugWith("using Client cross series Aggregates Collector",
+		"metric", res.name,
+		"partition", res.query.partition.GetStartTime())
+
 	it, ok := newRawChunkIterator(res, ctx.logger).(*RawChunkIterator)
 	if !ok {
 		return previousPartitionLastTime, previousPartitionLastValue, nil
