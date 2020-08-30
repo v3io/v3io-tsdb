@@ -119,7 +119,7 @@ func mainCollector(ctx *selectQueryContext, responseChannel chan *qryResults) {
 func rawCollector(ctx *selectQueryContext, res *qryResults) error {
 	ctx.logger.DebugWith("using Raw Collector",
 		"metric", res.name,
-		"partition", res.query.partition.GetStartTime()))
+		"partition", res.query.partition.GetStartTime())
 
 	if res.frame.isWildcardSelect {
 		columnIndex, ok := res.frame.columnByName[res.name]
@@ -152,7 +152,7 @@ func rawCollector(ctx *selectQueryContext, res *qryResults) error {
 func aggregateClientAggregates(ctx *selectQueryContext, res *qryResults) {
 	ctx.logger.DebugWith("using Client Aggregates Collector",
 		"metric", res.name,
-		"partition", res.query.partition.GetStartTime()))
+		"partition", res.query.partition.GetStartTime())
 	it := newRawChunkIterator(res, ctx.logger)
 	for it.Next() {
 		t, v := it.At()
@@ -218,7 +218,7 @@ func downsampleRawData(ctx *selectQueryContext, res *qryResults,
 	previousPartitionLastTime int64, previousPartitionLastValue float64) (int64, float64, error) {
 	ctx.logger.DebugWith("using Downsample Collector",
 		"metric", res.name,
-		"partition", res.query.partition.GetStartTime()))
+		"partition", res.query.partition.GetStartTime())
 
 	it, ok := newRawChunkIterator(res, ctx.logger).(*RawChunkIterator)
 	if !ok {
