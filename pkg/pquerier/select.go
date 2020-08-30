@@ -44,9 +44,7 @@ type selectQueryContext struct {
 	requestChannels []chan *qryResults
 	errorChannel    chan error
 	wg              sync.WaitGroup
-	createDFLock    sync.Mutex
 	stopChan        chan bool
-	queryWG         sync.WaitGroup
 	finalErrorChan  chan error
 }
 
@@ -91,11 +89,12 @@ func (queryCtx *selectQueryContext) start(parts []*partmgr.DBPartition, params *
 	}
 
 	for _, query := range queries {
-		queryCtx.queryWG.Add(1)
-		go processQueryResults(queryCtx, query)
+		err = queryCtx.processQueryResults(query)
+		if err != nil {
+			return nil, err
+		}
 	}
 
-	queryCtx.queryWG.Wait()
 	for i := 0; i < queryCtx.workers; i++ {
 		close(queryCtx.requestChannels[i])
 	}
@@ -296,29 +295,24 @@ func (queryCtx *selectQueryContext) startCollectors() error {
 	return nil
 }
 
-func processQueryResults(queryCtx *selectQueryContext, query *partQuery) {
-	defer queryCtx.queryWG.Done()
-
+func (queryCtx *selectQueryContext) processQueryResults(query *partQuery) error {
 	for query.Next() {
 
 		// read metric name
 		name, ok := query.GetField(config.MetricNameAttrName).(string)
 		if !ok {
-			queryCtx.errorChannel <- fmt.Errorf("could not find metric name attribute in response, res:%v", query.GetFields())
-			return
+			return fmt.Errorf("could not find metric name attribute in response, res:%v", query.GetFields())
 		}
 
 		// read label set
 		lsetAttr, lok := query.GetField(config.LabelSetAttrName).(string)
 		if !lok {
-			queryCtx.errorChannel <- fmt.Errorf("could not find label set attribute in response, res:%v", query.GetFields())
-			return
+			return fmt.Errorf("could not find label set attribute in response, res:%v", query.GetFields())
 		}
 
 		lset, err := utils.LabelsFromString(lsetAttr)
 		if err != nil {
-			queryCtx.errorChannel <- err
-			return
+			return err
 		}
 
 		// read chunk encoding type
@@ -330,8 +324,7 @@ func processQueryResults(queryCtx *selectQueryContext, query *partQuery) {
 		} else {
 			intEncoding, err := strconv.Atoi(encodingStr)
 			if err != nil {
-				queryCtx.errorChannel <- fmt.Errorf("error parsing encoding type of chunk, got: %v, error: %v", encodingStr, err)
-				return
+				return fmt.Errorf("error parsing encoding type of chunk, got: %v, error: %v", encodingStr, err)
 			}
 			encoding = chunkenc.Encoding(intEncoding)
 		}
@@ -349,8 +342,7 @@ func processQueryResults(queryCtx *selectQueryContext, query *partQuery) {
 				if labelValue != "" {
 					newLset[i] = utils.Label{Name: trimmed, Value: labelValue}
 				} else {
-					queryCtx.errorChannel <- fmt.Errorf("no label named %v found to group by", trimmed)
-					return
+					return fmt.Errorf("no label named %v found to group by", trimmed)
 				}
 			}
 			lset = newLset
@@ -362,7 +354,6 @@ func processQueryResults(queryCtx *selectQueryContext, query *partQuery) {
 			hash = lset.Hash()
 		}
 
-		queryCtx.createDFLock.Lock()
 		// find or create data frame
 		frame, ok := queryCtx.dataFrames[hash]
 		if !ok {
@@ -376,30 +367,18 @@ func processQueryResults(queryCtx *selectQueryContext, query *partQuery) {
 				results.IsServerAggregates(),
 				queryCtx.showAggregateLabel)
 			if err != nil {
-				queryCtx.errorChannel <- err
-				queryCtx.createDFLock.Unlock()
-				return
+				return err
 			}
 			queryCtx.dataFrames[hash] = frame
 			queryCtx.frameList = append(queryCtx.frameList, frame)
 		}
-		queryCtx.createDFLock.Unlock()
 
 		results.frame = frame
 		workerNum := hash & uint64(queryCtx.workers-1)
-
-		// In case termination signal was received exit, Otherwise send query result to worker
-		select {
-		case _ = <-queryCtx.stopChan:
-			return
-		case queryCtx.requestChannels[workerNum] <- &results:
-		}
-
+		queryCtx.requestChannels[workerNum] <- &results
 	}
 
-	if query.Err() != nil {
-		queryCtx.errorChannel <- query.Err()
-	}
+	return query.Err()
 }
 
 func (queryCtx *selectQueryContext) createColumnSpecs() ([]columnMeta, map[string][]columnMeta, error) {
