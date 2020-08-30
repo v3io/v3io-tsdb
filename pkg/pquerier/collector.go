@@ -148,7 +148,9 @@ func rawCollector(ctx *selectQueryContext, res *qryResults) error {
 }
 
 func aggregateClientAggregates(ctx *selectQueryContext, res *qryResults) {
-	ctx.logger.Debug("using Client Aggregates Collector for metric %v", res.name)
+	//ctx.logger.Debug("using Client Aggregates Collector for metric %v", res.name)
+	ctx.logger.WarnWith("using Client Aggregates Collector",
+		"partition", res.query.partition.GetStartTime())
 	it := newRawChunkIterator(res, ctx.logger)
 	for it.Next() {
 		t, v := it.At()
@@ -256,7 +258,10 @@ func downsampleRawData(ctx *selectQueryContext, res *qryResults,
 }
 
 func aggregateClientAggregatesCrossSeries(ctx *selectQueryContext, res *qryResults, previousPartitionLastTime int64, previousPartitionLastValue float64) (int64, float64, error) {
-	ctx.logger.Debug("using Client Aggregates Collector for metric %v", res.name)
+	//ctx.logger.Debug("using Client Aggregates Collector for metric %v", res.name)
+	ctx.logger.WarnWith("using Client Aggregates Collector",
+		"partition", res.query.partition.GetStartTime())
+
 	it, ok := newRawChunkIterator(res, ctx.logger).(*RawChunkIterator)
 	if !ok {
 		return previousPartitionLastTime, previousPartitionLastValue, nil
