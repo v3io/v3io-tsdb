@@ -25,6 +25,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"sort"
+	"sync/atomic"
 	"time"
 
 	"github.com/nuclio/logger"
@@ -156,8 +157,10 @@ func (cs *chunkStore) getChunksState(mc *MetricsCache, metric *MetricState) (boo
 	getInput := v3io.GetItemInput{
 		Path: path, AttributeNames: []string{config.MaxTimeAttrName}}
 
+	atomic.AddInt64(&mc.requestsInFlight, 1)
 	request, err := mc.container.GetItem(&getInput, metric, mc.responseChan)
 	if err != nil {
+		atomic.AddInt64(&mc.requestsInFlight, -1)
 		mc.logger.ErrorWith("Failed to send a GetItem request to the TSDB", "metric", metric.key, "err", err)
 		return false, err
 	}
@@ -186,8 +189,10 @@ func (cs *chunkStore) processGetResp(mc *MetricsCache, metric *MetricState, resp
 				path := filepath.Join(mc.cfg.TablePath, config.NamesDirectory, metric.name)
 				putInput := v3io.PutItemInput{Path: path, Attributes: map[string]interface{}{}}
 
+				atomic.AddInt64(&mc.requestsInFlight, 1)
 				request, err := mc.container.PutItem(&putInput, metric, mc.nameUpdateChan)
 				if err != nil {
+					atomic.AddInt64(&mc.requestsInFlight, -1)
 					cs.performanceReporter.IncrementCounter("PutNameError", 1)
 					mc.logger.ErrorWith("Update-name PutItem failed", "metric", metric.key, "err", err)
 				} else {
@@ -199,6 +204,8 @@ func (cs *chunkStore) processGetResp(mc *MetricsCache, metric *MetricState, resp
 			cs.performanceReporter.IncrementCounter("UpdateMetricError", 1)
 		}
 
+		metric.shouldGetState = false
+		cs.maxTime = 0 // In case of an error, initialize max time back to default
 		return
 	}
 
@@ -217,6 +224,7 @@ func (cs *chunkStore) processGetResp(mc *MetricsCache, metric *MetricState, resp
 
 	// Set Last TableId - indicate that there is no need to create metric object
 	cs.lastTid = cs.nextTid
+	metric.shouldGetState = false
 }
 
 // Append data to the right chunk and table based on the time and state
@@ -294,6 +302,13 @@ func (cs *chunkStore) writeChunks(mc *MetricsCache, metric *MetricState) (hasPen
 		t0 := cs.pending[0].t
 		partition, err := mc.partitionMngr.TimeToPart(t0)
 		if err != nil {
+			hasPendingUpdates = false
+			return
+		}
+
+		// In case the current max time is not up to date, force a get state
+		if partition.GetStartTime() > cs.maxTime && cs.maxTime > 0 {
+			metric.shouldGetState = true
 			hasPendingUpdates = false
 			return
 		}
@@ -397,6 +412,11 @@ func (cs *chunkStore) writeChunks(mc *MetricsCache, metric *MetricState) (hasPen
 			pendingSamplesCount++
 		}
 
+		// In case we advanced to a newer partition mark we need to get state again
+		if pendingSampleIndex < len(cs.pending) && !partition.InRange(cs.pending[pendingSampleIndex].t) {
+			metric.shouldGetState = true
+		}
+
 		cs.aggrList.Clear()
 		if pendingSampleIndex == len(cs.pending) {
 			cs.pending = cs.pending[:0]
@@ -440,9 +460,11 @@ func (cs *chunkStore) writeChunks(mc *MetricsCache, metric *MetricState) (hasPen
 		}
 		expr += fmt.Sprintf("%v=%d;", config.MaxTimeAttrName, cs.maxTime) // TODO: use max() expr
 		path := partition.GetMetricPath(metric.name, metric.hash, cs.labelNames, cs.isAggr())
+		atomic.AddInt64(&mc.requestsInFlight, 1)
 		request, err := mc.container.UpdateItem(
 			&v3io.UpdateItemInput{Path: path, Expression: &expr, Condition: conditionExpr}, metric, mc.responseChan)
 		if err != nil {
+			atomic.AddInt64(&mc.requestsInFlight, -1)
 			mc.logger.ErrorWith("UpdateItem failed", "err", err)
 			hasPendingUpdates = false
 		}
