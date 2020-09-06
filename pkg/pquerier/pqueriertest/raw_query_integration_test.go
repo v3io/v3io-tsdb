@@ -3,7 +3,6 @@
 package pqueriertest
 
 import (
-	"errors"
 	"fmt"
 	"math"
 	"testing"
@@ -717,76 +716,4 @@ func (suite *testRawQuerySuite) TestQueryMultiMetricsInconsistentLabels() {
 	for iter.Next() {
 		suite.NotNil(iter.At(), "Iterator yielded a nil series")
 	}
-}
-
-func (suite *testRawQuerySuite) TestLoadPartitionsFromAttributes() {
-	suite.v3ioConfig.LoadPartitionsFromSchemaAttr = true
-	defer func() { suite.v3ioConfig.LoadPartitionsFromSchemaAttr = false }()
-
-	adapter, err := tsdb.NewV3ioAdapter(suite.v3ioConfig, nil, nil)
-	if err != nil {
-		suite.T().Fatalf("failed to create v3io adapter. reason: %s", err)
-	}
-
-	labels1 := utils.LabelsFromStringList("os", "linux")
-	labels2 := utils.LabelsFromStringList("os", "mac")
-	numberOfEvents := 5
-	eventsInterval := int64(tsdbtest.MinuteInMillis)
-	expectedData := []tsdbtest.DataPoint{{suite.basicQueryTime - 7*tsdbtest.DaysInMillis, 10},
-		{int64(suite.basicQueryTime + tsdbtest.MinuteInMillis), 20},
-		{suite.basicQueryTime + 2*eventsInterval, 30},
-		{suite.basicQueryTime + 3*eventsInterval, 40}}
-
-	testParams := tsdbtest.NewTestParams(suite.T(),
-		tsdbtest.TestOption{
-			Key: tsdbtest.OptTimeSeries,
-			Value: tsdbtest.TimeSeries{tsdbtest.Metric{
-				Name:   "cpu",
-				Labels: labels1,
-				Data:   expectedData},
-				tsdbtest.Metric{
-					Name:   "cpu",
-					Labels: labels2,
-					Data:   expectedData},
-			}})
-
-	tsdbtest.InsertData(suite.T(), testParams)
-
-	querierV2, err := adapter.QuerierV2()
-	if err != nil {
-		suite.T().Fatalf("Failed to create querier v2, err: %v", err)
-	}
-
-	params := &pquerier.SelectParams{Name: "cpu", From: suite.basicQueryTime - 8*tsdbtest.DaysInMillis, To: suite.basicQueryTime + int64(numberOfEvents)*eventsInterval}
-	set, err := querierV2.Select(params)
-	if err != nil {
-		suite.T().Fatalf("Failed to exeute query, err: %v", err)
-	}
-
-	var seriesCount int
-	for set.Next() {
-		seriesCount++
-		iter := set.At().Iterator()
-		data, err := tsdbtest.IteratorToSlice(iter)
-		if err != nil {
-			suite.T().Fatal(err)
-		}
-
-		for i := 0; i < len(expectedData); i++ {
-			assert.Equal(suite.T(), expectedData[i].Time, data[i].Time)
-			currentExpected := expectedData[i].Value
-			switch val := currentExpected.(type) {
-			case float64:
-				assert.Equal(suite.T(), val, data[i].Value)
-			case int:
-				assert.Equal(suite.T(), float64(val), data[i].Value)
-			case string:
-				assert.Equal(suite.T(), val, data[i].Value)
-			default:
-				assert.Error(suite.T(), errors.New("unsupported data type"))
-			}
-		}
-	}
-
-	assert.Equal(suite.T(), 2, seriesCount, "series count didn't match expected")
 }
