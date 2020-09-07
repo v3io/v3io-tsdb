@@ -171,9 +171,8 @@ type V3ioConfig struct {
 	UsePreciseAggregations bool `json:"usePreciseAggregations,omitempty"`
 	// Coefficient to decide whether or not to use server aggregates optimization
 	// use server aggregations if ` <requested step> / <rollup interval>  >  UseServerAggregateCoefficient`
-	UseServerAggregateCoefficient int  `json:"useServerAggregateCoefficient,omitempty"`
-	LoadPartitionsFromSchemaAttr  bool `json:"loadPartitionsFromSchemaAttr,omitempty"`
-	RequestChanLength             int  `json:"RequestChanLength,omitempty"`
+	UseServerAggregateCoefficient int `json:"useServerAggregateCoefficient,omitempty"`
+	RequestChanLength             int `json:"RequestChanLength,omitempty"`
 }
 
 type MetricsReporterConfig struct {
@@ -225,8 +224,7 @@ type PartitionSchema struct {
 }
 
 type Partition struct {
-	StartTime  int64           `json:"startTime"`
-	SchemaInfo PartitionSchema `json:"schemaInfo"`
+	StartTime int64 `json:"startTime"`
 }
 
 type SchemaField struct {
