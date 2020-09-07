@@ -21,6 +21,7 @@ such restriction.
 package tsdbctl
 
 import (
+	"context"
 	"strings"
 	"time"
 
@@ -121,7 +122,7 @@ Arguments:
 func (qc *queryCommandeer) query() error {
 
 	if qc.name == "" && qc.filter == "" {
-		return errors.New("the query command must receive either a metric-name paramter (<metrics>) or a query filter (set via the -f|--filter flag)")
+		return errors.New("the query command must receive either a metric-name parameter (<metrics>) or a query filter (set via the -f|--filter flag)")
 	}
 
 	if qc.last != "" && (qc.from != "" || qc.to != "") {
@@ -222,7 +223,7 @@ func (qc *queryCommandeer) newQuery(from, to, step int64) error {
 
 func (qc *queryCommandeer) oldQuery(from, to, step int64) error {
 
-	qry, err := qc.rootCommandeer.adapter.Querier(nil, from, to)
+	qry, err := qc.rootCommandeer.adapter.Querier(context.TODO(), from, to)
 	if err != nil {
 		return errors.Wrap(err, "Failed to initialize the Querier object.")
 	}

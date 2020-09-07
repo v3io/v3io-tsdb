@@ -248,9 +248,9 @@ func (mc *MetricsCache) Add(lset utils.LabelsIfc, t int64, v interface{}) (uint6
 		for _, preAggr := range mc.partitionMngr.GetConfig().TableSchemaInfo.PreAggregates {
 			subLset := lset.Filter(preAggr.Labels)
 			name, key, hash := subLset.GetKey()
-			aggrMetric, ok := mc.getMetric(name, hash)
+			_, ok := mc.getMetric(name, hash)
 			if !ok {
-				aggrMetric = &MetricState{Lset: subLset, key: key, name: name, hash: hash}
+				aggrMetric := &MetricState{Lset: subLset, key: key, name: name, hash: hash}
 				aggrMetric.store = newChunkStore(mc.logger, subLset.LabelNames(), true)
 				mc.addMetric(hash, name, aggrMetric)
 				aggrMetrics = append(aggrMetrics, aggrMetric)

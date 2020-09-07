@@ -187,7 +187,6 @@ func (q *V3ioQuerier) baseSelectQry(params *SelectParams, showAggregateLabel boo
 		}
 
 		iter, err = selectContext.start(parts, params)
-		return
 	})
 
 	return
@@ -227,7 +226,7 @@ func (q *V3ioQuerier) getMetricNames() ([]string, error) {
 		metricNames = append(metricNames, iter.GetField(config.ObjectNameAttrName).(string))
 	}
 
-	sort.Sort(sort.StringSlice(metricNames))
+	sort.Strings(metricNames)
 
 	if iter.Err() != nil {
 		return nil, fmt.Errorf("failed to read metric names; err = %v", iter.Err().Error())

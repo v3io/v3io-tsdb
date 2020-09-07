@@ -171,9 +171,8 @@ type V3ioConfig struct {
 	UsePreciseAggregations bool `json:"usePreciseAggregations,omitempty"`
 	// Coefficient to decide whether or not to use server aggregates optimization
 	// use server aggregations if ` <requested step> / <rollup interval>  >  UseServerAggregateCoefficient`
-	UseServerAggregateCoefficient int  `json:"useServerAggregateCoefficient,omitempty"`
-	LoadPartitionsFromSchemaAttr  bool `json:"loadPartitionsFromSchemaAttr,omitempty"`
-	RequestChanLength             int  `json:"RequestChanLength,omitempty"`
+	UseServerAggregateCoefficient int `json:"useServerAggregateCoefficient,omitempty"`
+	RequestChanLength             int `json:"RequestChanLength,omitempty"`
 }
 
 type MetricsReporterConfig struct {
@@ -225,8 +224,7 @@ type PartitionSchema struct {
 }
 
 type Partition struct {
-	StartTime  int64           `json:"startTime"`
-	SchemaInfo PartitionSchema `json:"schemaInfo"`
+	StartTime int64 `json:"startTime"`
 }
 
 type SchemaField struct {
@@ -260,7 +258,6 @@ func GetOrDefaultConfig() (*V3ioConfig, error) {
 func GetOrLoadFromFile(path string) (*V3ioConfig, error) {
 	once.Do(func() {
 		instance, failure = loadConfig(path)
-		return
 	})
 
 	return instance, failure
@@ -269,7 +266,6 @@ func GetOrLoadFromFile(path string) (*V3ioConfig, error) {
 func GetOrLoadFromData(data []byte) (*V3ioConfig, error) {
 	once.Do(func() {
 		instance, failure = loadFromData(data)
-		return
 	})
 
 	return instance, failure
@@ -280,7 +276,6 @@ func GetOrLoadFromStruct(cfg *V3ioConfig) (*V3ioConfig, error) {
 	once.Do(func() {
 		initDefaults(cfg)
 		instance = cfg
-		return
 	})
 
 	return instance, nil

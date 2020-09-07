@@ -22,7 +22,7 @@ func IsValidMetricName(name string) error {
 	}
 
 	if !metricNameValidationRegex.Match([]byte(trimmed)) {
-		return fmt.Errorf("metric name containes illegal characters. Name should conform to '%s'",
+		return fmt.Errorf("metric name contains illegal characters. Name should conform to '%s'",
 			metricNameValidationRegexStr)
 	}
 
@@ -36,7 +36,7 @@ func IsValidLabelName(labelName string) error {
 	}
 
 	if !labelValidationRegex.Match([]byte(trimmed)) {
-		return fmt.Errorf("label name containes illegal characters. Label name should conform to '%s'",
+		return fmt.Errorf("label name contains illegal characters. Label name should conform to '%s'",
 			labelValidationRegexStr)
 	}
 

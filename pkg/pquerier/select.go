@@ -289,7 +289,6 @@ func (queryCtx *selectQueryContext) startCollectors() error {
 		}
 
 		close(queryCtx.finalErrorChan)
-		return
 	}()
 
 	return nil
@@ -497,7 +496,7 @@ func (queryCtx *selectQueryContext) generateTimeColumn() Column {
 	for t := queryCtx.queryParams.From; t <= queryCtx.queryParams.To; t += queryCtx.queryParams.Step {
 		err := timeColumn.SetDataAt(i, time.Unix(t/1000, (t%1000)*1e6))
 		if err != nil {
-			queryCtx.logger.ErrorWith(errors.Wrap(err, fmt.Sprintf("could not set data")))
+			queryCtx.logger.ErrorWith(errors.Wrap(err, "could not set data"))
 		} else {
 			i++
 		}
@@ -588,10 +587,7 @@ func (query *partQuery) getItems(ctx *selectQueryContext) error {
 }
 
 func (query *partQuery) Next() bool {
-	var res bool
-
-	res = query.iter.Next()
-	return res
+	return query.iter.Next()
 }
 
 func (query *partQuery) GetField(name string) interface{} {

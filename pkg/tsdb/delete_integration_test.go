@@ -3,10 +3,10 @@
 package tsdb_test
 
 import (
+	"encoding/json"
 	"fmt"
 	"math"
 	"path"
-	"strconv"
 	"testing"
 	"time"
 
@@ -1039,17 +1039,22 @@ func TestDeleteTable(t *testing.T) {
 }
 
 func getCurrentPartitions(test *testing.T, container v3io.Container, path string) []int64 {
-	input := &v3io.GetItemInput{Path: path + "/.schema",
-		AttributeNames: []string{"*"}}
-	res, err := container.GetItemSync(input)
+	input := &v3io.GetObjectInput{Path: path + "/.schema"}
+	resp, err := container.GetObjectSync(input)
 	if err != nil {
 		test.Fatal(errors.Wrap(err, "failed to get schema"))
 	}
-	output := res.Output.(*v3io.GetItemOutput)
+
+	schema := &config.Schema{}
+	err = json.Unmarshal(resp.Body(), schema)
+	resp.Release()
+	if err != nil {
+		test.Fatal(errors.Wrapf(err, "Failed to unmarshal schema at path '%s'.", path))
+	}
+
 	var partitions []int64
-	for part := range output.Item {
-		partitionsStartTime, _ := strconv.ParseInt(part[1:], 10, 64) // parse attribute and discard attribute prefix
-		partitions = append(partitions, partitionsStartTime)
+	for _, part := range schema.Partitions {
+		partitions = append(partitions, part.StartTime)
 	}
 	return partitions
 }

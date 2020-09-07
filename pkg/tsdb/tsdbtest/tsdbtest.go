@@ -1,6 +1,7 @@
 package tsdbtest
 
 import (
+	"context"
 	json2 "encoding/json"
 	"fmt"
 	"os"
@@ -320,7 +321,7 @@ func ValidateCountOfSamples(t testing.TB, adapter *V3ioAdapter, metricName strin
 
 func ValidateRawData(t testing.TB, adapter *V3ioAdapter, metricName string, startTimeMs, endTimeMs int64, isValid func(*DataPoint, *DataPoint) bool) {
 
-	qry, err := adapter.Querier(nil, startTimeMs, endTimeMs)
+	qry, err := adapter.Querier(context.TODO(), startTimeMs, endTimeMs)
 	if err != nil {
 		t.Fatal(err, "Failed to create a Querier instance.")
 	}

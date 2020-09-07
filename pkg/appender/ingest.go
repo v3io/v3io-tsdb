@@ -53,7 +53,7 @@ func (mc *MetricsCache) metricFeed(index int) {
 
 		for {
 			select {
-			case _ = <-mc.stopChan:
+			case <-mc.stopChan:
 				return
 			case app := <-mc.asyncAppendChan:
 				newMetrics := 0
@@ -150,9 +150,9 @@ func (mc *MetricsCache) metricsUpdateLoop(index int) {
 		counter := 0
 		for {
 			select {
-			case _ = <-mc.stopChan:
+			case <-mc.stopChan:
 				return
-			case _ = <-mc.newUpdates:
+			case <-mc.newUpdates:
 				// Handle new metric notifications (from metricFeed)
 				for mc.updatesInFlight < mc.cfg.Workers*2 {
 					freeSlots := mc.cfg.Workers*2 - mc.updatesInFlight
@@ -390,7 +390,7 @@ func (mc *MetricsCache) nameUpdateRespLoop() {
 	go func() {
 		for {
 			select {
-			case _ = <-mc.stopChan:
+			case <-mc.stopChan:
 				return
 			case resp := <-mc.nameUpdateChan:
 				// Handle V3IO PutItem in names table

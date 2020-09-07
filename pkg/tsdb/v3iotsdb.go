@@ -44,7 +44,6 @@ import (
 	"github.com/v3io/v3io-tsdb/pkg/partmgr"
 	"github.com/v3io/v3io-tsdb/pkg/pquerier"
 	"github.com/v3io/v3io-tsdb/pkg/querier"
-	"github.com/v3io/v3io-tsdb/pkg/tsdb/schema"
 	"github.com/v3io/v3io-tsdb/pkg/utils"
 )
 
@@ -200,12 +199,6 @@ func (a *V3ioAdapter) connect() error {
 	err = json.Unmarshal(resp.Body(), &tableSchema)
 	if err != nil {
 		return errors.Wrapf(err, "Failed to unmarshal the TSDB schema at '%s', got: %v .", fullpath, string(resp.Body()))
-	}
-
-	// in order to support backward compatibility we do not fail on version mismatch and only logging warning
-	if a.cfg.LoadPartitionsFromSchemaAttr && tableSchema.TableSchemaInfo.Version != schema.Version {
-		a.logger.Warn("Table Schema version mismatch - existing table schema version is %d while the tsdb library version is %d! Make sure to create the table with same library version",
-			tableSchema.TableSchemaInfo.Version, schema.Version)
 	}
 
 	a.partitionMngr, err = partmgr.NewPartitionMngr(&tableSchema, a.container, a.cfg)
@@ -491,7 +484,7 @@ func getItemsWorker(logger logger.Logger, container v3io.Container, input *v3io.
 	filesToDeleteChan chan<- v3io.Item, terminationChan chan<- error, onErrorTerminationChannel <-chan struct{}) {
 	for {
 		select {
-		case _ = <-onErrorTerminationChannel:
+		case <-onErrorTerminationChannel:
 			terminationChan <- nil
 			return
 		default:
@@ -511,7 +504,7 @@ func getItemsWorker(logger logger.Logger, container v3io.Container, input *v3io.
 
 			// In case we got error on delete while iterating getItems response
 			select {
-			case _ = <-onErrorTerminationChannel:
+			case <-onErrorTerminationChannel:
 				terminationChan <- nil
 				return
 			default:
@@ -532,7 +525,7 @@ func deleteObjectWorker(container v3io.Container, deleteParams *DeleteParams, lo
 	aggrMask aggregate.AggrType) {
 	for {
 		select {
-		case _ = <-onErrorTerminationChannel:
+		case <-onErrorTerminationChannel:
 			return
 		case itemToDelete, ok := <-filesToDeleteChannel:
 			if !ok {
