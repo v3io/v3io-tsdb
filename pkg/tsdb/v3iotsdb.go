@@ -484,7 +484,7 @@ func getItemsWorker(logger logger.Logger, container v3io.Container, input *v3io.
 	filesToDeleteChan chan<- v3io.Item, terminationChan chan<- error, onErrorTerminationChannel <-chan struct{}) {
 	for {
 		select {
-		case _ = <-onErrorTerminationChannel:
+		case <-onErrorTerminationChannel:
 			terminationChan <- nil
 			return
 		default:
@@ -504,7 +504,7 @@ func getItemsWorker(logger logger.Logger, container v3io.Container, input *v3io.
 
 			// In case we got error on delete while iterating getItems response
 			select {
-			case _ = <-onErrorTerminationChannel:
+			case <-onErrorTerminationChannel:
 				terminationChan <- nil
 				return
 			default:
@@ -525,7 +525,7 @@ func deleteObjectWorker(container v3io.Container, deleteParams *DeleteParams, lo
 	aggrMask aggregate.AggrType) {
 	for {
 		select {
-		case _ = <-onErrorTerminationChannel:
+		case <-onErrorTerminationChannel:
 			return
 		case itemToDelete, ok := <-filesToDeleteChannel:
 			if !ok {

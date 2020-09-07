@@ -310,7 +310,7 @@ func MaskToString(mask AggrType) string {
 	return output.String()
 }
 
-func ToAttrName(aggr AggrType) string {
+func ToAttrName(aggr fmt.Stringer) string {
 	return config.AggregateAttrPrefix + aggr.String()
 }
 

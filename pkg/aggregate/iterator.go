@@ -134,7 +134,7 @@ func (as *Series) NewSetFromAttrs(
 			}
 			aggrArrays[aggr] = utils.AsInt64Array(attrBlob.([]byte))
 
-			dataArrays[aggr] = make([]float64, length, length)
+			dataArrays[aggr] = make([]float64, length)
 			copy(dataArrays[aggr], getOrCreateInitDataArray(aggr, length))
 		}
 	}
@@ -189,7 +189,7 @@ func (as *Series) NewSetFromChunks(length int) *Set {
 
 	for _, aggr := range rawAggregates {
 		if aggr&as.aggrMask != 0 {
-			dataArrays[aggr] = make([]float64, length, length) // TODO: len/capacity & reuse (pool)
+			dataArrays[aggr] = make([]float64, length) // TODO: len/capacity & reuse (pool)
 			initArray := getOrCreateInitDataArray(aggr, length)
 			copy(dataArrays[aggr], initArray)
 		}
@@ -373,7 +373,7 @@ func getOrCreateInitDataArray(aggrType AggrType, length int) []float64 {
 
 func createInitDataArray(aggrType AggrType, length int) []float64 {
 	// Prepare "clean" array for fastest reset of "uninitialized" data arrays
-	resultArray := make([]float64, length, length)
+	resultArray := make([]float64, length)
 
 	var initWith float64
 	switch aggrType {

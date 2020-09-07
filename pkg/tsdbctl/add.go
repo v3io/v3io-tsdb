@@ -148,7 +148,7 @@ func (ac *addCommandeer) add() error {
 
 	if ac.inFile == "" && !ac.stdin {
 		// Process direct CLI input
-		if lset, err = utils.LabelsFromStringWithName(ac.name, ac.lset); err != nil {
+		if _, err = utils.LabelsFromStringWithName(ac.name, ac.lset); err != nil {
 			return err
 		}
 
@@ -170,7 +170,7 @@ func (ac *addCommandeer) add() error {
 		return err
 	}
 
-	err = ac.appendMetrics(appender, lset)
+	err = ac.appendMetrics(appender)
 	if err != nil {
 		return err
 	}
@@ -186,7 +186,7 @@ func (ac *addCommandeer) add() error {
 	return nil
 }
 
-func (ac *addCommandeer) appendMetrics(append tsdb.Appender, lset utils.Labels) error {
+func (ac *addCommandeer) appendMetrics(append tsdb.Appender) error {
 
 	var fp *os.File
 	var err error
@@ -225,7 +225,8 @@ func (ac *addCommandeer) appendMetrics(append tsdb.Appender, lset utils.Labels) 
 			return fmt.Errorf("Line %d of the CSV input file (%v) doesn't conform to the CSV-record requirements of 3-4 columns in each row - metric name,labels,value,[time]", num, line)
 		}
 
-		if lset, err = utils.LabelsFromStringWithName(line[0], line[1]); err != nil {
+		lset, err := utils.LabelsFromStringWithName(line[0], line[1])
+		if err != nil {
 			return err
 		}
 

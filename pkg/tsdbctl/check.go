@@ -193,7 +193,7 @@ func (cc *checkCommandeer) checkByName(container v3io.Container, tablePath strin
 	if cc.to == "" {
 		to = math.MaxInt64
 	} else {
-		to, err = utils.Str2unixTime(cc.to)
+		_, err = utils.Str2unixTime(cc.to)
 		return nil, errors.Wrapf(err, "failed to parse end time '%s'", cc.to)
 	}
 	partitionInterval, _ := utils.Str2duration(schema.PartitionSchemaInfo.PartitionerInterval)
