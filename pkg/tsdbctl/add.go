@@ -148,7 +148,7 @@ func (ac *addCommandeer) add() error {
 
 	if ac.inFile == "" && !ac.stdin {
 		// Process direct CLI input
-		if _, err = utils.LabelsFromStringWithName(ac.name, ac.lset); err != nil {
+		if lset, err = utils.LabelsFromStringWithName(ac.name, ac.lset); err != nil {
 			return err
 		}
 
