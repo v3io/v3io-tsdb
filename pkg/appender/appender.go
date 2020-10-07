@@ -190,7 +190,10 @@ func (mc *MetricsCache) getMetric(name string, hash uint64) (*MetricState, bool)
 	defer mc.mtx.RUnlock()
 
 	metric, ok := mc.cacheMetricMap.Get(cacheKey{name, hash})
-	return metric.(*MetricState), ok
+	if ok {
+		return metric.(*MetricState), ok
+	}
+	return nil, ok
 }
 
 // create a new metric and save in the map
