@@ -50,19 +50,19 @@ jobs:
         run: make test
 
       - name: Test integration
-        run: make integration
         env:
           V3IO_API: ${{ secrets.V3IO_API }}
           V3IO_ACCESS_KEY: ${{ secrets.V3IO_ACCESS_KEY }}
           V3IO_TSDB_CONFIG: ${{ github.workspace }}/test/ci_v3io.yaml
+        run: make integration
 
       - name: Benchmark
-        run: make bench
         env:
           V3IO_API: ${{ secrets.V3IO_API }}
           V3IO_ACCESS_KEY: ${{ secrets.V3IO_ACCESS_KEY }}
           V3IO_TSDB_CONFIG: ${{ github.workspace }}/test/ci_v3io_bench.yaml
           TSDB_BENCH_INGEST_CONFIG: ${{ github.workspace }}/test/benchmark/testdata/tsdb-bench-test-config-ci.yaml
+        run: make bench
 
   release:
     name: Release
