@@ -46,6 +46,7 @@ github.com/nuclio/nuclio-sdk-go v0.0.0-20190205170814-3b507fbd0324 h1:wSCJEH8mUQ
 github.com/nuclio/nuclio-sdk-go v0.0.0-20190205170814-3b507fbd0324/go.mod h1:NqMgotiF6Y0Ho4+i5AvJhH3FRKAyL4IMaMv/eoUOkKQ=
 github.com/nuclio/zap v0.0.2 h1:rY5PkMOl8CTkqRqIPuxziBiKK6Mq/8oEurfgRnNtqf0=
 github.com/nuclio/zap v0.0.2/go.mod h1:SUxPsgePvlyjx6c5MtGdB50pf0IQThtlyLwISLboeuc=
+github.com/nuclio/zap v0.0.3/go.mod h1:SUxPsgePvlyjx6c5MtGdB50pf0IQThtlyLwISLboeuc=
 github.com/pavius/zap v1.4.2-0.20180228181622-8d52692529b8 h1:WqLgmr/wj9TO5Sc6oYPQRAJBxuHE0NTeuVeFnT+FZVo=
 github.com/pavius/zap v1.4.2-0.20180228181622-8d52692529b8/go.mod h1:6FWOCx06uh50GClv8S2cfk3asqTJs3qq3ZNRtLZE77I=
 github.com/philhofer/fwd v1.0.0 h1:UbZqGr5Y38ApvM/V/jEljVxwocdweyH+vmYvRPBnbqQ=
