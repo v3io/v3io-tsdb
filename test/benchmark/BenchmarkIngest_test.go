@@ -2,6 +2,7 @@ package benchmark
 
 import (
 	"fmt"
+	"github.com/v3io/v3io-tsdb/pkg/appender"
 	"io/ioutil"
 	"log"
 	"sync/atomic"
@@ -20,7 +21,7 @@ import (
 const metricNamePrefix = "Name_"
 
 type RefId struct {
-	id     uint64
+	id     *appender.MetricIdentifier
 	nextId int64
 }
 

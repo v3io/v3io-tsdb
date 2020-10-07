@@ -161,7 +161,7 @@ func (ac *addCommandeer) add() error {
 			return err
 		}
 
-		_, err = ac.appendMetric(appender, lset, tarray, varray)
+		err = ac.appendMetric(appender, lset, tarray, varray)
 		if err != nil {
 			return err
 		}
@@ -240,7 +240,7 @@ func (ac *addCommandeer) appendMetrics(append tsdb.Appender) error {
 			return err
 		}
 
-		_, err = ac.appendMetric(append, lset, tarray, varray)
+		err = ac.appendMetric(append, lset, tarray, varray)
 		if err != nil {
 			return err
 		}
@@ -251,23 +251,23 @@ func (ac *addCommandeer) appendMetrics(append tsdb.Appender) error {
 }
 
 func (ac *addCommandeer) appendMetric(
-	append tsdb.Appender, lset utils.Labels, tarray []int64, varray []interface{}) (uint64, error) {
+	append tsdb.Appender, lset utils.Labels, tarray []int64, varray []interface{})  error {
 
 	ac.rootCommandeer.logger.DebugWith("Adding a sample value to a metric.", "lset", lset, "t", tarray, "v", varray)
 
 	ref, err := append.Add(lset, tarray[0], varray[0])
 	if err != nil {
-		return 0, errors.Wrap(err, "Failed to add a sample value to a metric.")
+		return errors.Wrap(err, "Failed to add a sample value to a metric.")
 	}
 
 	for i := 1; i < len(varray); i++ {
 		err := append.AddFast(lset, ref, tarray[i], varray[i])
 		if err != nil {
-			return 0, errors.Wrap(err, "Failed to perform AddFast append of metric sample values.")
+			return errors.Wrap(err, "Failed to perform AddFast append of metric sample values.")
 		}
 	}
 
-	return ref, nil
+	return nil
 }
 
 func strToTV(tarr, varr string) ([]int64, []interface{}, error) {
