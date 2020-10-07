@@ -175,7 +175,7 @@ type V3ioConfig struct {
 	// use server aggregations if ` <requested step> / <rollup interval>  >  UseServerAggregateCoefficient`
 	UseServerAggregateCoefficient int `json:"useServerAggregateCoefficient,omitempty"`
 	RequestChanLength             int `json:"RequestChanLength,omitempty"`
-	MetricCacheSize int `json:"MetricCacheSize,omitempty"`
+	MetricCacheSize               int `json:"MetricCacheSize,omitempty"`
 }
 
 type MetricsReporterConfig struct {
