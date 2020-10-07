@@ -22,10 +22,10 @@ package appender
 
 import (
 	"fmt"
-	"github.com/golang/groupcache/lru"
 	"sync"
 	"time"
 
+	"github.com/golang/groupcache/lru"
 	"github.com/nuclio/logger"
 	"github.com/pkg/errors"
 	"github.com/v3io/v3io-go/pkg/dataplane"
@@ -65,9 +65,10 @@ type MetricState struct {
 }
 
 type MetricIdentifier struct {
-	name  string
-	hash  uint64
+	name string
+	hash uint64
 }
+
 // Metric store states
 type storeState uint8
 
@@ -150,7 +151,7 @@ func NewMetricsCache(container v3io.Container, logger logger.Logger, cfg *config
 	partMngr *partmgr.PartitionManager) *MetricsCache {
 
 	newCache := MetricsCache{container: container, logger: logger, cfg: cfg, partitionMngr: partMngr}
-	newCache.cacheMetricMap = lru.New(4096)//map[cacheKey]*MetricState{}
+	newCache.cacheMetricMap = lru.New(4096) //map[cacheKey]*MetricState{}
 
 	newCache.responseChan = make(chan *v3io.Response, channelSize)
 	newCache.nameUpdateChan = make(chan *v3io.Response, channelSize)

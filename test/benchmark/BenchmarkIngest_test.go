@@ -2,7 +2,6 @@ package benchmark
 
 import (
 	"fmt"
-	"github.com/v3io/v3io-tsdb/pkg/appender"
 	"io/ioutil"
 	"log"
 	"sync/atomic"
@@ -11,6 +10,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/v3io/v3io-tsdb/internal/pkg/performance"
+	"github.com/v3io/v3io-tsdb/pkg/appender"
 	"github.com/v3io/v3io-tsdb/pkg/tsdb"
 	"github.com/v3io/v3io-tsdb/pkg/tsdb/tsdbtest"
 	"github.com/v3io/v3io-tsdb/pkg/tsdb/tsdbtest/testutils"

@@ -251,7 +251,7 @@ func (ac *addCommandeer) appendMetrics(append tsdb.Appender) error {
 }
 
 func (ac *addCommandeer) appendMetric(
-	append tsdb.Appender, lset utils.Labels, tarray []int64, varray []interface{})  error {
+	append tsdb.Appender, lset utils.Labels, tarray []int64, varray []interface{}) error {
 
 	ac.rootCommandeer.logger.DebugWith("Adding a sample value to a metric.", "lset", lset, "t", tarray, "v", varray)
 

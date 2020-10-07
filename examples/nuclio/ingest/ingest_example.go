@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/json"
-	"github.com/v3io/v3io-tsdb/pkg/appender"
 	"os"
 	"sort"
 	"strconv"
@@ -11,6 +10,7 @@ import (
 
 	"github.com/nuclio/nuclio-sdk-go"
 	"github.com/pkg/errors"
+	"github.com/v3io/v3io-tsdb/pkg/appender"
 	"github.com/v3io/v3io-tsdb/pkg/config"
 	"github.com/v3io/v3io-tsdb/pkg/tsdb"
 	"github.com/v3io/v3io-tsdb/pkg/utils"
