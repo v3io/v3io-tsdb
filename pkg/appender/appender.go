@@ -151,7 +151,7 @@ func NewMetricsCache(container v3io.Container, logger logger.Logger, cfg *config
 	partMngr *partmgr.PartitionManager) *MetricsCache {
 
 	newCache := MetricsCache{container: container, logger: logger, cfg: cfg, partitionMngr: partMngr}
-	newCache.cacheMetricMap = lru.New(cfg.CacheSize) //map[cacheKey]*MetricState{}
+	newCache.cacheMetricMap = lru.New(cfg.MetricCacheSize) //map[cacheKey]*MetricState{}
 
 	newCache.responseChan = make(chan *v3io.Response, channelSize)
 	newCache.nameUpdateChan = make(chan *v3io.Response, channelSize)
