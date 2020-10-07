@@ -1,0 +1,64 @@
+name: CI
+
+on:
+  pull_request_target:
+    branches:
+      - development
+      - 'v[0-9]+.[0-9]+.x'
+
+jobs:
+  test:
+    name: Lint & test
+    runs-on: ubuntu-latest
+    env:
+      TSDB_TEST_TABLE_PATH: TSDB_INTEGRATION_TESTS/${{ github.sha }}
+
+    steps:
+      - name: Dump github context
+        run: echo "$GITHUB_CONTEXT"
+        env:
+          GITHUB_CONTEXT: ${{ toJson(github) }}
+
+      - name: Dump runner context
+        run: echo "$RUNNER_CONTEXT"
+        env:
+          RUNNER_CONTEXT: ${{ toJson(runner) }}
+
+      - name: Dump github ref
+        run: echo "$GITHUB_REF"
+
+      - uses: actions/setup-go@v2
+        with:
+          go-version: "^1.14.0"
+
+      - uses: actions/cache@v2
+        with:
+          path: ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+
+      - uses: actions/checkout@v2
+        with:
+          ref: refs/pull/${{ github.event.number }}/merge
+
+      - name: Lint
+        run: make lint
+
+      - name: Test short
+        run: make test
+
+      - name: Test integration
+        env:
+          V3IO_API: ${{ secrets.V3IO_API }}
+          V3IO_ACCESS_KEY: ${{ secrets.V3IO_ACCESS_KEY }}
+          V3IO_TSDB_CONFIG: ${{ github.workspace }}/test/ci_v3io.yaml
+        run: make integration
+
+      - name: Benchmark
+        env:
+          V3IO_API: ${{ secrets.V3IO_API }}
+          V3IO_ACCESS_KEY: ${{ secrets.V3IO_ACCESS_KEY }}
+          V3IO_TSDB_CONFIG: ${{ github.workspace }}/test/ci_v3io_bench.yaml
+          TSDB_BENCH_INGEST_CONFIG: ${{ github.workspace }}/test/benchmark/testdata/tsdb-bench-test-config-ci.yaml
+        run: make bench
