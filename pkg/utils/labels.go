@@ -45,10 +45,12 @@ type Label struct {
 type Labels []Label
 
 type LabelsIfc interface {
-	GetKey() (string, string, uint64)
+	GetKey() (string, string)
 	GetExpr() string
 	Filter([]string) LabelsIfc
 	LabelNames() []string
+	Hash() uint64
+	HashWithName() uint64
 }
 
 func (ls Labels) Filter(keep []string) LabelsIfc {
@@ -68,8 +70,8 @@ func (ls Labels) Filter(keep []string) LabelsIfc {
 	return res
 }
 
-// convert Label set to a string in the form key1=v1,key2=v2.. + name + hash
-func (ls Labels) GetKey() (string, string, uint64) {
+// convert Label set to a string in the form key1=v1,key2=v2.. + name
+func (ls Labels) GetKey() (string, string) {
 	var keyBuilder strings.Builder
 	name := ""
 	for _, lbl := range ls {
@@ -83,13 +85,13 @@ func (ls Labels) GetKey() (string, string, uint64) {
 		}
 	}
 	if keyBuilder.Len() == 0 {
-		return name, "", ls.Hash()
+		return name, ""
 	}
 
 	// Discard last comma
 	key := keyBuilder.String()[:keyBuilder.Len()-1]
 
-	return name, key, ls.Hash()
+	return name, key
 
 }
 
@@ -181,6 +183,24 @@ func (ls Labels) Hash() uint64 {
 		if v.Name == MetricName {
 			continue
 		}
+		b = append(b, v.Name...)
+		b = append(b, sep)
+		b = append(b, v.Value...)
+		b = append(b, sep)
+	}
+
+	hash := xxhash.New()
+	_, err := hash.Write(b)
+	if err != nil {
+		return 0
+	}
+	return hash.Sum64()
+}
+
+func (ls Labels) HashWithName() uint64 {
+	b := make([]byte, 0, 1024)
+
+	for _, v := range ls {
 		b = append(b, v.Name...)
 		b = append(b, sep)
 		b = append(b, v.Value...)
