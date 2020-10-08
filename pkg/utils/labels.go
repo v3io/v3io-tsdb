@@ -45,11 +45,10 @@ type Label struct {
 type Labels []Label
 
 type LabelsIfc interface {
-	GetKey() (string, string)
+	GetKey() (string, string, uint64)
 	GetExpr() string
 	Filter([]string) LabelsIfc
 	LabelNames() []string
-	Hash() uint64
 	HashWithName() uint64
 }
 
@@ -70,8 +69,8 @@ func (ls Labels) Filter(keep []string) LabelsIfc {
 	return res
 }
 
-// convert Label set to a string in the form key1=v1,key2=v2.. + name
-func (ls Labels) GetKey() (string, string) {
+// convert Label set to a string in the form key1=v1,key2=v2.. + name + hash
+func (ls Labels) GetKey() (string, string, uint64) {
 	var keyBuilder strings.Builder
 	name := ""
 	for _, lbl := range ls {
@@ -85,13 +84,13 @@ func (ls Labels) GetKey() (string, string) {
 		}
 	}
 	if keyBuilder.Len() == 0 {
-		return name, ""
+		return name, "", ls.Hash()
 	}
 
 	// Discard last comma
 	key := keyBuilder.String()[:keyBuilder.Len()-1]
 
-	return name, key
+	return name, key, ls.Hash()
 
 }
 

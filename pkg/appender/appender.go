@@ -217,7 +217,7 @@ func (mc *MetricsCache) Add(lset utils.LabelsIfc, t int64, v interface{}) (uint6
 		isValueVariantType = true
 	}
 
-	name, key := lset.GetKey()
+	name, key, _ := lset.GetKey()
 	hash := lset.HashWithName()
 	err = utils.IsValidMetricName(name)
 	if err != nil {
@@ -229,7 +229,7 @@ func (mc *MetricsCache) Add(lset utils.LabelsIfc, t int64, v interface{}) (uint6
 	if !ok {
 		for _, preAggr := range mc.partitionMngr.GetConfig().TableSchemaInfo.PreAggregates {
 			subLset := lset.Filter(preAggr.Labels)
-			name, key := subLset.GetKey()
+			name, key, _ := subLset.GetKey()
 			hash := subLset.HashWithName()
 			_, ok := mc.getMetric(hash)
 			if !ok {
