@@ -261,7 +261,7 @@ func (ac *addCommandeer) appendMetric(
 	}
 
 	for i := 1; i < len(varray); i++ {
-		err := append.AddFast(lset, ref, tarray[i], varray[i])
+		err := append.AddFast(ref, tarray[i], varray[i])
 		if err != nil {
 			return errors.Wrap(err, "Failed to perform AddFast append of metric sample values.")
 		}

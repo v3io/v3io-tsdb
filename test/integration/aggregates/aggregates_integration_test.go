@@ -24,7 +24,6 @@ package aggregates
 
 import (
 	"fmt"
-	"github.com/v3io/v3io-tsdb/pkg/appender"
 	"math"
 	"testing"
 	"time"
@@ -33,6 +32,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/v3io/v3io-tsdb/internal/pkg/performance"
 	"github.com/v3io/v3io-tsdb/pkg/aggregate"
+	"github.com/v3io/v3io-tsdb/pkg/appender"
 	"github.com/v3io/v3io-tsdb/pkg/config"
 	"github.com/v3io/v3io-tsdb/pkg/tsdb"
 	"github.com/v3io/v3io-tsdb/pkg/tsdb/tsdbtest"
@@ -385,7 +385,7 @@ func writeNext(app tsdb.Appender, metrics []*metricContext, t int64, v float64) 
 			}
 			metric.ref = ref
 		} else {
-			err := app.AddFast(metric.lset, metric.ref, t, v)
+			err := app.AddFast(metric.ref, t, v)
 			if err != nil {
 				return err
 			}

@@ -151,7 +151,7 @@ func NewMetricsCache(container v3io.Container, logger logger.Logger, cfg *config
 	partMngr *partmgr.PartitionManager) *MetricsCache {
 
 	newCache := MetricsCache{container: container, logger: logger, cfg: cfg, partitionMngr: partMngr}
-	newCache.cacheMetricMap = lru.New(cfg.MetricCacheSize) //map[cacheKey]*MetricState{}
+	newCache.cacheMetricMap = lru.New(cfg.MetricCacheSize)
 
 	newCache.responseChan = make(chan *v3io.Response, channelSize)
 	newCache.nameUpdateChan = make(chan *v3io.Response, channelSize)
@@ -284,44 +284,18 @@ func (mc *MetricsCache) Add(lset utils.LabelsIfc, t int64, v interface{}) (*Metr
 	return &MetricIdentifier{metric.name, metric.hash}, err
 }
 
-func (mc *MetricsCache) AddFast(lset utils.Labels, ref *MetricIdentifier, t int64, v interface{}) error {
+func (mc *MetricsCache) AddFast(identifier *MetricIdentifier, t int64, v interface{}) error {
 
 	err := verifyTimeValid(t)
 	if err != nil {
 		return err
 	}
-	if ref == nil {
+	if identifier == nil {
 		return fmt.Errorf("nil identifier")
 	}
-	metric, ok := mc.getMetric(ref.name, ref.hash)
+	metric, ok := mc.getMetric(identifier.name, identifier.hash)
 	if !ok {
-		mc.logger.ErrorWith("metric not found", "name", ref.name, "hash", ref.hash)
-		return fmt.Errorf("metric not found")
-	}
-
-	err = metric.error()
-	metric.setError(nil)
-
-	mc.appendTV(metric, t, v)
-
-	for _, aggrMetric := range metric.aggrs {
-		mc.appendTV(aggrMetric, t, v)
-	}
-
-	return err
-}
-
-func (mc *MetricsCache) AddFastWithMetric(lset utils.Labels, t int64, v interface{}) error {
-
-	err := verifyTimeValid(t)
-	if err != nil {
-		return err
-	}
-	name, _, hash := lset.GetKey()
-	metric, ok := mc.getMetric(name, hash)
-	if !ok {
-		mc.logger.ErrorWith("metric not found", "name", name, "hash", hash)
-		return fmt.Errorf("metric not found")
+		return fmt.Errorf(fmt.Sprintf("metric not found. name=%s, hash=%v", identifier.name, identifier.hash))
 	}
 
 	err = metric.error()

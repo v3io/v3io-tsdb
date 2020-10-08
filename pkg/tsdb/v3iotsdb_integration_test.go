@@ -182,7 +182,7 @@ func testIngestDataCase(t *testing.T, testParams tsdbtest.TestParams) {
 			t.Fatalf("Failed to add data to appender. reason: %s", err)
 		}
 		for _, curr := range dp.Data[1:] {
-			appender.AddFast(labels, ref, curr.Time, curr.Value)
+			appender.AddFast(ref, curr.Time, curr.Value)
 		}
 
 		if _, err := appender.WaitForCompletion(0); err != nil {
@@ -246,7 +246,7 @@ func TestIngestDataWithSameTimestamp(t *testing.T) {
 		}
 
 		for _, curr := range dp.Data[1:] {
-			appender.AddFast(labels, ref, curr.Time, curr.Value)
+			appender.AddFast(ref, curr.Time, curr.Value)
 		}
 
 		if _, err := appender.WaitForCompletion(0); err != nil {
@@ -294,7 +294,7 @@ func TestIngestWithTimeDeltaBiggerThen32Bit(t *testing.T) {
 		}
 
 		for _, curr := range dp.Data[1:] {
-			appender.AddFast(labels, ref, curr.Time, curr.Value)
+			appender.AddFast(ref, curr.Time, curr.Value)
 		}
 
 		if _, err := appender.WaitForCompletion(0); err != nil {

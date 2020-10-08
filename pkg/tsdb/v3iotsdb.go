@@ -802,8 +802,8 @@ func (a v3ioAppender) Add(lset utils.Labels, t int64, v interface{}) (*appender.
 }
 
 // Faster Add using refID obtained from Add (avoid some hash/lookup overhead)
-func (a v3ioAppender) AddFast(lset utils.Labels, ref *appender.MetricIdentifier, t int64, v interface{}) error {
-	return a.metricsCache.AddFast(lset, ref, t, v)
+func (a v3ioAppender) AddFast(identifier *appender.MetricIdentifier, t int64, v interface{}) error {
+	return a.metricsCache.AddFast(identifier, t, v)
 }
 
 // Wait for completion of all updates
@@ -822,7 +822,7 @@ func (a v3ioAppender) Rollback() error { return nil }
 // The Appender interface provides batched appends against a storage.
 type Appender interface {
 	Add(l utils.Labels, t int64, v interface{}) (*appender.MetricIdentifier, error)
-	AddFast(l utils.Labels, ref *appender.MetricIdentifier, t int64, v interface{}) error
+	AddFast(identifier *appender.MetricIdentifier, t int64, v interface{}) error
 	WaitForCompletion(timeout time.Duration) (int, error)
 	Commit() error
 	Rollback() error
