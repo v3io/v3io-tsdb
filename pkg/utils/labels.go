@@ -70,7 +70,7 @@ func (ls Labels) Filter(keep []string) LabelsIfc {
 	return res
 }
 
-// convert Label set to a string in the form key1=v1,key2=v2.. + name + hash
+// convert Label set to a string in the form key1=v1,key2=v2.. + name
 func (ls Labels) GetKey() (string, string) {
 	var keyBuilder strings.Builder
 	name := ""
@@ -197,7 +197,6 @@ func (ls Labels) Hash() uint64 {
 	return hash.Sum64()
 }
 
-// Hash returns a hash value for the label set.
 func (ls Labels) HashWithName() uint64 {
 	b := make([]byte, 0, 1024)
 
