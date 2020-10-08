@@ -10,6 +10,7 @@ import (
 
 	"github.com/nuclio/nuclio-sdk-go"
 	"github.com/pkg/errors"
+	"github.com/v3io/v3io-tsdb/pkg/appender"
 	"github.com/v3io/v3io-tsdb/pkg/config"
 	"github.com/v3io/v3io-tsdb/pkg/tsdb"
 	"github.com/v3io/v3io-tsdb/pkg/utils"
@@ -73,7 +74,7 @@ func Handler(context *nuclio.Context, event nuclio.Event) (interface{}, error) {
 	// convert the map[string]string -> []Labels
 	labels := getLabelsFromRequest(request.Metric, request.Labels)
 
-	var ref uint64
+	var ref *appender.MetricIdentifier
 	// iterate over request samples
 	for _, sample := range request.Samples {
 
@@ -87,10 +88,10 @@ func Handler(context *nuclio.Context, event nuclio.Event) (interface{}, error) {
 			return "", errors.Wrap(err, "Failed to parse time: "+sample.Time)
 		}
 		// append sample to metric
-		if ref == 0 {
+		if ref == nil {
 			ref, err = tsdbAppender.Add(labels, sampleTime, sample.Value.N)
 		} else {
-			err = tsdbAppender.AddFast(labels, ref, sampleTime, sample.Value.N)
+			err = tsdbAppender.AddFast(ref, sampleTime, sample.Value.N)
 		}
 		if err != nil {
 			return "", errors.Wrap(err, "Failed to add sample")

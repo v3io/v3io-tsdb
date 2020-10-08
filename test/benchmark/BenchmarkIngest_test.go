@@ -10,6 +10,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/v3io/v3io-tsdb/internal/pkg/performance"
+	"github.com/v3io/v3io-tsdb/pkg/appender"
 	"github.com/v3io/v3io-tsdb/pkg/tsdb"
 	"github.com/v3io/v3io-tsdb/pkg/tsdb/tsdbtest"
 	"github.com/v3io/v3io-tsdb/pkg/tsdb/tsdbtest/testutils"
@@ -20,7 +21,7 @@ import (
 const metricNamePrefix = "Name_"
 
 type RefId struct {
-	id     uint64
+	id     *appender.MetricIdentifier
 	nextId int64
 }
 
@@ -246,7 +247,7 @@ func appendSingle(refIndex, cycleId int, appender tsdb.Appender, sampleTemplateJ
 			}
 			refs[refIndex].id = ref
 		} else {
-			err := appender.AddFast(sample.Lset, refs[refIndex].id, timestamps[timestampIndex], nextValue)
+			err := appender.AddFast(refs[refIndex].id, timestamps[timestampIndex], nextValue)
 			if err != nil {
 				return 0, errors.Wrapf(err,
 					"AddFast request has failed!\nSample:%v\ncycleId: %d\nrefIndex: %d\ntimestampIndex: %d\nnext Id: %d\n",
@@ -297,7 +298,7 @@ func appendAll(appender tsdb.Appender, sampleTemplates []string, timestamps []in
 				if err != nil {
 					return count, err
 				}
-				err = appender.AddFast(sample.Lset, refs[refIndex].id, timestamps[dataPointStartIndex], sample.Value)
+				err = appender.AddFast(refs[refIndex].id, timestamps[dataPointStartIndex], sample.Value)
 				if err != nil {
 					return count, errors.Wrap(err, fmt.Sprintf("AddFast request has failed! Sample:%v", sample))
 				}

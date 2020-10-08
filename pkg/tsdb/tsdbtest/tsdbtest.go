@@ -252,7 +252,7 @@ func InsertData(t *testing.T, testParams TestParams) *V3ioAdapter {
 			t.Fatalf("Failed to add data to the TSDB appender. Reason: %s", err)
 		}
 		for _, curr := range metric.Data[1:] {
-			err := appender.AddFast(labels, ref, curr.Time, curr.Value)
+			err := appender.AddFast(ref, curr.Time, curr.Value)
 			if err != nil {
 				t.Fatalf("Failed to AddFast. Reason: %s", err)
 			}

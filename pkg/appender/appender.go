@@ -25,6 +25,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/golang/groupcache/lru"
 	"github.com/nuclio/logger"
 	"github.com/pkg/errors"
 	"github.com/v3io/v3io-go/pkg/dataplane"
@@ -61,6 +62,11 @@ type MetricState struct {
 	isVariant  bool
 
 	shouldGetState bool
+}
+
+type MetricIdentifier struct {
+	name string
+	hash uint64
 }
 
 // Metric store states
@@ -131,9 +137,7 @@ type MetricsCache struct {
 
 	lastMetric uint64
 
-	// TODO: consider switching to synch.Map (https://golang.org/pkg/sync/#Map)
-	cacheMetricMap map[cacheKey]*MetricState // TODO: maybe use hash as key & combine w ref
-	cacheRefMap    map[uint64]*MetricState   // TODO: maybe turn to list + free list, periodically delete old matrics
+	cacheMetricMap *lru.Cache
 
 	NameLabelMap map[string]bool // temp store all lable names
 
@@ -147,8 +151,7 @@ func NewMetricsCache(container v3io.Container, logger logger.Logger, cfg *config
 	partMngr *partmgr.PartitionManager) *MetricsCache {
 
 	newCache := MetricsCache{container: container, logger: logger, cfg: cfg, partitionMngr: partMngr}
-	newCache.cacheMetricMap = map[cacheKey]*MetricState{}
-	newCache.cacheRefMap = map[uint64]*MetricState{}
+	newCache.cacheMetricMap = lru.New(cfg.MetricCacheSize)
 
 	newCache.responseChan = make(chan *v3io.Response, channelSize)
 	newCache.nameUpdateChan = make(chan *v3io.Response, channelSize)
@@ -186,8 +189,11 @@ func (mc *MetricsCache) getMetric(name string, hash uint64) (*MetricState, bool)
 	mc.mtx.RLock()
 	defer mc.mtx.RUnlock()
 
-	metric, ok := mc.cacheMetricMap[cacheKey{name, hash}]
-	return metric, ok
+	metric, ok := mc.cacheMetricMap.Get(cacheKey{name, hash})
+	if ok {
+		return metric.(*MetricState), ok
+	}
+	return nil, ok
 }
 
 // create a new metric and save in the map
@@ -197,21 +203,11 @@ func (mc *MetricsCache) addMetric(hash uint64, name string, metric *MetricState)
 
 	mc.lastMetric++
 	metric.refID = mc.lastMetric
-	mc.cacheRefMap[mc.lastMetric] = metric
-	mc.cacheMetricMap[cacheKey{name, hash}] = metric
+	mc.cacheMetricMap.Add(cacheKey{name, hash}, metric)
 	if _, ok := mc.NameLabelMap[name]; !ok {
 		metric.newName = true
 		mc.NameLabelMap[name] = true
 	}
-}
-
-// return metric struct by refID
-func (mc *MetricsCache) getMetricByRef(ref uint64) (*MetricState, bool) {
-	mc.mtx.RLock()
-	defer mc.mtx.RUnlock()
-
-	metric, ok := mc.cacheRefMap[ref]
-	return metric, ok
 }
 
 // Push append to async channel
@@ -220,11 +216,11 @@ func (mc *MetricsCache) appendTV(metric *MetricState, t int64, v interface{}) {
 }
 
 // First time add time & value to metric (by label set)
-func (mc *MetricsCache) Add(lset utils.LabelsIfc, t int64, v interface{}) (uint64, error) {
+func (mc *MetricsCache) Add(lset utils.LabelsIfc, t int64, v interface{}) (*MetricIdentifier, error) {
 
 	err := verifyTimeValid(t)
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
 
 	var isValueVariantType bool
@@ -239,7 +235,7 @@ func (mc *MetricsCache) Add(lset utils.LabelsIfc, t int64, v interface{}) (uint6
 	name, key, hash := lset.GetKey()
 	err = utils.IsValidMetricName(name)
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
 	metric, ok := mc.getMetric(name, hash)
 
@@ -277,7 +273,7 @@ func (mc *MetricsCache) Add(lset utils.LabelsIfc, t int64, v interface{}) (uint6
 		if metric.isVariant {
 			existingValueType = "string"
 		}
-		return 0, errors.Errorf("Cannot append %v type metric to %v type metric.", newValueType, existingValueType)
+		return nil, errors.Errorf("Cannot append %v type metric to %v type metric.", newValueType, existingValueType)
 	}
 
 	mc.appendTV(metric, t, v)
@@ -285,21 +281,21 @@ func (mc *MetricsCache) Add(lset utils.LabelsIfc, t int64, v interface{}) (uint6
 		mc.appendTV(aggrMetric, t, v)
 	}
 
-	return metric.refID, err
+	return &MetricIdentifier{metric.name, metric.hash}, err
 }
 
-// fast Add to metric (by refID)
-func (mc *MetricsCache) AddFast(ref uint64, t int64, v interface{}) error {
+func (mc *MetricsCache) AddFast(identifier *MetricIdentifier, t int64, v interface{}) error {
 
 	err := verifyTimeValid(t)
 	if err != nil {
 		return err
 	}
-
-	metric, ok := mc.getMetricByRef(ref)
+	if identifier == nil {
+		return fmt.Errorf("nil identifier")
+	}
+	metric, ok := mc.getMetric(identifier.name, identifier.hash)
 	if !ok {
-		mc.logger.ErrorWith("Ref not found", "ref", ref)
-		return fmt.Errorf("ref not found")
+		return fmt.Errorf(fmt.Sprintf("metric not found. name=%s, hash=%v", identifier.name, identifier.hash))
 	}
 
 	err = metric.error()
