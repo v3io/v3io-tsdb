@@ -51,7 +51,6 @@ type MetricState struct {
 	key   string
 	name  string
 	hash  uint64
-	refID uint64
 
 	aggrs []*MetricState
 
@@ -102,11 +101,6 @@ func (m *MetricState) error() error {
 	m.RLock()
 	defer m.RUnlock()
 	return m.err
-}
-
-type cacheKey struct {
-	name string
-	hash uint64
 }
 
 // store the state and metadata for all the metrics
@@ -274,7 +268,7 @@ func (mc *MetricsCache) Add(lset utils.LabelsIfc, t int64, v interface{}) (uint6
 		mc.appendTV(aggrMetric, t, v)
 	}
 
-	return metric.refID, err
+	return hash, err
 }
 
 // fast Add to metric (by refID)
