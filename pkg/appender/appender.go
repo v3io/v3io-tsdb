@@ -64,11 +64,6 @@ type MetricState struct {
 	shouldGetState bool
 }
 
-type MetricIdentifier struct {
-	name string
-	hash uint64
-}
-
 // Metric store states
 type storeState uint8
 
@@ -109,11 +104,6 @@ func (m *MetricState) error() error {
 	return m.err
 }
 
-type cacheKey struct {
-	name string
-	hash uint64
-}
-
 // store the state and metadata for all the metrics
 type MetricsCache struct {
 	cfg           *config.V3ioConfig
@@ -134,8 +124,6 @@ type MetricsCache struct {
 
 	outstandingUpdates int64
 	requestsInFlight   int64
-
-	lastMetric uint64
 
 	cacheMetricMap *lru.Cache
 
@@ -185,11 +173,11 @@ func (mc *MetricsCache) Start() error {
 }
 
 // return metric struct by key
-func (mc *MetricsCache) getMetric(name string, hash uint64) (*MetricState, bool) {
+func (mc *MetricsCache) getMetric(hash uint64) (*MetricState, bool) {
 	mc.mtx.RLock()
 	defer mc.mtx.RUnlock()
 
-	metric, ok := mc.cacheMetricMap.Get(cacheKey{name, hash})
+	metric, ok := mc.cacheMetricMap.Get(hash)
 	if ok {
 		return metric.(*MetricState), ok
 	}
@@ -201,9 +189,7 @@ func (mc *MetricsCache) addMetric(hash uint64, name string, metric *MetricState)
 	mc.mtx.Lock()
 	defer mc.mtx.Unlock()
 
-	mc.lastMetric++
-	metric.refID = mc.lastMetric
-	mc.cacheMetricMap.Add(cacheKey{name, hash}, metric)
+	mc.cacheMetricMap.Add(hash, metric)
 	if _, ok := mc.NameLabelMap[name]; !ok {
 		metric.newName = true
 		mc.NameLabelMap[name] = true
@@ -216,11 +202,11 @@ func (mc *MetricsCache) appendTV(metric *MetricState, t int64, v interface{}) {
 }
 
 // First time add time & value to metric (by label set)
-func (mc *MetricsCache) Add(lset utils.LabelsIfc, t int64, v interface{}) (*MetricIdentifier, error) {
+func (mc *MetricsCache) Add(lset utils.LabelsIfc, t int64, v interface{}) (uint64, error) {
 
 	err := verifyTimeValid(t)
 	if err != nil {
-		return nil, err
+		return 0, err
 	}
 
 	var isValueVariantType bool
@@ -232,19 +218,21 @@ func (mc *MetricsCache) Add(lset utils.LabelsIfc, t int64, v interface{}) (*Metr
 		isValueVariantType = true
 	}
 
-	name, key, hash := lset.GetKey()
+	name, key := lset.GetKey()
+	hash := lset.HashWithName()
 	err = utils.IsValidMetricName(name)
 	if err != nil {
-		return nil, err
+		return 0, err
 	}
-	metric, ok := mc.getMetric(name, hash)
+	metric, ok := mc.getMetric(hash)
 
 	var aggrMetrics []*MetricState
 	if !ok {
 		for _, preAggr := range mc.partitionMngr.GetConfig().TableSchemaInfo.PreAggregates {
 			subLset := lset.Filter(preAggr.Labels)
-			name, key, hash := subLset.GetKey()
-			_, ok := mc.getMetric(name, hash)
+			name, key := subLset.GetKey()
+			hash := subLset.HashWithName()
+			_, ok := mc.getMetric(hash)
 			if !ok {
 				aggrMetric := &MetricState{Lset: subLset, key: key, name: name, hash: hash}
 				aggrMetric.store = newChunkStore(mc.logger, subLset.LabelNames(), true)
@@ -273,7 +261,7 @@ func (mc *MetricsCache) Add(lset utils.LabelsIfc, t int64, v interface{}) (*Metr
 		if metric.isVariant {
 			existingValueType = "string"
 		}
-		return nil, errors.Errorf("Cannot append %v type metric to %v type metric.", newValueType, existingValueType)
+		return 0, errors.Errorf("Cannot append %v type metric to %v type metric.", newValueType, existingValueType)
 	}
 
 	mc.appendTV(metric, t, v)
@@ -281,21 +269,19 @@ func (mc *MetricsCache) Add(lset utils.LabelsIfc, t int64, v interface{}) (*Metr
 		mc.appendTV(aggrMetric, t, v)
 	}
 
-	return &MetricIdentifier{metric.name, metric.hash}, err
+	return metric.refID, err
 }
 
-func (mc *MetricsCache) AddFast(identifier *MetricIdentifier, t int64, v interface{}) error {
+// fast Add to metric (by refID)
+func (mc *MetricsCache) AddFast(ref uint64, t int64, v interface{}) error {
 
 	err := verifyTimeValid(t)
 	if err != nil {
 		return err
 	}
-	if identifier == nil {
-		return fmt.Errorf("nil identifier")
-	}
-	metric, ok := mc.getMetric(identifier.name, identifier.hash)
+	metric, ok := mc.getMetric(ref)
 	if !ok {
-		return fmt.Errorf(fmt.Sprintf("metric not found. name=%s, hash=%v", identifier.name, identifier.hash))
+		return fmt.Errorf(fmt.Sprintf("metric not found. ref=%v", ref))
 	}
 
 	err = metric.error()
