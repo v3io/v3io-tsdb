@@ -104,6 +104,11 @@ func (m *MetricState) error() error {
 	return m.err
 }
 
+type cacheKey struct {
+	name string
+	hash uint64
+}
+
 // store the state and metadata for all the metrics
 type MetricsCache struct {
 	cfg           *config.V3ioConfig

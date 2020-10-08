@@ -32,6 +32,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/v3io/v3io-tsdb/internal/pkg/performance"
 	"github.com/v3io/v3io-tsdb/pkg/aggregate"
+	"github.com/v3io/v3io-tsdb/pkg/appender"
 	"github.com/v3io/v3io-tsdb/pkg/config"
 	"github.com/v3io/v3io-tsdb/pkg/tsdb"
 	"github.com/v3io/v3io-tsdb/pkg/tsdb/tsdbtest"
@@ -64,7 +65,7 @@ type TestConfig struct {
 
 type metricContext struct {
 	lset utils.Labels
-	ref  uint64
+	ref  *appender.MetricIdentifier
 }
 
 func TestAggregates(t *testing.T) {
@@ -377,7 +378,7 @@ func generateData(t *testing.T, testConfig *TestConfig, adapter *tsdb.V3ioAdapte
 
 func writeNext(app tsdb.Appender, metrics []*metricContext, t int64, v float64) error {
 	for _, metric := range metrics {
-		if metric.ref == 0 {
+		if metric.ref == nil {
 			ref, err := app.Add(metric.lset, t, v)
 			if err != nil {
 				return err
