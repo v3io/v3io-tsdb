@@ -10,7 +10,6 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/v3io/v3io-tsdb/internal/pkg/performance"
-	"github.com/v3io/v3io-tsdb/pkg/appender"
 	"github.com/v3io/v3io-tsdb/pkg/tsdb"
 	"github.com/v3io/v3io-tsdb/pkg/tsdb/tsdbtest"
 	"github.com/v3io/v3io-tsdb/pkg/tsdb/tsdbtest/testutils"
@@ -21,7 +20,7 @@ import (
 const metricNamePrefix = "Name_"
 
 type RefId struct {
-	id     *appender.MetricIdentifier
+	id     uint64
 	nextId int64
 }
 
