@@ -77,7 +77,7 @@ const (
 
 	NamesDirectory = "names"
 
-	MetricCacheSize = 4096
+	MetricCacheSize = 131072
 )
 
 type BuildInfo struct {
