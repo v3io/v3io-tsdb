@@ -49,6 +49,7 @@ type LabelsIfc interface {
 	GetExpr() string
 	Filter([]string) LabelsIfc
 	LabelNames() []string
+	HashWithName() uint64
 }
 
 func (ls Labels) Filter(keep []string) LabelsIfc {
@@ -181,6 +182,24 @@ func (ls Labels) Hash() uint64 {
 		if v.Name == MetricName {
 			continue
 		}
+		b = append(b, v.Name...)
+		b = append(b, sep)
+		b = append(b, v.Value...)
+		b = append(b, sep)
+	}
+
+	hash := xxhash.New()
+	_, err := hash.Write(b)
+	if err != nil {
+		return 0
+	}
+	return hash.Sum64()
+}
+
+func (ls Labels) HashWithName() uint64 {
+	b := make([]byte, 0, 1024)
+
+	for _, v := range ls {
 		b = append(b, v.Name...)
 		b = append(b, sep)
 		b = append(b, v.Value...)

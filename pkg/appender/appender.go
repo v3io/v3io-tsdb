@@ -25,6 +25,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/golang/groupcache/lru"
 	"github.com/nuclio/logger"
 	"github.com/pkg/errors"
 	"github.com/v3io/v3io-go/pkg/dataplane"
@@ -50,7 +51,6 @@ type MetricState struct {
 	key   string
 	name  string
 	hash  uint64
-	refID uint64
 
 	aggrs []*MetricState
 
@@ -103,11 +103,6 @@ func (m *MetricState) error() error {
 	return m.err
 }
 
-type cacheKey struct {
-	name string
-	hash uint64
-}
-
 // store the state and metadata for all the metrics
 type MetricsCache struct {
 	cfg           *config.V3ioConfig
@@ -129,11 +124,7 @@ type MetricsCache struct {
 	outstandingUpdates int64
 	requestsInFlight   int64
 
-	lastMetric uint64
-
-	// TODO: consider switching to synch.Map (https://golang.org/pkg/sync/#Map)
-	cacheMetricMap map[cacheKey]*MetricState // TODO: maybe use hash as key & combine w ref
-	cacheRefMap    map[uint64]*MetricState   // TODO: maybe turn to list + free list, periodically delete old matrics
+	cacheMetricMap *lru.Cache
 
 	NameLabelMap map[string]bool // temp store all lable names
 
@@ -147,8 +138,7 @@ func NewMetricsCache(container v3io.Container, logger logger.Logger, cfg *config
 	partMngr *partmgr.PartitionManager) *MetricsCache {
 
 	newCache := MetricsCache{container: container, logger: logger, cfg: cfg, partitionMngr: partMngr}
-	newCache.cacheMetricMap = map[cacheKey]*MetricState{}
-	newCache.cacheRefMap = map[uint64]*MetricState{}
+	newCache.cacheMetricMap = lru.New(cfg.MetricCacheSize)
 
 	newCache.responseChan = make(chan *v3io.Response, channelSize)
 	newCache.nameUpdateChan = make(chan *v3io.Response, channelSize)
@@ -182,12 +172,15 @@ func (mc *MetricsCache) Start() error {
 }
 
 // return metric struct by key
-func (mc *MetricsCache) getMetric(name string, hash uint64) (*MetricState, bool) {
+func (mc *MetricsCache) getMetric(hash uint64) (*MetricState, bool) {
 	mc.mtx.RLock()
 	defer mc.mtx.RUnlock()
 
-	metric, ok := mc.cacheMetricMap[cacheKey{name, hash}]
-	return metric, ok
+	metric, ok := mc.cacheMetricMap.Get(hash)
+	if ok {
+		return metric.(*MetricState), ok
+	}
+	return nil, ok
 }
 
 // create a new metric and save in the map
@@ -195,23 +188,11 @@ func (mc *MetricsCache) addMetric(hash uint64, name string, metric *MetricState)
 	mc.mtx.Lock()
 	defer mc.mtx.Unlock()
 
-	mc.lastMetric++
-	metric.refID = mc.lastMetric
-	mc.cacheRefMap[mc.lastMetric] = metric
-	mc.cacheMetricMap[cacheKey{name, hash}] = metric
+	mc.cacheMetricMap.Add(hash, metric)
 	if _, ok := mc.NameLabelMap[name]; !ok {
 		metric.newName = true
 		mc.NameLabelMap[name] = true
 	}
-}
-
-// return metric struct by refID
-func (mc *MetricsCache) getMetricByRef(ref uint64) (*MetricState, bool) {
-	mc.mtx.RLock()
-	defer mc.mtx.RUnlock()
-
-	metric, ok := mc.cacheRefMap[ref]
-	return metric, ok
 }
 
 // Push append to async channel
@@ -236,19 +217,21 @@ func (mc *MetricsCache) Add(lset utils.LabelsIfc, t int64, v interface{}) (uint6
 		isValueVariantType = true
 	}
 
-	name, key, hash := lset.GetKey()
+	name, key, _ := lset.GetKey()
+	hash := lset.HashWithName()
 	err = utils.IsValidMetricName(name)
 	if err != nil {
 		return 0, err
 	}
-	metric, ok := mc.getMetric(name, hash)
+	metric, ok := mc.getMetric(hash)
 
 	var aggrMetrics []*MetricState
 	if !ok {
 		for _, preAggr := range mc.partitionMngr.GetConfig().TableSchemaInfo.PreAggregates {
 			subLset := lset.Filter(preAggr.Labels)
-			name, key, hash := subLset.GetKey()
-			_, ok := mc.getMetric(name, hash)
+			name, key, _ := subLset.GetKey()
+			hash := subLset.HashWithName()
+			_, ok := mc.getMetric(hash)
 			if !ok {
 				aggrMetric := &MetricState{Lset: subLset, key: key, name: name, hash: hash}
 				aggrMetric.store = newChunkStore(mc.logger, subLset.LabelNames(), true)
@@ -285,7 +268,7 @@ func (mc *MetricsCache) Add(lset utils.LabelsIfc, t int64, v interface{}) (uint6
 		mc.appendTV(aggrMetric, t, v)
 	}
 
-	return metric.refID, err
+	return hash, err
 }
 
 // fast Add to metric (by refID)
@@ -295,11 +278,9 @@ func (mc *MetricsCache) AddFast(ref uint64, t int64, v interface{}) error {
 	if err != nil {
 		return err
 	}
-
-	metric, ok := mc.getMetricByRef(ref)
+	metric, ok := mc.getMetric(ref)
 	if !ok {
-		mc.logger.ErrorWith("Ref not found", "ref", ref)
-		return fmt.Errorf("ref not found")
+		return fmt.Errorf(fmt.Sprintf("metric not found. ref=%v", ref))
 	}
 
 	err = metric.error()

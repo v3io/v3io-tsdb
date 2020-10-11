@@ -263,7 +263,7 @@ func (suite *testSelectDataframeSuite) TestStringAndFloatMetricsDataframe() {
 	ref, err := appender.Add(labelsWithName, expectedTimeColumn[0], logData[0])
 	suite.NoError(err, "failed to add data to the TSDB appender")
 	for i := 1; i < len(expectedTimeColumn); i++ {
-		appender.AddFast(labels, ref, expectedTimeColumn[i], logData[i])
+		appender.AddFast(ref, expectedTimeColumn[i], logData[i])
 	}
 
 	_, err = appender.WaitForCompletion(0)
@@ -890,7 +890,7 @@ func (suite *testSelectDataframeSuite) TestSparseStringAndNumericColumnsDatafram
 	refLog, err := appender.Add(labelsWithNameLog, timeColumnLog[0], dataLog[0])
 	suite.NoError(err, "failed to add data to the TSDB appender")
 	for i := 1; i < len(timeColumnLog); i++ {
-		appender.AddFast(labels, refLog, timeColumnLog[i], dataLog[i])
+		appender.AddFast(refLog, timeColumnLog[i], dataLog[i])
 	}
 
 	_, err = appender.WaitForCompletion(0)

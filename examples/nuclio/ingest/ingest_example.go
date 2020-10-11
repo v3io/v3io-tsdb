@@ -90,7 +90,7 @@ func Handler(context *nuclio.Context, event nuclio.Event) (interface{}, error) {
 		if ref == 0 {
 			ref, err = tsdbAppender.Add(labels, sampleTime, sample.Value.N)
 		} else {
-			err = tsdbAppender.AddFast(labels, ref, sampleTime, sample.Value.N)
+			err = tsdbAppender.AddFast(ref, sampleTime, sample.Value.N)
 		}
 		if err != nil {
 			return "", errors.Wrap(err, "Failed to add sample")

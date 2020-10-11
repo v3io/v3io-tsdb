@@ -384,7 +384,7 @@ func writeNext(app tsdb.Appender, metrics []*metricContext, t int64, v float64) 
 			}
 			metric.ref = ref
 		} else {
-			err := app.AddFast(metric.lset, metric.ref, t, v)
+			err := app.AddFast(metric.ref, t, v)
 			if err != nil {
 				return err
 			}

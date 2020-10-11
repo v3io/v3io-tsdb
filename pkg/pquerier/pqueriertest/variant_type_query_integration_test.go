@@ -50,7 +50,7 @@ func (suite *testVariantTypeSuite) TestVariantTypeQueryWithDataFrame() {
 		suite.T().Fatalf("Failed to add data to the TSDB appender. Reason: %s", err)
 	}
 	for i := 1; i < numberOfEvents; i++ {
-		appender.AddFast(labels, ref, expectedTimeColumn[i], dataToIngest[i])
+		appender.AddFast(ref, expectedTimeColumn[i], dataToIngest[i])
 	}
 
 	if _, err := appender.WaitForCompletion(0); err != nil {
@@ -120,7 +120,7 @@ func (suite *testVariantTypeSuite) TestVariantTypeQueryWithSeries() {
 		suite.T().Fatalf("Failed to add data to the TSDB appender. Reason: %s", err)
 	}
 	for i := 1; i < numberOfEvents; i++ {
-		appender.AddFast(labels, ref, expectedTimeColumn[i], dataToIngest[i])
+		appender.AddFast(ref, expectedTimeColumn[i], dataToIngest[i])
 	}
 
 	if _, err := appender.WaitForCompletion(0); err != nil {
@@ -182,7 +182,7 @@ func (suite *testVariantTypeSuite) TestCountAggregationForVariantTypeQueryWithSe
 		suite.T().Fatalf("Failed to add data to the TSDB appender. Reason: %s", err)
 	}
 	for i := 1; i < numberOfEvents; i++ {
-		appender.AddFast(labels, ref, expectedTimeColumn[i], dataToIngest[i])
+		appender.AddFast(ref, expectedTimeColumn[i], dataToIngest[i])
 	}
 
 	if _, err := appender.WaitForCompletion(0); err != nil {
@@ -249,7 +249,7 @@ func (suite *testVariantTypeSuite) TestVariantTypeQueryWithSeriesAlotOfData() {
 		suite.T().Fatalf("Failed to add data to the TSDB appender. Reason: %s", err)
 	}
 	for i := 1; i < numberOfEvents; i++ {
-		appender.AddFast(labels, ref, dataToIngest[i].Time, dataToIngest[i].Value)
+		appender.AddFast(ref, dataToIngest[i].Time, dataToIngest[i].Value)
 	}
 
 	if _, err := appender.WaitForCompletion(0); err != nil {

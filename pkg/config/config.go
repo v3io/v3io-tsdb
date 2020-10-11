@@ -76,6 +76,8 @@ const (
 	PrometheusMetricNameAttribute = "__name__"
 
 	NamesDirectory = "names"
+
+	MetricCacheSize = 131072
 )
 
 type BuildInfo struct {
@@ -173,6 +175,7 @@ type V3ioConfig struct {
 	// use server aggregations if ` <requested step> / <rollup interval>  >  UseServerAggregateCoefficient`
 	UseServerAggregateCoefficient int `json:"useServerAggregateCoefficient,omitempty"`
 	RequestChanLength             int `json:"RequestChanLength,omitempty"`
+	MetricCacheSize               int `json:"MetricCacheSize,omitempty"`
 }
 
 type MetricsReporterConfig struct {
@@ -449,5 +452,9 @@ func initDefaults(cfg *V3ioConfig) {
 
 	if cfg.Password == "" {
 		cfg.Password = os.Getenv("V3IO_PASSWORD")
+	}
+
+	if cfg.MetricCacheSize == 0 {
+		cfg.MetricCacheSize = MetricCacheSize
 	}
 }
