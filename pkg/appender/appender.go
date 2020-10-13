@@ -25,7 +25,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/golang/groupcache/lru"
 	"github.com/nuclio/logger"
 	"github.com/pkg/errors"
 	"github.com/v3io/v3io-go/pkg/dataplane"
@@ -124,7 +123,7 @@ type MetricsCache struct {
 	outstandingUpdates int64
 	requestsInFlight   int64
 
-	cacheMetricMap *lru.Cache
+	cacheMetricMap *Cache
 
 	NameLabelMap map[string]bool // temp store all lable names
 
@@ -138,7 +137,7 @@ func NewMetricsCache(container v3io.Container, logger logger.Logger, cfg *config
 	partMngr *partmgr.PartitionManager) *MetricsCache {
 
 	newCache := MetricsCache{container: container, logger: logger, cfg: cfg, partitionMngr: partMngr}
-	newCache.cacheMetricMap = lru.New(cfg.MetricCacheSize)
+	newCache.cacheMetricMap = NewCache(cfg.MetricCacheSize)
 
 	newCache.responseChan = make(chan *v3io.Response, channelSize)
 	newCache.nameUpdateChan = make(chan *v3io.Response, channelSize)
@@ -178,21 +177,25 @@ func (mc *MetricsCache) getMetric(hash uint64) (*MetricState, bool) {
 
 	metric, ok := mc.cacheMetricMap.Get(hash)
 	if ok {
-		return metric.(*MetricState), ok
+		return metric, ok
 	}
 	return nil, ok
 }
 
 // create a new metric and save in the map
-func (mc *MetricsCache) addMetric(hash uint64, name string, metric *MetricState) {
+func (mc *MetricsCache) addMetric(hash uint64, name string, metric *MetricState) error {
 	mc.mtx.Lock()
 	defer mc.mtx.Unlock()
 
-	mc.cacheMetricMap.Add(hash, metric)
+	err := mc.cacheMetricMap.Add(hash, metric)
+	if err != nil {
+		return errors.Wrap(err, "Metric cache is full")
+	}
 	if _, ok := mc.NameLabelMap[name]; !ok {
 		metric.newName = true
 		mc.NameLabelMap[name] = true
 	}
+	return nil
 }
 
 // Push append to async channel
@@ -235,7 +238,10 @@ func (mc *MetricsCache) Add(lset utils.LabelsIfc, t int64, v interface{}) (uint6
 			if !ok {
 				aggrMetric := &MetricState{Lset: subLset, key: key, name: name, hash: hash}
 				aggrMetric.store = newChunkStore(mc.logger, subLset.LabelNames(), true)
-				mc.addMetric(hash, name, aggrMetric)
+				err = mc.addMetric(hash, name, aggrMetric)
+				if err != nil {
+					return 0, err
+				}
 				aggrMetrics = append(aggrMetrics, aggrMetric)
 			}
 		}
@@ -243,7 +249,10 @@ func (mc *MetricsCache) Add(lset utils.LabelsIfc, t int64, v interface{}) (uint6
 			aggrs: aggrMetrics, isVariant: isValueVariantType}
 
 		metric.store = newChunkStore(mc.logger, lset.LabelNames(), false)
-		mc.addMetric(hash, name, metric)
+		err = mc.addMetric(hash, name, metric)
+		if err != nil {
+			return 0, err
+		}
 	} else {
 		aggrMetrics = metric.aggrs
 	}
