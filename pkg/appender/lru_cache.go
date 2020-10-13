@@ -12,10 +12,6 @@ type Cache struct {
 	// an item is evicted. Zero means no limit.
 	MaxEntries int
 
-	// OnEvicted optionally specifies a callback function to be
-	// executed when an entry is purged from the cache.
-	OnEvicted func(key uint64, value interface{})
-
 	ll    *clist.List
 	cache map[interface{}]*clist.Element
 }
@@ -87,9 +83,6 @@ func (c *Cache) removeElement(e *clist.Element) {
 	c.ll.Remove(e)
 	kv := e.Value.(*entry)
 	delete(c.cache, kv.key)
-	if c.OnEvicted != nil {
-		c.OnEvicted(kv.key, kv.value)
-	}
 }
 
 // Len returns the number of items in the cache.
@@ -102,12 +95,6 @@ func (c *Cache) Len() int {
 
 // Clear purges all stored items from the cache.
 func (c *Cache) Clear() {
-	if c.OnEvicted != nil {
-		for _, e := range c.cache {
-			kv := e.Value.(*entry)
-			c.OnEvicted(kv.key, kv.value)
-		}
-	}
 	c.ll = nil
 	c.cache = nil
 }
