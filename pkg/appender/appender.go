@@ -106,7 +106,6 @@ func (m *MetricState) error() error {
 type MetricsCache struct {
 	cfg           *config.V3ioConfig
 	partitionMngr *partmgr.PartitionManager
-	mtx           sync.RWMutex
 	container     v3io.Container
 	logger        logger.Logger
 	started       bool
@@ -172,9 +171,6 @@ func (mc *MetricsCache) Start() error {
 
 // return metric struct by key
 func (mc *MetricsCache) getMetric(hash uint64) (*MetricState, bool) {
-	mc.mtx.RLock()
-	defer mc.mtx.RUnlock()
-
 	metric, ok := mc.cacheMetricMap.Get(hash)
 	if ok {
 		return metric, ok
@@ -184,13 +180,7 @@ func (mc *MetricsCache) getMetric(hash uint64) (*MetricState, bool) {
 
 // create a new metric and save in the map
 func (mc *MetricsCache) addMetric(hash uint64, name string, metric *MetricState) error {
-	mc.mtx.Lock()
-	defer mc.mtx.Unlock()
-
-	err := mc.cacheMetricMap.Add(hash, metric)
-	if err != nil {
-		return errors.Wrap(err, "Metric cache is full")
-	}
+	mc.cacheMetricMap.Add(hash, metric)
 	if _, ok := mc.NameLabelMap[name]; !ok {
 		metric.newName = true
 		mc.NameLabelMap[name] = true

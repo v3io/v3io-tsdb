@@ -2,8 +2,7 @@ package appender
 
 import (
 	clist "container/list"
-
-	"github.com/pkg/errors"
+	"sync"
 )
 
 // Cache is an LRU cache. It is not safe for concurrent access.
@@ -12,8 +11,11 @@ type Cache struct {
 	// an item is evicted. Zero means no limit.
 	MaxEntries int
 
-	ll    *clist.List
+	free  *clist.List
+	used  *clist.List
 	cache map[interface{}]*clist.Element
+	cond  *sync.Cond
+	mtx   sync.RWMutex
 }
 
 type entry struct {
@@ -25,76 +27,77 @@ type entry struct {
 // If maxEntries is zero, the cache has no limit and it's assumed
 // that eviction is done by the caller.
 func NewCache(maxEntries int) *Cache {
-	return &Cache{
+	newCache := Cache{
 		MaxEntries: maxEntries,
-		ll:         clist.New(),
+		free:       clist.New(),
+		used:       clist.New(),
 		cache:      make(map[interface{}]*clist.Element),
 	}
+	newCache.cond = sync.NewCond(&newCache.mtx)
+	return &newCache
 }
 
 // Add adds a value to the cache.
-func (c *Cache) Add(key uint64, value *MetricState) error {
+func (c *Cache) Add(key uint64, value *MetricState) {
+	c.mtx.RLock()
+	defer c.mtx.RUnlock()
 	if c.cache == nil {
 		c.cache = make(map[interface{}]*clist.Element)
-		c.ll = clist.New()
+		c.free = clist.New()
 	}
 	if ee, ok := c.cache[key]; ok {
-		c.ll.MoveToFront(ee)
+		if ee.Value.(*entry).value.getState() == storeStateInit {
+			c.free.MoveToFront(ee)
+		}
 		ee.Value.(*entry).value = value
-		return nil
+		return
 	}
-	ele := c.ll.PushFront(&entry{key, value})
+	ele := c.used.PushFront(&entry{key, value})
 	c.cache[key] = ele
-	if c.MaxEntries != 0 && c.ll.Len() > c.MaxEntries {
-		return c.RemoveOldest()
+	if c.MaxEntries != 0 && c.free.Len()+c.used.Len() > c.MaxEntries {
+		c.removeOldest()
 	}
-	return nil
 }
 
 // Get looks up a key's value from the cache.
 func (c *Cache) Get(key uint64) (value *MetricState, ok bool) {
+	c.mtx.RLock()
+	defer c.mtx.RUnlock()
 	if c.cache == nil {
 		return
 	}
 	if ele, hit := c.cache[key]; hit {
-		c.ll.MoveToFront(ele)
+		c.free.MoveToFront(ele)
 		return ele.Value.(*entry).value, true
 	}
 	return
 }
 
 // RemoveOldest removes the oldest item from the cache.
-func (c *Cache) RemoveOldest() error {
+func (c *Cache) removeOldest() {
 	if c.cache == nil {
-		return nil
+		return
 	}
-	ele := c.ll.Back()
+	ele := c.free.Back()
 	if ele != nil {
-		if ele.Value.(*entry).value.state == storeStateInit {
-			c.removeElement(ele)
-		} else {
-			return errors.Errorf("Can't remove metric from cache")
-		}
+		c.free.Remove(ele)
+		kv := ele.Value.(*entry)
+		delete(c.cache, kv.key)
+	} else {
+		c.cond.Wait()
+		c.removeOldest()
 	}
-	return nil
 }
 
-func (c *Cache) removeElement(e *clist.Element) {
-	c.ll.Remove(e)
-	kv := e.Value.(*entry)
-	delete(c.cache, kv.key)
-}
-
-// Len returns the number of items in the cache.
-func (c *Cache) Len() int {
+func (c *Cache) ResetMetric(metric *MetricState) {
+	c.mtx.RLock()
+	defer c.mtx.RUnlock()
 	if c.cache == nil {
-		return 0
+		return
 	}
-	return c.ll.Len()
-}
-
-// Clear purges all stored items from the cache.
-func (c *Cache) Clear() {
-	c.ll = nil
-	c.cache = nil
+	if ele, ok := c.cache[metric.hash]; ok {
+		c.used.Remove(ele)
+		c.free.PushFront(ele)
+		c.cond.Signal()
+	}
 }

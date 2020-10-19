@@ -331,6 +331,7 @@ func (mc *MetricsCache) handleResponse(metric *MetricState, resp *v3io.Response,
 				metric.store = newChunkStore(mc.logger, metric.Lset.LabelNames(), metric.store.isAggr())
 				metric.retryCount = 0
 				metric.setState(storeStateInit)
+				mc.cacheMetricMap.ResetMetric(metric)
 			}
 
 			// Count errors
