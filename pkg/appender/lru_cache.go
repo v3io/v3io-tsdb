@@ -15,7 +15,7 @@ type Cache struct {
 	used  *clist.List
 	cache map[interface{}]*clist.Element
 	cond  *sync.Cond
-	mtx   sync.RWMutex
+	mtx   sync.Mutex
 }
 
 type entry struct {
@@ -39,8 +39,8 @@ func NewCache(maxEntries int) *Cache {
 
 // Add adds a value to the cache.
 func (c *Cache) Add(key uint64, value *MetricState) {
-	c.mtx.RLock()
-	defer c.mtx.RUnlock()
+	c.mtx.Lock()
+	defer c.mtx.Unlock()
 	if c.cache == nil {
 		c.cache = make(map[interface{}]*clist.Element)
 		c.free = clist.New()
@@ -61,8 +61,8 @@ func (c *Cache) Add(key uint64, value *MetricState) {
 
 // Get looks up a key's value from the cache.
 func (c *Cache) Get(key uint64) (value *MetricState, ok bool) {
-	c.mtx.RLock()
-	defer c.mtx.RUnlock()
+	c.mtx.Lock()
+	defer c.mtx.Unlock()
 	if c.cache == nil {
 		return
 	}
@@ -81,7 +81,7 @@ func (c *Cache) removeOldest() {
 	ele := c.free.Back()
 	if ele != nil {
 		c.free.Remove(ele)
-		kv := ele.Value.(*entry)
+		kv := ele.Value.(*clist.Element).Value.(*entry)
 		delete(c.cache, kv.key)
 	} else {
 		c.cond.Wait()
@@ -90,8 +90,8 @@ func (c *Cache) removeOldest() {
 }
 
 func (c *Cache) ResetMetric(metric *MetricState) {
-	c.mtx.RLock()
-	defer c.mtx.RUnlock()
+	c.mtx.Lock()
+	defer c.mtx.Unlock()
 	if c.cache == nil {
 		return
 	}

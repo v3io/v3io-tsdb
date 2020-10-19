@@ -66,11 +66,12 @@ type chunkStore struct {
 	lastTid  int64
 	chunks   [2]*attrAppender
 
-	labelNames    []string
-	aggrList      *aggregate.AggregatesList
-	pending       pendingList
-	maxTime       int64
-	delRawSamples bool // TODO: for metrics w aggregates only
+	labelNames      []string
+	aggrList        *aggregate.AggregatesList
+	pending         pendingList
+	maxTime         int64
+	delRawSamples   bool // TODO: for metrics w aggregates only
+	numNotProcessed int64
 }
 
 func (cs *chunkStore) isAggr() bool {
