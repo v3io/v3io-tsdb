@@ -60,7 +60,6 @@ type MetricState struct {
 	isVariant  bool
 
 	shouldGetState bool
-
 }
 
 // Metric store states
@@ -180,20 +179,19 @@ func (mc *MetricsCache) getMetric(hash uint64) (*MetricState, bool) {
 }
 
 // create a new metric and save in the map
-func (mc *MetricsCache) addMetric(hash uint64, name string, metric *MetricState) error {
+func (mc *MetricsCache) addMetric(hash uint64, name string, metric *MetricState) {
 	mc.cacheMetricMap.Add(hash, metric)
 	if _, ok := mc.NameLabelMap[name]; !ok {
 		metric.newName = true
 		mc.NameLabelMap[name] = true
 	}
-	return nil
 }
 
 // Push append to async channel
 func (mc *MetricsCache) appendTV(metric *MetricState, t int64, v interface{}) {
 	metric.Lock()
 	defer metric.Unlock()
-	metric.store.numNotProcessed ++
+	metric.store.numNotProcessed++
 	mc.asyncAppendChan <- &asyncAppend{metric: metric, t: t, v: v}
 }
 
@@ -232,10 +230,7 @@ func (mc *MetricsCache) Add(lset utils.LabelsIfc, t int64, v interface{}) (uint6
 			if !ok {
 				aggrMetric := &MetricState{Lset: subLset, key: key, name: name, hash: hash}
 				aggrMetric.store = newChunkStore(mc.logger, subLset.LabelNames(), true)
-				err = mc.addMetric(hash, name, aggrMetric)
-				if err != nil {
-					return 0, err
-				}
+				mc.addMetric(hash, name, aggrMetric)
 				aggrMetrics = append(aggrMetrics, aggrMetric)
 			}
 		}
@@ -243,10 +238,7 @@ func (mc *MetricsCache) Add(lset utils.LabelsIfc, t int64, v interface{}) (uint6
 			aggrs: aggrMetrics, isVariant: isValueVariantType}
 
 		metric.store = newChunkStore(mc.logger, lset.LabelNames(), false)
-		err = mc.addMetric(hash, name, metric)
-		if err != nil {
-			return 0, err
-		}
+		mc.addMetric(hash, name, metric)
 	} else {
 		aggrMetrics = metric.aggrs
 	}

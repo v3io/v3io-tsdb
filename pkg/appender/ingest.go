@@ -36,6 +36,7 @@ import (
 // Start event loops for handling metric updates (appends and Get/Update DB responses)
 // TODO: we can use multiple Go routines and spread the metrics across based on Hash LSB.
 func (mc *MetricsCache) start() error {
+
 	mc.nameUpdateRespLoop()
 	mc.metricsUpdateLoop(0)
 	mc.metricFeed(0)
@@ -223,7 +224,6 @@ func (mc *MetricsCache) metricsUpdateLoop(index int) {
 // If in the initial state, read metric metadata from the DB.
 func (mc *MetricsCache) postMetricUpdates(metric *MetricState) {
 
-
 	metric.Lock()
 	defer metric.Unlock()
 	var sent bool
@@ -299,6 +299,7 @@ func (mc *MetricsCache) handleResponse(metric *MetricState, resp *v3io.Response,
 	defer resp.Release()
 	metric.Lock()
 	defer metric.Unlock()
+
 	reqInput := resp.Request().Input
 
 	if resp.Error != nil && metric.getState() != storeStateGet {
@@ -310,6 +311,7 @@ func (mc *MetricsCache) handleResponse(metric *MetricState, resp *v3io.Response,
 		mc.logger.DebugWith("I/O response", "id", resp.ID, "err", resp.Error, "key", metric.key, "request type",
 			reflect.TypeOf(reqInput), "request", reqInput)
 	}
+
 	if metric.getState() == storeStateGet {
 		// Handle Get response, sync metric state with the DB
 		metric.store.processGetResp(mc, metric, resp)
@@ -378,7 +380,7 @@ func (mc *MetricsCache) handleResponse(metric *MetricState, resp *v3io.Response,
 		mc.metricQueue.Push(metric)
 		metric.setState(storeStateAboutToUpdate)
 	}
-	if !sent && metric.store.numNotProcessed == 0 && metric.store.pending.Len() == 0{
+	if !sent && metric.store.numNotProcessed == 0 && metric.store.pending.Len() == 0 {
 		mc.cacheMetricMap.ResetMetric(metric)
 	}
 
