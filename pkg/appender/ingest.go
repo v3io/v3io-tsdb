@@ -76,7 +76,7 @@ func (mc *MetricsCache) metricFeed(index int) {
 						// Handle append requests (Add / AddFast)
 						metric := app.metric
 						metric.Lock()
-						metric.store.numNotProcessed -= 1
+						metric.store.numNotProcessed--
 						metric.store.Append(app.t, app.v)
 						numPushed++
 						dataQueued += metric.store.samplesQueueLength()
