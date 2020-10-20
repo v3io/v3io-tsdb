@@ -330,7 +330,7 @@ func (mc *MetricsCache) handleResponse(metric *MetricState, resp *v3io.Response,
 				metric.store = newChunkStore(mc.logger, metric.Lset.LabelNames(), metric.store.isAggr())
 				metric.retryCount = 0
 				metric.setState(storeStateInit)
-				mc.cacheMetricMap.ResetMetric(metric)
+				mc.cacheMetricMap.ResetMetric(metric.hash)
 			}
 
 			// Count errors
@@ -381,7 +381,7 @@ func (mc *MetricsCache) handleResponse(metric *MetricState, resp *v3io.Response,
 		metric.setState(storeStateAboutToUpdate)
 	}
 	if !sent && metric.store.numNotProcessed == 0 && metric.store.pending.Len() == 0 {
-		mc.cacheMetricMap.ResetMetric(metric)
+		mc.cacheMetricMap.ResetMetric(metric.hash)
 	}
 
 	return sent

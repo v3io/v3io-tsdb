@@ -46,9 +46,8 @@ func (c *Cache) Add(key uint64, value *MetricState) {
 		c.free = clist.New()
 	}
 	if ee, ok := c.cache[key]; ok {
-		if ee.Value.(*entry).value.getState() == storeStateInit {
-			c.free.MoveToFront(ee)
-		}
+		// if it's in free list - move to front
+		c.free.MoveToFront(ee)
 		ee.Value.(*entry).value = value
 		return
 	}
@@ -67,13 +66,13 @@ func (c *Cache) Get(key uint64) (value *MetricState, ok bool) {
 		return
 	}
 	if ele, hit := c.cache[key]; hit {
+		// if it's in free list - move to front
 		c.free.MoveToFront(ele)
 		return ele.Value.(*entry).value, true
 	}
 	return
 }
 
-// RemoveOldest removes the oldest item from the cache.
 func (c *Cache) removeOldest() {
 	if c.cache == nil {
 		return
@@ -89,13 +88,13 @@ func (c *Cache) removeOldest() {
 	}
 }
 
-func (c *Cache) ResetMetric(metric *MetricState) {
+func (c *Cache) ResetMetric(key uint64) {
 	c.mtx.Lock()
 	defer c.mtx.Unlock()
 	if c.cache == nil {
 		return
 	}
-	if ele, ok := c.cache[metric.hash]; ok {
+	if ele, ok := c.cache[key]; ok {
 		c.used.Remove(ele)
 		c.free.PushFront(ele)
 		c.cond.Signal()
