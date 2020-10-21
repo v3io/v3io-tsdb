@@ -47,7 +47,7 @@ func (c *Cache) Add(key uint64, value *MetricState) {
 	}
 	if ee, ok := c.cache[key]; ok {
 		c.free.Remove(ee)
-		//check if element was already if list and if not push to front
+		//check if element was already in list and if not push to front
 		c.used.MoveToFront(ee)
 		if c.used.Front() != ee {
 			c.used.PushFront(ee)
@@ -71,7 +71,7 @@ func (c *Cache) Get(key uint64) (value *MetricState, ok bool) {
 	}
 	if ele, hit := c.cache[key]; hit {
 		c.free.Remove(ele)
-		//check if element was already if list and if not push to front
+		//check if element was already in list and if not push to front
 		c.used.MoveToFront(ele)
 		if c.used.Front() != ele {
 			c.used.PushFront(ele)
