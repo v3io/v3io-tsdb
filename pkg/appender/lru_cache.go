@@ -46,8 +46,12 @@ func (c *Cache) Add(key uint64, value *MetricState) {
 		c.free = clist.New()
 	}
 	if ee, ok := c.cache[key]; ok {
-		// if it's in free list - move to front
-		c.free.MoveToFront(ee)
+		c.free.Remove(ee)
+		//check if element was already if list and if not push to front
+		c.used.MoveToFront(ee)
+		if c.used.Front() != ee {
+			c.used.PushFront(ee)
+		}
 		ee.Value.(*entry).value = value
 		return
 	}
@@ -66,8 +70,12 @@ func (c *Cache) Get(key uint64) (value *MetricState, ok bool) {
 		return
 	}
 	if ele, hit := c.cache[key]; hit {
-		// if it's in free list - move to front
-		c.free.MoveToFront(ele)
+		c.free.Remove(ele)
+		//check if element was already if list and if not push to front
+		c.used.MoveToFront(ele)
+		if c.used.Front() != ele {
+			c.used.PushFront(ele)
+		}
 		return ele.Value.(*entry).value, true
 	}
 	return
