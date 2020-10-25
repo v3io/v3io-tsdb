@@ -35,10 +35,6 @@ func NewCache(max int) *Cache {
 func (c *Cache) Add(key uint64, value *MetricState) {
 	c.mtx.Lock()
 	defer c.mtx.Unlock()
-	if c.cache == nil {
-		c.cache = make(map[uint64]*clist.Element)
-		c.free = clist.New()
-	}
 	if ee, ok := c.cache[key]; ok {
 		c.free.Remove(ee)
 		//check if element was already in list and if not push to front
@@ -60,9 +56,6 @@ func (c *Cache) Add(key uint64, value *MetricState) {
 func (c *Cache) Get(key uint64) (value *MetricState, ok bool) {
 	c.mtx.Lock()
 	defer c.mtx.Unlock()
-	if c.cache == nil {
-		return
-	}
 	if ele, hit := c.cache[key]; hit {
 		c.free.Remove(ele)
 		//check if element was already in list and if not push to front
@@ -76,9 +69,6 @@ func (c *Cache) Get(key uint64) (value *MetricState, ok bool) {
 }
 
 func (c *Cache) removeOldest() {
-	if c.cache == nil {
-		return
-	}
 	for {
 		ele := c.free.Back()
 		if ele != nil {
@@ -94,9 +84,6 @@ func (c *Cache) removeOldest() {
 func (c *Cache) ResetMetric(key uint64) {
 	c.mtx.Lock()
 	defer c.mtx.Unlock()
-	if c.cache == nil {
-		return
-	}
 	if ele, ok := c.cache[key]; ok {
 		c.used.Remove(ele)
 		c.free.PushFront(ele)
