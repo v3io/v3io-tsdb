@@ -6,7 +6,6 @@ require (
 	github.com/cespare/xxhash v1.1.0
 	github.com/cpuguy83/go-md2man v1.0.10 // indirect
 	github.com/ghodss/yaml v1.0.0
-	github.com/golang/groupcache v0.0.0-20191027212112-611e8accdfc9
 	github.com/imdario/mergo v0.3.7
 	github.com/nuclio/logger v0.0.1
 	github.com/nuclio/nuclio-sdk-go v0.0.0-20190205170814-3b507fbd0324
