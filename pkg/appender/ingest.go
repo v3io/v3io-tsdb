@@ -76,7 +76,7 @@ func (mc *MetricsCache) metricFeed(index int) {
 						// Handle append requests (Add / AddFast)
 						metric := app.metric
 						metric.Lock()
-
+						metric.store.numNotProcessed--
 						metric.store.Append(app.t, app.v)
 						numPushed++
 						dataQueued += metric.store.samplesQueueLength()
@@ -126,7 +126,6 @@ func (mc *MetricsCache) metricFeed(index int) {
 						}
 					}
 				}
-
 				// If we have too much work, stall the queue for some time
 				if numPushed > mc.cfg.BatchSize/2 && dataQueued/numPushed > 64 {
 					switch {
@@ -331,6 +330,7 @@ func (mc *MetricsCache) handleResponse(metric *MetricState, resp *v3io.Response,
 				metric.store = newChunkStore(mc.logger, metric.Lset.LabelNames(), metric.store.isAggr())
 				metric.retryCount = 0
 				metric.setState(storeStateInit)
+				mc.cacheMetricMap.ResetMetric(metric.hash)
 			}
 
 			// Count errors
@@ -379,6 +379,9 @@ func (mc *MetricsCache) handleResponse(metric *MetricState, resp *v3io.Response,
 	} else if metric.store.samplesQueueLength() > 0 {
 		mc.metricQueue.Push(metric)
 		metric.setState(storeStateAboutToUpdate)
+	}
+	if !sent && metric.store.numNotProcessed == 0 && metric.store.pending.Len() == 0 {
+		mc.cacheMetricMap.ResetMetric(metric.hash)
 	}
 
 	return sent
