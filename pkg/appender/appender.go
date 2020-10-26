@@ -137,6 +137,7 @@ func NewMetricsCache(container v3io.Container, logger logger.Logger, cfg *config
 
 	newCache := MetricsCache{container: container, logger: logger, cfg: cfg, partitionMngr: partMngr}
 	newCache.cacheMetricMap = NewCache(cfg.MetricCacheSize)
+	newCache.logger.DebugWith("Initializing new metric cache", "size", cfg.MetricCacheSize)
 
 	newCache.responseChan = make(chan *v3io.Response, channelSize)
 	newCache.nameUpdateChan = make(chan *v3io.Response, channelSize)
