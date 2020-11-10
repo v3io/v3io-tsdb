@@ -2,6 +2,7 @@ package appender
 
 import (
 	clist "container/list"
+	"fmt"
 	"sync"
 )
 
@@ -35,21 +36,18 @@ func NewCache(max int) *Cache {
 func (c *Cache) Add(key uint64, value *MetricState) {
 	c.mtx.Lock()
 	defer c.mtx.Unlock()
-	if ee, ok := c.cache[key]; ok {
-		c.free.Remove(ee)
-		//check if element was already in list and if not push to front
-		c.used.MoveToFront(ee)
-		if c.used.Front() != ee {
-			c.used.PushFront(ee)
-		}
-		ee.Value.(*entry).value = value
-		return
+	if ele, ok := c.cache[key]; ok {
+		c.free.Remove(ele)
+		c.used.Remove(ele)
 	}
-	ele := c.used.PushFront(&entry{key, value})
-	c.cache[key] = ele
+	newEle := c.used.PushFront(&entry{key, value})
+	c.cache[key] = newEle
+	fmt.Printf("ADD used %+v free %+v \n ", c.used, c.free)
 	if c.maxEntries != 0 && c.free.Len()+c.used.Len() > c.maxEntries {
 		c.removeOldest()
+		fmt.Printf("remove used %+v free %+v \n ", c.used, c.free)
 	}
+
 }
 
 // Get looks up a key's value from the cache.
@@ -58,11 +56,10 @@ func (c *Cache) Get(key uint64) (value *MetricState, ok bool) {
 	defer c.mtx.Unlock()
 	if ele, hit := c.cache[key]; hit {
 		c.free.Remove(ele)
-		//check if element was already in list and if not push to front
-		c.used.MoveToFront(ele)
-		if c.used.Front() != ele {
-			c.used.PushFront(ele)
-		}
+		c.used.Remove(ele)
+		newEle := c.used.PushFront(&entry{key, ele.Value.(*entry).value})
+		c.cache[key] = newEle
+		fmt.Printf("GET used %+v free %+v \n ", c.used, c.free)
 		return ele.Value.(*entry).value, true
 	}
 	return
@@ -73,7 +70,7 @@ func (c *Cache) removeOldest() {
 		ele := c.free.Back()
 		if ele != nil {
 			c.free.Remove(ele)
-			kv := ele.Value.(*clist.Element).Value.(*entry)
+			kv := ele.Value.(*entry)
 			delete(c.cache, kv.key)
 			return
 		}
@@ -86,7 +83,9 @@ func (c *Cache) ResetMetric(key uint64) {
 	defer c.mtx.Unlock()
 	if ele, ok := c.cache[key]; ok {
 		c.used.Remove(ele)
-		c.free.PushFront(ele)
+		newEle := c.free.PushFront(&entry{key, ele.Value.(*entry).value})
+		c.cache[key] = newEle
+		fmt.Printf("RESET used %+v free %+v \n", c.used, c.free)
 		c.cond.Signal()
 	}
 }
