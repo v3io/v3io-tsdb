@@ -186,7 +186,8 @@ func (cs *chunkStore) processGetResp(mc *MetricsCache, metric *MetricState, resp
 
 	if resp.Error != nil {
 		if utils.IsNotExistsError(resp.Error) {
-			if metric.newName {
+			if !metric.created {
+				metric.created = true
 				path := filepath.Join(mc.cfg.TablePath, config.NamesDirectory, metric.name)
 				putInput := v3io.PutItemInput{Path: path, Attributes: map[string]interface{}{}}
 
