@@ -2,7 +2,6 @@ package appender
 
 import (
 	clist "container/list"
-	"fmt"
 	"sync"
 )
 
@@ -40,12 +39,9 @@ func (c *Cache) Add(key uint64, value *MetricState) {
 		c.free.Remove(ele)
 		c.used.Remove(ele)
 	}
-	newEle := c.used.PushFront(&entry{key, value})
-	c.cache[key] = newEle
-	fmt.Printf("ADD used %+v free %+v \n ", c.used, c.free)
+	c.cache[key] = c.used.PushFront(&entry{key, value})
 	if c.maxEntries != 0 && c.free.Len()+c.used.Len() > c.maxEntries {
 		c.removeOldest()
-		fmt.Printf("remove used %+v free %+v \n ", c.used, c.free)
 	}
 
 }
@@ -57,9 +53,7 @@ func (c *Cache) Get(key uint64) (value *MetricState, ok bool) {
 	if ele, hit := c.cache[key]; hit {
 		c.free.Remove(ele)
 		c.used.Remove(ele)
-		newEle := c.used.PushFront(&entry{key, ele.Value.(*entry).value})
-		c.cache[key] = newEle
-		fmt.Printf("GET used %+v free %+v \n ", c.used, c.free)
+		c.cache[key] = c.used.PushFront(&entry{key, ele.Value.(*entry).value})
 		return ele.Value.(*entry).value, true
 	}
 	return
@@ -83,9 +77,8 @@ func (c *Cache) ResetMetric(key uint64) {
 	defer c.mtx.Unlock()
 	if ele, ok := c.cache[key]; ok {
 		c.used.Remove(ele)
-		newEle := c.free.PushFront(&entry{key, ele.Value.(*entry).value})
-		c.cache[key] = newEle
-		fmt.Printf("RESET used %+v free %+v \n", c.used, c.free)
+		c.free.Remove(ele)
+		c.cache[key] = c.free.PushFront(&entry{key, ele.Value.(*entry).value})
 		c.cond.Signal()
 	}
 }
