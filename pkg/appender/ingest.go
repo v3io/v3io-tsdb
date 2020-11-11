@@ -241,7 +241,7 @@ func (mc *MetricsCache) postMetricUpdates(metric *MetricState) {
 		if !sent {
 			if metric.store.samplesQueueLength() == 0 {
 				metric.setState(storeStateReady)
-				if metric.store.numNotProcessed == 0 && metric.store.pending.Len() == 0 {
+				if metric.store.numNotProcessed == 0 {
 					mc.cacheMetricMap.ResetMetric(metric.hash)
 				}
 			} else {

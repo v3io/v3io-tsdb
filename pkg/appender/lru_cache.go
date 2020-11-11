@@ -36,6 +36,9 @@ func (c *Cache) Add(key uint64, value *MetricState) {
 	c.mtx.Lock()
 	defer c.mtx.Unlock()
 	if ele, ok := c.cache[key]; ok {
+		//deleting from both lists as a workaround to not knowing which list actually contains the elem
+		//if the elem is not present in the list Remove won't do anything
+		// Remove clears ele's head,prev and next pointers so it can't be reused
 		c.free.Remove(ele)
 		c.used.Remove(ele)
 	}
@@ -51,6 +54,9 @@ func (c *Cache) Get(key uint64) (value *MetricState, ok bool) {
 	c.mtx.Lock()
 	defer c.mtx.Unlock()
 	if ele, hit := c.cache[key]; hit {
+		//deleting from both lists as a workaround to not knowing which list actually contains the elem
+		//if the elem is not present in the list Remove won't do anything
+		// Remove clears ele's head,prev and next pointers so it can't be reused
 		c.free.Remove(ele)
 		c.used.Remove(ele)
 		c.cache[key] = c.used.PushFront(&entry{key, ele.Value.(*entry).value})
@@ -64,8 +70,7 @@ func (c *Cache) removeOldest() {
 		ele := c.free.Back()
 		if ele != nil {
 			c.free.Remove(ele)
-			kv := ele.Value.(*entry)
-			delete(c.cache, kv.key)
+			delete(c.cache, ele.Value.(*entry).key)
 			return
 		}
 		c.cond.Wait()
@@ -76,6 +81,9 @@ func (c *Cache) ResetMetric(key uint64) {
 	c.mtx.Lock()
 	defer c.mtx.Unlock()
 	if ele, ok := c.cache[key]; ok {
+		//deleting from both lists as a workaround to not knowing which list actually contains the elem
+		//if the elem is not present in the list Remove won't do anything
+		// Remove clears ele's head,prev and next pointers so it can't be reused
 		c.used.Remove(ele)
 		c.free.Remove(ele)
 		c.cache[key] = c.free.PushFront(&entry{key, ele.Value.(*entry).value})
