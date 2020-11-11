@@ -56,7 +56,7 @@ type MetricState struct {
 	store      *chunkStore
 	err        error
 	retryCount uint8
-	newName    bool
+	created    bool
 	isVariant  bool
 
 	shouldGetState bool
@@ -147,7 +147,6 @@ func NewMetricsCache(container v3io.Container, logger logger.Logger, cfg *config
 	newCache.newUpdates = make(chan int, 1000)
 	newCache.stopChan = make(chan int, 3)
 
-	newCache.NameLabelMap = map[string]bool{}
 	newCache.performanceReporter = performance.ReporterInstanceFromConfig(cfg)
 
 	return &newCache
@@ -182,10 +181,6 @@ func (mc *MetricsCache) getMetric(hash uint64) (*MetricState, bool) {
 // create a new metric and save in the map
 func (mc *MetricsCache) addMetric(hash uint64, name string, metric *MetricState) {
 	mc.cacheMetricMap.Add(hash, metric)
-	if _, ok := mc.NameLabelMap[name]; !ok {
-		metric.newName = true
-		mc.NameLabelMap[name] = true
-	}
 }
 
 // Push append to async channel
