@@ -241,6 +241,9 @@ func (mc *MetricsCache) postMetricUpdates(metric *MetricState) {
 		if !sent {
 			if metric.store.samplesQueueLength() == 0 {
 				metric.setState(storeStateReady)
+				if metric.store.numNotProcessed == 0 {
+					mc.cacheMetricMap.ResetMetric(metric.hash)
+				}
 			} else {
 				if mc.metricQueue.length() > 0 {
 					atomic.AddInt64(&mc.outstandingUpdates, 1)

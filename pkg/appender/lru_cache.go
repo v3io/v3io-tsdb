@@ -35,21 +35,18 @@ func NewCache(max int) *Cache {
 func (c *Cache) Add(key uint64, value *MetricState) {
 	c.mtx.Lock()
 	defer c.mtx.Unlock()
-	if ee, ok := c.cache[key]; ok {
-		c.free.Remove(ee)
-		//check if element was already in list and if not push to front
-		c.used.MoveToFront(ee)
-		if c.used.Front() != ee {
-			c.used.PushFront(ee)
-		}
-		ee.Value.(*entry).value = value
-		return
+	if ele, ok := c.cache[key]; ok {
+		//deleting from both lists as a workaround to not knowing which list actually contains the elem
+		//if the elem is not present in the list Remove won't do anything
+		// Remove clears ele's head,prev and next pointers so it can't be reused
+		c.free.Remove(ele)
+		c.used.Remove(ele)
 	}
-	ele := c.used.PushFront(&entry{key, value})
-	c.cache[key] = ele
+	c.cache[key] = c.used.PushFront(&entry{key, value})
 	if c.maxEntries != 0 && c.free.Len()+c.used.Len() > c.maxEntries {
 		c.removeOldest()
 	}
+
 }
 
 // Get looks up a key's value from the cache.
@@ -57,12 +54,12 @@ func (c *Cache) Get(key uint64) (value *MetricState, ok bool) {
 	c.mtx.Lock()
 	defer c.mtx.Unlock()
 	if ele, hit := c.cache[key]; hit {
+		//deleting from both lists as a workaround to not knowing which list actually contains the elem
+		//if the elem is not present in the list Remove won't do anything
+		// Remove clears ele's head,prev and next pointers so it can't be reused
 		c.free.Remove(ele)
-		//check if element was already in list and if not push to front
-		c.used.MoveToFront(ele)
-		if c.used.Front() != ele {
-			c.used.PushFront(ele)
-		}
+		c.used.Remove(ele)
+		c.cache[key] = c.used.PushFront(&entry{key, ele.Value.(*entry).value})
 		return ele.Value.(*entry).value, true
 	}
 	return
@@ -73,8 +70,7 @@ func (c *Cache) removeOldest() {
 		ele := c.free.Back()
 		if ele != nil {
 			c.free.Remove(ele)
-			kv := ele.Value.(*clist.Element).Value.(*entry)
-			delete(c.cache, kv.key)
+			delete(c.cache, ele.Value.(*entry).key)
 			return
 		}
 		c.cond.Wait()
@@ -85,8 +81,12 @@ func (c *Cache) ResetMetric(key uint64) {
 	c.mtx.Lock()
 	defer c.mtx.Unlock()
 	if ele, ok := c.cache[key]; ok {
+		//deleting from both lists as a workaround to not knowing which list actually contains the elem
+		//if the elem is not present in the list Remove won't do anything
+		// Remove clears ele's head,prev and next pointers so it can't be reused
 		c.used.Remove(ele)
-		c.free.PushFront(ele)
+		c.free.Remove(ele)
+		c.cache[key] = c.free.PushFront(&entry{key, ele.Value.(*entry).value})
 		c.cond.Signal()
 	}
 }
