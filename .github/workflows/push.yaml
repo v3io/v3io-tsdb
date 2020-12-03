@@ -99,7 +99,7 @@ jobs:
 
       - name: Set TSDB_LABEL to release tag
         run: |
-          echo "::set-env name=TSDB_LABEL::${{ steps.release_info.outputs.REF_TAG }}"
+          echo "TSDB_LABEL=${{ steps.release_info.outputs.REF_TAG }}" >> $GITHUB_ENV
 
       - uses: actions/checkout@v2
 
