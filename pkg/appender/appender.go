@@ -186,8 +186,8 @@ func (mc *MetricsCache) addMetric(hash uint64, name string, metric *MetricState)
 // Push append to async channel
 func (mc *MetricsCache) appendTV(metric *MetricState, t int64, v interface{}) {
 	metric.Lock()
-	defer metric.Unlock()
 	metric.store.numNotProcessed++
+	metric.Unlock()
 	mc.asyncAppendChan <- &asyncAppend{metric: metric, t: t, v: v}
 }
 
