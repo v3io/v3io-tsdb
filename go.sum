@@ -80,6 +80,8 @@ github.com/v3io/v3io-go v0.1.5-0.20200416113214-f1b82b9a8e82 h1:4LEQnRvqUtAk++AO
 github.com/v3io/v3io-go v0.1.5-0.20200416113214-f1b82b9a8e82/go.mod h1:D0W1tjsVgcp4xk3ZI2fjKTKaOpYJLewN1BPN0x2osO4=
 github.com/v3io/v3io-go v0.1.9 h1:etkrrRmrI++i8sxGfK/+13f41TxIMohYeZHwVUM62vw=
 github.com/v3io/v3io-go v0.1.9/go.mod h1:5poBlcjZG5TiexRTYI44PE6tHzZz5Z60w+iS899pWtc=
+github.com/v3io/v3io-go v0.2.4-0.20201209122348-e01fabe35df8 h1:Bg3LtR/4cH9mGWTWKGeEZcf7Z88whuf4mufSnj5S4qg=
+github.com/v3io/v3io-go v0.2.4-0.20201209122348-e01fabe35df8/go.mod h1:WGxAG5MfZ5FeeZa7yGzocW+iLxTlrpkOWdnCIty4QDc=
 github.com/valyala/bytebufferpool v1.0.0 h1:GqA5TC/0021Y/b9FG4Oi9Mr3q7XYx6KllzawFIhcdPw=
 github.com/valyala/bytebufferpool v1.0.0/go.mod h1:6bBcMArwyJ5K/AmCkWv1jt77kVWyCJ6HpOuEn7z0Csc=
 github.com/valyala/fasthttp v1.2.0 h1:dzZJf2IuMiclVjdw0kkT+f9u4YdrapbNyGAN47E/qnk=
