@@ -19,7 +19,7 @@ require (
 )
 
 replace (
-	github.com/v3io/v3io-go => github.com/v3io/v3io-go v0.2.4-0.20201209122348-e01fabe35df8
+	github.com/v3io/v3io-go => github.com/v3io/v3io-go v0.2.5-0.20210113095419-6c806b8d5186
 	github.com/v3io/v3io-tsdb => ./
 	github.com/xwb1989/sqlparser => github.com/v3io/sqlparser v0.0.0-20190306105200-4d7273501871
 	labix.org/v2/mgo => github.com/go-mgo/mgo v0.0.0-20180705113738-7446a0344b7872c067b3d6e1b7642571eafbae17
