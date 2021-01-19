@@ -26,6 +26,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
+	"net/http"
 	pathUtil "path"
 	"path/filepath"
 	"strconv"
@@ -37,6 +38,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/v3io/v3io-go/pkg/dataplane"
 	"github.com/v3io/v3io-go/pkg/dataplane/http"
+	v3ioerrors "github.com/v3io/v3io-go/pkg/errors"
 	"github.com/v3io/v3io-tsdb/pkg/aggregate"
 	"github.com/v3io/v3io-tsdb/pkg/appender"
 	"github.com/v3io/v3io-tsdb/pkg/chunkenc"
@@ -95,14 +97,24 @@ func CreateTSDB(cfg *config.V3ioConfig, schema *config.Schema, container v3io.Co
 
 	path := pathUtil.Join(cfg.TablePath, config.SchemaConfigFileName)
 	// Check whether the config file already exists, and abort if it does
-	_, err = container.GetObjectSync(&v3io.GetObjectInput{Path: path, DataPlaneInput: dataPlaneInput})
-	if err == nil {
-		return fmt.Errorf("A TSDB table already exists at path '" + cfg.TablePath + "'.")
-	}
-
-	err = container.PutObjectSync(&v3io.PutObjectInput{Path: path, Body: data, DataPlaneInput: dataPlaneInput})
-	if err != nil {
-		return errors.Wrapf(err, "Failed to create a TSDB schema at path '%s/%s/%s'.", cfg.WebAPIEndpoint, cfg.Container, path)
+	for i := 0; i < 8; i++ {
+		_, err = container.GetObjectSync(&v3io.GetObjectInput{Path: path, DataPlaneInput: dataPlaneInput})
+		if err == nil {
+			return fmt.Errorf("A TSDB table already exists at path '" + cfg.TablePath + "'.")
+		} else if e, hasStatusCode := err.(v3ioerrors.ErrorWithStatusCode); hasStatusCode && e.StatusCode() != http.StatusNotFound {
+			err = errors.Wrapf(err, "Failed to check TSDB schema at path '%s/%s/%s'.", cfg.WebAPIEndpoint, cfg.Container, path)
+			lgr.Error(err)
+		} else {
+			// if no tsdb schema found
+			err = container.PutObjectSync(&v3io.PutObjectInput{Path: path, Body: data, DataPlaneInput: dataPlaneInput})
+			if err != nil {
+				err = errors.Wrapf(err, "Failed to create a TSDB schema at path '%s/%s/%s'.", cfg.WebAPIEndpoint, cfg.Container, path)
+				lgr.Error(err)
+			} else {
+				lgr.Info("Successfully created TSDB schema at path '%s/%s/%s'.", cfg.WebAPIEndpoint, cfg.Container, path)
+				break
+			}
+		}
 	}
 	return err
 }
