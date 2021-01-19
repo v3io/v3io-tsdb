@@ -100,9 +100,15 @@ func CreateTSDB(cfg *config.V3ioConfig, schema *config.Schema, container v3io.Co
 		return fmt.Errorf("A TSDB table already exists at path '" + cfg.TablePath + "'.")
 	}
 
-	err = container.PutObjectSync(&v3io.PutObjectInput{Path: path, Body: data, DataPlaneInput: dataPlaneInput})
-	if err != nil {
-		return errors.Wrapf(err, "Failed to create a TSDB schema at path '%s/%s/%s'.", cfg.WebAPIEndpoint, cfg.Container, path)
+	for i := 0; i < 8; i++ {
+		err = container.PutObjectSync(&v3io.PutObjectInput{Path: path, Body: data, DataPlaneInput: dataPlaneInput})
+		if err != nil {
+			err = errors.Wrapf(err, "Failed to create a TSDB schema at path '%s/%s/%s'.", cfg.WebAPIEndpoint, cfg.Container, path)
+			lgr.Error(err)
+		} else {
+			lgr.Info("Successfully created TSDB schema at path '%s/%s/%s'.", cfg.WebAPIEndpoint, cfg.Container, path)
+			break
+		}
 	}
 	return err
 }
