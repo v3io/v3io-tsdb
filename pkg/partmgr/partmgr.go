@@ -267,6 +267,21 @@ func (p *PartitionManager) ReadAndUpdateSchema() (err error) {
 	return
 }
 
+func unmarshalSchema(data []byte) (*config.Schema, error) {
+	schemaInstance := &config.Schema{}
+	err := json.Unmarshal(data, schemaInstance)
+	if err != nil {
+		return nil, err
+	}
+	if schemaInstance.TableSchemaInfo.PartitionerInterval == "" {
+		return nil, errors.New("Schema partition interval may not be empty")
+	}
+	if schemaInstance.TableSchemaInfo.ChunckerInterval == "" {
+		return nil, errors.New("Schema chunk interval may not be empty")
+	}
+	return schemaInstance, nil
+}
+
 func (p *PartitionManager) updatePartitionsFromSchema(schema *config.Schema) error {
 	if schema == nil {
 		schemaFilePath := p.GetSchemaFilePath()
@@ -275,8 +290,7 @@ func (p *PartitionManager) updatePartitionsFromSchema(schema *config.Schema) err
 			return errors.Wrapf(innerError, "Failed to read schema at path '%s'.", schemaFilePath)
 		}
 
-		schema = &config.Schema{}
-		innerError = json.Unmarshal(resp.Body(), schema)
+		schema, innerError = unmarshalSchema(resp.Body())
 		if innerError != nil {
 			return errors.Wrapf(innerError, "Failed to unmarshal schema at path '%s'.", schemaFilePath)
 		}

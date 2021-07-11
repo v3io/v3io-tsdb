@@ -96,6 +96,20 @@ func TestNewPartitionMngrBadInput(t *testing.T) {
 	assert.Error(t, err)
 }
 
+func TestUnmarshalSchemaError(t *testing.T) {
+	schemaString := []byte(`{}`)
+	_, err := unmarshalSchema(schemaString)
+	assert.Error(t, err)
+
+	schemaString = []byte(`{"tableSchemaInfo": {}}`)
+	_, err = unmarshalSchema(schemaString)
+	assert.Error(t, err)
+
+	schemaString = []byte(`{"tableSchemaInfo": {"PartitionerInterval": ""}}`)
+	_, err = unmarshalSchema(schemaString)
+	assert.Error(t, err)
+}
+
 func TestPartsForRange(tst *testing.T) {
 	numPartitions := 5
 	manager := getPartitionManager(tst)
