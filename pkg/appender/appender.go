@@ -115,9 +115,8 @@ type MetricsCache struct {
 	asyncAppendChan chan *asyncAppend
 	updatesInFlight int
 
-	metricQueue     *ElasticQueue
-	updatesComplete chan int
-	newUpdates      chan int
+	metricQueue *ElasticQueue
+	newUpdates  chan int
 
 	outstandingUpdates int64
 	requestsInFlight   int64
