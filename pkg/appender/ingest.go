@@ -272,9 +272,8 @@ func (mc *MetricsCache) sendGetMetricState(metric *MetricState) (bool, error) {
 		mc.logger.ErrorWith("Failed to get item state", "metric", metric.Lset, "err", err)
 		setError(mc, metric, err)
 		return false, err
-	} else {
-		metric.setState(storeStateGet)
 	}
+	metric.setState(storeStateGet)
 
 	return sent, nil
 }
