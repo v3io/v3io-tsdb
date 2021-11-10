@@ -233,10 +233,6 @@ func (p *PartitionManager) ReadAndUpdateSchema() (err error) {
 	}
 
 	schemaFilePath := p.GetSchemaFilePath()
-	if err != nil {
-		err = errors.Wrap(err, "Failed to create timer ReadAndUpdateSchemaTimer.")
-		return
-	}
 	schemaInfoResp, err := p.container.GetItemSync(&v3io.GetItemInput{Path: schemaFilePath, AttributeNames: []string{"__mtime_secs", "__mtime_nsecs"}})
 	if err != nil {
 		err = errors.Wrapf(err, "Failed to read schema at path '%s'.", schemaFilePath)

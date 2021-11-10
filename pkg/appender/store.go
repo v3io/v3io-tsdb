@@ -302,7 +302,8 @@ func (cs *chunkStore) writeChunks(mc *MetricsCache, metric *MetricState) (hasPen
 
 		// Init the partition info and find whether we need to init the metric headers (labels, ..) in the case of a new partition
 		t0 := cs.pending[0].t
-		partition, err := mc.partitionMngr.TimeToPart(t0)
+		var partition *partmgr.DBPartition
+		partition, err = mc.partitionMngr.TimeToPart(t0)
 		if err != nil {
 			hasPendingUpdates = false
 			return

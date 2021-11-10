@@ -71,11 +71,7 @@ bin:
 
 PHONY: gofmt
 gofmt:
-ifeq ($(shell gofmt -l .),)
-	# gofmt OK
-else
-	$(error Please run `go fmt ./...` to format the code)
-endif
+	if [ "$(gofmt -l .)" != "" ]; then echo 'Please run `go fmt ./...` to format the code'; fi
 
 .PHONY: impi
 impi:
