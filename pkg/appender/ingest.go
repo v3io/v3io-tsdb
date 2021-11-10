@@ -227,19 +227,22 @@ func (mc *MetricsCache) postMetricUpdates(metric *MetricState) {
 	metric.Lock()
 	defer metric.Unlock()
 	var sent bool
+	var err error
 
 	// In case we are in pre get state or our data spreads across multiple partitions, get the new state for the current partition
 	if metric.getState() == storeStatePreGet ||
 		(metric.canSendRequests() && metric.shouldGetState) {
-		sent = mc.sendGetMetricState(metric)
-		if sent {
+		sent, err = mc.sendGetMetricState(metric)
+		if err != nil {
+			metric.setState(storeStateInit)
+		} else if sent {
 			mc.updatesInFlight++
 		}
 	} else if metric.canSendRequests() {
-		sent = mc.writeChunksAndGetState(metric)
+		sent, err = mc.writeChunksAndGetState(metric)
 
 		if !sent {
-			if metric.store.samplesQueueLength() == 0 {
+			if err != nil || metric.store.samplesQueueLength() == 0 {
 				metric.setState(storeStateReady)
 				if metric.store.numNotProcessed == 0 {
 					mc.cacheMetricMap.ResetMetric(metric.hash)
@@ -255,10 +258,10 @@ func (mc *MetricsCache) postMetricUpdates(metric *MetricState) {
 
 }
 
-func (mc *MetricsCache) sendGetMetricState(metric *MetricState) bool {
+func (mc *MetricsCache) sendGetMetricState(metric *MetricState) (bool, error) {
 	// If we are already in a get state, discard
 	if metric.getState() == storeStateGet {
-		return false
+		return false, nil
 	}
 
 	sent, err := metric.store.getChunksState(mc, metric)
@@ -268,14 +271,14 @@ func (mc *MetricsCache) sendGetMetricState(metric *MetricState) bool {
 
 		mc.logger.ErrorWith("Failed to get item state", "metric", metric.Lset, "err", err)
 		setError(mc, metric, err)
-	} else {
-		metric.setState(storeStateGet)
+		return false, err
 	}
+	metric.setState(storeStateGet)
 
-	return sent
+	return sent, nil
 }
 
-func (mc *MetricsCache) writeChunksAndGetState(metric *MetricState) bool {
+func (mc *MetricsCache) writeChunksAndGetState(metric *MetricState) (bool, error) {
 	sent, err := metric.store.writeChunks(mc, metric)
 	if err != nil {
 		// Count errors
@@ -287,13 +290,13 @@ func (mc *MetricsCache) writeChunksAndGetState(metric *MetricState) bool {
 		metric.setState(storeStateUpdate)
 	} else if metric.shouldGetState {
 		// In case we didn't write any data and the metric state needs to be updated, update it straight away
-		sent = mc.sendGetMetricState(metric)
+		sent, err = mc.sendGetMetricState(metric)
 	}
 
 	if sent {
 		mc.updatesInFlight++
 	}
-	return sent
+	return sent, err
 }
 
 // Handle DB responses
@@ -315,6 +318,14 @@ func (mc *MetricsCache) handleResponse(metric *MetricState, resp *v3io.Response,
 			reflect.TypeOf(reqInput), "request", reqInput)
 	}
 
+	clear := func() {
+		resp.Release()
+		metric.store = newChunkStore(mc.logger, metric.Lset.LabelNames(), metric.store.isAggr())
+		metric.retryCount = 0
+		metric.setState(storeStateInit)
+		mc.cacheMetricMap.ResetMetric(metric.hash)
+	}
+
 	if metric.getState() == storeStateGet {
 		// Handle Get response, sync metric state with the DB
 		metric.store.processGetResp(mc, metric, resp)
@@ -328,14 +339,6 @@ func (mc *MetricsCache) handleResponse(metric *MetricState, resp *v3io.Response,
 			}
 			metric.retryCount = 0
 		} else {
-			clear := func() {
-				resp.Release()
-				metric.store = newChunkStore(mc.logger, metric.Lset.LabelNames(), metric.store.isAggr())
-				metric.retryCount = 0
-				metric.setState(storeStateInit)
-				mc.cacheMetricMap.ResetMetric(metric.hash)
-			}
-
 			// Count errors
 			mc.performanceReporter.IncrementCounter("ChunkUpdateRetries", 1)
 
@@ -370,15 +373,24 @@ func (mc *MetricsCache) handleResponse(metric *MetricState, resp *v3io.Response,
 	metric.setState(storeStateReady)
 
 	var sent bool
+	var err error
 
 	// In case our data spreads across multiple partitions, get the new state for the current partition
 	if metric.shouldGetState {
-		sent = mc.sendGetMetricState(metric)
+		sent, err = mc.sendGetMetricState(metric)
+		if err != nil {
+			clear()
+			return false
+		}
 		if sent {
 			mc.updatesInFlight++
 		}
 	} else if canWrite {
-		sent = mc.writeChunksAndGetState(metric)
+		sent, err = mc.writeChunksAndGetState(metric)
+		if err != nil {
+			clear()
+			return false
+		}
 	} else if metric.store.samplesQueueLength() > 0 {
 		mc.metricQueue.Push(metric)
 		metric.setState(storeStateAboutToUpdate)
