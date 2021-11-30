@@ -22,8 +22,8 @@ func IsValidMetricName(name string) error {
 	}
 
 	if !metricNameValidationRegex.Match([]byte(trimmed)) {
-		return fmt.Errorf("metric name contains illegal characters. Name should conform to '%s'",
-			metricNameValidationRegexStr)
+		return fmt.Errorf("metric name contains illegal characters. Name '%s' should conform to '%s'",
+			trimmed, metricNameValidationRegexStr)
 	}
 
 	return nil
