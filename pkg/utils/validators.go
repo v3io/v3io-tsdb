@@ -36,8 +36,8 @@ func IsValidLabelName(labelName string) error {
 	}
 
 	if !labelValidationRegex.Match([]byte(trimmed)) {
-		return fmt.Errorf("label name contains illegal characters. Label name should conform to '%s'",
-			labelValidationRegexStr)
+		return fmt.Errorf("label name contains illegal characters. Label name '%s' should conform to '%s'",
+			trimmed, labelValidationRegexStr)
 	}
 
 	return nil
