@@ -102,7 +102,7 @@ func (mr *MetricReporter) Stop() error {
 		}
 		mr.registry.UnregisterAll()
 	} else {
-		return errors.Errorf("can't stop metric reporter since it's not running.")
+		return errors.Errorf("can't stop metric reporter since it's not running")
 	}
 
 	return nil
@@ -142,7 +142,7 @@ func (mr *MetricReporter) UpdateHistogram(name string, value int64) {
 // SIGINT will listen to CTRL-C.
 // SIGTERM will be caught if kill command executed.
 func (mr *MetricReporter) registerShutdownHook() {
-	var gracefulStop = make(chan os.Signal)
+	var gracefulStop = make(chan os.Signal, 1)
 	// Register for specific signals
 	signal.Notify(gracefulStop, syscall.SIGINT, syscall.SIGTERM)
 
