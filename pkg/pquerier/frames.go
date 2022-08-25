@@ -481,13 +481,12 @@ func (d *dataFrame) finishAllColumns() error {
 // for example the following time series:
 // metric1 - (t0,v0), (t2, v1)
 // metric2 - (t1,v2), (t2, v3)
-//
 // will be converted to:
 // time		metric1		metric2
 //	t0		  v0		  NaN
 //	t1		  NaN		  v2
 //	t2		  v1		  v3
-//
+
 func (d *dataFrame) rawSeriesToColumns() error {
 	var timeData []time.Time
 	var currentTime int64

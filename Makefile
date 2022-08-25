@@ -102,7 +102,7 @@ impi:
 
 $(GOPATH)/bin/golangci-lint:
 	@echo Installing golangci-lint...
-	curl -sfL https://install.goreleaser.com/github.com/golangci/golangci-lint.sh | sh -s v1.10.2
+	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s v1.49.0
 	cp ./bin/golangci-lint $(GOPATH)/bin/
 
 .PHONY: lint
