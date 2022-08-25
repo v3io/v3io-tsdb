@@ -88,15 +88,15 @@ impi:
 
 $(GOPATH)/bin/golangci-lint:
 	@echo Installing golangci-lint...
-	curl -sfL https://install.goreleaser.com/github.com/golangci/golangci-lint.sh | sh -s v1.10.2
+	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s v1.49.0
 	cp ./bin/golangci-lint $(GOPATH)/bin/
 
 .PHONY: lint
 lint: gofmt impi $(GOPATH)/bin/golangci-lint
 	@echo Linting...
 	@$(GOPATH)/bin/golangci-lint run \
-     --disable-all --enable=deadcode --enable=goconst --enable=golint --enable=ineffassign \
-     --enable=interfacer --enable=unconvert --enable=varcheck --enable=errcheck --enable=gofmt --enable=misspell \
+     --disable-all --enable=goconst --enable=revive --enable=ineffassign \
+     --enable=unconvert --enable=errcheck --enable=gofmt --enable=misspell \
      --enable=staticcheck --enable=gosimple --enable=govet --enable=goconst \
     cmd/... pkg/... internal/...
 	@echo done linting
