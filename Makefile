@@ -95,8 +95,8 @@ $(GOPATH)/bin/golangci-lint:
 lint: gofmt impi $(GOPATH)/bin/golangci-lint
 	@echo Linting...
 	@$(GOPATH)/bin/golangci-lint run \
-     --disable-all --enable=goconst --enable=revive --enable=ineffassign \
-     --enable=unconvert --enable=errcheck --enable=gofmt --enable=misspell \
+     --disable-all --enable=deadcode --enable=goconst --enable=golint --enable=ineffassign \
+     --enable=interfacer --enable=unconvert --enable=varcheck --enable=errcheck --enable=gofmt --enable=misspell \
      --enable=staticcheck --enable=gosimple --enable=govet --enable=goconst \
     cmd/... pkg/... internal/...
 	@echo done linting
