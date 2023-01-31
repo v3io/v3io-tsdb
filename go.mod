@@ -19,12 +19,12 @@ require (
 )
 
 require (
+	github.com/andybalholm/brotli v1.0.4 // indirect
 	github.com/cpuguy83/go-md2man v1.0.10 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/golang/protobuf v1.2.0 // indirect
 	github.com/inconshreveable/mousetrap v1.0.0 // indirect
-	github.com/klauspost/compress v1.4.0 // indirect
-	github.com/klauspost/cpuid v0.0.0-20180405133222-e7e905edc00e // indirect
+	github.com/klauspost/compress v1.15.0 // indirect
 	github.com/mattn/go-colorable v0.1.1 // indirect
 	github.com/mattn/go-isatty v0.0.5 // indirect
 	github.com/mgutz/ansi v0.0.0-20170206155736-9520e82c474b // indirect
@@ -34,16 +34,16 @@ require (
 	github.com/russross/blackfriday v1.5.2 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
-	github.com/valyala/fasthttp v1.2.0 // indirect
+	github.com/valyala/fasthttp v1.34.0 // indirect
 	go.uber.org/atomic v1.3.2 // indirect
 	go.uber.org/multierr v1.1.0 // indirect
-	golang.org/x/net v0.0.0-20190311183353-d8887717615a // indirect
+	golang.org/x/net v0.0.0-20220225172249-27dd8689420f // indirect
 	golang.org/x/sync v0.0.0-20200317015054-43a5402ce75a // indirect
-	golang.org/x/sys v0.0.0-20190222072716-a9d3bda3a223 // indirect
-	golang.org/x/text v0.3.0 // indirect
+	golang.org/x/sys v0.0.0-20220227234510-4e6760a101f9 // indirect
+	golang.org/x/text v0.3.7 // indirect
 	google.golang.org/genproto v0.0.0-20180817151627-c66870c02cf8 // indirect
 	google.golang.org/grpc v1.20.0 // indirect
-	gopkg.in/yaml.v2 v2.2.2 // indirect
+	gopkg.in/yaml.v2 v2.2.8 // indirect
 	zombiezen.com/go/capnproto2 v2.17.0+incompatible // indirect
 )
 
