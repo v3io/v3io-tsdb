@@ -21,7 +21,7 @@ package benchmark
 
 import (
 	"fmt"
-	"io/ioutil"
+	"io"
 	"log"
 	"sync/atomic"
 	"testing"
@@ -55,7 +55,7 @@ func BenchmarkIngest(b *testing.B) {
 	defer metricReporter.Stop()
 
 	log.SetFlags(0)
-	log.SetOutput(ioutil.Discard)
+	log.SetOutput(io.Discard)
 	testStartTimeNano := time.Now().UnixNano()
 
 	var count = 0 // count real number of samples to compare with query result

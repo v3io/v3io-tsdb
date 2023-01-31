@@ -23,7 +23,6 @@ package config
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"strings"
 	"sync"
@@ -354,7 +353,7 @@ func loadConfig(path string) (*V3ioConfig, error) {
 			return nil, errors.Wrap(err, "Failed to read the TSDB configuration.")
 		}
 	} else {
-		data, err = ioutil.ReadFile(resolvedPath)
+		data, err = os.ReadFile(resolvedPath)
 		if err != nil {
 			return nil, err
 		}

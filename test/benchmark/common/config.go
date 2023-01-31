@@ -21,7 +21,6 @@ package common
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 
@@ -90,7 +89,7 @@ func loadBenchmarkIngestConfigFromFile(benchConfigFile string) (*BenchmarkIngest
 		benchConfigFile = filepath.Join(TsdbDefaultTestConfigPath, "tsdb-bench-test-config.yaml") // relative path
 	}
 
-	configData, err := ioutil.ReadFile(benchConfigFile)
+	configData, err := os.ReadFile(benchConfigFile)
 	if err != nil {
 		return nil, errors.Errorf("failed to load config from file %s", benchConfigFile)
 	}
