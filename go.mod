@@ -13,7 +13,7 @@ require (
 	github.com/rcrowley/go-metrics v0.0.0-20181016184325-3113b8401b8a
 	github.com/spf13/cobra v0.0.3
 	github.com/stretchr/testify v1.8.1
-	github.com/v3io/frames v0.10.2
+	github.com/v3io/frames v0.10.3-0.20230131140351-212b363ea621
 	github.com/v3io/v3io-go v0.3.0
 	github.com/xwb1989/sqlparser v0.0.0-20180606152119-120387863bf2
 )

@@ -23,6 +23,7 @@ package utils
 import (
 	"encoding/binary"
 	"net/url"
+	"os"
 	"strings"
 	"time"
 
@@ -49,7 +50,7 @@ func NewLogger(level string) (logger.Logger, error) {
 		logLevel = nucliozap.WarnLevel
 	}
 
-	log, err := nucliozap.NewNuclioZapCmd("v3io-tsdb", logLevel)
+	log, err := nucliozap.NewNuclioZapCmd("v3io-tsdb", logLevel, os.Stdout)
 	if err != nil {
 		return nil, err
 	}
