@@ -23,7 +23,10 @@ on:
 jobs:
   test:
     name: Lint & test
-    runs-on: ubuntu-latest
+    runs-on: [ self-hosted, Linux ]
+    container:
+      image: python:3.9.18
+
     env:
       TSDB_TEST_TABLE_PATH: TSDB_INTEGRATION_TESTS/${{ github.sha }}
 
