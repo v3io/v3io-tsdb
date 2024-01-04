@@ -28,7 +28,7 @@ jobs:
     name: Lint & test
     runs-on: [ self-hosted, Linux ]
     container:
-      image: python:3.9.18
+      image: golang:1.19
 
     env:
       TSDB_TEST_TABLE_PATH: TSDB_INTEGRATION_TESTS/${{ github.sha }}
@@ -46,10 +46,6 @@ jobs:
 
       - name: Dump github ref
         run: echo "$GITHUB_REF"
-
-      - uses: actions/setup-go@v2
-        with:
-          go-version: "^1.19.5"
 
       - uses: actions/cache@v2
         with:
