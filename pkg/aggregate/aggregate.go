@@ -95,7 +95,7 @@ func SchemaFieldFromString(aggregates []string, col string) ([]config.SchemaFiel
 			} else {
 				field, ok := aggrToSchemaField[trimmed]
 				if !ok {
-					return nil, fmt.Errorf("invalid aggragator type '%s'", trimmed)
+					return nil, fmt.Errorf("invalid aggregator type '%s'", trimmed)
 				}
 				fieldList = append(fieldList, getAggrFullName(field, col))
 			}
@@ -179,7 +179,7 @@ func FromString(aggrString string) (AggrType, error) {
 	}
 	aggr, ok := aggrTypeString[trimmed]
 	if !ok {
-		return 0, fmt.Errorf("invalid aggragate type: %v", trimmed)
+		return 0, fmt.Errorf("invalid aggregate type: %v", trimmed)
 	}
 	return aggr, nil
 }
