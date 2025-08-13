@@ -44,14 +44,7 @@ jobs:
       - name: Dump github ref
         run: echo "$GITHUB_REF"
 
-      - uses: actions/cache@v2
-        with:
-          path: ~/go/pkg/mod
-          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-go-
-
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v5
         with:
           ref: refs/pull/${{ github.event.number }}/merge
 
