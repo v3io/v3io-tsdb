@@ -91,7 +91,7 @@ func (fi *frameIterator) Next() bool {
 
 	series := fi.ctx.frameList[fi.setIndex]
 	// If raw series is nil
-	if series.isRawSeries && series.rawColumns[fi.seriesIndex] == nil {
+	if series.isRawSeries && any(series.rawColumns[fi.seriesIndex]) == nil {
 		return fi.Next()
 	}
 
@@ -716,7 +716,7 @@ func (c *basicColumn) Name() string {
 
 // Len returns the number of elements
 func (c *basicColumn) Len() int {
-	if c.framesCol != nil {
+	if any(c.framesCol) != nil {
 		return c.framesCol.Len()
 	}
 	return c.size
