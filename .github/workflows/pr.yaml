@@ -25,7 +25,7 @@ jobs:
     name: Lint & test
     runs-on: [ self-hosted, Linux ]
     container:
-      image: golang:1.19
+      image: golang:1.24
 
     env:
       TSDB_TEST_TABLE_PATH: TSDB_INTEGRATION_TESTS/${{ github.sha }}
