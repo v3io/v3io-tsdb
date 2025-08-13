@@ -271,7 +271,7 @@ func (mc *MetricsCache) AddFast(ref uint64, t int64, v interface{}) error {
 	metric, ok := mc.getMetric(ref)
 	if !ok {
 		// do not change error msg, it's parsed by prom
-		return fmt.Errorf(fmt.Sprintf("metric not found. ref=%v", ref))
+		return fmt.Errorf("metric not found. ref=%v", ref)
 	}
 
 	err = metric.error()

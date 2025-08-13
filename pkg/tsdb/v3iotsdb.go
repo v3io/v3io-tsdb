@@ -100,7 +100,7 @@ func CreateTSDB(cfg *config.V3ioConfig, schema *config.Schema, container v3io.Co
 	for i := 0; i < 8; i++ {
 		_, err = container.GetObjectSync(&v3io.GetObjectInput{Path: path, DataPlaneInput: dataPlaneInput})
 		if err == nil {
-			return fmt.Errorf("A TSDB table already exists at path '" + cfg.TablePath + "'.")
+			return fmt.Errorf("A TSDB table already exists at path '%s'.", cfg.TablePath)
 		} else if e, hasStatusCode := err.(v3ioerrors.ErrorWithStatusCode); hasStatusCode && e.StatusCode() != http.StatusNotFound {
 			err = errors.Wrapf(err, "Failed to check TSDB schema at path '%s/%s/%s'.", cfg.WebAPIEndpoint, cfg.Container, path)
 			lgr.Error(err)
