@@ -87,26 +87,13 @@ PHONY: gofmt
 gofmt:
 	if [ "$(gofmt -l .)" != "" ]; then echo 'Please run `go fmt ./...` to format the code'; fi
 
-.PHONY: impi
-impi:
-	@echo Installing impi...
-	GO111MODULE=off go get -u github.com/pavius/impi/cmd/impi
-	@echo Verifying imports...
-	$(GOPATH)/bin/impi \
-		--local github.com/iguazio/provazio \
-		--skip pkg/controller/apis \
-		--skip pkg/controller/client \
-		--ignore-generated \
-		--scheme stdLocalThirdParty \
-		./...
-
 $(GOPATH)/bin/golangci-lint:
 	@echo Installing golangci-lint...
 	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s v1.49.0
 	cp ./bin/golangci-lint $(GOPATH)/bin/
 
 .PHONY: lint
-lint: gofmt impi $(GOPATH)/bin/golangci-lint
+lint: gofmt $(GOPATH)/bin/golangci-lint
 	@echo Linting...
 	@$(GOPATH)/bin/golangci-lint run \
      --disable-all --enable=deadcode --enable=goconst --enable=golint --enable=ineffassign \
