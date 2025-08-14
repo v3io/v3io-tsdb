@@ -34,8 +34,7 @@ import (
 	"github.com/v3io/v3io-tsdb/pkg/chunkenc"
 	"github.com/v3io/v3io-tsdb/pkg/config"
 	"github.com/v3io/v3io-tsdb/pkg/pquerier"
-	// nolint: golint
-	. "github.com/v3io/v3io-tsdb/pkg/tsdb"
+	"github.com/v3io/v3io-tsdb/pkg/tsdb"
 	"github.com/v3io/v3io-tsdb/pkg/tsdb/tsdbtest/testutils"
 	"github.com/v3io/v3io-tsdb/pkg/utils"
 )
@@ -164,12 +163,12 @@ type Sample struct {
 }
 
 func DeleteTSDB(t testing.TB, v3ioConfig *config.V3ioConfig) {
-	adapter, err := NewV3ioAdapter(v3ioConfig, nil, nil)
+	adapter, err := tsdb.NewV3ioAdapter(v3ioConfig, nil, nil)
 	if err != nil {
 		t.Fatalf("Failed to create an adapter. Reason: %s", err)
 	}
 
-	if err := adapter.DeleteDB(DeleteParams{DeleteAll: true, IgnoreErrors: true}); err != nil {
+	if err := adapter.DeleteDB(tsdb.DeleteParams{DeleteAll: true, IgnoreErrors: true}); err != nil {
 		t.Fatalf("Failed to delete a TSDB instance (table) on teardown. Reason: %s", err)
 	}
 }
@@ -180,7 +179,7 @@ func CreateTestTSDB(t testing.TB, v3ioConfig *config.V3ioConfig) {
 
 func CreateTestTSDBWithAggregates(t testing.TB, v3ioConfig *config.V3ioConfig, aggregates string) {
 	schema := testutils.CreateSchema(t, aggregates)
-	if err := CreateTSDB(v3ioConfig, schema, nil); err != nil {
+	if err := tsdb.CreateTSDB(v3ioConfig, schema, nil); err != nil {
 		v3ioConfigAsJSON, _ := json2.MarshalIndent(v3ioConfig, "", "  ")
 		t.Fatalf("Failed to create a TSDB instance (table). Reason: %v\nConfiguration:\n%s", err, string(v3ioConfigAsJSON))
 	}
@@ -219,7 +218,7 @@ func SetUp(t testing.TB, testParams TestParams) func() {
 	}
 }
 
-func SetUpWithData(t *testing.T, testOpts TestParams) (*V3ioAdapter, func()) {
+func SetUpWithData(t *testing.T, testOpts TestParams) (*tsdb.V3ioAdapter, func()) {
 	teardown := SetUp(t, testOpts)
 	adapter := InsertData(t, testOpts)
 	return adapter, teardown
@@ -228,7 +227,7 @@ func SetUpWithData(t *testing.T, testOpts TestParams) (*V3ioAdapter, func()) {
 func SetUpWithDBConfig(t *testing.T, schema *config.Schema, testParams TestParams) func() {
 	v3ioConfig := testParams.V3ioConfig()
 	v3ioConfig.TablePath = PrefixTablePath(fmt.Sprintf("%s-%d", t.Name(), time.Now().Nanosecond()))
-	if err := CreateTSDB(v3ioConfig, schema, nil); err != nil {
+	if err := tsdb.CreateTSDB(v3ioConfig, schema, nil); err != nil {
 		v3ioConfigAsJSON, _ := json2.MarshalIndent(v3ioConfig, "", "  ")
 		t.Fatalf("Failed to create a TSDB instance (table). Reason: %s\nConfiguration:\n%s", err, string(v3ioConfigAsJSON))
 	}
@@ -248,8 +247,8 @@ func SetUpWithDBConfig(t *testing.T, schema *config.Schema, testParams TestParam
 	}
 }
 
-func InsertData(t *testing.T, testParams TestParams) *V3ioAdapter {
-	adapter, err := NewV3ioAdapter(testParams.V3ioConfig(), nil, nil)
+func InsertData(t *testing.T, testParams TestParams) *tsdb.V3ioAdapter {
+	adapter, err := tsdb.NewV3ioAdapter(testParams.V3ioConfig(), nil, nil)
 	if err != nil {
 		t.Fatalf("Failed to create a V3IO TSDB adapter. Reason: %s", err)
 	}
@@ -285,7 +284,7 @@ func InsertData(t *testing.T, testParams TestParams) *V3ioAdapter {
 	return adapter
 }
 
-func ValidateCountOfSamples(t testing.TB, adapter *V3ioAdapter, metricName string, expected int, startTimeMs, endTimeMs int64, queryAggStep int64) {
+func ValidateCountOfSamples(t testing.TB, adapter *tsdb.V3ioAdapter, metricName string, expected int, startTimeMs, endTimeMs int64, queryAggStep int64) {
 
 	var stepSize int64
 	if queryAggStep <= 0 {
@@ -338,7 +337,7 @@ func ValidateCountOfSamples(t testing.TB, adapter *V3ioAdapter, metricName strin
 	t.Logf("PASS: the metric-samples actual count matches the expected total count [%d(actualCount) == %d(expected)].", actualCount, expected)
 }
 
-func ValidateRawData(t testing.TB, adapter *V3ioAdapter, metricName string, startTimeMs, endTimeMs int64, isValid func(*DataPoint, *DataPoint) bool) {
+func ValidateRawData(t testing.TB, adapter *tsdb.V3ioAdapter, metricName string, startTimeMs, endTimeMs int64, isValid func(*DataPoint, *DataPoint) bool) {
 
 	qry, err := adapter.Querier(context.TODO(), startTimeMs, endTimeMs)
 	if err != nil {

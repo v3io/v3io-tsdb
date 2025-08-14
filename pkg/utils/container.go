@@ -28,10 +28,10 @@ import (
 	"time"
 
 	"github.com/nuclio/logger"
-	"github.com/nuclio/zap"
+	nucliozap "github.com/nuclio/zap"
 	"github.com/pkg/errors"
 	"github.com/v3io/v3io-go/pkg/dataplane"
-	"github.com/v3io/v3io-go/pkg/dataplane/http"
+	v3iohttp "github.com/v3io/v3io-go/pkg/dataplane/http"
 	"github.com/v3io/v3io-tsdb/pkg/config"
 )
 

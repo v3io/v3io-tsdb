@@ -340,7 +340,7 @@ func (queryCtx *selectQueryContext) processQueryResults(query *partQuery) error 
 		if !ok {
 			encoding = chunkenc.EncXOR
 		} else {
-			intEncoding, err := strconv.Atoi(encodingStr)
+			intEncoding, err := strconv.ParseInt(encodingStr, 10, 8)
 			if err != nil {
 				return fmt.Errorf("error parsing encoding type of chunk, got: %v, error: %v", encodingStr, err)
 			}

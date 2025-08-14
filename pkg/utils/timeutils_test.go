@@ -1,4 +1,4 @@
-// +build unit
+//go:build unit
 
 /*
 Copyright 2018 Iguazio Systems Ltd.
