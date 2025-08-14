@@ -21,9 +21,18 @@ on:
       - 'v[0-9]+.[0-9]+.x'
 
 jobs:
+  fail-if-unsafe:
+    runs-on: ubuntu-latest
+    if: ${{ !contains( github.event.pull_request.labels.*.name, 'safe-to-test') }}
+    steps:
+      - name: Fail if not marked as safe to test
+        run: |
+          echo "CI will not run on a PR unless it has the safe-to-test label applied"
+          exit 1
   test:
     name: Lint & test
     runs-on: [ self-hosted, Linux ]
+    if: ${{ contains( github.event.pull_request.labels.*.name, 'safe-to-test') }}
     container:
       image: golang:1.24
 
