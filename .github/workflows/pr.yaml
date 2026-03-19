@@ -38,6 +38,9 @@ jobs:
     if: ${{ contains( github.event.pull_request.labels.*.name, 'safe-to-test') }}
     container:
       image: golang:1.24
+      credentials:
+        username: ${{ secrets.DOCKER_HUB_USERNAME }}
+        password: ${{ secrets.DOCKER_HUB_TOKEN }}
 
     env:
       TSDB_TEST_TABLE_PATH: TSDB_INTEGRATION_TESTS/${{ github.sha }}
