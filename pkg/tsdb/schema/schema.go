@@ -134,9 +134,11 @@ func newSchema(samplesIngestionRate, aggregationGranularity, aggregatesList stri
 }
 
 func calculatePartitionAndChunkInterval(rateInHours, minChunkSize, maxChunkSize, maxSampleSize, maxPartitionSize int) (string, string, error) {
+	// 32000 / 8 = 4000
 	maxNumberOfEventsPerChunk := maxChunkSize / maxSampleSize
 	minNumberOfEventsPerChunk := minChunkSize / maxSampleSize
 
+	// 4000 / 3600
 	chunkInterval := maxNumberOfEventsPerChunk / rateInHours
 	if chunkInterval == 0 {
 		return "", "", fmt.Errorf("the samples ingestion rate (%v/h) is too high", rateInHours)
